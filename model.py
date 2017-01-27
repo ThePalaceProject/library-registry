@@ -136,7 +136,7 @@ class Place(Base):
     __tablename__ = 'places'
 
     # These are the kinds of places we keep track of. These are not
-    # supposed to be precise terms. Each census-designated places is
+    # supposed to be precise terms. Each census-designated place is
     # called a 'city', even if it's not a city in the legal sense.
     # Countries that call their top-level administrative divisions something
     # other than 'states' can still use 'state' as their type.
