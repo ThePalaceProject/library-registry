@@ -1,0 +1,8 @@
+psycopg2
+sqlalchemy
+geoalchemy2
+flask-sqlalchemy-session
+flask
+loggly-python-handler
+uwsgi
+nose
