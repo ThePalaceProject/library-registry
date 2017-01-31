@@ -33,7 +33,6 @@ class GeographyLoader(object):
         type = metadata['type']
         parent_external_id = metadata['parent_id']
         name = metadata['name']
-        full_name = metadata.get('full_name', None)
         aliases = metadata.get('aliases', [])
         abbreviated_name = metadata.get('abbreviated_name', None)
 
