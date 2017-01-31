@@ -8,7 +8,8 @@ from sqlalchemy import (
     String
 )
 from sqlalchemy import (
-    create_engine
+    create_engine,
+    exc as sa_exc
 )
 from sqlalchemy.exc import (
     IntegrityError
@@ -25,6 +26,7 @@ from sqlalchemy.orm.exc import (
     NoResultFound,
     MultipleResultsFound,
 )
+from sqlalchemy.orm.session import Session
 
 from geoalchemy2 import Geography
 
@@ -154,9 +156,14 @@ class Place(Base):
     # derived from.
     external_id = Column(String, index=True)
 
-    # The name given to this place in the data source it was derived from.
+    # The name given to this place by the data source it was
+    # derived from.
     external_name = Column(String, index=True)
 
+    # A canonical abbreviated name for this place. Generally used only
+    # for nations and states.
+    abbreviated_name = Column(String, index=True)
+    
     # The most convenient place that 'contains' this place. For most
     # places the most convenient parent will be a state. For states,
     # the best parent will be a nation. A nation has no parent.
@@ -172,3 +179,17 @@ class Place(Base):
     
     # The geography of the place itself.
     geography = Column(Geography(), nullable=False)
+    
+    def __repr__(self):
+        if self.parent:
+            parent = self.parent.external_name
+        else:
+            parent = None
+        if self.abbreviated_name:
+            abbr = "abbr=%s " % self.abbreviated_name
+        else:
+            abbr = ''
+        output = u"<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
+            self.external_name, self.type, abbr, self.external_id, parent
+        )
+        return output.encode("utf8")
