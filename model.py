@@ -172,3 +172,12 @@ class Place(Base):
     
     # The geography of the place itself.
     geography = Column(Geography(), nullable=False)
+
+    def __repr__(self):
+        if self.parent:
+            parent = self.parent.name
+        else:
+            parent = None
+        return "<Place: %s type=%s external_id=%s parent=%s>" % (
+            self.name, self.type, self.external_id, parent
+        )
