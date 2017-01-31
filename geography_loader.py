@@ -56,8 +56,7 @@ class GeographyLoader(object):
         # Set these values, even the ones that were set in
         # create_method_kwargs, so that we can update any that have
         # changed.
-        place.name = name
-        place.full_name = full_name
+        place.external_name = name
         place.abbreviated_name = abbreviated_name
         place.geography = geography
 
@@ -65,4 +64,4 @@ class GeographyLoader(object):
         # database table that can hold them.
 
         self.places_by_external_id[external_id] = place
-        return place
+        return place, is_new
