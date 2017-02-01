@@ -83,4 +83,79 @@ class TestPlace(DatabaseTest):
             name='New York State', language='eng'
         )
         eq_([alias], new_york.aliases)
+
+    def test_served_by(self):
+        zip = self.zip_10018
+        nyc = self.new_york_city
+        new_york = self.new_york_state
+        connecticut = self.connecticut_state
+
+        # There are two libraries here...
+        nypl = self._library("New York Public Library", service_areas=[nyc])
+        ct_state = self._library(
+            "Connecticut State Library", service_areas=[connecticut]
+        )
+
+        # ...but only one serves the 10018 ZIP code.
+        eq_([nypl], zip.served_by().all())
+
+        eq_([nypl], nyc.served_by().all())
+        eq_([ct_state], connecticut.served_by().all())
+
+        # TODO: Because New York and Connecticut share a border, and
+        # the Connecticut state library serves the entire state,
+        # including the border, it looks like the Connecticut state
+        # library serves New York state (which includes its border).
+        eq_(set([nypl, ct_state]), set(new_york.served_by()))
         
+class TestLibrary(DatabaseTest):
+
+    def test_library_service_area(self):
+        zip = self.zip_10018
+        nypl = self._library("New York Public Library", service_areas=[zip])
+        [service_area] = nypl.service_areas
+        eq_(zip, service_area.place)
+        eq_(nypl, service_area.library)
+
+    def test_nearby(self):
+        # Create two libraries. One serves New York City, and one serves
+        # the entire state of Connecticut.
+        nypl = self._library(
+            "New York Public Library", service_areas=[self.new_york_city]
+        )
+        ct_state = self._library(
+            "Connecticut State Library", service_areas=[self.connecticut_state]
+        )
+
+        # From this point in Brooklyn, NYPL is the closest library.
+        # NYPL's service area includes that point, so the distance is
+        # zero. The service area of CT State (i.e. the Connecticut
+        # border) is only 44 kilometers away, so it also shows up.
+        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, 40.65, -73.94)
+
+        eq_(0, d1)
+        eq_(nypl, lib1)
+
+        eq_(44, int(d2/1000))
+        eq_(ct_state, lib2)
+
+        # From this point in Connecticut, CT State is the closest
+        # library (0 km away), so it shows up first, but NYPL (61 km
+        # away) also shows up as a possibility.
+        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, 41.3, -73.3)
+        eq_(ct_state, lib1)
+        eq_(0, d1)
+        
+        eq_(nypl, lib2)
+        eq_(61, int(d2/1000))
+                
+        # From this point in Pennsylvania, NYPL shows up (142km away) but
+        # CT State does not.
+        [(lib1, d1)] = Library.nearby(self._db, 40, -75.8)
+        eq_(nypl, lib1)
+        eq_(142, int(d1/1000))
+
+        # If we only look within a 100km radius, then there are no
+        # libraries near that point in Pennsylvania.
+        eq_([], Library.nearby(self._db, 40, -75.8, 100).all())
+

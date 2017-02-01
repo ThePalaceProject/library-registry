@@ -197,6 +197,20 @@ class Place(Base):
         Geography objects get treated as Geometry objects.
         """
         return cast(self.geography, Geography)
+
+    def served_by(self):
+        """Find all Libraries with a ServiceArea whose Place intersects
+        this Place.
+        """
+        _db = Session.object_session(self)
+        # TODO: intersects believes that (e.g.) New York intersects
+        # with Connecticut, because it shares a
+        # border. ST_ContainsProperly might do better but it doesn't
+        # work on geography objects.
+        intersects = Place.geography.intersects(self.geography)
+        qu = _db.query(Library).join(Library.service_areas).join(
+            ServiceArea.place).filter(intersects)
+        return qu
     
     def __repr__(self):
         if self.parent:
