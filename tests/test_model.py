@@ -103,11 +103,15 @@ class TestPlace(DatabaseTest):
         eq_([nypl], nyc.served_by().all())
         eq_([ct_state], connecticut.served_by().all())
 
-        # TODO: Because New York and Connecticut share a border, and
-        # the Connecticut state library serves the entire state,
-        # including the border, it looks like the Connecticut state
-        # library serves New York state (which includes its border).
-        eq_(set([nypl, ct_state]), set(new_york.served_by()))
+        # New York and Connecticut share a border, and the Connecticut
+        # state library serves the entire state, including the
+        # border. According to PostGIS 'intersect' logic, Connecticut
+        # intersects New York at the border. This implies that the
+        # Connecticut state library also serves New York state. We
+        # avoid this by, when searching for libraries on the state or
+        # national level, only considering results located in the same
+        # state or nation.
+        eq_([nypl], new_york.served_by().all())
         
 
 class TestLibrary(DatabaseTest):
@@ -160,7 +164,3 @@ class TestLibrary(DatabaseTest):
         # If we only look within a 100km radius, then there are no
         # libraries near that point in Pennsylvania.
         eq_([], Library.nearby(self._db, 40, -75.8, 100).all())
-<<<<<<< HEAD
-
-=======
->>>>>>> master
