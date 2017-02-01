@@ -132,6 +132,12 @@ class TestLibrary(DatabaseTest):
         eq_([brooklyn],
             list(Library.for_name(self._db, "Brooklyn Public Library"))
         )
+
+        # We can tolerate a small number of typos in the official name
+        # of the library.
+        eq_([brooklyn],
+            list(Library.for_name(self._db, "Brooklyn Public Libary"))
+        )
         
         boston, is_new = get_one_or_create(
             self._db, Library, name="Boston Public Library"
@@ -143,9 +149,12 @@ class TestLibrary(DatabaseTest):
                 library=library
             )
         eq_(
-            set([brooklyn, boston]), set(Library.for_name(self._db, "BPL"))
+            set([brooklyn, boston]), set(Library.for_name(self._db, "bpl"))
         )
-            
+
+        # We do not tolerate typos in aliases.
+        eq_([], list(Library.for_name(self._db, "OPL")))
+        
     def test_nearby(self):
         # Create two libraries. One serves New York City, and one serves
         # the entire state of Connecticut.

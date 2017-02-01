@@ -161,8 +161,13 @@ class Library(Base):
     @classmethod
     def for_name(cls, _db, name):
         """Find a library whose name or alias matches the given name."""
+
+        # We allow for minor misspellings in the official name,
+        # but not in aliases (which are likely to be acronyms)
+        name_close_enough = func.levenshtein(func.lower(Library.name),
+                                             func.lower(name)) < 2
         qu = _db.query(Library).outerjoin(Library.aliases).filter(
-            or_(Library.name.ilike(name), LibraryAlias.name.ilike(name))
+            or_(name_close_enough, LibraryAlias.name.ilike(name))
         )
         return qu
     
