@@ -7,6 +7,7 @@ from sqlalchemy import func
 from model import (
     get_one,
     get_one_or_create,
+    Library,
     Place,
     PlaceAlias,
 )
@@ -108,6 +109,7 @@ class TestPlace(DatabaseTest):
         # library serves New York state (which includes its border).
         eq_(set([nypl, ct_state]), set(new_york.served_by()))
         
+
 class TestLibrary(DatabaseTest):
 
     def test_library_service_area(self):
@@ -158,4 +160,7 @@ class TestLibrary(DatabaseTest):
         # If we only look within a 100km radius, then there are no
         # libraries near that point in Pennsylvania.
         eq_([], Library.nearby(self._db, 40, -75.8, 100).all())
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
