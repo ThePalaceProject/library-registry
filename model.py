@@ -12,6 +12,7 @@ from sqlalchemy import (
     create_engine,
     exc as sa_exc,
     func,
+    or_,
     UniqueConstraint,
 )
 from sqlalchemy.exc import (
@@ -266,6 +267,31 @@ class Place(Base):
         Geography objects get treated as Geometry objects.
         """
         return cast(self.geography, Geography)
+
+    def served_by(self):
+        """Find all Libraries with a ServiceArea whose Place intersects
+        this Place.
+        """
+        _db = Session.object_session(self)
+        intersects = Place.geography.intersects(self.geography)
+        qu = _db.query(Library).join(Library.service_areas).join(
+            ServiceArea.place).filter(intersects)
+
+        if self.type in (Place.STATE, Place.NATION):
+            # We are looking for all libraries in the state/nation. Don't
+            # consider Places outside the state/nation.
+            #
+            # We don't do this for cities because it's much more
+            # likely that a library will accept patrons from the next
+            # town over.
+            #
+            # TODO: With ST_ContainsProperly we might be able to
+            # eliminate this extra code, but that function doesn't
+            # work on geometry objects.
+            qu = qu.filter(
+                or_(ServiceArea.place==self, Place.parent==self)
+            )
+        return qu
     
     def __repr__(self):
         if self.parent:

@@ -84,6 +84,34 @@ class TestPlace(DatabaseTest):
             name='New York State', language='eng'
         )
         eq_([alias], new_york.aliases)
+
+    def test_served_by(self):
+        zip = self.zip_10018
+        nyc = self.new_york_city
+        new_york = self.new_york_state
+        connecticut = self.connecticut_state
+
+        # There are two libraries here...
+        nypl = self._library("New York Public Library", service_areas=[nyc])
+        ct_state = self._library(
+            "Connecticut State Library", service_areas=[connecticut]
+        )
+
+        # ...but only one serves the 10018 ZIP code.
+        eq_([nypl], zip.served_by().all())
+
+        eq_([nypl], nyc.served_by().all())
+        eq_([ct_state], connecticut.served_by().all())
+
+        # New York and Connecticut share a border, and the Connecticut
+        # state library serves the entire state, including the
+        # border. According to PostGIS 'intersect' logic, Connecticut
+        # intersects New York at the border. This implies that the
+        # Connecticut state library also serves New York state. We
+        # avoid this by, when searching for libraries on the state or
+        # national level, only considering results located in the same
+        # state or nation.
+        eq_([nypl], new_york.served_by().all())
         
 
 class TestLibrary(DatabaseTest):
