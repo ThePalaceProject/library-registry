@@ -194,6 +194,7 @@ class Library(Base):
                 distance.asc())
         return qu
 
+
 class LibraryAlias(Base):
 
     """An alternate name for a library."""

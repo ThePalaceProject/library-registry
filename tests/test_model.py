@@ -136,7 +136,7 @@ class TestLibrary(DatabaseTest):
         # We can tolerate a small number of typos in the official name
         # of the library.
         eq_([brooklyn],
-            list(Library.for_name(self._db, "Brooklyn Public Libary"))
+            list(Library.for_name(self._db, "brooklyn public libary"))
         )
         
         boston, is_new = get_one_or_create(
