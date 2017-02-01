@@ -5,11 +5,12 @@ from sqlalchemy import (
     Column,
     ForeignKey,
     Integer,
-    String
+    Unicode,
 )
 from sqlalchemy import (
     create_engine,
-    exc as sa_exc
+    exc as sa_exc,
+    UniqueConstraint,
 )
 from sqlalchemy.exc import (
     IntegrityError
@@ -27,6 +28,7 @@ from sqlalchemy.orm.exc import (
     MultipleResultsFound,
 )
 from sqlalchemy.orm.session import Session
+from sqlalchemy.sql.expression import cast
 
 from geoalchemy2 import Geography
 
@@ -150,19 +152,19 @@ class Place(Base):
     id = Column(Integer, primary_key=True)
 
     # The type of place.
-    type = Column(String(255), index=True, nullable=False)
+    type = Column(Unicode(255), index=True, nullable=False)
 
     # The unique ID given to this place in the data source it was
     # derived from.
-    external_id = Column(String, index=True)
+    external_id = Column(Unicode, index=True)
 
     # The name given to this place by the data source it was
     # derived from.
-    external_name = Column(String, index=True)
+    external_name = Column(Unicode, index=True)
 
     # A canonical abbreviated name for this place. Generally used only
     # for nations and states.
-    abbreviated_name = Column(String, index=True)
+    abbreviated_name = Column(Unicode, index=True)
     
     # The most convenient place that 'contains' this place. For most
     # places the most convenient parent will be a state. For states,
@@ -177,8 +179,24 @@ class Place(Base):
         lazy="joined"
     )
     
-    # The geography of the place itself.
-    geography = Column(Geography(), nullable=False)
+    # The geography of the place itself. It is stored internally as a
+    # geometry, which means we have to cast to Geography when doing
+    # calculations.
+    geography = Column(Geography(geometry_type='GEOMETRY'), nullable=False)
+
+    aliases = relationship("PlaceAlias", backref='place')
+
+    @property
+    def geo(self):
+        """Cast the .geography object to Geography for use in a database
+        query. Otherwise it's sometimes treated as a Geometry object,
+        which results in inaccurate measurements.
+
+        TODO: I would prefer to do without this, but I don't
+        understand enough about PostGIS/Geoalchemy to understand why
+        Geography objects get treated as Geometry objects.
+        """
+        return cast(self.geography, Geography)
     
     def __repr__(self):
         if self.parent:
@@ -193,3 +211,18 @@ class Place(Base):
             self.external_name, self.type, abbr, self.external_id, parent
         )
         return output.encode("utf8")
+
+
+class PlaceAlias(Base):
+
+    """An alternate name for a place."""
+    __tablename__ = 'placealiases'
+
+    id = Column(Integer, primary_key=True)
+    place_id = Column(Integer, ForeignKey('places.id'), index=True)
+    name = Column(Unicode, index=True)
+    language = Column(Unicode(3), index=True)
+
+    __table_args__ = (
+        UniqueConstraint('place_id', 'name', 'language'),
+    )
