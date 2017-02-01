@@ -134,6 +134,49 @@ def create(db, model, create_method='',
     
 Base = declarative_base()
 
+class Library(Base):
+    """An entry in this table corresponds more or less to an OPDS server.
+
+    Most libraries are designed to serve everyone in a specific list
+    of Places. (These are the ones we support now).
+
+    TODO: Eventually a Library will be able to specify a list of
+    Audiences as well. This will allow us to search for or filter
+    libraries that don't serve absolutely everyone in their service
+    area.
+    """
+    __tablename__ = 'libraries'
+
+    id = Column(Integer, primary_key=True)
+    
+    # The official name of the library.
+    name = Column(Unicode, index=True)
+
+    service_areas = relationship('ServiceArea', backref='library')
+
+
+class ServiceArea(Base):
+    """Designates a geographic area served by a Library.
+
+    A ServiceArea maps a Library to a Place. People living in this
+    Place have service from the Library.
+    """
+    __tablename__ = 'serviceareas'
+   
+    id = Column(Integer, primary_key=True)
+    library_id = Column(
+        Integer, ForeignKey('libraries.id'), index=True
+    )
+
+    place_id = Column(
+        Integer, ForeignKey('places.id'), index=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint('library_id', 'place_id'),
+    )
+    
+
 class Place(Base):
     __tablename__ = 'places'
 
@@ -186,6 +229,8 @@ class Place(Base):
 
     aliases = relationship("PlaceAlias", backref='place')
 
+    service_areas = relationship("ServiceArea", backref="place")
+    
     @property
     def geo(self):
         """Cast the .geography object to Geography for use in a database

@@ -84,3 +84,13 @@ class TestPlace(DatabaseTest):
         )
         eq_([alias], new_york.aliases)
         
+
+class TestLibrary(DatabaseTest):
+
+    def test_library_service_area(self):
+        zip = self.zip_10018
+        nypl = self._library("New York Public Library", service_areas=[zip])
+        [service_area] = nypl.service_areas
+        eq_(zip, service_area.place)
+        eq_(nypl, service_area.library)
+
