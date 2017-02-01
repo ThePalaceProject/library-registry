@@ -179,11 +179,10 @@ class Place(Base):
         lazy="joined"
     )
     
-    # The geography of the place itself. Storing it internally as a GEOMETRY
-    # means we have to cast to Geography when doing calculations, but
-    # it lets us store points alongside polygons, which is important for
-    # our purposes.
-    geography = Column(Geography(geometry_type='GEOMETRY'), nullable=False)
+    # The geography of the place itself. It is stored internally as a
+    # geometry, which means we have to cast to Geography when doing
+    # calculations.
+    geography = Column(Geography(geometry_type='POINT'), nullable=False)
 
     aliases = relationship("PlaceAlias", backref='place')
 
