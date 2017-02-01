@@ -1,5 +1,6 @@
 from config import Configuration
 import logging
+from nose.tools import set_trace
 import warnings
 from sqlalchemy import (
     Column,
@@ -10,6 +11,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     create_engine,
     exc as sa_exc,
+    func,
     UniqueConstraint,
 )
 from sqlalchemy.exc import (
@@ -154,6 +156,28 @@ class Library(Base):
 
     service_areas = relationship('ServiceArea', backref='library')
 
+    @classmethod
+    def nearby(cls, _db, latitude, longitude, max_radius=150):
+        """Find libraries whose service areas include or are close to the
+        given point.
+
+        :param latitude: The latitude component of the starting point.
+        :param longitude: The longitude component of the starting point.
+        :param max_radius: How far out from the starting point to search
+            for a library's service area, in kilometers.
+
+        :return: A database query that returns lists of 2-tuples
+        (library, distance from starting point). Distances are
+        measured in meters.
+        """
+        target = 'POINT (%s %s)' % (longitude, latitude)
+        
+        nearby = func.ST_DWithin(target, Place.geography, max_radius*1000)
+        distance = func.ST_Distance(target, Place.geography)
+        qu = _db.query(Library).join(Library.service_areas).join(
+            ServiceArea.place).filter(nearby).add_column(distance).order_by(
+                distance.asc())
+        return qu
 
 class ServiceArea(Base):
     """Designates a geographic area served by a Library.
