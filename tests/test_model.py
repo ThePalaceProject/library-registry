@@ -8,6 +8,7 @@ from model import (
     get_one,
     get_one_or_create,
     Place,
+    PlaceAlias,
 )
 
 from . import (
@@ -70,3 +71,16 @@ class TestPlace(DatabaseTest):
             ],
             [(x[0].external_name, int(x[1]/1000)) for x in places]
         )
+
+    def test_aliases(self):
+        new_york, is_new = get_one_or_create(
+            self._db, Place, type=Place.STATE, external_id='04',
+            external_name='New York',
+            create_method_kwargs=dict(geography='POINT(-75 43)')
+        )
+        alias, is_new = get_one_or_create(
+            self._db, PlaceAlias, place=new_york,
+            name='New York State', language='eng'
+        )
+        eq_([alias], new_york.aliases)
+        

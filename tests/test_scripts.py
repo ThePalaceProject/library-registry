@@ -1,4 +1,7 @@
-from nose.tools import set_trace
+from nose.tools import (
+    set_trace,
+    eq_,
+)
 from StringIO import StringIO
 
 from model import (

@@ -7,6 +7,7 @@ from sqlalchemy.sql.expression import cast
 from model import (
     get_one_or_create,
     Place,
+    PlaceAlias,
 )
 
 class GeographyLoader(object):
@@ -59,8 +60,14 @@ class GeographyLoader(object):
         place.abbreviated_name = abbreviated_name
         place.geography = geography
 
-        # TODO: aliases are ignored since there is currently no
-        # database table that can hold them.
-
+        # We only ever add aliases. If the database contains an alias
+        # for this place that doesn't show up in the metadata, it
+        # may have been created manually.
+        for alias in aliases:
+            name = alias['name']
+            language = alias['language']
+            alias, is_new = get_one_or_create(
+                self._db, PlaceAlias, place=place, name=name, language=language
+            )
         self.places_by_external_id[external_id] = place
         return place, is_new
