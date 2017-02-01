@@ -8,6 +8,7 @@ from model import (
     get_one,
     get_one_or_create,
     Library,
+    LibraryAlias,
     Place,
     PlaceAlias,
 )
@@ -123,6 +124,28 @@ class TestLibrary(DatabaseTest):
         eq_(zip, service_area.place)
         eq_(nypl, service_area.library)
 
+    def test_aliases(self):
+        brooklyn, is_new = get_one_or_create(
+            self._db, Library, name="Brooklyn Public Library"
+        )
+
+        eq_([brooklyn],
+            list(Library.for_name(self._db, "Brooklyn Public Library"))
+        )
+        
+        boston, is_new = get_one_or_create(
+            self._db, Library, name="Boston Public Library"
+        )
+
+        for library in (brooklyn, boston):
+            get_one_or_create(
+                self._db, LibraryAlias, name="BPL", language=None,
+                library=library
+            )
+        eq_(
+            set([brooklyn, boston]), set(Library.for_name(self._db, "BPL"))
+        )
+            
     def test_nearby(self):
         # Create two libraries. One serves New York City, and one serves
         # the entire state of Connecticut.
