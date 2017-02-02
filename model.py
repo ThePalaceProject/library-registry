@@ -302,26 +302,17 @@ class Place(Base):
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place intersects
         this Place.
+
+        A Library whose ServiceArea borders this place, but does not
+        intersect this place, is not counted. This way, the state
+        library from the next state over doesn't count as serving your
+        state.
         """
         _db = Session.object_session(self)
         intersects = Place.geometry.intersects(self.geometry)
+        does_not_touch = func.ST_Touches(Place.geometry, self.geometry) == False
         qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place).filter(intersects)
-
-        if self.type in (Place.STATE, Place.NATION):
-            # We are looking for all libraries in the state/nation. Don't
-            # consider Places outside the state/nation.
-            #
-            # We don't do this for cities because it's much more
-            # likely that a library will accept patrons from the next
-            # town over.
-            #
-            # TODO: With ST_ContainsProperly we might be able to
-            # eliminate this extra code, but that function doesn't
-            # work on geometry objects.
-            qu = qu.filter(
-                or_(ServiceArea.place==self, Place.parent==self)
-            )
+            ServiceArea.place).filter(intersects).filter(does_not_touch)
         return qu
     
     def __repr__(self):
