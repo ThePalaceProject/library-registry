@@ -114,16 +114,16 @@ class DatabaseTest(object):
         return library                  
 
     def _place(self, external_id=None, external_name=None, type=None,
-               abbreviated_name=None, parent=None, geography=None):
-        if not geography:
-            geography = 'SSRID=4326;POINT(%s %s)' % (
+               abbreviated_name=None, parent=None, geometry=None):
+        if not geometry:
+            geometry = 'SSRID=4326;POINT(%s %s)' % (
                 self.latitude_counter, self.longitude_counter
             )
             self.latitude_counter += 0.1
             self.longitude_counter += 0.1
-        elif isinstance(geography, basestring):
+        elif isinstance(geometry, basestring):
             # Treat it as GeoJSON.
-            geography = GeometryUtility.from_geojson(geography)
+            geometry = GeometryUtility.from_geojson(geometry)
         external_id = external_id or self._str
         external_name = external_name or self._str
         type = type or Place.CITY
@@ -131,7 +131,7 @@ class DatabaseTest(object):
             self._db, Place, external_id=external_id,
             external_name=external_name, type=type,
             abbreviated_name=abbreviated_name, parent=parent,
-            geography=geography
+            geometry=geometry
         )
         return place
     

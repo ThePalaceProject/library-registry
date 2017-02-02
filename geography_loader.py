@@ -26,10 +26,10 @@ class GeographyLoader(object):
             if not metadata:
                 # End of file.
                 break
-            geography = fh.readline().strip()
-            yield self.load(metadata, geography)
+            geometry = fh.readline().strip()
+            yield self.load(metadata, geometry)
 
-    def load(self, metadata, geography):
+    def load(self, metadata, geometry):
         metadata = json.loads(metadata)
         external_id = metadata['id']
         type = metadata['type']
@@ -45,11 +45,11 @@ class GeographyLoader(object):
 
         # This gives us a Geometry object. Set its SRID so the database
         # knows it's using real-world latitude and longitude.
-        geometry = GeometryUtility.from_geojson(geography)
+        geometry = GeometryUtility.from_geojson(geometry)
         place, is_new = get_one_or_create(
             self._db, Place, external_id=external_id, type=type,
             parent=parent,
-            create_method_kwargs = dict(geography=geometry)
+            create_method_kwargs = dict(geometry=geometry)
         )
 
         # Set these values, even the ones that were set in
@@ -57,7 +57,7 @@ class GeographyLoader(object):
         # changed.
         place.external_name = name
         place.abbreviated_name = abbreviated_name
-        place.geography = geometry
+        place.geometry = geometry
 
         # We only ever add aliases. If the database contains an alias
         # for this place that doesn't show up in the metadata, it

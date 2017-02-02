@@ -78,13 +78,13 @@ class TestGeographyLoader(DatabaseTest):
         # Create a preexisting Place with an alias.
         old_us, is_new = get_one_or_create(
             self._db, Place, parent=None, external_name="United States",
-            external_id="US", type="nation", geography='SRID=4326;POINT(-75 43)'
+            external_id="US", type="nation", geometry='SRID=4326;POINT(-75 43)'
         )
         eq_(None, old_us.abbreviated_name)
         old_alias = get_one_or_create(
             self._db, PlaceAlias, name="USA", language="eng", place=old_us
         )
-        old_us_geography = old_us.geography
+        old_us_geography = old_us.geometry
         
         # Load a small NDJSON "file" containing information about
         # three places.
@@ -115,7 +115,7 @@ class TestGeographyLoader(DatabaseTest):
         eq_("US", us.abbreviated_name)
 
         # And its geography has been updated.
-        assert old_us_geography != us.geography
+        assert old_us_geography != us.geometry
 
         # Its preexisting alias has been preserved, and a new alias added.
         [new_alias, old_alias] = sorted(us.aliases, key=lambda x: x.name)

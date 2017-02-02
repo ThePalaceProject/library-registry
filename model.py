@@ -187,9 +187,9 @@ class Library(Base):
         """
         target = 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
         
-        nearby = func.ST_DWithin(target, cast(Place.geography, Geography),
+        nearby = func.ST_DWithin(target, cast(Place.geometry, Geography),
                                  max_radius*1000)
-        distance = func.ST_Distance_Sphere(target, Place.geography)
+        distance = func.ST_Distance_Sphere(target, Place.geometry)
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place).filter(nearby).add_column(distance).order_by(
                 distance.asc())
@@ -281,7 +281,7 @@ class Place(Base):
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
-    geography = Column(Geometry(srid=4326), nullable=False)
+    geometry = Column(Geometry(srid=4326), nullable=False)
 
     aliases = relationship("PlaceAlias", backref='place')
 
@@ -289,7 +289,7 @@ class Place(Base):
     
     @property
     def geo(self):
-        """Cast the .geography object to Geography for use in a database
+        """Cast the .geometry object to Geography for use in a database
         query. Otherwise it's sometimes treated as a Geometry object,
         which results in inaccurate measurements.
 
@@ -297,14 +297,14 @@ class Place(Base):
         understand enough about PostGIS/Geoalchemy to understand why
         Geography objects get treated as Geometry objects.
         """
-        return cast(self.geography, Geography)
+        return cast(self.geometry, Geography)
 
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place intersects
         this Place.
         """
         _db = Session.object_session(self)
-        intersects = Place.geography.intersects(self.geography)
+        intersects = Place.geometry.intersects(self.geometry)
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place).filter(intersects)
 
