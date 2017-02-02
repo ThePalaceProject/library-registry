@@ -155,8 +155,22 @@ class Library(Base):
     # The official name of the library.
     name = Column(Unicode, index=True)
 
+    aliases = relationship("LibraryAlias", backref='library')
     service_areas = relationship('ServiceArea', backref='library')
 
+    @classmethod
+    def for_name(cls, _db, name):
+        """Find a library whose name or alias matches the given name."""
+
+        # We allow for minor misspellings in the official name,
+        # but not in aliases (which are likely to be acronyms)
+        name_close_enough = func.levenshtein(func.lower(Library.name),
+                                             func.lower(name)) < 2
+        qu = _db.query(Library).outerjoin(Library.aliases).filter(
+            or_(name_close_enough, LibraryAlias.name.ilike(name))
+        )
+        return qu
+    
     @classmethod
     def nearby(cls, _db, latitude, longitude, max_radius=150):
         """Find libraries whose service areas include or are close to the
@@ -180,6 +194,22 @@ class Library(Base):
                 distance.asc())
         return qu
 
+
+class LibraryAlias(Base):
+
+    """An alternate name for a library."""
+    __tablename__ = 'libraryalias'
+
+    id = Column(Integer, primary_key=True)
+    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
+    name = Column(Unicode, index=True)
+    language = Column(Unicode(3), index=True)
+
+    __table_args__ = (
+        UniqueConstraint('library_id', 'name', 'language'),
+    )
+
+    
 class ServiceArea(Base):
     """Designates a geographic area served by a Library.
 
