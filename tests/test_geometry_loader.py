@@ -16,14 +16,14 @@ from . import (
     DatabaseTest,
 )
 
-from geography_loader import GeographyLoader
+from geometry_loader import GeometryLoader
 
 
-class TestGeographyLoader(DatabaseTest):
+class TestGeometryLoader(DatabaseTest):
 
     def setup(self):
-        super(TestGeographyLoader, self).setup()
-        self.loader = GeographyLoader(self._db)
+        super(TestGeometryLoader, self).setup()
+        self.loader = GeometryLoader(self._db)
     
     def test_load(self):       
         # Load a place identified by a GeoJSON Polygon.
@@ -49,13 +49,11 @@ class TestGeographyLoader(DatabaseTest):
         eq_(True, is_new)
         
         # We can measure the distance in kilometers between New York
-        # and Texas. This verifies that the GeoJSON shapes are
-        # imported as real-world geographies, not abstract
-        # geometries.
-        distance_func = func.ST_Distance(new_york.geo, texas_zip.geo)
+        # and Texas.
+        distance_func = func.ST_Distance_Sphere(new_york.geometry, texas_zip.geometry)
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
-        eq_(2511, int(distance/1000))
+        eq_(2510, int(distance/1000))
         
         [alias] = new_york.aliases
         eq_("New York State", alias.name)
@@ -69,22 +67,22 @@ class TestGeographyLoader(DatabaseTest):
         eq_(new_york, new_york_2)
 
         # This changes the distance between the two points.
-        distance_func = func.ST_Distance(new_york_2.geo, texas_zip.geo)
+        distance_func = func.ST_Distance_Sphere(new_york_2.geometry, texas_zip.geometry)
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
-        eq_(2638, int(distance/1000))
+        eq_(2637, int(distance/1000))
         
     def test_load_ndjson(self):
         # Create a preexisting Place with an alias.
         old_us, is_new = get_one_or_create(
             self._db, Place, parent=None, external_name="United States",
-            external_id="US", type="nation", geography='POINT(-75 43)'
+            external_id="US", type="nation", geometry='SRID=4326;POINT(-75 43)'
         )
         eq_(None, old_us.abbreviated_name)
         old_alias = get_one_or_create(
             self._db, PlaceAlias, name="USA", language="eng", place=old_us
         )
-        old_us_geography = old_us.geography
+        old_us_geography = old_us.geometry
         
         # Load a small NDJSON "file" containing information about
         # three places.
@@ -115,7 +113,7 @@ class TestGeographyLoader(DatabaseTest):
         eq_("US", us.abbreviated_name)
 
         # And its geography has been updated.
-        assert old_us_geography != us.geography
+        assert old_us_geography != us.geometry
 
         # Its preexisting alias has been preserved, and a new alias added.
         [new_alias, old_alias] = sorted(us.aliases, key=lambda x: x.name)
@@ -127,7 +125,7 @@ class TestGeographyLoader(DatabaseTest):
         # We can measure the distance in kilometers between the point
         # chosen to represent 'Montgomery' and the point chosen to
         # represent 'Alabama'.
-        distance_func = func.ST_Distance(montgomery.geo, alabama.geo)
+        distance_func = func.ST_Distance_Sphere(montgomery.geometry, alabama.geometry)
         [[distance]] = self._db.query().add_columns(distance_func).all()
         print distance
         eq_(276, int(distance/1000))

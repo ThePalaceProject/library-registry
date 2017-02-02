@@ -27,20 +27,20 @@ class TestPlace(DatabaseTest):
         new_york, is_new = get_one_or_create(
             self._db, Place, type=Place.STATE, external_id='04',
             external_name='New York',
-            create_method_kwargs=dict(geography='POINT(-75 43)')
+            create_method_kwargs=dict(geometry='SRID=4326;POINT(-75 43)')
         )
         eq_(True, is_new)
         
         new_mexico, is_new = get_one_or_create(
             self._db, Place, type=Place.STATE, external_id='21',
             external_name='New Mexico',
-            create_method_kwargs=dict(geography='POINT(-106 34)')
+            create_method_kwargs=dict(geometry='SRID=4326;POINT(-106 34)')
         )
         
         connecticut, is_new = get_one_or_create(
             self._db, Place, type=Place.STATE, external_id='14',
             external_name='Connecticut',
-            create_method_kwargs=dict(geography='POINT(-73.7 41.6)')
+            create_method_kwargs=dict(geometry='SRID=4326;POINT(-73.7 41.6)')
         )
 
         # Create a city within one of the states, again represented by
@@ -50,7 +50,7 @@ class TestPlace(DatabaseTest):
             external_name='Lake Placid',
             parent=new_york,
             create_method_kwargs=dict(
-                geography='POINT(-73.59 44.17)'
+                geometry='SRID=4326;POINT(-73.59 44.17)'
             )
         )        
         eq_(new_york, lake_placid.parent)
@@ -59,7 +59,9 @@ class TestPlace(DatabaseTest):
         
         # Query the database to find states ordered by distance from
         # Lake Placid.
-        distance = func.ST_Distance(lake_placid.geography, Place.geography)
+        distance = func.ST_Distance_Sphere(
+            lake_placid.geometry, Place.geometry
+        )
         places = self._db.query(Place).filter(
             Place.type==Place.STATE).order_by(distance).add_columns(distance)
         
@@ -69,7 +71,7 @@ class TestPlace(DatabaseTest):
             [
                 ("New York", 172),
                 ("Connecticut", 285),
-                ("New Mexico", 2998)
+                ("New Mexico", 2993)
             ],
             [(x[0].external_name, int(x[1]/1000)) for x in places]
         )
@@ -78,7 +80,7 @@ class TestPlace(DatabaseTest):
         new_york, is_new = get_one_or_create(
             self._db, Place, type=Place.STATE, external_id='04',
             external_name='New York',
-            create_method_kwargs=dict(geography='POINT(-75 43)')
+            create_method_kwargs=dict(geometry='SRID=4326;POINT(-75 43)')
         )
         alias, is_new = get_one_or_create(
             self._db, PlaceAlias, place=new_york,

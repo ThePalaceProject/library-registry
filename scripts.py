@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 
-from geography_loader import GeographyLoader
+from geometry_loader import GeometryLoader
 from model import (
     production_session
 )
@@ -82,7 +82,7 @@ class LoadPlacesScript(Script):
         parsed, stdin = self.parse_command_line(
             self._db, cmd_args, stdin
         )
-        loader = GeographyLoader(self._db)
+        loader = GeometryLoader(self._db)
         a = 0
         for place, is_new in loader.load_ndjson(stdin):
             if is_new:

@@ -33,7 +33,7 @@ from sqlalchemy.orm.exc import (
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import cast
 
-from geoalchemy2 import Geography
+from geoalchemy2 import Geography, Geometry
 
 def production_session():
     url = Configuration.database_url()
@@ -185,10 +185,11 @@ class Library(Base):
         (library, distance from starting point). Distances are
         measured in meters.
         """
-        target = 'POINT (%s %s)' % (longitude, latitude)
+        target = 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
         
-        nearby = func.ST_DWithin(target, Place.geography, max_radius*1000)
-        distance = func.ST_Distance(target, Place.geography)
+        nearby = func.ST_DWithin(target, cast(Place.geometry, Geography),
+                                 max_radius*1000)
+        distance = func.ST_Distance_Sphere(target, Place.geometry)
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place).filter(nearby).add_column(distance).order_by(
                 distance.asc())
@@ -280,47 +281,26 @@ class Place(Base):
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
-    geography = Column(Geography(geometry_type='GEOMETRY'), nullable=False)
+    geometry = Column(Geometry(srid=4326), nullable=False)
 
     aliases = relationship("PlaceAlias", backref='place')
 
     service_areas = relationship("ServiceArea", backref="place")
     
-    @property
-    def geo(self):
-        """Cast the .geography object to Geography for use in a database
-        query. Otherwise it's sometimes treated as a Geometry object,
-        which results in inaccurate measurements.
-
-        TODO: I would prefer to do without this, but I don't
-        understand enough about PostGIS/Geoalchemy to understand why
-        Geography objects get treated as Geometry objects.
-        """
-        return cast(self.geography, Geography)
-
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place intersects
         this Place.
+
+        A Library whose ServiceArea borders this place, but does not
+        intersect this place, is not counted. This way, the state
+        library from the next state over doesn't count as serving your
+        state.
         """
         _db = Session.object_session(self)
-        intersects = Place.geography.intersects(self.geography)
+        intersects = Place.geometry.intersects(self.geometry)
+        does_not_touch = func.ST_Touches(Place.geometry, self.geometry) == False
         qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place).filter(intersects)
-
-        if self.type in (Place.STATE, Place.NATION):
-            # We are looking for all libraries in the state/nation. Don't
-            # consider Places outside the state/nation.
-            #
-            # We don't do this for cities because it's much more
-            # likely that a library will accept patrons from the next
-            # town over.
-            #
-            # TODO: With ST_ContainsProperly we might be able to
-            # eliminate this extra code, but that function doesn't
-            # work on geometry objects.
-            qu = qu.filter(
-                or_(ServiceArea.place==self, Place.parent==self)
-            )
+            ServiceArea.place).filter(intersects).filter(does_not_touch)
         return qu
     
     def __repr__(self):
