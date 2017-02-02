@@ -287,18 +287,6 @@ class Place(Base):
 
     service_areas = relationship("ServiceArea", backref="place")
     
-    @property
-    def geo(self):
-        """Cast the .geometry object to Geography for use in a database
-        query. Otherwise it's sometimes treated as a Geometry object,
-        which results in inaccurate measurements.
-
-        TODO: I would prefer to do without this, but I don't
-        understand enough about PostGIS/Geoalchemy to understand why
-        Geography objects get treated as Geometry objects.
-        """
-        return cast(self.geometry, Geography)
-
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place intersects
         this Place.
