@@ -195,6 +195,36 @@ class Library(Base):
                 distance.asc())
         return qu
 
+    number = re.compile("[0-9]")
+    running_whitespace = re.compile("\s+")
+
+    @classmethod
+    def query_cleanup(cls, query):
+        """Clean up a query."""
+        query = query.lower()
+        query = cls.running_whitespace.gsub(" ", query)
+        return query
+    
+    @classmethod
+    def search(cls, _db, latitude, longitude, query):
+        """Try as hard as possible to find a small number of libraries
+        that match the given query.
+
+        Preference will be given to libraries closer to the current
+        latitude/longitude.
+        """
+        if not query:
+            return []
+
+        query = cls.query_cleanup(query)
+        
+        # In theory, absolutely anything could be a library name or alias.
+        potential_library_names = [query]
+        potential_place_names = []
+        
+        if cls.number.search(query):
+            # It's probably a postal code.
+            potential_place_names.append(query)
 
 class LibraryAlias(Base):
 
