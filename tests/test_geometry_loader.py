@@ -16,14 +16,14 @@ from . import (
     DatabaseTest,
 )
 
-from geography_loader import GeographyLoader
+from geometry_loader import GeometryLoader
 
 
-class TestGeographyLoader(DatabaseTest):
+class TestGeometryLoader(DatabaseTest):
 
     def setup(self):
-        super(TestGeographyLoader, self).setup()
-        self.loader = GeographyLoader(self._db)
+        super(TestGeometryLoader, self).setup()
+        self.loader = GeometryLoader(self._db)
     
     def test_load(self):       
         # Load a place identified by a GeoJSON Polygon.
