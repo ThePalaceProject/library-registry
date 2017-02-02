@@ -4,7 +4,7 @@ import os
 from nose.tools import (
     set_trace
 )
-from geoalchemy2 import Geography
+from geoalchemy2 import Geometry
 from sqlalchemy import func
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import cast
@@ -18,6 +18,7 @@ from model import (
     ServiceArea,
     SessionManager,
 )
+from util import GeometryUtility
 
 def package_setup():
     """Make sure the database schema is initialized and initial
@@ -115,14 +116,14 @@ class DatabaseTest(object):
     def _place(self, external_id=None, external_name=None, type=None,
                abbreviated_name=None, parent=None, geography=None):
         if not geography:
-            geography = 'POINT(%s %s)' % (
+            geography = 'SSRID=4326;POINT(%s %s)' % (
                 self.latitude_counter, self.longitude_counter
             )
             self.latitude_counter += 0.1
             self.longitude_counter += 0.1
         elif isinstance(geography, basestring):
             # Treat it as GeoJSON.
-            geography = cast(func.ST_GeomFromGeoJSON(geography), Geography)
+            geography = GeometryUtility.from_geojson(geography)
         external_id = external_id or self._str
         external_name = external_name or self._str
         type = type or Place.CITY

@@ -33,7 +33,7 @@ from sqlalchemy.orm.exc import (
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import cast
 
-from geoalchemy2 import Geography
+from geoalchemy2 import Geography, Geometry
 
 def production_session():
     url = Configuration.database_url()
@@ -185,7 +185,7 @@ class Library(Base):
         (library, distance from starting point). Distances are
         measured in meters.
         """
-        target = 'POINT (%s %s)' % (longitude, latitude)
+        target = 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
         
         nearby = func.ST_DWithin(target, Place.geography, max_radius*1000)
         distance = func.ST_Distance(target, Place.geography)
@@ -280,7 +280,7 @@ class Place(Base):
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
-    geography = Column(Geography(geometry_type='GEOMETRY'), nullable=False)
+    geography = Column(Geometry(srid=4326), nullable=False)
 
     aliases = relationship("PlaceAlias", backref='place')
 

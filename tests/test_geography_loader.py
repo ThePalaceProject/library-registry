@@ -78,7 +78,7 @@ class TestGeographyLoader(DatabaseTest):
         # Create a preexisting Place with an alias.
         old_us, is_new = get_one_or_create(
             self._db, Place, parent=None, external_name="United States",
-            external_id="US", type="nation", geography='POINT(-75 43)'
+            external_id="US", type="nation", geography='SRID=4326;POINT(-75 43)'
         )
         eq_(None, old_us.abbreviated_name)
         old_alias = get_one_or_create(
