@@ -187,8 +187,9 @@ class Library(Base):
         """
         target = 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
         
-        nearby = func.ST_DWithin(target, Place.geography, max_radius*1000)
-        distance = func.ST_Distance(target, Place.geography)
+        nearby = func.ST_DWithin(target, cast(Place.geography, Geography),
+                                 max_radius*1000)
+        distance = func.ST_Distance_Sphere(target, Place.geography)
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place).filter(nearby).add_column(distance).order_by(
                 distance.asc())

@@ -59,7 +59,9 @@ class TestPlace(DatabaseTest):
         
         # Query the database to find states ordered by distance from
         # Lake Placid.
-        distance = func.ST_Distance(lake_placid.geography, Place.geography)
+        distance = func.ST_Distance_Sphere(
+            lake_placid.geography, Place.geography
+        )
         places = self._db.query(Place).filter(
             Place.type==Place.STATE).order_by(distance).add_columns(distance)
         
@@ -69,7 +71,7 @@ class TestPlace(DatabaseTest):
             [
                 ("New York", 172),
                 ("Connecticut", 285),
-                ("New Mexico", 2998)
+                ("New Mexico", 2993)
             ],
             [(x[0].external_name, int(x[1]/1000)) for x in places]
         )
