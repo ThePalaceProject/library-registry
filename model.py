@@ -203,6 +203,9 @@ class Library(Base):
         """Clean up a query."""
         query = query.lower()
         query = cls.running_whitespace.gsub(" ", query)
+
+        # Correct the most common misspelling of 'library'.
+        query = query.replace("libary", "library")
         return query
     
     @classmethod
@@ -218,14 +221,52 @@ class Library(Base):
 
         query = cls.query_cleanup(query)
         
-        # In theory, absolutely anything could be a library name or alias.
-        potential_library_names = [query]
-        potential_place_names = []
+        # In theory, absolutely anything could be a library name or
+        # alias. We'll let Levenshtein distance take care of minor
+        # typos, but we don't process the query very much before
+        # seeing if it matches a library name.
+        library_name = query
+        place_name = None
+        place_type = None
         
-        if cls.number.search(query):
-            # It's probably a postal code.
-            potential_place_names.append(query)
+        # If the query looks like a library name, extract a location
+        # from it. This will find the public library in Irvine even
+        # though there is no "Irvine Public Library".
+        #
+        # NOTE: This will fall down if there is a place with "Library"
+        # in the name, but there are no such places in the US.
+        for indicator in 'public library', 'library':
+            if indicator in query:
+                query = query.replace(indicator, '').strip()
 
+        if query.endswith(' county'):
+            # It's common for someone to search for e.g. 'kern county
+            # library'. If we have a library system named after the
+            # county, it will show up in the library name search. But
+            # we should also look up counties with that name and find
+            # all the libraries that cover some part of one of those
+            # counties.
+            query = query[:-7]
+            place_type = Place.COUNTY
+
+        place_name = query
+
+        libraries_by_name = cls.search_by_name(
+            _db, library_name, latitude, longitude
+        )
+
+        libraries_by_location = cls.search_by_location(
+            _db, place_name, place_type, latitude, longitude,
+            libraries_by_name
+        )
+
+        return libraries_by_name + libraries_by_location
+
+
+    @classmethod
+    def search_by_name(cls, _db, name, latitude, longitude):
+        pass
+    
 class LibraryAlias(Base):
 
     """An alternate name for a library."""
