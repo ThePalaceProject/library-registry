@@ -24,6 +24,7 @@ from sqlalchemy.ext.declarative import (
     declarative_base
 )
 from sqlalchemy.orm import (
+    aliased,
     backref,
     relationship,
     sessionmaker,
@@ -251,7 +252,7 @@ class Library(Base):
             
         # We tack on any additional libraries that match a place query.
         if place_query:
-            libraries_by_location = cls.search_by_location(
+            libraries_by_location = cls.search_by_location_name(
                 _db, place_name, place_type, here,
                 libraries_by_name
             )
@@ -281,9 +282,9 @@ class Library(Base):
         return qu
 
     @classmethod
-    def search_by_location(cls, _db, query, type, here=None,
-                           exclude_libraries=[]):
-        """Find libraries whose service area includes a place with
+    def search_by_location_name(cls, _db, query, type=None, here=None,
+                                exclude_libraries=[]):
+        """Find libraries whose service area overlaps a place with
         the given name.
 
         :param query: Name of the place to search for.
@@ -293,10 +294,18 @@ class Library(Base):
          results (because they were picked up earlier by a
          higher-priority query).
         """
-        qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place
-        )
-        qu = qu.filter(cls.fuzzy_match(Place.name, query))
+        named_place = aliased(Place)
+        qu = _db.query(Library).join(
+            Library.service_areas).join(
+                ServiceArea.place).join(
+                    named_place,
+                    func.ST_Intersects(Place.geometry, named_place.geometry)
+                ).outerjoin(named_place.aliases)
+
+        name_match = cls.fuzzy_match(named_place.external_name, query)
+        alias_match = cls.fuzzy_match(PlaceAlias.name, query)
+        qu = qu.filter(or_(name_match, alias_match))
+        set_trace()
         if type:
             qu = qu.filter(Place.type==type)
         if exclude_libraries:

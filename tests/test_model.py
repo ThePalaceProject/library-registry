@@ -234,12 +234,25 @@ class TestLibrary(DatabaseTest):
     def test_search_by_location(self):
         # We know about the NYPL, which serves Manhattan (an alias for
         # New York City), and we know about the Kansas State Library,
-        # which servers Manhattan, KS.
+        # which serves Manhattan, KS.
         nypl = self.nypl
         kansas_state = self.kansas_state_library
         connecticut_state = self.connecticut_state_library
-        
-        libraries = list(Library.search_by_name(self._db, "manhattan"))
+        manhattan_ks = self.manhattan_ks
 
-        # Our query finds both libraries.
-        pass
+        # The NYPL explicitly covers New York City, which has
+        # 'Manhattan' as an alias.
+        [nyc] = [x.place for x in nypl.service_areas]
+        eq_(["Manhattan"], [x.name for x in nyc.aliases])
+        
+        # The Kansas state library does not explicitly cover
+        # Manhattan, KS.  It covers the whole state, and Manhattan
+        # happens to be inside the state.
+        [kansas] = [x.place for x in kansas_state.service_areas]
+        eq_("Kansas", kansas.external_name)
+        eq_(Place.STATE, kansas.type)
+        
+        # A search for 'manhattan' finds both libraries.
+        libraries = list(Library.search_by_location_name(self._db, "manhattan"))
+        eq_(2, len(libraries))
+
