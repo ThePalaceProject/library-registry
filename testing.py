@@ -116,7 +116,7 @@ class DatabaseTest(object):
     def _place(self, external_id=None, external_name=None, type=None,
                abbreviated_name=None, parent=None, geometry=None):
         if not geometry:
-            geometry = 'SSRID=4326;POINT(%s %s)' % (
+            geometry = 'SRID=4326;POINT(%s %s)' % (
                 self.latitude_counter, self.longitude_counter
             )
             self.latitude_counter += 0.1

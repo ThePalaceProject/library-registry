@@ -185,11 +185,34 @@ class Library(Base):
         (library, distance from starting point). Distances are
         measured in meters.
         """
+
+        # We start with a single point on the globe. Call this Point
+        # A.
         target = 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
-        
-        nearby = func.ST_DWithin(target, cast(Place.geometry, Geography),
-                                 max_radius*1000)
+        target_geography = cast(target, Geography)
+
+        # Find another point on the globe that's 150 kilometers
+        # northeast of Point A. Call this Point B.
+        other_point = func.ST_Project(
+            target_geography, max_radius*1000, func.radians(90.0)
+        )
+        other_point = cast(other_point, Geometry)
+
+        # Determine the distance between Point A and Point B, in
+        # radians. (150 kilometers is a different number of radians in
+        # different parts of the world.)
+        distance_to_other_point = func.ST_Distance(target, other_point)
+
+        # Find all Places that are no further away from A than that
+        # number of radians.
+        nearby = func.ST_DWithin(target,
+                                 Place.geometry,
+                                 distance_to_other_point)
+
+        # For each such place, calculate the distance to Point A in
+        # meters.
         distance = func.ST_Distance_Sphere(target, Place.geometry)
+        
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place).filter(nearby).add_column(distance).order_by(
                 distance.asc())
