@@ -3,6 +3,7 @@ import logging
 from nose.tools import set_trace
 import re
 import warnings
+from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
     Column,
     ForeignKey,
@@ -32,6 +33,7 @@ from sqlalchemy.orm.exc import (
     MultipleResultsFound,
 )
 from sqlalchemy.orm.session import Session
+from sqlalchemy.sql import compiler
 from sqlalchemy.sql.expression import cast
 
 from geoalchemy2 import Geography, Geometry
@@ -104,6 +106,19 @@ def get_one(db, model, on_multiple='error', **kwargs):
     except NoResultFound:
         return None
 
+def dump_query(query):
+    dialect = query.session.bind.dialect
+    statement = query.statement
+    comp = compiler.SQLCompiler(dialect, statement)
+    comp.compile()
+    enc = dialect.encoding
+    params = {}
+    for k,v in comp.params.iteritems():
+        if isinstance(v, unicode):
+            v = v.encode(enc)
+        params[k] = sqlescape(v)
+    return (comp.string.encode(enc) % params).decode(enc)
+    
 def get_one_or_create(db, model, create_method='',
                       create_method_kwargs=None,
                       **kwargs):
@@ -257,6 +272,7 @@ class Library(Base):
         if here:
             qu = qu.join(Library.service_areas).outerjoin(ServiceArea.place)
 
+        set_trace()
         name_matches = cls.fuzzy_match(LibraryAlias.name, name)
         alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
         qu = qu.filter(or_(name_matches, alias_matches))

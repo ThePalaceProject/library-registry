@@ -125,37 +125,6 @@ class TestLibrary(DatabaseTest):
         [service_area] = nypl.service_areas
         eq_(zip, service_area.place)
         eq_(nypl, service_area.library)
-
-    def test_aliases(self):
-        brooklyn, is_new = get_one_or_create(
-            self._db, Library, name="Brooklyn Public Library"
-        )
-
-        eq_([brooklyn],
-            list(Library.search_by_name(self._db, "Brooklyn Public Library"))
-        )
-
-        # We can tolerate a small number of typos in the official name
-        # of the library.
-        eq_([brooklyn],
-            list(Library.search_by_name(self._db, "brooklyn public libary"))
-        )
-        
-        boston, is_new = get_one_or_create(
-            self._db, Library, name="Boston Public Library"
-        )
-
-        for library in (brooklyn, boston):
-            get_one_or_create(
-                self._db, LibraryAlias, name="BPL", language=None,
-                library=library
-            )
-        eq_(
-            set([brooklyn, boston]), set(Library.search_by_name(self._db, "bpl"))
-        )
-
-        # We do not tolerate typos in aliases.
-        eq_([], list(Library.search_by_name(self._db, "OPL")))
         
     def test_nearby(self):
         # Create two libraries. One serves New York City, and one serves
@@ -224,3 +193,47 @@ class TestLibrary(DatabaseTest):
         eq_(("kern county library", "kern", Place.COUNTY),
             m("kern county library"))
         eq_(("lapl", "lapl", None), m("lapl"))
+
+    def test_search_by_name(self):
+        def search(x):
+            return list(Library.search_by_name(self._db, x))
+
+        brooklyn, is_new = get_one_or_create(
+            self._db, Library, name="Brooklyn Public Library"
+        )
+
+        eq_([brooklyn], search("Brooklyn Public Library"))
+
+        # We can tolerate a small number of typos in the official name
+        # of the library.
+        eq_([brooklyn], search(self._db, "broklyn public library"))
+        
+        boston, is_new = get_one_or_create(
+            self._db, Library, name="Boston Public Library"
+        )
+
+        for library in (brooklyn, boston):
+            get_one_or_create(
+                self._db, LibraryAlias, name="BPL", language=None,
+                library=library
+            )
+        eq_(
+            set([brooklyn, boston]), set(search("bpl"))
+        )
+
+        # We do not tolerate typos in short names.
+        eq_([], search("OPL"))
+        
+
+    def test_search_by_location(self):
+        # We know about the NYPL, which serves Manhattan (an alias for
+        # New York City), and we know about the Kansas State Library,
+        # which servers Manhattan, KS.
+        nypl = self.nypl
+        kansas_state = self.kansas_state_library
+        connecticut_state = self.connecticut_state_library
+        
+        libraries = list(Library.search_by_name(self._db, "manhattan"))
+
+        # Our query finds both libraries.
+        pass
