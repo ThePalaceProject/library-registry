@@ -1,6 +1,7 @@
 from config import Configuration
 import logging
 from nose.tools import set_trace
+import re
 import warnings
 from sqlalchemy import (
     Column,
@@ -159,17 +160,11 @@ class Library(Base):
     service_areas = relationship('ServiceArea', backref='library')
 
     @classmethod
-    def for_name(cls, _db, name):
-        """Find a library whose name or alias matches the given name."""
-
-        # We allow for minor misspellings in the official name,
-        # but not in aliases (which are likely to be acronyms)
-        name_close_enough = func.levenshtein(func.lower(Library.name),
-                                             func.lower(name)) < 2
-        qu = _db.query(Library).outerjoin(Library.aliases).filter(
-            or_(name_close_enough, LibraryAlias.name.ilike(name))
-        )
-        return qu
+    def point(cls, latitude, longitude):
+        """Convert latitude/longitude to a string that can be
+        used as a Geometry.
+        """
+        return 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
     
     @classmethod
     def nearby(cls, _db, latitude, longitude, max_radius=150):
@@ -188,7 +183,7 @@ class Library(Base):
 
         # We start with a single point on the globe. Call this Point
         # A.
-        target = 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
+        target = cls.point(latitude, longitude)
         target_geography = cast(target, Geography)
 
         # Find another point on the globe that's 150 kilometers
@@ -218,7 +213,86 @@ class Library(Base):
                 distance.asc())
         return qu
 
-    number = re.compile("[0-9]")
+    @classmethod
+    def search(cls, _db, latitude, longitude, query):
+        """Try as hard as possible to find a small number of libraries
+        that match the given query.
+
+        Preference will be given to libraries closer to the current
+        latitude/longitude.
+        """
+        if not query:
+            # No query, no results.
+            return []
+        here = cls.point(latitude, longitude)
+
+        library_query, place_query, place_type = cls.query_parts(query)
+
+        # We start with libraries that match the name query.
+        if library_query:
+            libraries_for_name = cls.search_by_name(_db, library_query, here)
+        else:
+            libraries_for_name = []
+            
+        # We tack on any additional libraries that match a place query.
+        if place_query:
+            libraries_by_location = cls.search_by_location(
+                _db, place_name, place_type, here,
+                libraries_by_name
+            )
+        else:
+            libraries_for_location = []
+            
+        return libraries_for_name + libraries_for_location
+
+    @classmethod
+    def search_by_name(cls, _db, name, here=None):
+        """Find libraries whose name or alias matches the given name.
+
+        :param name: Name of the library to search for.
+        :param here: Order results by proximity to this location.
+        """
+       
+        qu = _db.query(Library).outerjoin(Library.aliases)
+        if here:
+            qu = qu.join(Library.service_areas).outerjoin(ServiceArea.place)
+
+        name_matches = cls.fuzzy_match(LibraryAlias.name, name)
+        alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
+        qu = qu.filter(or_(name_matches, alias_matches))
+
+        if here:
+            qu = qu.order_by(func.ST_Distance_Sphere(here, Place.geometry))
+        return qu
+
+    @classmethod
+    def search_by_location(cls, _db, query, type, here=None,
+                           exclude_libraries=[]):
+        """Find libraries whose service area includes a place with
+        the given name.
+
+        :param query: Name of the place to search for.
+        :param type: Restrict results to places of this type.
+        :param here: Order results by proximity to this location.
+        :param exclude_libraries: A list of Libraries to exclude from
+         results (because they were picked up earlier by a
+         higher-priority query).
+        """
+        qu = _db.query(Library).join(Library.service_areas).join(
+            ServiceArea.place
+        )
+        qu = qu.filter(cls.fuzzy_match(Place.name, query))
+        if type:
+            qu = qu.filter(Place.type==type)
+        if exclude_libraries:
+            exclude_ids = [x.id for x in exclude_libraries]
+            qu = qu.filter(~Library.id.in_(exclude_ids))
+        if here:
+            qu = qu.order_by(func.ST_Distance_Sphere(here, Place.geometry))
+        return qu
+    
+    us_zip = re.compile("^[0-9]{5}$")
+    us_zip_plus_4 = re.compile("^[0-9]{5}-[0-9]{4}$")
     running_whitespace = re.compile("\s+")
 
     @classmethod
@@ -230,66 +304,77 @@ class Library(Base):
         # Correct the most common misspelling of 'library'.
         query = query.replace("libary", "library")
         return query
+
+    @classmethod
+    def as_postal_code(cls, query):
+        """Try to interpret a query as a postal code."""
+        if cls.us_zip.match(query):
+            return query
+        match = cls.us_zip_plus_4.match(query)
+        if match:
+            return query[:5]
     
     @classmethod
-    def search(cls, _db, latitude, longitude, query):
-        """Try as hard as possible to find a small number of libraries
-        that match the given query.
-
-        Preference will be given to libraries closer to the current
-        latitude/longitude.
+    def query_parts(cls, query):
+        """Turn a query received by a user into a set of things to
+        check against different bits of the database.
         """
-        if not query:
-            return []
-
         query = cls.query_cleanup(query)
-        
+
+        postal_code = cls.as_postal_code(query)
+        if postal_code:
+            # The query is a postal code. Don't even bother searching
+            # for a library name -- just find that code.
+            return None, postal_code, Place.POSTAL_CODE
+
         # In theory, absolutely anything could be a library name or
         # alias. We'll let Levenshtein distance take care of minor
         # typos, but we don't process the query very much before
         # seeing if it matches a library name.
-        library_name = query
-        place_name = None
-        place_type = None
-        
+        library_query = query
+
         # If the query looks like a library name, extract a location
-        # from it. This will find the public library in Irvine even
-        # though there is no "Irvine Public Library".
+        # from it. This will find the public library in Irvine from
+        # "irvine public library", even though there is no library
+        # called the "Irvine Public Library".
         #
         # NOTE: This will fall down if there is a place with "Library"
         # in the name, but there are no such places in the US.
+        place_query = query
+        place_type = None
         for indicator in 'public library', 'library':
-            if indicator in query:
-                query = query.replace(indicator, '').strip()
+            if indicator in place_query:
+                place_query = place_query.replace(indicator, '').strip()
 
-        if query.endswith(' county'):
+        if place_query.endswith(' county'):
             # It's common for someone to search for e.g. 'kern county
             # library'. If we have a library system named after the
             # county, it will show up in the library name search. But
             # we should also look up counties with that name and find
             # all the libraries that cover some part of one of those
             # counties.
-            query = query[:-7]
+            place_query = place_query[:-7]
             place_type = Place.COUNTY
-
-        place_name = query
-
-        libraries_by_name = cls.search_by_name(
-            _db, library_name, latitude, longitude
-        )
-
-        libraries_by_location = cls.search_by_location(
-            _db, place_name, place_type, latitude, longitude,
-            libraries_by_name
-        )
-
-        return libraries_by_name + libraries_by_location
-
-
-    @classmethod
-    def search_by_name(cls, _db, name, latitude, longitude):
-        pass
+        
+        return library_query, place_query, place_type
     
+    @classmethod
+    def fuzzy_match(cls, field, value):
+        """Create a SQL clause that attempts a fuzzy match of the given
+        field against the given value.
+
+        If the field's value is less than six characters, we require
+        an exact (case-insensitive) match. Otherwise, we require a
+        Levenshtein distance of less than two between the field value and
+        the provided value.
+        """
+        is_long = func.length(field) >= 6
+        close_enough = func.levenshtein(func.lower(field), value) < 2
+        long_value_is_match = (is_long & close_enough)
+        short_value_is_match = (~is_long & field.ilike(value))
+        return or_(long_value_is_match, short_value_is_match)
+
+
 class LibraryAlias(Base):
 
     """An alternate name for a library."""
