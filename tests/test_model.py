@@ -204,14 +204,20 @@ class TestLibrary(DatabaseTest):
 
         eq_([brooklyn], search("brooklyn public library"))
 
-        # We can tolerate a small number of typos in the official name
-        # of the library.
+        # We can tolerate a small number of typos in a name or alias
+        # that is longer than 6 characters.
         eq_([brooklyn], search("broklyn public library"))
+
+        get_one_or_create(
+            self._db, LibraryAlias, name="Bklynlib", language=None,
+            library=brooklyn
+        )        
+        eq_([brooklyn], search("zklynlib"))
         
         boston, is_new = get_one_or_create(
             self._db, Library, name="boston public library"
         )
-
+        
         for library in (brooklyn, boston):
             get_one_or_create(
                 self._db, LibraryAlias, name="BPL", language=None,
