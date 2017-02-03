@@ -302,6 +302,18 @@ class TestLibrary(DatabaseTest):
         )
         eq_([], excluded.all())
 
-    def search(self):
+    def test_search(self):
         """Test the overall search method."""
+        
+        # Here's a Kansas library with a confusing name that looks
+        # like "New York".
+        new_work = self._library("New Work", [self.kansas_state])
+
+        # Here's a library whose service area includes a place called
+        # "New York".
+        nypl = self._nypl
+
+        libraries = Library.search("NEW YORK", Library.point(40.7, -73.9))
+        set_trace()
+        pass
         
