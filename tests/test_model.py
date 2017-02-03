@@ -198,3 +198,7 @@ class TestLibrary(DatabaseTest):
         # If we only look within a 100km radius, then there are no
         # libraries near that point in Pennsylvania.
         eq_([], Library.nearby(self._db, 40, -75.8, 100).all())
+
+    def test_query_cleanup(self):
+        m = Library.query_cleanup
+        eq_("new york public library", "new york public libary")
