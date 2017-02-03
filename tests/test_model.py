@@ -319,7 +319,6 @@ class TestLibrary(DatabaseTest):
         nypl = self.nypl
 
         libraries = Library.search(self._db, 40.7, -73.9, "NEW YORK")
-
         # Even though NYPL is closer to the current location, the
         # Kansas library showed up first because it was a name match,
         # as opposed to a service location match.
@@ -331,7 +330,7 @@ class TestLibrary(DatabaseTest):
         libraries = Library.search(self._db, 40.7, -73.9, "NEW YORM")
         eq_(['NYPL'], [x.name for x in libraries])
 
-        # Searching for a state picks up libraries whose service areas
-        # intersect with that state.
+        # Searching for a place name picks up libraries whose service
+        # areas intersect with that place.
         libraries = Library.search(self._db, 40.7, -73.9, "Kansas")
         eq_(['Now Work'], [x.name for x in libraries])
