@@ -387,7 +387,11 @@ class Library(Base):
             # counties.
             place_query = place_query[:-7]
             place_type = Place.COUNTY
-        
+
+        if place_query.endswith(' state'):
+            place_query = place_query[:-6]
+            place_type = Place.STATE
+            
         return library_query, place_query, place_type
     
     @classmethod

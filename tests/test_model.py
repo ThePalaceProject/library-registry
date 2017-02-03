@@ -196,6 +196,8 @@ class TestLibrary(DatabaseTest):
         eq_(("queens library", "queens", None), m("queens library"))
         eq_(("kern county library", "kern", Place.COUNTY),
             m("kern county library"))
+        eq_(("new york state library", "new york", Place.STATE),
+            m("new york state library"))
         eq_(("lapl", "lapl", None), m("lapl"))
 
     def test_search_by_library_name(self):
