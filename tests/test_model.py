@@ -195,29 +195,32 @@ class TestLibrary(DatabaseTest):
         eq_(("lapl", "lapl", None), m("lapl"))
 
     def test_search_by_name(self):
-        def search(x):
-            return list(Library.search_by_name(self._db, x))
+        def search(name, here=None):
+            return list(Library.search_by_name(self._db, name, here))
 
-        brooklyn, is_new = get_one_or_create(
-            self._db, Library, name="Brooklyn Public Library"
+        # The Brooklyn Public Library serves New York City.
+        brooklyn = self._library(
+            "Brooklyn Public Library", [self.new_york_city]
         )
 
+        # We can find the library by its name.
         eq_([brooklyn], search("brooklyn public library"))
 
         # We can tolerate a small number of typos in a name or alias
         # that is longer than 6 characters.
         eq_([brooklyn], search("broklyn public library"))
-
         get_one_or_create(
             self._db, LibraryAlias, name="Bklynlib", language=None,
             library=brooklyn
         )        
         eq_([brooklyn], search("zklynlib"))
-        
-        boston, is_new = get_one_or_create(
-            self._db, Library, name="boston public library"
+
+        # The Boston Public Library serves Boston, MA.
+        boston = self._library(
+            "Boston Public Library", [self.boston_ma]
         )
-        
+
+        # Both libraries are known colloquially as 'BPL'.
         for library in (brooklyn, boston):
             get_one_or_create(
                 self._db, LibraryAlias, name="BPL", language=None,
@@ -227,8 +230,22 @@ class TestLibrary(DatabaseTest):
             set([brooklyn, boston]), set(search("bpl"))
         )
 
-        # We do not tolerate typos in short names.
+        # We do not tolerate typos in short names, because the chance of
+        # ambiguity is so high.
         eq_([], search("opl"))
+
+        # If we're searching for "BPL" from California, Brooklyn shows
+        # up first, because it's closer to California.
+        eq_(["Brooklyn Public Library",
+             "Boston Public Library"],
+            [x.name for x in search("bpl", Library.point(35, -118))])
+
+        # If we're searching for "BPL" from Maine, Boston shows
+        # up first, because it's closer to Maine.
+        eq_(["Boston Public Library",
+             "Brooklyn Public Library"],
+            [x.name for x in search("bpl", Library.point(43, -70))]
+        )
         
 
     def test_search_by_location(self):

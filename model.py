@@ -271,14 +271,15 @@ class Library(Base):
        
         qu = _db.query(Library).outerjoin(Library.aliases)
         if here:
-            qu = qu.join(Library.service_areas).outerjoin(ServiceArea.place)
+            qu = qu.outerjoin(Library.service_areas).outerjoin(ServiceArea.place)
 
         name_matches = cls.fuzzy_match(Library.name, name)
         alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
         qu = qu.filter(or_(name_matches, alias_matches))
 
         if here:
-            qu = qu.order_by(func.ST_Distance_Sphere(here, Place.geometry))
+            distance = func.ST_Distance_Sphere(here, Place.geometry)
+            qu = qu.order_by(distance.asc())
         return qu
 
     @classmethod
