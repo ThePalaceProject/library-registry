@@ -39,6 +39,10 @@ from sqlalchemy.sql.expression import cast
 
 from geoalchemy2 import Geography, Geometry
 
+from util import (
+    GeometryUtility,
+)
+
 def production_session():
     url = Configuration.database_url()
     logging.debug("Database url: %s", url)
@@ -176,13 +180,6 @@ class Library(Base):
     service_areas = relationship('ServiceArea', backref='library')
 
     @classmethod
-    def point(cls, latitude, longitude):
-        """Convert latitude/longitude to a string that can be
-        used as a Geometry.
-        """
-        return 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
-    
-    @classmethod
     def nearby(cls, _db, latitude, longitude, max_radius=150):
         """Find libraries whose service areas include or are close to the
         given point.
@@ -199,7 +196,7 @@ class Library(Base):
 
         # We start with a single point on the globe. Call this Point
         # A.
-        target = cls.point(latitude, longitude)
+        target = GeometryUtility.point(latitude, longitude)
         target_geography = cast(target, Geography)
 
         # Find another point on the globe that's 150 kilometers
@@ -247,7 +244,7 @@ class Library(Base):
         if not query:
             # No query, no results.
             return []
-        here = cls.point(latitude, longitude)
+        here = GeometryUtility.point(latitude, longitude)
 
         library_query, place_query, place_type = cls.query_parts(query)
 

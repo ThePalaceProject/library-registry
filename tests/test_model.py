@@ -12,6 +12,9 @@ from model import (
     Place,
     PlaceAlias,
 )
+from util import (
+    GeometryUtility
+)
 
 from . import (
     DatabaseTest,
@@ -239,13 +242,13 @@ class TestLibrary(DatabaseTest):
         # up first, because it's closer to California.
         eq_(["Brooklyn Public Library",
              "Boston Public Library"],
-            [x.name for x in search("bpl", Library.point(35, -118))])
+            [x.name for x in search("bpl", GeometryUtility.point(35, -118))])
 
         # If we're searching for "BPL" from Maine, Boston shows
         # up first, because it's closer to Maine.
         eq_(["Boston Public Library",
              "Brooklyn Public Library"],
-            [x.name for x in search("bpl", Library.point(43, -70))]
+            [x.name for x in search("bpl", GeometryUtility.point(43, -70))]
         )
         
 
@@ -276,14 +279,14 @@ class TestLibrary(DatabaseTest):
         # If you're searching from California, the Kansas library
         # shows up first.
         ca_results = Library.search_by_location_name(
-            self._db, "manhattan", here=Library.point(35, -118)
+            self._db, "manhattan", here=GeometryUtility.point(35, -118)
         )
         eq_(["Kansas State Library", "NYPL"], [x.name for x in ca_results])
         
         # If you're searching from Maine, the New York library shows
         # up first.
         me_results = Library.search_by_location_name(
-            self._db, "manhattan", here=Library.point(43, -70)
+            self._db, "manhattan", here=GeometryUtility.point(43, -70)
         )
         eq_(["NYPL", "Kansas State Library"], [x.name for x in me_results])
 
