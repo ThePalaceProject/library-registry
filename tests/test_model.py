@@ -101,7 +101,6 @@ class TestPlace(DatabaseTest):
         )
 
         # ...but only one serves the 10018 ZIP code.
-        set_trace()
         eq_([nypl], zip.served_by().all())
 
         eq_([nypl], nyc.served_by().all())
