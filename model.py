@@ -294,6 +294,8 @@ class Library(Base):
          results (because they were picked up earlier by a
          higher-priority query).
         """
+        # For a library to match, the Place named by the query must
+        # intersect a Place served by that library.
         named_place = aliased(Place)
         qu = _db.query(Library).join(
             Library.service_areas).join(
@@ -306,7 +308,7 @@ class Library(Base):
         alias_match = cls.fuzzy_match(PlaceAlias.name, query)
         qu = qu.filter(or_(name_match, alias_match))
         if type:
-            qu = qu.filter(Place.type==type)
+            qu = qu.filter(named_place.type==type)
         if exclude_libraries:
             exclude_ids = [x.id for x in exclude_libraries]
             qu = qu.filter(~Library.id.in_(exclude_ids))

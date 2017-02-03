@@ -268,3 +268,18 @@ class TestLibrary(DatabaseTest):
             self._db, "manhattan", here=Library.point(43, -70)
         )
         eq_(["NYPL", "Kansas State Library"], [x.name for x in me_results])
+
+        # We can explicitly prohibit certain libraries from being considered
+        # if we picked them up in an earlier search.
+        excluded = Library.search_by_location_name(
+            self._db, "manhattan", exclude_libraries=[nypl]
+        )
+        eq_(["Kansas State Library"], [x.name for x in excluded])
+
+        # We can insist that only certain types of places be considered as
+        # matching the name. There is no state called 'Manhattan', so
+        # this query finds nothing.
+        excluded = Library.search_by_location_name(
+            self._db, "manhattan", type=Place.STATE
+        )
+        eq_([], excluded.all())
