@@ -12,3 +12,10 @@ class GeometryUtility(object):
         geometry = func.ST_GeomFromGeoJSON(geojson)
         geometry = func.ST_SetSRID(geometry, 4326)
         return geometry
+
+    @classmethod
+    def point(cls, latitude, longitude):
+        """Convert latitude/longitude to a string that can be
+        used as a Geometry.
+        """
+        return 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
