@@ -202,14 +202,14 @@ class TestLibrary(DatabaseTest):
             self._db, Library, name="Brooklyn Public Library"
         )
 
-        eq_([brooklyn], search("Brooklyn Public Library"))
+        eq_([brooklyn], search("brooklyn public library"))
 
         # We can tolerate a small number of typos in the official name
         # of the library.
-        eq_([brooklyn], search(self._db, "broklyn public library"))
+        eq_([brooklyn], search("broklyn public library"))
         
         boston, is_new = get_one_or_create(
-            self._db, Library, name="Boston Public Library"
+            self._db, Library, name="boston public library"
         )
 
         for library in (brooklyn, boston):
@@ -222,7 +222,7 @@ class TestLibrary(DatabaseTest):
         )
 
         # We do not tolerate typos in short names.
-        eq_([], search("OPL"))
+        eq_([], search("opl"))
         
 
     def test_search_by_location(self):

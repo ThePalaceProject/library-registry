@@ -139,16 +139,16 @@ class DatabaseTest(object):
     # Some useful Libraries.
     @property
     def nypl(self):
-        return self.library("NYPL", [self.new_york_city])
+        return self._library("NYPL", [self.new_york_city])
 
     @property
     def connecticut_state_library(self):
-        return self.library("Connecticut State Library",
+        return self._library("Connecticut State Library",
                             [self.connecticut_state])
 
     @property
     def kansas_state_library(self):
-        return self.library("Kansas State Library", [self.kansas_state])
+        return self._library("Kansas State Library", [self.kansas_state])
     
     # Some useful Places.
     

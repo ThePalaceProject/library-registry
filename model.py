@@ -272,8 +272,7 @@ class Library(Base):
         if here:
             qu = qu.join(Library.service_areas).outerjoin(ServiceArea.place)
 
-        set_trace()
-        name_matches = cls.fuzzy_match(LibraryAlias.name, name)
+        name_matches = cls.fuzzy_match(Library.name, name)
         alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
         qu = qu.filter(or_(name_matches, alias_matches))
 
@@ -386,9 +385,9 @@ class Library(Base):
         """
         is_long = func.length(field) >= 6
         close_enough = func.levenshtein(func.lower(field), value) < 2
-        long_value_is_match = (is_long & close_enough)
-        short_value_is_match = (~is_long & field.ilike(value))
-        return or_(long_value_is_match, short_value_is_match)
+        long_value_is_approximate_match = (is_long & close_enough)
+        exact_match = field.ilike(value)
+        return or_(long_value_is_approximate_match, exact_match)
 
 
 class LibraryAlias(Base):
