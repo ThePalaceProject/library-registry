@@ -259,11 +259,16 @@ class Library(Base):
         if place_query:
             libraries_for_location = cls.search_by_location_name(
                 _db, place_query, place_type, here,
-                libraries_for_name
             ).limit(max_libraries).all()
         else:
             libraries_for_location = []
-            
+
+        if libraries_for_name and libraries_for_location:
+            # Filter out any libraries that show up in both lists.
+            for_name = set(libraries_for_name)
+            libraries_for_location = [
+                x for x in libraries_for_location if not x in for_name
+            ]
         return libraries_for_name + libraries_for_location
 
     @classmethod
@@ -288,8 +293,7 @@ class Library(Base):
         return qu
 
     @classmethod
-    def search_by_location_name(cls, _db, query, type=None, here=None,
-                                exclude_libraries=[]):
+    def search_by_location_name(cls, _db, query, type=None, here=None):
         """Find libraries whose service area overlaps a place with
         the given name.
 
@@ -315,9 +319,6 @@ class Library(Base):
         qu = qu.filter(or_(name_match, alias_match))
         if type:
             qu = qu.filter(named_place.type==type)
-        if exclude_libraries:
-            exclude_ids = [x.id for x in exclude_libraries]
-            qu = qu.filter(~Library.id.in_(exclude_ids))
         if here:
             distance = func.ST_Distance_Sphere(here, named_place.geometry)
             qu = qu.order_by(distance.asc())

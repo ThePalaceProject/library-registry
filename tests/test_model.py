@@ -292,13 +292,6 @@ class TestLibrary(DatabaseTest):
         )
         eq_(["NYPL", "Kansas State Library"], [x.name for x in me_results])
 
-        # We can explicitly prohibit certain libraries from being considered
-        # if we picked them up in an earlier search.
-        excluded = Library.search_by_location_name(
-            self._db, "manhattan", exclude_libraries=[nypl]
-        )
-        eq_(["Kansas State Library"], [x.name for x in excluded])
-
         # We can insist that only certain types of places be considered as
         # matching the name. There is no state called 'Manhattan', so
         # this query finds nothing.
@@ -334,3 +327,19 @@ class TestLibrary(DatabaseTest):
         # areas intersect with that place.
         libraries = Library.search(self._db, 40.7, -73.9, "Kansas")
         eq_(['Now Work'], [x.name for x in libraries])
+
+    def test_search_excludes_duplicates(self):
+        # Here's a library that serves a place called Kansas
+        # whose name is also "Kansas"
+        library = self._library("Kansas", [self.kansas_state])
+
+        # It matches both the name search and the location search.
+        eq_([library],
+            Library.search_by_location_name(self._db, "kansas").all())
+        eq_([library],
+            Library.search_by_library_name(self._db, "kansas").all())
+        
+        # But when we do the general search, the library only shows up once.
+        eq_([library], Library.search(self._db, 0, 0, "Kansas"))
+
+        
