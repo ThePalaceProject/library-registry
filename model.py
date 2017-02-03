@@ -299,7 +299,7 @@ class Library(Base):
     def query_cleanup(cls, query):
         """Clean up a query."""
         query = query.lower()
-        query = cls.running_whitespace.gsub(" ", query)
+        query = cls.running_whitespace.sub(" ", query).strip()
 
         # Correct the most common misspelling of 'library'.
         query = query.replace("libary", "library")

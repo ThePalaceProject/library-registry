@@ -201,4 +201,26 @@ class TestLibrary(DatabaseTest):
 
     def test_query_cleanup(self):
         m = Library.query_cleanup
-        eq_("new york public library", "new york public libary")
+
+        eq_("the library", m("THE LIBRARY"))
+        eq_("the library", m("\tthe   library\n\n"))
+        eq_("the library", m("the libary"))
+
+    def test_as_postal_code(self):
+        m = Library.as_postal_code
+        eq_("93203", m("93203"))
+        eq_("93203", m("93203-1234"))
+        eq_(None, m("the library"))
+
+        # A UK post code is not currently recognized.
+        eq_(None, m("AB1 0AA"))
+
+    def test_query_parts(self):
+        m = Library.query_parts
+        eq_((None, "93203", Place.POSTAL_CODE), m("93203"))
+        eq_(("new york public library", "new york", None),
+            m("new york public library"))        
+        eq_(("queens library", "queens", None), m("queens library"))
+        eq_(("kern county library", "kern", Place.COUNTY),
+            m("kern county library"))
+        eq_(("lapl", "lapl", None), m("lapl"))
