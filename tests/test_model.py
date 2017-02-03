@@ -177,6 +177,7 @@ class TestLibrary(DatabaseTest):
 
     def test_as_postal_code(self):
         m = Library.as_postal_code
+        # US ZIP codes are recognized as postal codes.
         eq_("93203", m("93203"))
         eq_("93203", m("93203-1234"))
         eq_(None, m("the library"))
@@ -194,9 +195,9 @@ class TestLibrary(DatabaseTest):
             m("kern county library"))
         eq_(("lapl", "lapl", None), m("lapl"))
 
-    def test_search_by_name(self):
+    def test_search_by_library_name(self):
         def search(name, here=None):
-            return list(Library.search_by_name(self._db, name, here))
+            return list(Library.search_by_library_name(self._db, name, here))
 
         # The Brooklyn Public Library serves New York City.
         brooklyn = self._library(
@@ -257,7 +258,7 @@ class TestLibrary(DatabaseTest):
         # The NYPL explicitly covers New York City, which has
         # 'Manhattan' as an alias.
         [nyc] = [x.place for x in nypl.service_areas]
-        eq_(["Manhattan"], [x.name for x in nyc.aliases])
+        assert "Manhattan" in [x.name for x in nyc.aliases]
         
         # The Kansas state library covers the entire state,
         # which happens to contain a city called Manhattan.
@@ -300,3 +301,7 @@ class TestLibrary(DatabaseTest):
             self._db, "manhattan", type=Place.STATE
         )
         eq_([], excluded.all())
+
+    def search(self):
+        """Test the overall search method."""
+        

@@ -30,7 +30,7 @@ class TestLoadPlacesScript(DatabaseTest):
 
         # ...and import three places into the database.
         places = self._db.query(Place).all()
-        eq_(["United States", "Alabama", "Montgomery"],
-            [x.external_name for x in places])
-        eq_(["US", "01", "0151000"], [x.external_id for x in places])
+        eq_(set(["United States", "Alabama", "Montgomery"]),
+            set([x.external_name for x in places]))
+        eq_(set(["US", "01", "0151000"]), set([x.external_id for x in places]))
 

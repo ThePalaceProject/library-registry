@@ -246,7 +246,7 @@ class Library(Base):
 
         # We start with libraries that match the name query.
         if library_query:
-            libraries_for_name = cls.search_by_name(_db, library_query, here)
+            libraries_for_name = cls.search_by_library_name(_db, library_query, here)
         else:
             libraries_for_name = []
             
@@ -262,7 +262,7 @@ class Library(Base):
         return libraries_for_name + libraries_for_location
 
     @classmethod
-    def search_by_name(cls, _db, name, here=None):
+    def search_by_library_name(cls, _db, name, here=None):
         """Find libraries whose name or alias matches the given name.
 
         :param name: Name of the library to search for.

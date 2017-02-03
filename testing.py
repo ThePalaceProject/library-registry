@@ -170,6 +170,9 @@ class DatabaseTest(object):
         alias = get_one_or_create(
             self._db, PlaceAlias, place=place, name='Manhattan'
         )
+        alias = get_one_or_create(
+            self._db, PlaceAlias, place=place, name='New York'
+        )
         return place
 
     @property
