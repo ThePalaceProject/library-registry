@@ -232,27 +232,39 @@ class TestLibrary(DatabaseTest):
         
 
     def test_search_by_location(self):
-        # We know about the NYPL, which serves Manhattan (an alias for
-        # New York City), and we know about the Kansas State Library,
-        # which serves Manhattan, KS.
+        # We know about three libraries.
         nypl = self.nypl
         kansas_state = self.kansas_state_library
         connecticut_state = self.connecticut_state_library
-        manhattan_ks = self.manhattan_ks
 
         # The NYPL explicitly covers New York City, which has
         # 'Manhattan' as an alias.
         [nyc] = [x.place for x in nypl.service_areas]
         eq_(["Manhattan"], [x.name for x in nyc.aliases])
         
-        # The Kansas state library does not explicitly cover
-        # Manhattan, KS.  It covers the whole state, and Manhattan
-        # happens to be inside the state.
+        # The Kansas state library covers the entire state,
+        # which happens to contain a city called Manhattan.
         [kansas] = [x.place for x in kansas_state.service_areas]
         eq_("Kansas", kansas.external_name)
         eq_(Place.STATE, kansas.type)
+        manhattan_ks = self.manhattan_ks
         
         # A search for 'manhattan' finds both libraries.
         libraries = list(Library.search_by_location_name(self._db, "manhattan"))
-        eq_(2, len(libraries))
+        eq_(set(["NYPL", "Kansas State Library"]),
+            set([x.name for x in libraries])
+        )
 
+        # If you're searching from California, the Kansas library
+        # shows up first.
+        ca_results = Library.search_by_location_name(
+            self._db, "manhattan", here=Library.point(35, -118)
+        )
+        eq_(["Kansas State Library", "NYPL"], [x.name for x in ca_results])
+        
+        # If you're searching from Maine, the New York library shows
+        # up first.
+        me_results = Library.search_by_location_name(
+            self._db, "manhattan", here=Library.point(43, -70)
+        )
+        eq_(["NYPL", "Kansas State Library"], [x.name for x in me_results])

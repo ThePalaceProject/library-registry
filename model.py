@@ -305,14 +305,14 @@ class Library(Base):
         name_match = cls.fuzzy_match(named_place.external_name, query)
         alias_match = cls.fuzzy_match(PlaceAlias.name, query)
         qu = qu.filter(or_(name_match, alias_match))
-        set_trace()
         if type:
             qu = qu.filter(Place.type==type)
         if exclude_libraries:
             exclude_ids = [x.id for x in exclude_libraries]
             qu = qu.filter(~Library.id.in_(exclude_ids))
         if here:
-            qu = qu.order_by(func.ST_Distance_Sphere(here, Place.geometry))
+            distance = func.ST_Distance_Sphere(here, named_place.geometry)
+            qu = qu.order_by(distance.asc())
         return qu
     
     us_zip = re.compile("^[0-9]{5}$")
