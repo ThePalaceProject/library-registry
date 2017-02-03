@@ -237,6 +237,13 @@ class Library(Base):
         Preference will be given to libraries closer to the current
         latitude/longitude.
         """
+        # We don't anticipate a lot of libraries or a lot of
+        # localities with the same name, but we need to have _some_
+        # kind of limit just to place an upper bound on how bad things
+        # can get. This will guarantee we never return more than 20
+        # results.
+        max_libraries = 10
+        
         if not query:
             # No query, no results.
             return []
@@ -246,16 +253,17 @@ class Library(Base):
 
         # We start with libraries that match the name query.
         if library_query:
-            libraries_for_name = cls.search_by_library_name(_db, library_query, here)
+            libraries_for_name = cls.search_by_library_name(
+                _db, library_query, here).limit(max_libraries).all()
         else:
             libraries_for_name = []
             
         # We tack on any additional libraries that match a place query.
         if place_query:
-            libraries_by_location = cls.search_by_location_name(
-                _db, place_name, place_type, here,
-                libraries_by_name
-            )
+            libraries_for_location = cls.search_by_location_name(
+                _db, place_query, place_type, here,
+                libraries_for_name
+            ).limit(max_libraries).all()
         else:
             libraries_for_location = []
             
@@ -396,7 +404,7 @@ class Library(Base):
         the provided value.
         """
         is_long = func.length(field) >= 6
-        close_enough = func.levenshtein(func.lower(field), value) < 2
+        close_enough = func.levenshtein(func.lower(field), value) <= 2
         long_value_is_approximate_match = (is_long & close_enough)
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)

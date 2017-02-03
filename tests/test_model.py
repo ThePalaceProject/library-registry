@@ -305,15 +305,28 @@ class TestLibrary(DatabaseTest):
     def test_search(self):
         """Test the overall search method."""
         
-        # Here's a Kansas library with a confusing name that looks
-        # like "New York".
-        new_work = self._library("New Work", [self.kansas_state])
+        # Here's a Kansas library with a confusing name whose
+        # Levenshtein distance from "New York" is 2.
+        new_work = self._library("Now Work", [self.kansas_state])
 
         # Here's a library whose service area includes a place called
         # "New York".
-        nypl = self._nypl
+        nypl = self.nypl
 
-        libraries = Library.search("NEW YORK", Library.point(40.7, -73.9))
-        set_trace()
-        pass
-        
+        libraries = Library.search(self._db, 40.7, -73.9, "NEW YORK")
+
+        # Even though NYPL is closer to the current location, the
+        # Kansas library showed up first because it was a name match,
+        # as opposed to a service location match.
+        eq_(['Now Work', 'NYPL'], [x.name for x in libraries])
+
+        # This search query has a Levenshtein distance of 1 from "New
+        # York", but a distance of 3 from "Now Work", so only NYPL
+        # shows up.
+        libraries = Library.search(self._db, 40.7, -73.9, "NEW YORM")
+        eq_(['NYPL'], [x.name for x in libraries])
+
+        # Searching for a state picks up libraries whose service areas
+        # intersect with that state.
+        libraries = Library.search(self._db, 40.7, -73.9, "Kansas")
+        eq_(['Now Work'], [x.name for x in libraries])
