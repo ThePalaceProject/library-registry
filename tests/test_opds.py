@@ -28,16 +28,18 @@ class TestOPDS(DatabaseTest):
             TestAnnotator()
         )
         feed = unicode(feed)
-        # The annotator modified the feed.
+        parsed = feedparser.parse(feed)
+
+        # The feed is labeled appropriately.
+        eq_("A Feed!", parsed['feed']['title'])
+        eq_("http://url/", parsed['feed']['link'])
+        
+        # The annotator modified the feed in passing.
         assert (
             '<randomtag>Random text inserted by annotator.</randomtag>'
             in feed
         )
-
-        parsed = feedparser.parse(feed)
-        eq_("A Feed!", parsed['feed']['title'])
-        eq_("http://url/", parsed['feed']['link'])
-
+        
         # Each library became an entry in the feed.
         eq_([l1.name, l2.name], [x['title'] for x in parsed['entries']])
         
