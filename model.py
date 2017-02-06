@@ -438,6 +438,14 @@ class Library(Base):
         long_value_is_approximate_match = (is_long & close_enough)
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)
+
+    @property
+    def urn_uri(self):
+        "Return the URN as a urn: URI."
+        if self.urn.startswith('urn:'):
+            return self.urn
+        else:
+            return 'urn:' + self.urn
     
     @property
     def logo_data_uri(self):

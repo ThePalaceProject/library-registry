@@ -57,7 +57,7 @@ class TestOPDS(DatabaseTest):
         feed = feedparser.parse(entry)
         [entry] = feed['entries']
         eq_(library.name, entry['title'])
-        eq_(library.urn, entry['id'])
+        eq_(library.urn_uri, entry['id'])
         [content] = entry['content']
         eq_(library.description, content['value'])
         eq_("text/plain", content['type'])

@@ -154,7 +154,7 @@ class NavigationFeed(OPDSFeed):
     @classmethod
     def library_entry(cls, library):
         entry = AtomFeed.entry(
-            AtomFeed.id(library.urn),
+            AtomFeed.id(library.urn_uri),
             AtomFeed.title(library.name),
             AtomFeed.updated(cls._strftime(library.timestamp))
         )

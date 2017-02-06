@@ -136,6 +136,13 @@ class TestLibrary(DatabaseTest):
         self._db.commit()
         assert nypl.timestamp > first_modified
 
+    def test_urn_uri(self):
+        nypl = self._library("New York Public Library")
+        nypl.urn = 'foo'
+        eq_("urn:foo", nypl.urn_uri)
+        nypl.urn = 'urn:bar'
+        eq_('urn:bar', nypl.urn_uri)
+        
     def test_logo_data_uri(self):
         """The library's logo can be converted into a data: URI."""
         nypl = self._library("New York Public Library")
