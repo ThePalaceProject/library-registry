@@ -11,6 +11,7 @@ from model import (
 from scripts import (
     AddLibraryScript,
     LoadPlacesScript,
+    SearchLibraryScript,
     SearchPlacesScript,
 )
 from . import (
@@ -86,4 +87,26 @@ class TestAddLibraryScript(DatabaseTest):
         eq_("eng", alias.language)
 
         eq_([nyc], [x.place for x in library.service_areas])
+
+
+class TestSearchPlacesScript(DatabaseTest):
+
+    def test_run(self):
+        nys = self.new_york_state
+        nypl = self.nypl
+        csl = self.connecticut_state_library
+        zip = self.zip_10018
+        ct = self.connecticut_state
+        nyc = self.new_york_city
+        nypl.opds_url = "http://opds/"
+        
+        # Run the script...
+        output = StringIO()
+        script = SearchLibraryScript(self._db)
+        script.run(cmd_args=["10018"], stdout=output)
+
+        # We found the library whose service area overlaps 10018
+        # (NYPL), but not the other library.
+        actual_output = output.getvalue()
+        eq_("%s: %s\n" % (nypl.name, nypl.opds_url), actual_output)
 

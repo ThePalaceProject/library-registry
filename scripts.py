@@ -1,3 +1,4 @@
+from nose.tools import set_trace
 import argparse
 import logging
 import os
@@ -113,11 +114,27 @@ class SearchPlacesScript(Script):
 
     def run(self, cmd_args=None, stdout=sys.stdout):
         parsed = self.parse_command_line(self._db, cmd_args)
-        print parsed.name
         for place in self._db.query(Place).filter(
                 Place.external_name.in_(parsed.name)
         ):
             stdout.write(place)
+            stdout.write("\n")
+
+
+class SearchLibraryScript(Script):
+    """Command-line interface to the library search."""
+    @classmethod
+    def arg_parser(cls):
+        parser = super(SearchLibraryScript, cls).arg_parser()
+        parser.add_argument(
+            'query', nargs=1, help='Search query.'
+        )
+        return parser
+
+    def run(self, cmd_args=None, stdout=sys.stdout):
+        parsed = self.parse_command_line(self._db, cmd_args)
+        for library in Library.search(self._db, None, None, parsed.query[0]):
+            stdout.write("%s: %s" % (library.name, library.opds_url))
             stdout.write("\n")
 
 
