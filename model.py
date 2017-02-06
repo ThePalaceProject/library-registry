@@ -180,6 +180,10 @@ class Library(Base):
     # The official name of the library.
     name = Column(Unicode, index=True)
 
+    # A URN that uniquely identifies the library. This is the URN
+    # served by the library's Authentication for OPDS document.
+    urn = Column(Unicode, index=True)
+    
     # Human-readable explanation of who the library serves.
     description = Column(Unicode)
 
@@ -187,7 +191,7 @@ class Library(Base):
     opds_url = Column(Unicode)
 
     # The URL to the library's web page.
-    html_url = Column(Unicode)
+    web_url = Column(Unicode)
     
     # When the library's record was last updated.
     timestamp = Column(DateTime, index=True,
@@ -196,6 +200,9 @@ class Library(Base):
 
     # The library's logo.
     logo = Column(Binary)
+
+    # TODO: We need fields for the short library name and shared
+    # secret for Adobe purposes.
     
     aliases = relationship("LibraryAlias", backref='library')
     service_areas = relationship('ServiceArea', backref='library')
@@ -431,7 +438,7 @@ class Library(Base):
         long_value_is_approximate_match = (is_long & close_enough)
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)
-
+    
     @property
     def logo_data_uri(self):
         """Return the logo as a data: URI."""
