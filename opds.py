@@ -9,31 +9,15 @@ class AtomFeed(object):
     TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ%z'
 
     ATOM_NS = 'http://www.w3.org/2005/Atom'
-    APP_NS = 'http://www.w3.org/2007/app'
-    #xhtml_ns = 'http://www.w3.org/1999/xhtml'
-    DCTERMS_NS = 'http://purl.org/dc/terms/'
     OPDS_NS = 'http://opds-spec.org/2010/catalog'
-    SCHEMA_NS = 'http://schema.org/'
-    DRM_NS = 'http://librarysimplified.org/terms/drm'
-    
-    SIMPLIFIED_NS = "http://librarysimplified.org/terms/"
-    BIBFRAME_NS = "http://bibframe.org/vocab/"
 
     nsmap = {
         None: ATOM_NS,
-        'app': APP_NS,
-        'dcterms' : DCTERMS_NS,
         'opds' : OPDS_NS,
-        'drm' : DRM_NS,
-        'schema' : SCHEMA_NS,
-        'simplified' : SIMPLIFIED_NS,
-        'bibframe' : BIBFRAME_NS,
     }
 
     default_typemap = {datetime: lambda e, v: _strftime(v)}
     E = builder.ElementMaker(typemap=default_typemap, nsmap=nsmap)
-    SIMPLIFIED = builder.ElementMaker(typemap=default_typemap, nsmap=nsmap, namespace=SIMPLIFIED_NS)
-    SCHEMA = builder.ElementMaker(typemap=default_typemap, nsmap=nsmap, namespace=SCHEMA_NS)
 
     @classmethod
     def _strftime(self, date):
@@ -54,7 +38,6 @@ class AtomFeed(object):
 
     @classmethod
     def add_link_to_entry(cls, entry, children=None, **kwargs):
-        #links.append(E.link(rel=rel, href=url, type=image_type))
         link = cls.E.link(**kwargs)
         entry.append(link)
         if children:
@@ -136,6 +119,7 @@ class AtomFeed(object):
 
         string_tree = etree.tostring(self.feed, pretty_print=True)
         return string_tree.encode("utf8")
+
 
 class OPDSFeed(AtomFeed):
 
