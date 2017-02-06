@@ -36,8 +36,7 @@ class TestOPDS(DatabaseTest):
 
         parsed = feedparser.parse(feed)
         # Each library became an entry in the feed.
-        eq_(["The New York Public Library", "Brooklyn Public Library"],
-            [x['title'] for x in parsed['entries']])
+        eq_([l1.name, l2.name], [x['title'] for x in parsed['entries']])
         
     def test_library_entry(self):
 
