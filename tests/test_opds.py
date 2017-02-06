@@ -35,6 +35,9 @@ class TestOPDS(DatabaseTest):
         )
 
         parsed = feedparser.parse(feed)
+        eq_("A Feed!", parsed['feed']['title'])
+        eq_("http://url/", parsed['feed']['link'])
+
         # Each library became an entry in the feed.
         eq_([l1.name, l2.name], [x['title'] for x in parsed['entries']])
         
