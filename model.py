@@ -207,6 +207,8 @@ class Library(Base):
     aliases = relationship("LibraryAlias", backref='library')
     service_areas = relationship('ServiceArea', backref='library')
 
+    __table_args__ = (UniqueConstraint('urn'),)
+
     @classmethod
     def nearby(cls, _db, latitude, longitude, max_radius=150):
         """Find libraries whose service areas include or are close to the
