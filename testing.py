@@ -109,6 +109,7 @@ class DatabaseTest(object):
     def _library(self, name=None, service_areas=[]):
         name = name or self._str
         library, ignore = get_one_or_create(self._db, Library, name=name)
+        library.urn = self._str
         for place in service_areas:
             get_one_or_create(self._db, ServiceArea, library=library,
                               place=place)

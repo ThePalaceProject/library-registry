@@ -1,11 +1,15 @@
+import base64
 from config import Configuration
+import datetime
 import logging
 from nose.tools import set_trace
 import re
 import warnings
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
+    Binary,
     Column,
+    DateTime,
     ForeignKey,
     Integer,
     Unicode,
@@ -176,6 +180,30 @@ class Library(Base):
     # The official name of the library.
     name = Column(Unicode, index=True)
 
+    # A URN that uniquely identifies the library. This is the URN
+    # served by the library's Authentication for OPDS document.
+    urn = Column(Unicode, index=True)
+    
+    # Human-readable explanation of who the library serves.
+    description = Column(Unicode)
+
+    # The URL to the library's OPDS server.
+    opds_url = Column(Unicode)
+
+    # The URL to the library's web page.
+    web_url = Column(Unicode)
+    
+    # When the library's record was last updated.
+    timestamp = Column(DateTime, index=True,
+                       default=lambda: datetime.datetime.utcnow(),
+                       onupdate=lambda: datetime.datetime.utcnow())
+
+    # The library's logo.
+    logo = Column(Binary)
+
+    # TODO: We need fields for the short library name and shared
+    # secret for Adobe purposes.
+    
     aliases = relationship("LibraryAlias", backref='library')
     service_areas = relationship('ServiceArea', backref='library')
 
@@ -410,6 +438,21 @@ class Library(Base):
         long_value_is_approximate_match = (is_long & close_enough)
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)
+
+    @property
+    def urn_uri(self):
+        "Return the URN as a urn: URI."
+        if self.urn.startswith('urn:'):
+            return self.urn
+        else:
+            return 'urn:' + self.urn
+    
+    @property
+    def logo_data_uri(self):
+        """Return the logo as a data: URI."""
+        if not self.logo:
+            return None
+        return "data:image/png;base64,%s" % base64.b64encode(self.logo)
 
 
 class LibraryAlias(Base):

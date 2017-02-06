@@ -3,6 +3,8 @@ from nose.tools import (
     set_trace,
 )
 from sqlalchemy import func
+import base64
+import datetime
 
 from model import (
     get_one,
@@ -122,6 +124,32 @@ class TestPlace(DatabaseTest):
 
 class TestLibrary(DatabaseTest):
 
+    def test_timestamp(self):
+        """Timestamp gets automatically set on database commit."""
+        nypl = self._library("New York Public Library")
+        first_modified = nypl.timestamp
+        now = datetime.datetime.utcnow()
+        self._db.commit()
+        assert (now-first_modified).seconds < 2
+
+        nypl.opds_url = "http://library/"
+        self._db.commit()
+        assert nypl.timestamp > first_modified
+
+    def test_urn_uri(self):
+        nypl = self._library("New York Public Library")
+        nypl.urn = 'foo'
+        eq_("urn:foo", nypl.urn_uri)
+        nypl.urn = 'urn:bar'
+        eq_('urn:bar', nypl.urn_uri)
+        
+    def test_logo_data_uri(self):
+        """The library's logo can be converted into a data: URI."""
+        nypl = self._library("New York Public Library")
+        nypl.logo = "Fake logo"
+        expect = 'data:image/png;base64,' + base64.b64encode(nypl.logo)
+        eq_(expect, nypl.logo_data_uri)
+        
     def test_library_service_area(self):
         zip = self.zip_10018
         nypl = self._library("New York Public Library", service_areas=[zip])
