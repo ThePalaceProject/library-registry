@@ -2,7 +2,7 @@ feedparser
 flask
 flask-sqlalchemy-session
 geoalchemy2
-jwt
+pyjwt
 loggly-python-handler
 lxml
 nose
