@@ -1,3 +1,4 @@
+from nose.tools import set_trace
 import argparse
 import logging
 import os
@@ -5,7 +6,13 @@ import sys
 
 from geometry_loader import GeometryLoader
 from model import (
-    production_session
+    get_one,
+    get_one_or_create,
+    production_session,
+    Place,
+    Library,
+    LibraryAlias,
+    ServiceArea,
 )
 from config import Configuration
 
@@ -93,4 +100,94 @@ class LoadPlacesScript(Script):
             a += 1
             if not a % 1000:
                 self._db.commit()
+        self._db.commit()
+
+
+class SearchPlacesScript(Script):
+    @classmethod
+    def arg_parser(cls):
+        parser = super(SearchPlacesScript, cls).arg_parser()
+        parser.add_argument(
+            'name', nargs='*', help='Place name to search for'
+        )
+        return parser
+
+    def run(self, cmd_args=None, stdout=sys.stdout):
+        parsed = self.parse_command_line(self._db, cmd_args)
+        for place in self._db.query(Place).filter(
+                Place.external_name.in_(parsed.name)
+        ):
+            stdout.write(place)
+            stdout.write("\n")
+
+
+class SearchLibraryScript(Script):
+    """Command-line interface to the library search."""
+    @classmethod
+    def arg_parser(cls):
+        parser = super(SearchLibraryScript, cls).arg_parser()
+        parser.add_argument(
+            'query', nargs=1, help='Search query.'
+        )
+        return parser
+
+    def run(self, cmd_args=None, stdout=sys.stdout):
+        parsed = self.parse_command_line(self._db, cmd_args)
+        for library in Library.search(self._db, None, None, parsed.query[0]):
+            stdout.write("%s: %s" % (library.name, library.opds_url))
+            stdout.write("\n")
+
+
+class AddLibraryScript(Script):
+
+    @classmethod
+    def arg_parser(cls):
+        parser = super(AddLibraryScript, cls).arg_parser()
+        parser.add_argument(
+            '--name', help='Official name of the library', required=True
+        )
+        parser.add_argument(
+            '--urn',
+            help="URN used in the library's Authentication for OPDS document.",
+            required=True
+        )
+        parser.add_argument(
+            '--opds', help="URL of the library's OPDS server.",
+            required=True
+        )
+        parser.add_argument('--alias', nargs='+', help='Alias for the library')
+        parser.add_argument(
+            '--description',
+            help="Human-readable description of the library."
+        )
+        parser.add_argument(
+            '--web', help="URL of the library's web server."
+        )
+        parser.add_argument('--place', nargs='+',
+                            help="External ID of the library's service area.")
+        return parser
+
+    def run(self, cmd_args=None):
+        parsed = self.parse_command_line(self._db, cmd_args)
+        name = parsed.name
+        urn = parsed.urn
+        opds = parsed.opds
+        web = parsed.web
+        description = parsed.description
+        aliases = parsed.alias
+        places = parsed.place
+
+        library, is_new = get_one_or_create(self._db, Library, urn=urn)
+        library.name = name
+        library.opds_url = opds
+        library.web_url = web
+        library.description = description
+        for alias in aliases:
+            get_one_or_create(self._db, LibraryAlias, library=library,
+                              name=alias, language='eng')
+        for place_external_id in places:
+            place = get_one(self._db, Place, external_id=place_external_id)
+            get_one_or_create(
+                self._db, ServiceArea, library=library, place=place
+            )
         self._db.commit()
