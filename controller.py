@@ -1,9 +1,14 @@
 import logging
+from flask.ext.babel import lazy_gettext as _
+from flask import Response
+
 from model import production_session
 from config import (
     Configuration,
     CannotLoadConfiguration,
 )
+from opds import NavigationFeed
+
 from util import GeometryUtility
 from util.app_server import HeartbeatController
 
@@ -32,15 +37,61 @@ class LibraryRegistry(object):
         self.library_registry = LibraryRegistryController(self)
         self.heartbeat = HeartbeatController()
 
+    def url_for(self, view, *args, **kwargs):
+        kwargs['_external'] = True
+        return url_for(view, *args, **kwargs)
+
 
 class LibraryRegistryController(object):
 
+    OPENSEARCH_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
+ <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+   <ShortName>%(name)s</ShortName>
+   <Description>%(description)s</Description>
+   <Tags>%(tags)s</Tags>
+   <Url type="application/atom+xml;profile=opds-catalog" template="%(url_template)s"/>
+ </OpenSearchDescription>"""
+    
     def __init__(self, app):
         self.app = app
         self._db = self.app._db
 
+    def point_from_ip(self, ip_address):
+        if not ip_address:
+            return None
+        return GeometryUtility.point_from_ip(ip_address)
+        
     def nearby(self, ip_address):
-        point = GeometryUtility.point_from_ip(ip_address)
+        point = self.point_from_ip(ip_address)
+        qu = Library.nearby(self._db, point)
+        qu = qu.limit(5)
+        this_url = self.app.url_for('nearby')
+        return NavigationFeed(
+            self._db, _("Find your library"), this_url, qu
+        )
+        
+    def search(self, ip_address=None):
+        point = self.point_from_ip(ip_address)
+        query = flask.request.args.get('q')
+        headers = {}
+        if query:
+            # Run the query and send the results.
+            results = Library.search(self._db, point, query)
+            this_url = self.app.url_for('search')
+            feed = NavigationFeed(
+                self._db, _("Search results"), this_url, results
+            )
+            headers["Content-Type"] = NavigationFeed.NAVIGATION_FEED_TYPE
+            body = unicode(feed)
+        else:
+            # Send the search form.
+            body = self.OPENSEARCH_TEMPLATE % dict(
+                name=_("Find your library"),
+                description=_("Search by ZIP code, city or library name."),
+                tags="",
+                url_template = self.app.url_for('search', q="{searchTerms}")
+            )
+            headers['Content-Type'] = "application/opensearchdescription+xml"
+        return Response(body, 200, headers)
 
-    def search(self):
-        pass
+       
