@@ -208,7 +208,7 @@ class Library(Base):
     # To issue Adobe IDs for this library, the registry must share a
     # short name and a secret with them.
 
-    adobe_short_name = Column(Unicode, nullable=False, index=True)
+    adobe_short_name = Column(Unicode, index=True)
     adobe_shared_secret = Column(Unicode)
 
     aliases = relationship("LibraryAlias", backref='library')
