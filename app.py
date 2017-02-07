@@ -1,9 +1,12 @@
 """Library registry web application."""
+import os
 from flask import Flask, url_for, redirect, Response
+from flask.ext.babel import Babel
 
 from config import Configuration
 from controller import LibraryRegistry
 from util.problem_detail import ProblemDetail
+from util.app_server import returns_problem_detail
 
 app = Flask(__name__)
 debug = Configuration.logging_policy().get("level") == 'DEBUG'
@@ -18,15 +21,6 @@ if os.environ.get('AUTOINITIALIZE') == 'False':
 else:
     if getattr(app, 'library_registry', None) is None:
         app.library_registry = LibraryRegistry()
-
-def returns_problem_detail(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        v = f(*args, **kwargs)
-        if isinstance(v, ProblemDetail):
-            return v.response
-        return v
-    return decorated
 
 @app.teardown_request
 def shutdown_session(exception):

@@ -27,4 +27,3 @@ class GeometryUtility(object):
         used as a Geometry.
         """
         return 'SRID=4326;POINT (%s %s)' % (longitude, latitude)
-

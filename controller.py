@@ -1,8 +1,15 @@
 import logging
+import flask
 from flask.ext.babel import lazy_gettext as _
-from flask import Response
+from flask import (
+    Response,
+    url_for,
+)
 
-from model import production_session
+from model import (
+    production_session,
+    Library,
+)
 from config import (
     Configuration,
     CannotLoadConfiguration,
@@ -10,7 +17,11 @@ from config import (
 from opds import NavigationFeed
 
 from util import GeometryUtility
-from util.app_server import HeartbeatController
+from util.app_server import (
+    HeartbeatController,
+    feed_response,
+)
+
 
 class LibraryRegistry(object):
 
@@ -66,32 +77,33 @@ class LibraryRegistryController(object):
         qu = Library.nearby(self._db, point)
         qu = qu.limit(5)
         this_url = self.app.url_for('nearby')
-        return NavigationFeed(
-            self._db, _("Find your library"), this_url, qu
+        feed = NavigationFeed(
+            self._db, unicode(_("Find your library")), this_url, qu
         )
+        return feed_response(feed)
         
     def search(self, ip_address=None):
         point = self.point_from_ip(ip_address)
         query = flask.request.args.get('q')
-        headers = {}
         if query:
             # Run the query and send the results.
             results = Library.search(self._db, point, query)
             this_url = self.app.url_for('search')
             feed = NavigationFeed(
-                self._db, _("Search results"), this_url, results
+                self._db, unicode(_("Search results")), this_url, results
             )
-            headers["Content-Type"] = NavigationFeed.NAVIGATION_FEED_TYPE
-            body = unicode(feed)
+            return feed_response(feed)
         else:
             # Send the search form.
             body = self.OPENSEARCH_TEMPLATE % dict(
                 name=_("Find your library"),
                 description=_("Search by ZIP code, city or library name."),
                 tags="",
-                url_template = self.app.url_for('search', q="{searchTerms}")
+                url_template = self.app.url_for('search') + "?q={searchTerms}"
             )
+            headers = {}
             headers['Content-Type'] = "application/opensearchdescription+xml"
-        return Response(body, 200, headers)
-
-       
+            headers['Cache-Control'] = "public, no-transform, max-age: %d" % (
+                3600 * 24 * 30
+            )
+            return Response(body, 200, headers)

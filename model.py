@@ -326,6 +326,7 @@ class Library(Base):
 
         if here:
             distance = func.ST_Distance_Sphere(here, Place.geometry)
+            qu = qu.add_column(distance)
             qu = qu.order_by(distance.asc())
         return qu
 
@@ -344,7 +345,7 @@ class Library(Base):
         # For a library to match, the Place named by the query must
         # intersect a Place served by that library.
         named_place = aliased(Place)
-        qu = _db.query(Library).join(
+        qu = _db.query(Library).distinct().join(
             Library.service_areas).join(
                 ServiceArea.place).join(
                     named_place,
@@ -358,6 +359,7 @@ class Library(Base):
             qu = qu.filter(named_place.type==type)
         if here:
             distance = func.ST_Distance_Sphere(here, named_place.geometry)
+            qu = qu.add_column(distance)
             qu = qu.order_by(distance.asc())
         return qu
     
