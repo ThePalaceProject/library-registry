@@ -17,8 +17,11 @@ class Configuration(object):
     LOGGING_FORMAT = "format"
     LOG_FORMAT_TEXT = "text"
     LOG_FORMAT_JSON = "json"
-    
+
+   
     INTEGRATIONS = 'integrations'
+    LIBRARY_REGISTRY_INTEGRATION = 'Library Registry'
+    URL = 'url'
     DATABASE_INTEGRATION = "Postgres"
     DATABASE_PRODUCTION_URL = "production_url"
     DATABASE_TEST_URL = "test_url"
@@ -74,6 +77,17 @@ class Configuration(object):
                 "Required integration '%s' was not defined! I see: %r" % (
                     name, ", ".join(sorted(integrations.keys()))
                 )
+            )
+        return v
+
+    @classmethod
+    def integration_url(cls, name, required=False):
+        """Find the URL to an integration."""
+        integration = cls.integration(name, required=required)
+        v = integration.get(cls.URL, None)
+        if not v and required:
+            raise ValueError(
+                "Integration '%s' did not define a required 'url'!" % name
             )
         return v
 

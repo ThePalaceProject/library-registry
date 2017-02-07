@@ -52,6 +52,11 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(OPDSFeed.NAVIGATION_FEED_TYPE, response.headers['Content-Type'])
             feed = feedparser.parse(response.data)
 
+            # The feed can be cached for a while, since the list of libraries
+            # doesn't change very quickly.
+            eq_("public, no-transform, max-age: 43200, s-maxage: 21600",
+                response.headers['Cache-Control'])
+
             # We found both libraries within a 150-kilometer radius of the
             # starting point.
             nypl, ct = feed['entries']
@@ -60,6 +65,22 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Connecticut State Library", ct['title'])
             eq_("35 km.", ct['schema_distance'])
 
+            # If that's not good enough, there's a link to the search
+            # controller, so you can do a search.
+            [search_link, self_link] = sorted(
+                feed['feed']['links'], key=lambda x: x['rel']
+            )
+            url_for = self.app.library_registry.url_for
+
+            eq_(url_for("nearby"), self_link['href'])
+            eq_("self", self_link['rel'])
+            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, self_link['type'])
+
+            eq_(url_for("search"), search_link['href'])
+            eq_("search", search_link['rel'])
+            eq_("application/opensearchdescription+xml", search_link['type'])
+            
+            
     def test_nearby_no_ip_address(self):
         with self.app.test_request_context("/"):
             response = self.controller.nearby(None)
@@ -74,7 +95,7 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_nearby_no_libraries(self):
         with self.app.test_request_context("/"):
-            response = self.controller.nearby("8.8.8.8")
+            response = self.controller.nearby("8.8.8.8") # California
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
             eq_(OPDSFeed.NAVIGATION_FEED_TYPE, response.headers['Content-Type'])
@@ -114,3 +135,18 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_("Kansas State Library", ks['title'])
             eq_("1922 km.", ks['schema_distance'])
+
+            [search_link, self_link] = sorted(
+                feed['feed']['links'], key=lambda x: x['rel']
+            )
+            url_for = self.app.library_registry.url_for
+
+            # The search results have a self link and a link back to
+            # the search form.
+            eq_(url_for("search", q="manhattan"), self_link['href'])
+            eq_("self", self_link['rel'])
+            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, self_link['type'])
+
+            eq_(url_for("search"), search_link['href'])
+            eq_("search", search_link['rel'])
+            eq_("application/opensearchdescription+xml", search_link['type'])

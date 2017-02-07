@@ -1,6 +1,8 @@
 """Library registry web application."""
 import os
-from flask import Flask, url_for, redirect, Response
+import urlparse
+
+from flask import Flask, url_for, redirect, Response, request
 from flask.ext.babel import Babel
 
 from config import Configuration
@@ -40,14 +42,33 @@ def shutdown_session(exception):
 @app.route('/')
 @returns_problem_detail
 def nearby():
-    return app.library_registry.nearby()
+    return app.library_registry.registry_controller.nearby(
+        request.remote_addr
+    )
 
 @app.route('/search')
 @returns_problem_detail
 def search():
-    return app.library_registry.search()
+    return app.library_registry.registry_controller.search(
+        request.remote_addr
+    )
 
 @app.route('/heartbeat')
 @returns_problem_detail
 def hearbeat():
     return app.heartbeat.heartbeat()
+
+if __name__ == '__main__':
+    debug = True
+    url = Configuration.integration_url(
+        Configuration.LIBRARY_REGISTRY_INTEGRATION, required=True)
+    scheme, netloc, path, parameters, query, fragment = urlparse.urlparse(url)
+    if ':' in netloc:
+        host, port = netloc.split(':')
+        port = int(port)
+    else:
+        host = netloc
+        port = 80
+
+    app.library_registry.log.info("Starting app on %s:%s", host, port)
+    app.run(debug=debug, host=host, port=port)

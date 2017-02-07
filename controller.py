@@ -1,3 +1,4 @@
+from nose.tools import set_trace
 import logging
 import flask
 from flask.ext.babel import lazy_gettext as _
@@ -14,7 +15,10 @@ from config import (
     Configuration,
     CannotLoadConfiguration,
 )
-from opds import NavigationFeed
+from opds import (
+    NavigationFeed,
+    Annotator,
+)
 
 from util import GeometryUtility
 from util.app_server import (
@@ -22,6 +26,7 @@ from util.app_server import (
     feed_response,
 )
 
+OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 
 class LibraryRegistry(object):
 
@@ -45,7 +50,7 @@ class LibraryRegistry(object):
 
     def setup_controllers(self):
         """Set up all the controllers that will be used by the web app."""
-        self.library_registry = LibraryRegistryController(self)
+        self.registry_controller = LibraryRegistryController(self)
         self.heartbeat = HeartbeatController()
 
     def url_for(self, view, *args, **kwargs):
@@ -53,6 +58,19 @@ class LibraryRegistry(object):
         return url_for(view, *args, **kwargs)
 
 
+class LibraryRegistryAnnotator(Annotator):
+
+    def __init__(self, app):
+        self.app = app
+    
+    def annotate_feed(self, feed):
+        """Add a search link to every feed."""
+        search_url = self.app.url_for("search")
+        feed.add_link_to_feed(
+            feed.feed, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
+        )
+
+    
 class LibraryRegistryController(object):
 
     OPENSEARCH_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
@@ -66,7 +84,8 @@ class LibraryRegistryController(object):
     def __init__(self, app):
         self.app = app
         self._db = self.app._db
-
+        self.annotator = LibraryRegistryAnnotator(app)
+        
     def point_from_ip(self, ip_address):
         if not ip_address:
             return None
@@ -78,7 +97,8 @@ class LibraryRegistryController(object):
         qu = qu.limit(5)
         this_url = self.app.url_for('nearby')
         feed = NavigationFeed(
-            self._db, unicode(_("Find your library")), this_url, qu
+            self._db, unicode(_("Find your library")), this_url, qu,
+            annotator=self.annotator
         )
         return feed_response(feed)
         
@@ -88,9 +108,11 @@ class LibraryRegistryController(object):
         if query:
             # Run the query and send the results.
             results = Library.search(self._db, point, query)
-            this_url = self.app.url_for('search')
+            this_url = self.app.url_for('search', q=query)
             feed = NavigationFeed(
-                self._db, unicode(_("Search results")), this_url, results
+                self._db, unicode(_('Search results for "%s"') % query),
+                this_url, results,
+                annotator=self.annotator
             )
             return feed_response(feed)
         else:
@@ -102,7 +124,7 @@ class LibraryRegistryController(object):
                 url_template = self.app.url_for('search') + "?q={searchTerms}"
             )
             headers = {}
-            headers['Content-Type'] = "application/opensearchdescription+xml"
+            headers['Content-Type'] = OPENSEARCH_MEDIA_TYPE
             headers['Cache-Control'] = "public, no-transform, max-age: %d" % (
                 3600 * 24 * 30
             )

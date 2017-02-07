@@ -107,7 +107,8 @@ class AtomFeed(object):
             self.E.id(url),
             self.E.title(title),
             self.E.updated(self._strftime(datetime.datetime.utcnow())),
-            self.E.link(href=url, rel="self"),
+            self.E.link(href=url, rel="self",
+                        type=OPDSFeed.NAVIGATION_FEED_TYPE),
         )
 
 
@@ -151,7 +152,7 @@ class NavigationFeed(OPDSFeed):
                 library = (library,)
             self.feed.append(self.library_entry(*library))
         annotator.annotate_feed(self)
-            
+        
     @classmethod
     def library_entry(cls, library, distance=None):
         entry = AtomFeed.entry(
