@@ -71,6 +71,18 @@ class TestLibraryRegistryController(ControllerTest):
             # We found no nearby libraries, because we had no IP address to
             # start with.
             eq_([], feed['entries'])
+
+    def test_nearby_no_libraries(self):
+        with self.app.test_request_context("/"):
+            response = self.controller.nearby("8.8.8.8")
+            assert isinstance(response, Response)
+            eq_("200 OK", response.status)
+            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, response.headers['Content-Type'])
+            feed = feedparser.parse(response.data)
+
+            # We found no nearby libraries, because we were too far away
+            # from them.
+            eq_([], feed['entries'])
             
     def test_search_form(self):
         with self.app.test_request_context("/"):
