@@ -210,12 +210,12 @@ class Library(Base):
     __table_args__ = (UniqueConstraint('urn'),)
 
     @classmethod
-    def nearby(cls, _db, latitude, longitude, max_radius=150):
+    def nearby(cls, _db, target, max_radius=150):
         """Find libraries whose service areas include or are close to the
         given point.
 
-        :param latitude: The latitude component of the starting point.
-        :param longitude: The longitude component of the starting point.
+        :param target: The starting point. May be a Geometry object or
+         a 2-tuple (latitude, longitude).
         :param max_radius: How far out from the starting point to search
             for a library's service area, in kilometers.
 
@@ -226,7 +226,8 @@ class Library(Base):
 
         # We start with a single point on the globe. Call this Point
         # A.
-        target = GeometryUtility.point(latitude, longitude)
+        if isinstance(target, tuple):
+            target = GeometryUtility.point(*target)
         target_geography = cast(target, Geography)
 
         # Find another point on the globe that's 150 kilometers
@@ -257,12 +258,13 @@ class Library(Base):
         return qu
 
     @classmethod
-    def search(cls, _db, latitude, longitude, query):
+    def search(cls, _db, target, query):
         """Try as hard as possible to find a small number of libraries
         that match the given query.
 
-        Preference will be given to libraries closer to the current
-        latitude/longitude.
+        :param target: Order libraries by their distance from this
+         point. May be a Geometry object or a 2-tuple (latitude,
+         longitude).
         """
         # We don't anticipate a lot of libraries or a lot of
         # localities with the same name, but we need to have _some_
@@ -274,8 +276,11 @@ class Library(Base):
         if not query:
             # No query, no results.
             return []
-        if latitude and longitude:
-            here = GeometryUtility.point(latitude, longitude)
+        if target:
+            if isinstance(target, tuple):
+                here = GeometryUtility.point(*target)
+            else:
+                here = target
         else:
             here = None
             
@@ -321,6 +326,7 @@ class Library(Base):
 
         if here:
             distance = func.ST_Distance_Sphere(here, Place.geometry)
+            qu = qu.add_column(distance)
             qu = qu.order_by(distance.asc())
         return qu
 
@@ -339,7 +345,7 @@ class Library(Base):
         # For a library to match, the Place named by the query must
         # intersect a Place served by that library.
         named_place = aliased(Place)
-        qu = _db.query(Library).join(
+        qu = _db.query(Library).distinct().join(
             Library.service_areas).join(
                 ServiceArea.place).join(
                     named_place,
@@ -353,6 +359,7 @@ class Library(Base):
             qu = qu.filter(named_place.type==type)
         if here:
             distance = func.ST_Distance_Sphere(here, named_place.geometry)
+            qu = qu.add_column(distance)
             qu = qu.order_by(distance.asc())
         return qu
     

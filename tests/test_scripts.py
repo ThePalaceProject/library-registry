@@ -30,7 +30,7 @@ class TestLoadPlacesScript(DatabaseTest):
         script = LoadPlacesScript(self._db)
 
         # Run the script...
-        script.run(stdin=StringIO(test_ndjson))
+        script.run(cmd_args=[], stdin=StringIO(test_ndjson))
 
         # ...and import three places into the database.
         places = self._db.query(Place).all()

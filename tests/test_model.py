@@ -171,7 +171,7 @@ class TestLibrary(DatabaseTest):
         # NYPL's service area includes that point, so the distance is
         # zero. The service area of CT State (i.e. the Connecticut
         # border) is only 44 kilometers away, so it also shows up.
-        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, 40.65, -73.94)
+        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, (40.65, -73.94))
 
         eq_(0, d1)
         eq_(nypl, lib1)
@@ -182,7 +182,7 @@ class TestLibrary(DatabaseTest):
         # From this point in Connecticut, CT State is the closest
         # library (0 km away), so it shows up first, but NYPL (61 km
         # away) also shows up as a possibility.
-        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, 41.3, -73.3)
+        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, (41.3, -73.3))
         eq_(ct_state, lib1)
         eq_(0, d1)
         
@@ -191,13 +191,13 @@ class TestLibrary(DatabaseTest):
                 
         # From this point in Pennsylvania, NYPL shows up (142km away) but
         # CT State does not.
-        [(lib1, d1)] = Library.nearby(self._db, 40, -75.8)
+        [(lib1, d1)] = Library.nearby(self._db, (40, -75.8))
         eq_(nypl, lib1)
         eq_(142, int(d1/1000))
 
         # If we only look within a 100km radius, then there are no
         # libraries near that point in Pennsylvania.
-        eq_([], Library.nearby(self._db, 40, -75.8, 100).all())
+        eq_([], Library.nearby(self._db, (40, -75.8), 100).all())
 
     def test_query_cleanup(self):
         m = Library.query_cleanup
@@ -272,13 +272,13 @@ class TestLibrary(DatabaseTest):
         # up first, because it's closer to California.
         eq_(["Brooklyn Public Library",
              "Boston Public Library"],
-            [x.name for x in search("bpl", GeometryUtility.point(35, -118))])
+            [x[0].name for x in search("bpl", GeometryUtility.point(35, -118))])
 
         # If we're searching for "BPL" from Maine, Boston shows
         # up first, because it's closer to Maine.
         eq_(["Boston Public Library",
              "Brooklyn Public Library"],
-            [x.name for x in search("bpl", GeometryUtility.point(43, -70))]
+            [x[0].name for x in search("bpl", GeometryUtility.point(43, -70))]
         )
         
 
@@ -311,14 +311,14 @@ class TestLibrary(DatabaseTest):
         ca_results = Library.search_by_location_name(
             self._db, "manhattan", here=GeometryUtility.point(35, -118)
         )
-        eq_(["Kansas State Library", "NYPL"], [x.name for x in ca_results])
+        eq_(["Kansas State Library", "NYPL"], [x[0].name for x in ca_results])
         
         # If you're searching from Maine, the New York library shows
         # up first.
         me_results = Library.search_by_location_name(
             self._db, "manhattan", here=GeometryUtility.point(43, -70)
         )
-        eq_(["NYPL", "Kansas State Library"], [x.name for x in me_results])
+        eq_(["NYPL", "Kansas State Library"], [x[0].name for x in me_results])
 
         # We can insist that only certain types of places be considered as
         # matching the name. There is no state called 'Manhattan', so
@@ -339,22 +339,27 @@ class TestLibrary(DatabaseTest):
         # "New York".
         nypl = self.nypl
 
-        libraries = Library.search(self._db, 40.7, -73.9, "NEW YORK")
+        libraries = Library.search(self._db, (40.7, -73.9), "NEW YORK")
         # Even though NYPL is closer to the current location, the
         # Kansas library showed up first because it was a name match,
         # as opposed to a service location match.
-        eq_(['Now Work', 'NYPL'], [x.name for x in libraries])
-
+        eq_(['Now Work', 'NYPL'], [x[0].name for x in libraries])
+        eq_([1768, 0], [int(x[1]/1000) for x in libraries])
+        
         # This search query has a Levenshtein distance of 1 from "New
         # York", but a distance of 3 from "Now Work", so only NYPL
         # shows up.
-        libraries = Library.search(self._db, 40.7, -73.9, "NEW YORM")
-        eq_(['NYPL'], [x.name for x in libraries])
+        #
+        # Although "NEW YORM" matches both the city and state, both of
+        # which intersect with NYPL's service area, NYPL only shows up
+        # once.
+        libraries = Library.search(self._db, (40.7, -73.9), "NEW YORM")
+        eq_(['NYPL'], [x[0].name for x in libraries])
 
         # Searching for a place name picks up libraries whose service
         # areas intersect with that place.
-        libraries = Library.search(self._db, 40.7, -73.9, "Kansas")
-        eq_(['Now Work'], [x.name for x in libraries])
+        libraries = Library.search(self._db, (40.7, -73.9), "Kansas")
+        eq_(['Now Work'], [x[0].name for x in libraries])
 
     def test_search_excludes_duplicates(self):
         # Here's a library that serves a place called Kansas
@@ -368,6 +373,7 @@ class TestLibrary(DatabaseTest):
             Library.search_by_library_name(self._db, "kansas").all())
         
         # But when we do the general search, the library only shows up once.
-        eq_([library], Library.search(self._db, 0, 0, "Kansas"))
+        [(result, distance)] = Library.search(self._db, (0, 0), "Kansas")
+        eq_(library, result)
 
         

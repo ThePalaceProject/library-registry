@@ -3,8 +3,10 @@ flask
 flask-sqlalchemy-session
 geoalchemy2
 loggly-python-handler
+lxml
 nose
 psycopg2
 python-geoip-geolite2
 sqlalchemy
 uwsgi
+Flask-Babel

@@ -1,0 +1,10 @@
+{
+    "integrations" : {
+	"Library Registry" : {
+	    "url" : ""
+	},
+	"Postgres" : {
+    	    "test_url" : "postgres://simplified_test:test@localhost:5432/simplified_library_registry_test"
+    	}
+    }
+}

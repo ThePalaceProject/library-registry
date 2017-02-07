@@ -10,15 +10,18 @@ class AtomFeed(object):
 
     ATOM_NS = 'http://www.w3.org/2005/Atom'
     OPDS_NS = 'http://opds-spec.org/2010/catalog'
-
+    SCHEMA_NS = 'http://schema.org/'
+    
     nsmap = {
         None: ATOM_NS,
         'opds' : OPDS_NS,
+        'schema' : SCHEMA_NS
     }
 
     default_typemap = {datetime: lambda e, v: _strftime(v)}
     E = builder.ElementMaker(typemap=default_typemap, nsmap=nsmap)
-
+    SCHEMA = builder.ElementMaker(typemap=default_typemap, nsmap=nsmap, namespace=SCHEMA_NS)
+       
     @classmethod
     def _strftime(self, date):
         """
@@ -79,11 +82,6 @@ class AtomFeed(object):
     def name(cls, *args, **kwargs):
         return cls.E.name(*args, **kwargs)
 
-
-    @classmethod
-    def schema_(cls, field_name):
-        return "{%s}%s" % (cls.SCHEMA_NS, field_name)
-
     @classmethod
     def summary(cls, *args, **kwargs):
         return cls.E.summary(*args, **kwargs)
@@ -109,7 +107,8 @@ class AtomFeed(object):
             self.E.id(url),
             self.E.title(title),
             self.E.updated(self._strftime(datetime.datetime.utcnow())),
-            self.E.link(href=url, rel="self"),
+            self.E.link(href=url, rel="self",
+                        type=OPDSFeed.NAVIGATION_FEED_TYPE),
         )
 
 
@@ -130,6 +129,7 @@ class OPDSFeed(AtomFeed):
     CATALOG_REL = "http://opds-spec.org/catalog"
     THUMBNAIL_REL = "http://opds-spec.org/image/thumbnail"
 
+    CACHE_TIME = 3600 * 12
 
 class Annotator(object):
 
@@ -138,7 +138,7 @@ class Annotator(object):
 
     
 class NavigationFeed(OPDSFeed):
-
+   
     def __init__(self, _db, title, url, libraries, annotator=None):
         """Turn a list of libraries into a feed."""
         super(NavigationFeed, self).__init__(title, url)
@@ -148,16 +148,23 @@ class NavigationFeed(OPDSFeed):
         self.annotator = annotator
        
         for library in libraries:
-            self.feed.append(self.library_entry(library))
+            if not isinstance(library, tuple):
+                library = (library,)
+            self.feed.append(self.library_entry(*library))
         annotator.annotate_feed(self)
-            
+        
     @classmethod
-    def library_entry(cls, library):
+    def library_entry(cls, library, distance=None):
         entry = AtomFeed.entry(
             AtomFeed.id(library.urn_uri),
             AtomFeed.title(library.name),
             AtomFeed.updated(cls._strftime(library.timestamp))
         )
+
+        if distance is not None:
+            distance_tag = AtomFeed.SCHEMA.distance()
+            distance_tag.text = "%d km." % (distance/1000)
+            entry.append(distance_tag)
         
         # Add description.
         if library.description:
