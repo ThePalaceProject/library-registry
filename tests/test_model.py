@@ -1,10 +1,12 @@
 from nose.tools import (
+    assert_raises_regexp,
     eq_,
     set_trace,
 )
 from sqlalchemy import func
 import base64
 import datetime
+import operator
 
 from model import (
     get_one,
@@ -150,6 +152,17 @@ class TestLibrary(DatabaseTest):
         nypl.logo = "Fake logo"
         expect = 'data:image/png;base64,' + base64.b64encode(nypl.logo)
         eq_(expect, nypl.logo_data_uri)
+
+    def test_adobe_short_name(self):
+        lib = self._library("A Library")
+        lib.adobe_short_name = 'abcd'
+        eq_("ABCD", lib.adobe_short_name)
+        try:
+            lib.adobe_short_name = 'ab|cd'
+            raise Error("Expected exception not raised.")
+        except ValueError, e:
+            eq_('Adobe short name cannot contain the pipe character.',
+                e.message)
         
     def test_library_service_area(self):
         zip = self.zip_10018

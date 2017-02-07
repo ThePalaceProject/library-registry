@@ -73,7 +73,7 @@ class TestShortClientTokenEncoder(object):
             ValueError, "No patron identifier specified",
             self.encoder.encode, "lib", "My library secret", None
         )
-        
+       
     def test_short_client_token_encode_known_value(self):
         """Verify that the encoding algorithm gives a known value on known
         input.
@@ -117,42 +117,41 @@ class TestShortClientTokenDecoder(DatabaseTest):
     def setup(self):
         super(TestShortClientTokenDecoder, self).setup()
         self.encoder = ShortClientTokenEncoder()
-    
+        self.decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE)
+        self.library = self._library()
+        self.library.adobe_short_name='LIBRARY'
+        self.library.adobe_shared_secret='My shared secret'
+        
     def test_short_client_token_lookup_delegated_patron_identifier_success(self):
         """Test that the library registry can create a
         DelegatedPatronIdentifier from a short client token generated
         by one of its libraries.
         """
-        library = self._library()
         short_client_token = self.encoder.encode(
-            library.adobe_short_name, library.adobe_shared_secret,
+            self.library.adobe_short_name, self.library.adobe_shared_secret,
             "Foreign Patron"
         )
 
-        decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE)
-        identifier = decoder.decode(self._db, short_client_token)
+        identifier = self.decoder.decode(self._db, short_client_token)
         assert isinstance(identifier, DelegatedPatronIdentifier)
-        eq_(library, identifier.library)
+        eq_(self.library, identifier.library)
         eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, identifier.type)
         eq_("Foreign Patron", identifier.patron_identifier)
         assert identifier.delegated_identifier.startswith('urn:uuid:')
         
         # Do the lookup again and verify we get the same
         # DelegatedPatronIdentifier.
-        identifier2 = decoder.decode(self._db, short_client_token)
+        identifier2 = self.decoder.decode(self._db, short_client_token)
         eq_(identifier, identifier2)
         
     def test_short_client_token_lookup_delegated_patron_identifier_failure(self):
-        """Test various token decoding errors"""
-        decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE)
-        library = self._library()
-        library.adobe_short_name="LIBRARY"
-        
-        m = decoder._decode
+        """Test various token decoding errors"""        
+        m = self.decoder._decode
 
         assert_raises_regexp(
-            decoder.decode,
+            ValueError,
             'Supposed client token "no pipes" does not contain a pipe.',
+            self.decoder.decode,
             self._db, "no pipes"
         )
         
@@ -206,34 +205,19 @@ class TestShortClientTokenDecoder(DatabaseTest):
         assert ':' in encoded_signature
         assert '+' not in encoded_signature
         
-        # Make sure that decode_two_part_short_client_token properly
-        # reverses that change when decoding the 'password'.
-        class MockAuthdataUtility(AuthdataUtility):
-            def _decode_short_client_token(self, token, supposed_signature):
-                eq_(supposed_signature, signature)
-                self.test_code_ran = True
-
-        utility =  MockAuthdataUtility(
-            vendor_id = "The Vendor ID",
-            library_uri = "http://your-library.org/",
-            library_short_name = "you",
-            secret = "Your library secret",
-        )
-        utility.test_code_ran = False
-        utility.decode_two_part_short_client_token(
-            "username", encoded_signature
+        # Make sure that decode properly reverses that change when
+        # decoding the 'password'.
+        def _decode(_db, token, supposed_signature):
+            eq_(supposed_signature, signature)
+            self.decoder.test_code_ran = True
+        self.decoder._decode = _decode
+            
+        self.decoder.test_code_ran = False
+        self.decoder.decode_two_part(
+            self._db, "username", encoded_signature
         )
 
         # The code in _decode_short_client_token ran. Since there was no
         # test failure, it ran successfully.
-        eq_(True, utility.test_code_ran)        
-        
-    def test_cannot_decode_null_patron_identifier(self):
+        eq_(True, self.decoder.test_code_ran)        
 
-        authdata = self.authdata._encode(
-            "http://url/", None, 
-        )
-        assert_raises_regexp(
-            DecodeError, "No subject specified",
-            self.authdata.decode, authdata
-        )

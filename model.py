@@ -34,6 +34,7 @@ from sqlalchemy.orm import (
     backref,
     relationship,
     sessionmaker,
+    validates,
 )
 from sqlalchemy.orm.exc import (
     NoResultFound,
@@ -209,9 +210,9 @@ class Library(Base):
 
     # TODO: adobe_short name can't contain the pipe character
     # and should be uppercased before being stored.
-    adobe_short_name = Column(Unicode, index=True)
+    adobe_short_name = Column(Unicode, nullable=False, index=True)
     adobe_shared_secret = Column(Unicode)
-    
+
     aliases = relationship("LibraryAlias", backref='library')
     delegated_patron_identifiers = relationship(
         "DelegatedPatronIdentifier", backref='library'
@@ -223,6 +224,16 @@ class Library(Base):
         UniqueConstraint('adobe_short_name'),
     )
 
+    @validates('adobe_short_name')
+    def validate_adobe_short_name(self, key, value):
+        if not value:
+            return value
+        if '|' in value:
+            raise ValueError(
+                'Adobe short name cannot contain the pipe character.'
+            )
+        return value.upper()    
+    
     @classmethod
     def nearby(cls, _db, target, max_radius=150):
         """Find libraries whose service areas include or are close to the
@@ -729,9 +740,8 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         library_short_name, expiration, patron_identifier = token.split("|", 2)
 
         library_short_name = library_short_name.upper()
-        # Look up the Library object based on short name.
 
-        
+        # Look up the Library object based on short name.
         library = get_one(_db, Library, adobe_short_name=library_short_name)
         if not library:
             raise ValueError(
