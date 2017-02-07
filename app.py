@@ -56,7 +56,7 @@ def search():
 @app.route('/heartbeat')
 @returns_problem_detail
 def hearbeat():
-    return app.heartbeat.heartbeat()
+    return app.library_registry.heartbeat.heartbeat()
 
 if __name__ == '__main__':
     debug = True
