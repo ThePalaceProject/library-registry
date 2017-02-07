@@ -208,8 +208,6 @@ class Library(Base):
     # To issue Adobe IDs for this library, the registry must share a
     # short name and a secret with them.
 
-    # TODO: adobe_short name can't contain the pipe character
-    # and should be uppercased before being stored.
     adobe_short_name = Column(Unicode, nullable=False, index=True)
     adobe_shared_secret = Column(Unicode)
 
