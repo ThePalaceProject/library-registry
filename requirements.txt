@@ -8,3 +8,4 @@ psycopg2
 python-geoip-geolite2
 sqlalchemy
 uwsgi
+Flask-Babel
