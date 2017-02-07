@@ -171,7 +171,7 @@ class TestLibrary(DatabaseTest):
         # NYPL's service area includes that point, so the distance is
         # zero. The service area of CT State (i.e. the Connecticut
         # border) is only 44 kilometers away, so it also shows up.
-        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, 40.65, -73.94)
+        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, (40.65, -73.94))
 
         eq_(0, d1)
         eq_(nypl, lib1)
@@ -182,7 +182,7 @@ class TestLibrary(DatabaseTest):
         # From this point in Connecticut, CT State is the closest
         # library (0 km away), so it shows up first, but NYPL (61 km
         # away) also shows up as a possibility.
-        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, 41.3, -73.3)
+        [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, (41.3, -73.3))
         eq_(ct_state, lib1)
         eq_(0, d1)
         
@@ -191,13 +191,13 @@ class TestLibrary(DatabaseTest):
                 
         # From this point in Pennsylvania, NYPL shows up (142km away) but
         # CT State does not.
-        [(lib1, d1)] = Library.nearby(self._db, 40, -75.8)
+        [(lib1, d1)] = Library.nearby(self._db, (40, -75.8))
         eq_(nypl, lib1)
         eq_(142, int(d1/1000))
 
         # If we only look within a 100km radius, then there are no
         # libraries near that point in Pennsylvania.
-        eq_([], Library.nearby(self._db, 40, -75.8, 100).all())
+        eq_([], Library.nearby(self._db, (40, -75.8), 100).all())
 
     def test_query_cleanup(self):
         m = Library.query_cleanup

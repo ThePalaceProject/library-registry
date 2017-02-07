@@ -210,12 +210,12 @@ class Library(Base):
     __table_args__ = (UniqueConstraint('urn'),)
 
     @classmethod
-    def nearby(cls, _db, latitude, longitude, max_radius=150):
+    def nearby(cls, _db, target, max_radius=150):
         """Find libraries whose service areas include or are close to the
         given point.
 
-        :param latitude: The latitude component of the starting point.
-        :param longitude: The longitude component of the starting point.
+        :param target: The starting point. May be a Geometry object or
+         a 2-tuple (latitude, longitude).
         :param max_radius: How far out from the starting point to search
             for a library's service area, in kilometers.
 
@@ -226,7 +226,8 @@ class Library(Base):
 
         # We start with a single point on the globe. Call this Point
         # A.
-        target = GeometryUtility.point(latitude, longitude)
+        if isinstance(target, tuple):
+            target = GeometryUtility.point(*target)
         target_geography = cast(target, Geography)
 
         # Find another point on the globe that's 150 kilometers

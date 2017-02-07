@@ -4,6 +4,7 @@ from config import (
     Configuration,
     CannotLoadConfiguration,
 )
+from util import GeometryUtility
 from util.app_server import HeartbeatController
 
 class LibraryRegistry(object):
@@ -38,8 +39,8 @@ class LibraryRegistryController(object):
         self.app = app
         self._db = self.app._db
 
-    def nearby(self):
-        pass
+    def nearby(self, ip_address):
+        point = GeometryUtility.point_from_ip(ip_address)
 
     def search(self):
         pass
