@@ -97,7 +97,7 @@ class LibraryRegistryController(object):
         qu = qu.limit(5)
         this_url = self.app.url_for('nearby')
         feed = NavigationFeed(
-            self._db, "Libraries near you", this_url, qu,
+            self._db, unicode(_("Libraries near you")), this_url, qu,
             annotator=self.annotator
         )
         return feed_response(feed)
@@ -110,7 +110,7 @@ class LibraryRegistryController(object):
             results = Library.search(self._db, point, query)
             this_url = self.app.url_for('search', q=query)
             feed = NavigationFeed(
-                self._db, 'Search results for "%s"' % query,
+                self._db, unicode(_('Search results for "%s"')) % query,
                 this_url, results,
                 annotator=self.annotator
             )
