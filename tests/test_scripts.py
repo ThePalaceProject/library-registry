@@ -89,7 +89,7 @@ class TestAddLibraryScript(DatabaseTest):
         eq_([nyc], [x.place for x in library.service_areas])
 
 
-class TestSearchPlacesScript(DatabaseTest):
+class TestSearchLibraryScript(DatabaseTest):
 
     def test_run(self):
         nys = self.new_york_state
