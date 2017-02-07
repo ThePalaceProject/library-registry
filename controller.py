@@ -97,7 +97,7 @@ class LibraryRegistryController(object):
         qu = qu.limit(5)
         this_url = self.app.url_for('nearby')
         feed = NavigationFeed(
-            self._db, "Find your library", this_url, qu,
+            self._db, "Libraries near you", this_url, qu,
             annotator=self.annotator
         )
         return feed_response(feed)
