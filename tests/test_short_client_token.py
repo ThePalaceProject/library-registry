@@ -57,17 +57,15 @@ class TestShortClientTokenEncoder(object):
 
 
     def test_must_provide_library_information(self):
+        error = "Both library short name and secret must be specified."
         assert_raises_regexp(
-            ValueError, "Both library short name and secret must be specified.",
-            self.encoder.encode, None, None, None
+            ValueError, error, self.encoder.encode, None, None, None
         )
         assert_raises_regexp(
-            ValueError, "Both library short name and secret must be specified.",
-            self.encoder.encode, "A", None, None
+            ValueError, error, self.encoder.encode, "A", None, None
         )
         assert_raises_regexp(
-            ValueError, "Both library short name and secret must be specified.",
-            self.encoder.encode, None, "A", None
+            ValueError, error, self.encoder.encode, None, "A", None
         )
         
     def test_cannot_encode_null_patron_identifier(self):
@@ -152,6 +150,12 @@ class TestShortClientTokenDecoder(DatabaseTest):
         
         m = decoder._decode
 
+        assert_raises_regexp(
+            decoder.decode,
+            'Supposed client token "no pipes" does not contain a pipe.',
+            self._db, "no pipes"
+        )
+        
         # A token has to contain at least two pipe characters.
         assert_raises_regexp(
             ValueError, "Invalid client token",
