@@ -1,3 +1,4 @@
+import base64
 from nose.tools import (
     eq_,
     set_trace,
@@ -12,18 +13,120 @@ from model import (
 
 from . import DatabaseTest
 
-class TestShortClientToken(DatabaseTest):
+class TestShortClientTokenEncoder(object):
+
+    def setup(self):
+        self.encoder = ShortClientTokenEncoder()
+    
+    def test_adobe_base64_encode_decode(self):
+        """Test our special variant of base64 encoding designed to avoid
+        triggering an Adobe bug.
+        """
+        value = "!\tFN6~'Es52?X!#)Z*_S"
+        
+        encoded = self.encoder.adobe_base64_encode(value)
+        eq_('IQlGTjZ:J0VzNTI;WCEjKVoqX1M@', encoded)
+
+        # This is like normal base64 encoding, but with a colon
+        # replacing the plus character, a semicolon replacing the
+        # slash, an at sign replacing the equal sign and the final
+        # newline stripped.
+        eq_(
+            encoded.replace(":", "+").replace(";", "/").replace("@", "=") + "\n",
+            base64.encodestring(value)
+        )
+
+        # We can reverse the encoding to get the original value.
+        eq_(value, self.encoder.adobe_base64_decode(encoded))
+
+    def test_encode_short_client_token_uses_adobe_base64_encoding(self):
+        class MockSigner(object):
+            def prepare_key(self, key):
+                return key
+            def sign(self, value, key):
+                """Always return the same signature, crafted to contain a 
+                plus sign, a slash and an equal sign when base64-encoded.
+                """
+                return "!\tFN6~'Es52?X!#)Z*_S"
+        self.encoder.signer = MockSigner()
+        token = self.encoder._encode("lib", "My library secret", "1234", 0)
+
+        # The signature part of the token has been encoded with our
+        # custom encoding, not vanilla base64.
+        eq_('lib|0|1234|IQlGTjZ:J0VzNTI;WCEjKVoqX1M@', token)
+
+
+    def test_must_provide_library_information(self):
+        assert_raises_regexp(
+            ValueError, "Both library short name and secret must be specified.",
+            self.encoder.encode, None, None, None
+        )
+        assert_raises_regexp(
+            ValueError, "Both library short name and secret must be specified.",
+            self.encoder.encode, "A", None, None
+        )
+        assert_raises_regexp(
+            ValueError, "Both library short name and secret must be specified.",
+            self.encoder.encode, None, "A", None
+        )
+        
+    def test_cannot_encode_null_patron_identifier(self):
+        assert_raises_regexp(
+            ValueError, "No patron identifier specified",
+            self.encoder.encode, "lib", "My library secret", None
+        )
+        
+    def test_short_client_token_encode_known_value(self):
+        """Verify that the encoding algorithm gives a known value on known
+        input.
+        """
+        secret = "My library secret"
+        value = self.encoder._encode(
+            "a library", secret, "a patron identifier", 1234.5
+        )
+
+        # Note the colon characters that replaced the plus signs in
+        # what would otherwise be normal base64 text. Similarly for
+        # the semicolon which replaced the slash, and the at sign which
+        # replaced the equals sign.
+        eq_('a library|1234.5|a patron identifier|YoNGn7f38mF531KSWJ;o1H0Z3chbC:uTE:t7pAwqYxM@',
+            value
+        )
+
+        # Dissect the known value to show how it works.
+        token, signature = value.rsplit("|", 1)
+
+        # Signature is base64-encoded in a custom way that avoids
+        # triggering an Adobe bug ; token is not.
+        signature = self.encoder.adobe_base64_decode(signature)
+
+        # The token comes from the library name, the patron identifier,
+        # and the time of creation.
+        eq_("a library|1234.5|a patron identifier", token)
+
+        # The signature comes from signing the token with the
+        # secret associated with this library.
+        expect_signature = self.encoder.signer.sign(
+            token, self.encoder.signer.prepare_key(secret)
+        )
+        eq_(expect_signature, signature)
+        
+
+class TestShortClientTokenDecoder(DatabaseTest):
 
     TEST_NODE_VALUE = 114740953091845
+
+    def setup(self):
+        super(TestShortClientTokenDecoder, self).setup()
+        self.encoder = ShortClientTokenEncoder()
     
     def test_short_client_token_lookup_delegated_patron_identifier_success(self):
         """Test that the library registry can create a
         DelegatedPatronIdentifier from a short client token generated
         by one of its libraries.
         """
-        encoder = ShortClientTokenEncoder()
         library = self._library()
-        short_client_token = encoder.encode(
+        short_client_token = self.encoder.encode(
             library.adobe_short_name, library.adobe_shared_secret,
             "Foreign Patron"
         )
@@ -87,3 +190,46 @@ class TestShortClientToken(DatabaseTest):
             m, self._db, "library|99999999999|patron", "signature"
         )
 
+    def test_decode_uses_adobe_base64_encoding(self):
+
+        library = self._library()
+        
+        # The base64 encoding of this signature has a plus sign in it.
+        signature = 'LbU}66%\\-4zt>R>_)\n2Q'
+        encoded_signature = self.encoder.adobe_base64_encode(signature)
+
+        # We replace the plus sign with a colon.
+        assert ':' in encoded_signature
+        assert '+' not in encoded_signature
+        
+        # Make sure that decode_two_part_short_client_token properly
+        # reverses that change when decoding the 'password'.
+        class MockAuthdataUtility(AuthdataUtility):
+            def _decode_short_client_token(self, token, supposed_signature):
+                eq_(supposed_signature, signature)
+                self.test_code_ran = True
+
+        utility =  MockAuthdataUtility(
+            vendor_id = "The Vendor ID",
+            library_uri = "http://your-library.org/",
+            library_short_name = "you",
+            secret = "Your library secret",
+        )
+        utility.test_code_ran = False
+        utility.decode_two_part_short_client_token(
+            "username", encoded_signature
+        )
+
+        # The code in _decode_short_client_token ran. Since there was no
+        # test failure, it ran successfully.
+        eq_(True, utility.test_code_ran)        
+        
+    def test_cannot_decode_null_patron_identifier(self):
+
+        authdata = self.authdata._encode(
+            "http://url/", None, 
+        )
+        assert_raises_regexp(
+            DecodeError, "No subject specified",
+            self.authdata.decode, authdata
+        )
