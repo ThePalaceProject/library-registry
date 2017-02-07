@@ -9,6 +9,7 @@ import datetime
 from model import (
     get_one,
     get_one_or_create,
+    DelegatedPatronIdentifier,
     Library,
     LibraryAlias,
     Place,
@@ -377,3 +378,33 @@ class TestLibrary(DatabaseTest):
         eq_(library, result)
 
         
+class TestDelegatedPatronIdentifier(DatabaseTest):
+
+    def test_get_one_or_create(self):
+        library = self._library()
+        patron_identifier = self._str
+        identifier_type = DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID
+        def make_id():
+            return "id1"
+        identifier, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, library, patron_identifier, identifier_type,
+            make_id
+        )
+        eq_(True, is_new)
+        eq_(library, identifier.library)
+        eq_(patron_identifier, identifier.patron_identifier)
+        # id_1() was called.
+        eq_("id1", identifier.delegated_identifier)
+
+        # Try the same thing again but provide a different create_function
+        # that raises an exception if called.
+        def explode():
+            raise Exception("I should never be called.")
+        identifier2, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, library, patron_identifier, identifier_type, explode
+        )
+        # The existing identifier was looked up.
+        eq_(False, is_new)
+        eq_(identifier2.id, identifier.id)
+        # id_2() was not called.
+        eq_("id1", identifier2.delegated_identifier)
