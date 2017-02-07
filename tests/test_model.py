@@ -339,7 +339,7 @@ class TestLibrary(DatabaseTest):
         # "New York".
         nypl = self.nypl
 
-        libraries = Library.search(self._db, 40.7, -73.9, "NEW YORK")
+        libraries = Library.search(self._db, (40.7, -73.9), "NEW YORK")
         # Even though NYPL is closer to the current location, the
         # Kansas library showed up first because it was a name match,
         # as opposed to a service location match.
@@ -348,12 +348,12 @@ class TestLibrary(DatabaseTest):
         # This search query has a Levenshtein distance of 1 from "New
         # York", but a distance of 3 from "Now Work", so only NYPL
         # shows up.
-        libraries = Library.search(self._db, 40.7, -73.9, "NEW YORM")
+        libraries = Library.search(self._db, (40.7, -73.9), "NEW YORM")
         eq_(['NYPL'], [x.name for x in libraries])
 
         # Searching for a place name picks up libraries whose service
         # areas intersect with that place.
-        libraries = Library.search(self._db, 40.7, -73.9, "Kansas")
+        libraries = Library.search(self._db, (40.7, -73.9), "Kansas")
         eq_(['Now Work'], [x.name for x in libraries])
 
     def test_search_excludes_duplicates(self):
@@ -368,6 +368,6 @@ class TestLibrary(DatabaseTest):
             Library.search_by_library_name(self._db, "kansas").all())
         
         # But when we do the general search, the library only shows up once.
-        eq_([library], Library.search(self._db, 0, 0, "Kansas"))
+        eq_([library], Library.search(self._db, (0, 0), "Kansas"))
 
         

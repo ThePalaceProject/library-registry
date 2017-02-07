@@ -133,7 +133,7 @@ class SearchLibraryScript(Script):
 
     def run(self, cmd_args=None, stdout=sys.stdout):
         parsed = self.parse_command_line(self._db, cmd_args)
-        for library in Library.search(self._db, None, None, parsed.query[0]):
+        for library in Library.search(self._db, None, parsed.query[0]):
             stdout.write("%s: %s" % (library.name, library.opds_url))
             stdout.write("\n")
 

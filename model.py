@@ -258,12 +258,13 @@ class Library(Base):
         return qu
 
     @classmethod
-    def search(cls, _db, latitude, longitude, query):
+    def search(cls, _db, target, query):
         """Try as hard as possible to find a small number of libraries
         that match the given query.
 
-        Preference will be given to libraries closer to the current
-        latitude/longitude.
+        :param target: Order libraries by their distance from this
+         point. May be a Geometry object or a 2-tuple (latitude,
+         longitude).
         """
         # We don't anticipate a lot of libraries or a lot of
         # localities with the same name, but we need to have _some_
@@ -275,8 +276,11 @@ class Library(Base):
         if not query:
             # No query, no results.
             return []
-        if latitude and longitude:
-            here = GeometryUtility.point(latitude, longitude)
+        if target:
+            if isinstance(target, tuple):
+                here = GeometryUtility.point(*target)
+            else:
+                here = target
         else:
             here = None
             
