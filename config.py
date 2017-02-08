@@ -1,6 +1,22 @@
+import contextlib
+import copy
 import json
 import os
 import logging
+
+@contextlib.contextmanager
+def temp_config(new_config=None, replacement_classes=None):
+    old_config = Configuration.instance
+    replacement_classes = replacement_classes or [Configuration]
+    if new_config is None:
+        new_config = copy.deepcopy(old_config)
+    try:
+        for c in replacement_classes:
+            c.instance = new_config
+        yield new_config
+    finally:
+        for c in replacement_classes:
+            c.instance = old_config
 
 class CannotLoadConfiguration(Exception):
     pass
@@ -26,6 +42,10 @@ class Configuration(object):
     DATABASE_PRODUCTION_URL = "production_url"
     DATABASE_TEST_URL = "test_url"
 
+    ADOBE_VENDOR_ID_INTEGRATION = "Adobe Vendor ID"
+    ADOBE_VENDOR_ID = "vendor_id"
+    ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
+    
     @classmethod
     def load(cls):
         cfv = 'SIMPLIFIED_CONFIGURATION_FILE'
@@ -100,6 +120,21 @@ class Configuration(object):
             key = cls.DATABASE_PRODUCTION_URL
         return cls.integration(cls.DATABASE_INTEGRATION)[key]
 
+    @classmethod
+    def vendor_id(cls):
+        """Look up the Adobe Vendor ID configuration for this registry.
+
+        :return: a 2-tuple (vendor ID, node value)
+        """
+        integration = cls.integration(cls.ADOBE_VENDOR_ID_INTEGRATION,
+                                      required=False)
+        if not integration:
+            return None, None
+        return (
+            integration[cls.ADOBE_VENDOR_ID],
+            integration[cls.ADOBE_VENDOR_ID_NODE_VALUE],
+        )
+    
     @classmethod
     def logging_policy(cls):
         default_logging = {}
