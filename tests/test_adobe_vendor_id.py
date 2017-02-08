@@ -264,20 +264,17 @@ class TestVendorIDModel(VendorIDTest):
         eq_(new_label, label)
 
     def test_short_client_token_lookup_failure(self):
-        """An error in token processing results in a ValueError."""
-        assert_raises_regexp(
-            ValueError,
-            "Invalid client token: bad token",
-            self.model.standard_lookup,
-            dict(username="bad token", password="bad signature")
+        """An invalid short client token will not be turned into an 
+        Adobe Account ID.
+        """
+        eq_(
+            (None, None),
+            self.model.standard_lookup(
+                dict(username="bad token", password="bad signature")
+            )
         )
 
-        assert_raises_regexp(
-            ValueError,
-            'Supposed client token "badauthdata" does not contain a pipe.',
-            self.model.authdata_lookup,
-            "badauthdata"
-        )
+        eq_(None, None, self.model.authdata_lookup('badauthdata'))
 
         # This token is correctly formed but the signature doesn't match.
         encoder = ShortClientTokenEncoder()
@@ -286,9 +283,5 @@ class TestVendorIDModel(VendorIDTest):
             self.library.adobe_shared_secret + "bad",
             "patron alias"
         )
-        assert_raises_regexp(
-            ValueError,
-            "Invalid signature",
-            self.model.authdata_lookup, bad_signature
-        )
+        eq_(None, None, (self.model.authdata_lookup, bad_signature))
 

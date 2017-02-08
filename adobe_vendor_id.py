@@ -202,9 +202,12 @@ class AdobeVendorIDModel(object):
         """
         username = authorization_data.get('username') 
         password = authorization_data.get('password')
-        delegated_patron_identifier = self.short_client_token_decoder.decode_two_part(
-            self._db, username, password
-        )
+        try:
+            delegated_patron_identifier = self.short_client_token_decoder.decode_two_part(
+                self._db, username, password
+            )
+        except ValueError, e:
+            delegated_patron_identifier = None
         return self.account_id_and_label(delegated_patron_identifier)
         
     def authdata_lookup(self, authdata):
@@ -213,13 +216,18 @@ class AdobeVendorIDModel(object):
         DelegatedPatronIdentifier to hold the Adobe Account ID if
         necessary.
         """
-        delegated_patron_identifier = self.short_client_token_decoder.decode(
-            self._db, authdata
-        )
+        try:
+            delegated_patron_identifier = self.short_client_token_decoder.decode(
+                self._db, authdata
+            )
+        except ValueError, e:
+            delegated_patron_identifier = None
         return self.account_id_and_label(delegated_patron_identifier)
 
     def account_id_and_label(self, delegated_patron_identifier):
         "Turn a DelegatedPatronIdentifier into a (account id, label) 2-tuple."
+        if not delegated_patron_identifier:
+            return (None, None)
         urn = delegated_patron_identifier.delegated_identifier
         return (urn, self.urn_to_label(urn))
         
