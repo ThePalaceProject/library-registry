@@ -1,22 +1,7 @@
 from nose.tools import set_trace
-import logging
-import uuid
 import base64
-import os
-import datetime
-import jwt
-from jwt.algorithms import HMACAlgorithm
 
-import flask
-from flask import Response
-from flask.ext.babel import lazy_gettext as _
-from config import (
-    CannotLoadConfiguration,
-    Configuration,
-)
-from sqlalchemy.orm.session import Session
 from util.xmlparser import XMLParser
-from util.problem_detail import ProblemDetail
 
 class AdobeRequestParser(XMLParser):
 
