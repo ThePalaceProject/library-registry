@@ -8,6 +8,7 @@ lxml
 nose
 psycopg2
 python-geoip-geolite2
+requests
 sqlalchemy
 uwsgi
 Flask-Babel

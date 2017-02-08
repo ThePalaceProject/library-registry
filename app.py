@@ -4,9 +4,11 @@ import urlparse
 
 from flask import Flask, url_for, redirect, Response, request
 from flask.ext.babel import Babel
+from flask_sqlalchemy_session import flask_scoped_session
 
 from config import Configuration
 from controller import LibraryRegistry
+from model import SessionManager
 from util.problem_detail import ProblemDetail
 from util.app_server import returns_problem_detail
 
@@ -16,13 +18,19 @@ app.config['DEBUG'] = debug
 app.debug = debug
 babel = Babel(app)
 
+testing = 'TESTING' in os.environ
+db_url = Configuration.database_url(testing)
+SessionManager.initialize(db_url)
+session_factory = SessionManager.sessionmaker(db_url)
+_db = flask_scoped_session(session_factory, app)
+
 if os.environ.get('AUTOINITIALIZE') == 'False':
     pass
     # It's the responsibility of the importing code to set app.library_registry
     # appropriately.
 else:
     if getattr(app, 'library_registry', None) is None:
-        app.library_registry = LibraryRegistry()
+        app.library_registry = LibraryRegistry(_db)
 
 @app.teardown_request
 def shutdown_session(exception):
@@ -57,6 +65,31 @@ def search():
 @returns_problem_detail
 def hearbeat():
     return app.library_registry.heartbeat.heartbeat()
+
+# Adobe Vendor ID implementation
+@app.route('/AdobeAuth/SignIn', methods=['POST'])
+@returns_problem_detail
+def adobe_vendor_id_signin():
+    if app.library_registry.adobe_vendor_id:
+        return app.library_registry.adobe_vendor_id.signin_handler()
+    else:
+        return Response("", 404)
+    
+@app.route('/AdobeAuth/AccountInfo', methods=['POST'])
+@returns_problem_detail
+def adobe_vendor_id_accountinfo():
+    if app.library_registry.adobe_vendor_id:
+        return app.library_registry.adobe_vendor_id.userinfo_handler()
+    else:
+        return Response("", 404)
+
+@app.route('/AdobeAuth/Status')
+@returns_problem_detail
+def adobe_vendor_id_status():
+    if app.library_registry.adobe_vendor_id:
+        return app.library_registry.adobe_vendor_id.status_handler()
+    else:
+        return Response("", 404)
 
 if __name__ == '__main__':
     debug = True
