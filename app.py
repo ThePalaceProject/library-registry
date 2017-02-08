@@ -58,6 +58,31 @@ def search():
 def hearbeat():
     return app.library_registry.heartbeat.heartbeat()
 
+# Adobe Vendor ID implementation
+@app.route('/AdobeAuth/SignIn', methods=['POST'])
+@returns_problem_detail
+def adobe_vendor_id_signin():
+    if app.library_registry.adobe_vendor_id:
+        return app.library_registry.adobe_vendor_id.signin_handler()
+    else:
+        return Response("", 404)
+    
+@app.route('/AdobeAuth/AccountInfo', methods=['POST'])
+@returns_problem_detail
+def adobe_vendor_id_accountinfo():
+    if app.library_registry.adobe_vendor_id:
+        return app.library_registry.adobe_vendor_id.userinfo_handler()
+    else:
+        return Response("", 404)
+
+@app.route('/AdobeAuth/Status')
+@returns_problem_detail
+def adobe_vendor_id_status():
+    if app.library_registry.adobe_vendor_id:
+        return app.library_registry.adobe_vendor_id.status_handler()
+    else:
+        return Response("", 404)
+
 if __name__ == '__main__':
     debug = True
     url = Configuration.integration_url(
