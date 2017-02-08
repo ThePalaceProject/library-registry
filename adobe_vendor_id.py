@@ -1,7 +1,42 @@
+import datetime
+import flask
+from flask import Response
 from nose.tools import set_trace
 import base64
 
+from model import (
+    ShortClientTokenDecoder,
+)
 from util.xmlparser import XMLParser
+
+class AdobeVendorIDController(object):
+
+    """Flask controllers that implement the Account Service and
+    Authorization Service portions of the Adobe Vendor ID protocol.
+    """
+    def __init__(self, _db, vendor_id, node_value):
+        self._db = _db
+        self.request_handler = AdobeVendorIDRequestHandler(vendor_id)
+        self.model = AdobeVendorIDModel(self._db, node_value)
+
+    def signin_handler(self):
+        """Process an incoming signInRequest document."""
+        __transaction = self._db.begin_nested()
+        output = self.request_handler.handle_signin_request(
+            flask.request.data, self.model.standard_lookup,
+            self.model.authdata_lookup)
+        __transaction.commit()
+        return Response(output, 200, {"Content-Type": "application/xml"})
+
+    def userinfo_handler(self):
+        """Process an incoming userInfoRequest document."""
+        output = self.request_handler.handle_accountinfo_request(
+            flask.request.data, self.model.urn_to_label)
+        return Response(output, 200, {"Content-Type": "application/xml"})
+
+    def status_handler(self):
+        return Response("UP", 200, {"Content-Type": "text/plain"})
+
 
 class AdobeRequestParser(XMLParser):
 
@@ -143,3 +178,51 @@ class AdobeVendorIDRequestHandler(object):
     def error_document(self, type, message):
         return self.ERROR_RESPONSE_TEMPLATE % dict(
             vendor_id=self.vendor_id, type=type, message=message)
+
+class AdobeVendorIDModel(object):
+
+    """Implement Adobe Vendor ID within the library registry's database
+    model.
+    """
+
+    def __init__(self, _db, node_value, temporary_token_duration=None):
+        self._db = _db
+        self.temporary_token_duration = (
+            temporary_token_duration or datetime.timedelta(minutes=10)
+        )
+        if isinstance(node_value, basestring):
+            node_value = int(node_value, 16)
+        self.short_client_token_decoder = ShortClientTokenDecoder(node_value)
+        
+    def standard_lookup(self, authorization_data):
+        """Treat an incoming username and password as the two parts of a short
+        client token. Return an Adobe Account ID and a human-readable
+        label. Create a DelegatedPatronIdentifier to hold the Adobe
+        Account ID if necessary.
+        """
+        username = authorization_data.get('username') 
+        password = authorization_data.get('password')
+        delegated_patron_identifier = self.short_client_token_decoder.decode_two_part(
+            self._db, username, password
+        )
+        return self.account_id_and_label(delegated_patron_identifier)
+        
+    def authdata_lookup(self, authdata):
+        """Treat an authdata string as a short client token. Return an Adobe
+        Account ID and a human-readable label. Create a
+        DelegatedPatronIdentifier to hold the Adobe Account ID if
+        necessary.
+        """
+        delegated_patron_identifier = self.short_client_token_decoder.decode(
+            self._db, authdata
+        )
+        return self.account_id_and_label(delegated_patron_identifier)
+
+    def account_id_and_label(self, delegated_patron_identifier):
+        "Turn a DelegatedPatronIdentifier into a (account id, label) 2-tuple."
+        urn = delegated_patron_identifier.delegated_identifier
+        return (urn, self.urn_to_label(urn))
+        
+    def urn_to_label(self, urn):
+        """We have no information about patrons, so labels are sparse."""
+        return "Delegated account ID %s" % urn
