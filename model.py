@@ -166,6 +166,7 @@ def create(db, model, create_method='',
     
 Base = declarative_base()
 
+    
 class Library(Base):
     """An entry in this table corresponds more or less to an OPDS server.
 
