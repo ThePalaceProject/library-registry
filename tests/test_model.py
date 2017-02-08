@@ -1,14 +1,17 @@
 from nose.tools import (
+    assert_raises_regexp,
     eq_,
     set_trace,
 )
 from sqlalchemy import func
 import base64
 import datetime
+import operator
 
 from model import (
     get_one,
     get_one_or_create,
+    DelegatedPatronIdentifier,
     Library,
     LibraryAlias,
     Place,
@@ -149,6 +152,17 @@ class TestLibrary(DatabaseTest):
         nypl.logo = "Fake logo"
         expect = 'data:image/png;base64,' + base64.b64encode(nypl.logo)
         eq_(expect, nypl.logo_data_uri)
+
+    def test_adobe_short_name(self):
+        lib = self._library("A Library")
+        lib.adobe_short_name = 'abcd'
+        eq_("ABCD", lib.adobe_short_name)
+        try:
+            lib.adobe_short_name = 'ab|cd'
+            raise Error("Expected exception not raised.")
+        except ValueError, e:
+            eq_('Adobe short name cannot contain the pipe character.',
+                e.message)
         
     def test_library_service_area(self):
         zip = self.zip_10018
@@ -377,3 +391,33 @@ class TestLibrary(DatabaseTest):
         eq_(library, result)
 
         
+class TestDelegatedPatronIdentifier(DatabaseTest):
+
+    def test_get_one_or_create(self):
+        library = self._library()
+        patron_identifier = self._str
+        identifier_type = DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID
+        def make_id():
+            return "id1"
+        identifier, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, library, patron_identifier, identifier_type,
+            make_id
+        )
+        eq_(True, is_new)
+        eq_(library, identifier.library)
+        eq_(patron_identifier, identifier.patron_identifier)
+        # id_1() was called.
+        eq_("id1", identifier.delegated_identifier)
+
+        # Try the same thing again but provide a different create_function
+        # that raises an exception if called.
+        def explode():
+            raise Exception("I should never be called.")
+        identifier2, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, library, patron_identifier, identifier_type, explode
+        )
+        # The existing identifier was looked up.
+        eq_(False, is_new)
+        eq_(identifier2.id, identifier.id)
+        # id_2() was not called.
+        eq_("id1", identifier2.delegated_identifier)
