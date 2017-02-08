@@ -29,11 +29,28 @@ class VendorIDTest(DatabaseTest):
         with temp_config() as config:
             config[Configuration.INTEGRATIONS][name] = {
                 Configuration.ADOBE_VENDOR_ID: "VENDORID",
-                Configuration.ADOBE_NODE_VALUE: 114740953091845,
+                Configuration.ADOBE_VENDOR_ID_NODE_VALUE: 114740953091845,
             }
             yield config
 
+class TestConfiguration(VendorIDTest):
 
+    def test_accessor(self):
+        with self.temp_config() as config:
+            vendor_id, node_value = Configuration.vendor_id()
+            eq_("VENDORID", vendor_id)
+            eq_(114740953091845, node_value)
+
+    def test_accessor_vendor_id_not_configured(self):
+        with self.temp_config() as config:
+            del config[Configuration.INTEGRATIONS][
+                Configuration.ADOBE_VENDOR_ID_INTEGRATION
+            ]
+            vendor_id, node_value = Configuration.vendor_id()
+            eq_(None, vendor_id)
+            eq_(None, node_value)
+
+    
 class TestVendorIDRequestParsers(object):
 
     username_sign_in_request = """<signInRequest method="standard" xmlns="http://ns.adobe.com/adept">

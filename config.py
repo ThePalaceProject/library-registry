@@ -132,7 +132,7 @@ class Configuration(object):
             return None, None
         return (
             integration[cls.ADOBE_VENDOR_ID],
-            integration[cls.ADOBE_NODE_VALUE],
+            integration[cls.ADOBE_VENDOR_ID_NODE_VALUE],
         )
     
     @classmethod
