@@ -185,11 +185,8 @@ class AdobeVendorIDModel(object):
     model.
     """
 
-    def __init__(self, _db, node_value, temporary_token_duration=None):
+    def __init__(self, _db, node_value):
         self._db = _db
-        self.temporary_token_duration = (
-            temporary_token_duration or datetime.timedelta(minutes=10)
-        )
         if isinstance(node_value, basestring):
             node_value = int(node_value, 16)
         self.short_client_token_decoder = ShortClientTokenDecoder(node_value)
