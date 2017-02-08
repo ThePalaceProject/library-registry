@@ -4,9 +4,11 @@ import urlparse
 
 from flask import Flask, url_for, redirect, Response, request
 from flask.ext.babel import Babel
+from flask_sqlalchemy_session import flask_scoped_session
 
 from config import Configuration
 from controller import LibraryRegistry
+from model import SessionManager
 from util.problem_detail import ProblemDetail
 from util.app_server import returns_problem_detail
 
@@ -16,13 +18,19 @@ app.config['DEBUG'] = debug
 app.debug = debug
 babel = Babel(app)
 
+testing = 'TESTING' in os.environ
+db_url = Configuration.database_url(testing)
+SessionManager.initialize(db_url)
+session_factory = SessionManager.sessionmaker(db_url)
+_db = flask_scoped_session(session_factory, app)
+
 if os.environ.get('AUTOINITIALIZE') == 'False':
     pass
     # It's the responsibility of the importing code to set app.library_registry
     # appropriately.
 else:
     if getattr(app, 'library_registry', None) is None:
-        app.library_registry = LibraryRegistry()
+        app.library_registry = LibraryRegistry(_db)
 
 @app.teardown_request
 def shutdown_session(exception):
