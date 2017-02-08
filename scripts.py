@@ -201,14 +201,16 @@ class AddLibraryScript(Script):
             library.adobe_short_name = adobe_short_name
         if adobe_shared_secret:
             library.adobe_shared_secret = adobe_shared_secret
-        for alias in aliases:
-            get_one_or_create(self._db, LibraryAlias, library=library,
-                              name=alias, language='eng')
-        for place_external_id in places:
-            place = get_one(self._db, Place, external_id=place_external_id)
-            get_one_or_create(
-                self._db, ServiceArea, library=library, place=place
-            )
+        if aliases:
+            for alias in aliases:
+                get_one_or_create(self._db, LibraryAlias, library=library,
+                                  name=alias, language='eng')
+        if places:
+            for place_external_id in places:
+                place = get_one(self._db, Place, external_id=place_external_id)
+                get_one_or_create(
+                    self._db, ServiceArea, library=library, place=place
+                )
         self._db.commit()
 
 
