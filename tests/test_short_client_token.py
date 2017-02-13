@@ -121,6 +121,13 @@ class TestShortClientTokenDecoder(DatabaseTest):
         self.library = self._library()
         self.library.adobe_short_name='LIBRARY'
         self.library.adobe_shared_secret='My shared secret'
+
+    def test_uuid(self):
+        u = self.decoder.uuid()
+        # All UUIDs need to start with a 0 and end with the same node
+        # value.
+        assert u.startswith('urn:uuid:0')
+        assert u.endswith('685b35c00f05')
         
     def test_short_client_token_lookup_delegated_patron_identifier_success(self):
         """Test that the library registry can create a

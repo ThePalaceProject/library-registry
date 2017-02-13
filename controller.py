@@ -7,6 +7,8 @@ from flask import (
     url_for,
 )
 
+from adobe_vendor_id import AdobeVendorIDController
+
 from model import (
     production_session,
     Library,
@@ -52,7 +54,14 @@ class LibraryRegistry(object):
         """Set up all the controllers that will be used by the web app."""
         self.registry_controller = LibraryRegistryController(self)
         self.heartbeat = HeartbeatController()
-
+        vendor_id, node_value = Configuration.vendor_id()
+        if vendor_id:
+            self.adobe_vendor_id = AdobeVendorIDController(
+                self._db, vendor_id, node_value
+            )
+        else:
+            self.adobe_vendor_id = None
+        
     def url_for(self, view, *args, **kwargs):
         kwargs['_external'] = True
         return url_for(view, *args, **kwargs)

@@ -1,7 +1,10 @@
 from nose.tools import set_trace
 import argparse
+import base64
 import logging
 import os
+import re
+import requests
 import sys
 
 from geometry_loader import GeometryLoader
@@ -117,7 +120,7 @@ class SearchPlacesScript(Script):
         for place in self._db.query(Place).filter(
                 Place.external_name.in_(parsed.name)
         ):
-            stdout.write(place)
+            stdout.write(repr(place))
             stdout.write("\n")
 
 
@@ -163,6 +166,12 @@ class AddLibraryScript(Script):
         parser.add_argument(
             '--web', help="URL of the library's web server."
         )
+        parser.add_argument(
+            '--adobe-short-name', help="Short name of the library for Adobe Vendor ID purposes."
+        )
+        parser.add_argument(
+            '--adobe-shared-secret', help="Shared secret between the library and the registry for Adobe Vendor ID purposes."
+        )
         parser.add_argument('--place', nargs='+',
                             help="External ID of the library's service area.")
         return parser
@@ -176,18 +185,104 @@ class AddLibraryScript(Script):
         description = parsed.description
         aliases = parsed.alias
         places = parsed.place
-
+        adobe_short_name = parsed.adobe_short_name
+        adobe_shared_secret = parsed.adobe_shared_secret
+        
         library, is_new = get_one_or_create(self._db, Library, urn=urn)
-        library.name = name
-        library.opds_url = opds
-        library.web_url = web
-        library.description = description
-        for alias in aliases:
-            get_one_or_create(self._db, LibraryAlias, library=library,
-                              name=alias, language='eng')
-        for place_external_id in places:
-            place = get_one(self._db, Place, external_id=place_external_id)
-            get_one_or_create(
-                self._db, ServiceArea, library=library, place=place
-            )
+        if name:
+            library.name = name
+        if opds:
+            library.opds_url = opds
+        if web:
+            library.web_url = web
+        if description:
+            library.description = description
+        if adobe_short_name:
+            library.adobe_short_name = adobe_short_name
+        if adobe_shared_secret:
+            library.adobe_shared_secret = adobe_shared_secret
+        if aliases:
+            for alias in aliases:
+                get_one_or_create(self._db, LibraryAlias, library=library,
+                                  name=alias, language='eng')
+        if places:
+            for place_external_id in places:
+                place = get_one(self._db, Place, external_id=place_external_id)
+                get_one_or_create(
+                    self._db, ServiceArea, library=library, place=place
+                )
         self._db.commit()
+
+
+class AdobeVendorIDAcceptanceTestScript(Script):
+    """Verify basic Adobe Vendor ID functionality, the way Adobe does
+    when testing compliance.
+    """
+    
+    @classmethod
+    def arg_parser(cls):
+        parser = super(AdobeVendorIDAcceptanceTestScript, cls).arg_parser()
+        parser.add_argument(
+            '--url', help='URL to the library registry', required=True
+        )
+        parser.add_argument(
+            '--token', help='A short client token obtained from a library',
+            required=True
+        )
+        return parser
+        
+    def run(self, cmd_args=None):
+        parsed = self.parse_command_line(self._db, cmd_args)
+
+        base_url = parsed.url
+        if not base_url.endswith('/'):
+            base_url += '/'
+        base_url += 'AdobeAuth/'
+        token = parsed.token
+
+        signin_url = base_url + "SignIn"
+        accountinfo_url = base_url + "AccountInfo"
+        status_url = base_url + "Status"
+
+        print "1. Checking status: %s" % status_url
+        response = requests.get(status_url)
+        print "Status code: %s" % response.status_code
+        if response.content == 'UP':
+            print 'Response was "UP", as expected.'
+        else:
+            print "Unexpected response: %r" % response.content
+        print
+            
+        print "2. Passing token into SignIn as authdata: %s" % signin_url
+
+        body = """<signInRequest method="authData" xmlns="http://ns.adobe.com/adept">
+<authData>%s</authData>
+</signInRequest>""" % base64.encodestring(token)
+        response = requests.post(signin_url, data=body)
+        print response.content
+
+        print
+        print "3. Passing token into SignIn as username/password."
+        username, password = token.rsplit('|', 1)
+        body = """<signInRequest method="standard" xmlns="http://ns.adobe.com/adept">
+<username>%s</username>
+<password>%s</password>
+</signInRequest>""" % (username, password)
+        response = requests.post(signin_url, data=body)
+        print response.content
+
+        match = re.compile("<user>([^<]+)</user>").search(response.content)
+        if match:
+            urn = match.groups()[0]
+        else:
+            print "No URN found, cannot continue."
+            urn = None
+
+        if urn:
+            print
+            print "4. Passing result into UserInfo to get user info."
+            body = """<accountInfoRequest method="standard" xmlns="http://ns.adobe.com/adept">
+<user>%s</user>
+</accountInfoRequest>""" % urn
+            response = requests.post(accountinfo_url, data=body)
+            print response.content
