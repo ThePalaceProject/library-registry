@@ -304,7 +304,7 @@ class TestLibrary(DatabaseTest):
 
         # The NYPL explicitly covers New York City, which has
         # 'Manhattan' as an alias.
-        [nyc] = [x.place for x in nypl.service_areas]
+        [nyc, zip_11212] = [x.place for x in nypl.service_areas]
         assert "Manhattan" in [x.name for x in nyc.aliases]
         
         # The Kansas state library covers the entire state,
@@ -342,6 +342,14 @@ class TestLibrary(DatabaseTest):
         )
         eq_([], excluded.all())
 
+        # A search for "Brooklyn" finds the NYPL, but it only finds it
+        # once, even though NYPL is associated with two places called
+        # "Brooklyn": New York City and the ZIP code 11212
+        [brooklyn_results] = Library.search_by_location_name(
+            self._db, "brooklyn", here=GeometryUtility.point(43, -70)
+        )
+        eq_(nypl, brooklyn_results[0])
+        
     def test_search(self):
         """Test the overall search method."""
         
