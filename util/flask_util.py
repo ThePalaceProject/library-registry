@@ -22,3 +22,16 @@ def problem(type, status, title, detail=None, instance=None, headers={}):
     
 def languages_for_request():
     return languages_from_accept(flask.request.accept_languages)
+
+def originating_ip():
+    """If there is an X-Forwarded-For header, use its value as the
+    originating IP address. Otherwise, use the address that originated
+    this request.
+    """
+    address = None
+    header = 'X-Forwarded-For'
+    if header in flask.request.headers:
+        address = flask.request.headers[header]
+    if not address:
+        address = flask.request.remote_addr
+    return address

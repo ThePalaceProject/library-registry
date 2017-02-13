@@ -10,6 +10,7 @@ from config import Configuration
 from controller import LibraryRegistry
 from model import SessionManager
 from util.problem_detail import ProblemDetail
+from util.flask_util import originating_ip
 from util.app_server import returns_problem_detail
 
 app = Flask(__name__)
@@ -46,19 +47,19 @@ def shutdown_session(exception):
         else:
             app.library_registry._db.commit()
 
-
+       
 @app.route('/')
 @returns_problem_detail
 def nearby():
     return app.library_registry.registry_controller.nearby(
-        request.remote_addr
+        originating_ip()
     )
 
 @app.route('/search')
 @returns_problem_detail
 def search():
     return app.library_registry.registry_controller.search(
-        request.remote_addr
+        originating_ip()
     )
 
 @app.route('/heartbeat')
