@@ -9,15 +9,38 @@ from model import (
 )
 from util.xmlparser import XMLParser
 
+class ExternalCredentialValidator(object):
+    """If credentials cannot be validated through the library registry,
+    the validation attempt may be delegated to some other service.
+
+    This should only be necessary for NYPL, and only during a
+    transition period.
+    """
+    def __init__(self, url):
+        self.url = url
+
+    def authenticate(self, username, password):
+        """Make a HEAD request to the external authentication
+        URL and return a yes-or-no answer.
+        """
+        response = requests.head(self.url, auth=(username, password))
+        if response.status_code == 200:
+            return True
+        return False
+
+
 class AdobeVendorIDController(object):
 
     """Flask controllers that implement the Account Service and
     Authorization Service portions of the Adobe Vendor ID protocol.
     """
-    def __init__(self, _db, vendor_id, node_value):
+    def __init__(self, _db, vendor_id, node_value,
+                 external_credential_validator):
         self._db = _db
         self.request_handler = AdobeVendorIDRequestHandler(vendor_id)
-        self.model = AdobeVendorIDModel(self._db, node_value)
+        self.model = AdobeVendorIDModel(
+            self._db, node_value, external_credential_validator
+        )
 
     def signin_handler(self):
         """Process an incoming signInRequest document."""
@@ -185,11 +208,12 @@ class AdobeVendorIDModel(object):
     model.
     """
 
-    def __init__(self, _db, node_value):
+    def __init__(self, _db, node_value, external_credential_validator):
         self._db = _db
         if isinstance(node_value, basestring):
             node_value = int(node_value, 16)
         self.short_client_token_decoder = ShortClientTokenDecoder(node_value)
+        self.external_credential_validator = external_credential_validator
         
     def standard_lookup(self, authorization_data):
         """Treat an incoming username and password as the two parts of a short
