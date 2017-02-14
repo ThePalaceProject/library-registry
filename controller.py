@@ -57,7 +57,7 @@ class LibraryRegistry(object):
         vendor_id, node_value = Configuration.vendor_id()
         if vendor_id:
             self.adobe_vendor_id = AdobeVendorIDController(
-                self._db, vendor_id, node_value
+                self._db, vendor_id, node_value, None
             )
         else:
             self.adobe_vendor_id = None

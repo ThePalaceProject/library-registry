@@ -3,30 +3,93 @@ import flask
 from flask import Response
 from nose.tools import set_trace
 import base64
+import re
+import requests
 
 from model import (
     ShortClientTokenDecoder,
 )
 from util.xmlparser import XMLParser
 
-class ExternalCredentialValidator(object):
-    """If credentials cannot be validated through the library registry,
-    the validation attempt may be delegated to some other service.
+class AdobeVendorIDClient(object):
+    """This is used by the AdobeVendorIDAcceptanceTestScript to verify the
+    compliance of the library registry.
 
-    This should only be necessary for NYPL, and only during a
-    transition period.
+    It may also be used during a transition period where you are
+    moving from another Vendor ID implementation to a library
+    registry. You can validate any credentials that cannot be
+    validated through the library registry, inanother Vendor ID
+    implementation.
     """
-    def __init__(self, url):
-        self.url = url
 
-    def authenticate(self, username, password):
-        """Make a HEAD request to the external authentication
-        URL and return a yes-or-no answer.
-        """
-        response = requests.head(self.url, auth=(username, password))
-        if response.status_code == 200:
+    SIGNIN_AUTHDATA_BODY = """<signInRequest method="authData" xmlns="http://ns.adobe.com/adept">
+<authData>%s</authData>
+</signInRequest>""" 
+
+    SIGNIN_STANDARD_BODY = """<signInRequest method="standard" xmlns="http://ns.adobe.com/adept">
+<username>%s</username>
+<password>%s</password>
+</signInRequest>""" 
+
+    USER_INFO_BODY = """<accountInfoRequest method="standard" xmlns="http://ns.adobe.com/adept">
+<user>%s</user>
+</accountInfoRequest>"""
+
+    USER_IDENTIFIER_RE = re.compile("<user>([^<]+)</user>")
+    LABEL_RE = re.compile("<label>([^<]+)</label>")
+    
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.signin_url = base_url + "SignIn"
+        self.accountinfo_url = base_url + "AccountInfo"
+        self.status_url = base_url + "Status"
+
+    def status(self):
+        response = requests.get(self.status_url)
+        if response.status_code == 200 and response.content == 'UP':
             return True
-        return False
+        return response
+        
+    def sign_in_authdata(self, authdata):
+        body = self.SIGNIN_AUTHDATA_BODY % base64.encodestring(authdata)
+        response = requests.post(self.signin_url, data=body)
+        return self._process_sign_in_result(response)
+
+    def sign_in_standard(self, username, password):
+        body = self.SIGNIN_STANDARD_BODY % (username, password)
+        response = requests.post(self.signin_url, data=body)
+        return self._process_sign_in_result(response)
+           
+    def user_info(self, urn):
+        body = self.USER_INFO_BODY % urn
+        response = requests.post(self.accountinfo_url, data=body)
+        if response.status_code != 200:
+            return response
+        label = self.extract_label(response.content)
+        if not label:
+            return response
+        return label, response.content
+        
+    def extract_user_identifier(self, content):
+        return self._extract_by_re(content, self.USER_IDENTIFIER_RE)
+
+    def extract_label(self, content):
+        return self._extract_by_re(content, self.LABEL_RE)
+
+    def _extract_by_re(self, content, re):
+        match = re.search(content)
+        if not match:
+            return None
+        return match.groups()[0]
+    
+    def _process_sign_in_result(self, response):
+        if response.status_code != 200:
+            return response
+        identifier = self.extract_user_identifier(response.content)
+        label = self.extract_label(response.content)
+        if not identifier or not label:
+            return response
+        return identifier, label, response.content
 
 
 class AdobeVendorIDController(object):
