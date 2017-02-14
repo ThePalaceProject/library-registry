@@ -245,45 +245,28 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         
         print "1. Checking status: %s" % client.status_url
         response = client.status()
-        if response is True:
-            print 'OK Service is up and running.'
-        else:
-            print "XX Got unexpected response: %r" % response.content
-        print
+        # status() will raise an exception if anything is wrong.
+        print 'OK Service is up and running.'
             
         print "2. Passing token into SignIn as authdata: %s" % client.signin_url
-        response = client.sign_in_authdata(token)
-        if isinstance(response, tuple):
-            identifier, label, content = response
-            print "OK Found user identifier and label."
-            print "   User identifier: %s" % identifier
-            print "   Label: %s" % label
-            print "   Full content: %s" % content
-        else:
-            print "XX Got unexpected response: %r" % response.content
+        identifier, label, content = client.sign_in_authdata(token)
+        print "OK Found user identifier and label."
+        print "   User identifier: %s" % identifier
+        print "   Label: %s" % label
+        print "   Full content: %s" % content
 
         print
         print "3. Passing token into SignIn as username/password."
         username, password = token.rsplit('|', 1)
-        response = client.sign_in_standard(username, password)
-        if isinstance(response, tuple):
-            identifier, label, content = response
-            print "OK Found user identifier and label."
-            print "   User identifier: %s" % identifier
-            print "   Label: %s" % label
-            print "   Full content: %s" % content
-        else:
-            print "XX Got unexpected response: %r" % response.content
-            identifier = None
+        identifier, label, content = client.sign_in_standard(username, password)
+        print "OK Found user identifier and label."
+        print "   User identifier: %s" % identifier
+        print "   Label: %s" % label
+        print "   Full content: %s" % content
             
-        if identifier:
-            print
-            print "4. Passing identifier into UserInfo to get user info: %s" % client.accountinfo_url
-            response = client.user_info(identifier)
-            if isinstance(response, tuple):
-                user_info, content = response
-                print "OK Found user info: %s" % user_info
-                print "   Full content: %s" % content
-            else:
-                print "XX Got unexpected response: %r" % response.content
+        print
+        print "4. Passing identifier into UserInfo to get user info: %s" % client.accountinfo_url
+        user_info, content = client.user_info(identifier)
+        print "OK Found user info: %s" % user_info
+        print "   Full content: %s" % content
 
