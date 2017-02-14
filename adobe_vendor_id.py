@@ -236,7 +236,7 @@ class AdobeVendorIDModel(object):
                     pass
 
         # Neither this server nor the delegates were able to do anything.
-        return None
+        return None, None
             
     def authdata_lookup(self, authdata):
         """Treat an authdata string as a short client token. Return an Adobe
@@ -265,7 +265,7 @@ class AdobeVendorIDModel(object):
                     pass
 
         # Neither this server nor the delegates were able to do anything.
-        return None
+        return None, None
 
     def account_id_and_label(self, delegated_patron_identifier):
         "Turn a DelegatedPatronIdentifier into a (account id, label) 2-tuple."
@@ -355,7 +355,7 @@ class AdobeVendorIDClient(object):
         self.handle_error(response.status_code, content)
         label = self.extract_label(content)
         if not label:
-            raise VendorIDException("Unexpected response: %s" % content)
+            raise VendorIDServerException("Unexpected response: %s" % content)
         return label, content
         
     def extract_user_identifier(self, content):
@@ -366,8 +366,8 @@ class AdobeVendorIDClient(object):
    
     def handle_error(self, status_code, content):
         if status_code != 200:
-            raise VendorIDException(
-                "Unexpected status code: %s" % status_Code
+            raise VendorIDServerException(
+                "Unexpected status code: %s" % status_code
             )
         error = self._extract_by_re(content, self.ERROR_RE)
         if error:
@@ -385,7 +385,7 @@ class AdobeVendorIDClient(object):
         identifier = self.extract_user_identifier(content)
         label = self.extract_label(content)
         if not identifier or not label:
-            raise VendorIDException("Unexpected response: %s" % content)
+            raise VendorIDServerException("Unexpected response: %s" % content)
         return identifier, label, content
 
 
