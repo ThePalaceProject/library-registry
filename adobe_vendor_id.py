@@ -18,12 +18,17 @@ class AdobeVendorIDController(object):
     Authorization Service portions of the Adobe Vendor ID protocol.
     """
     def __init__(self, _db, vendor_id, node_value,
-                 external_credential_validator):
+                 delegates=[]):
+        """Constructor.
+        
+        :param delegates: A list of URLs or AdobeVendorIDClient
+        objects. If this Vendor ID server cannot validate an incoming
+        login, it will delegate to each of these other servers in
+        turn.
+        """
         self._db = _db
         self.request_handler = AdobeVendorIDRequestHandler(vendor_id)
-        self.model = AdobeVendorIDModel(
-            self._db, node_value, external_credential_validator
-        )
+        self.model = AdobeVendorIDModel(self._db, node_value, delegates)
 
     def signin_handler(self):
         """Process an incoming signInRequest document."""
@@ -191,12 +196,17 @@ class AdobeVendorIDModel(object):
     model.
     """
 
-    def __init__(self, _db, node_value, external_credential_validator):
+    def __init__(self, _db, node_value, delegates):
         self._db = _db
         if isinstance(node_value, basestring):
             node_value = int(node_value, 16)
         self.short_client_token_decoder = ShortClientTokenDecoder(node_value)
-        self.external_credential_validator = external_credential_validator
+        self.delegates = []
+        for i in delegates:
+            if isinstance(i, basestring):
+                self.delegates.append(AdobeVendorIDClient(i))
+            else:
+                self.delegates.append(i)
         
     def standard_lookup(self, authorization_data):
         """Treat an incoming username and password as the two parts of a short
@@ -212,8 +222,22 @@ class AdobeVendorIDModel(object):
             )
         except ValueError, e:
             delegated_patron_identifier = None
-        return self.account_id_and_label(delegated_patron_identifier)
-        
+        if delegated_patron_identifier:
+            return self.account_id_and_label(delegated_patron_identifier)
+        else:
+            for delegate in self.delegates:
+                try:
+                    account_id, label, content = delegate.sign_in_standard(
+                        username, password
+                    )
+                    return account_id, label
+                except Exception, e:
+                    # This delegate couldn't help us.
+                    pass
+
+        # Neither this server nor the delegates were able to do anything.
+        return None
+            
     def authdata_lookup(self, authdata):
         """Treat an authdata string as a short client token. Return an Adobe
         Account ID and a human-readable label. Create a
@@ -226,7 +250,22 @@ class AdobeVendorIDModel(object):
             )
         except ValueError, e:
             delegated_patron_identifier = None
-        return self.account_id_and_label(delegated_patron_identifier)
+
+        if delegated_patron_identifier:
+            return self.account_id_and_label(delegated_patron_identifier)
+        else:
+            for delegate in self.delegates:
+                try:
+                    account_id, label, content = delegate.sign_in_authdata(
+                        username, password
+                    )
+                    return account_id, label
+                except Exception, e:
+                    # This delegate couldn't help us.
+                    pass
+
+        # Neither this server nor the delegates were able to do anything.
+        return None
 
     def account_id_and_label(self, delegated_patron_identifier):
         "Turn a DelegatedPatronIdentifier into a (account id, label) 2-tuple."
@@ -349,3 +388,28 @@ class AdobeVendorIDClient(object):
             raise VendorIDException("Unexpected response: %s" % content)
         return identifier, label, content
 
+
+class MockAdobeVendorIDClient(AdobeVendorIDClient):
+    """Mock AdobeVendorIDClient for use in tests."""
+    
+    def __init__(self):
+        self.queue = []
+
+    def queue(self, response):
+        """Queue a response."""
+        self.queue.insert(0, response)
+        
+    def dequeue(self, *args, **kwargs):
+        """Dequeue a response.
+
+        If it's an exception, raise it. Otherwise return it.
+        """
+        response = self.queue.pop()
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    status = dequeue
+    sign_in_authdata = dequeue
+    sign_in_standard = dequeue
+    user_info = dequeue
