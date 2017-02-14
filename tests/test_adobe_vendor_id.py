@@ -313,7 +313,7 @@ class TestVendorIDModel(VendorIDTest):
         
         # We tried delegate 1 before getting the answer from delegate 2.
         eq_([], delegate1.queue)
-        eq_([], delegate1.queue)
+        eq_([], delegate2.queue)
 
         # Now test authentication by authdata.
 
