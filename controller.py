@@ -54,10 +54,10 @@ class LibraryRegistry(object):
         """Set up all the controllers that will be used by the web app."""
         self.registry_controller = LibraryRegistryController(self)
         self.heartbeat = HeartbeatController()
-        vendor_id, node_value = Configuration.vendor_id()
+        vendor_id, node_value, delegates = Configuration.vendor_id()
         if vendor_id:
             self.adobe_vendor_id = AdobeVendorIDController(
-                self._db, vendor_id, node_value
+                self._db, vendor_id, node_value, delegates
             )
         else:
             self.adobe_vendor_id = None

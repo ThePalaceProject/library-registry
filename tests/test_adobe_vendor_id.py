@@ -17,6 +17,9 @@ from adobe_vendor_id import (
     AdobeAccountInfoRequestParser,
     AdobeVendorIDRequestHandler,
     AdobeVendorIDModel,
+    MockAdobeVendorIDClient,
+    VendorIDAuthenticationError,
+    VendorIDServerException,
 )
 
 from model import(
@@ -46,18 +49,20 @@ class TestConfiguration(VendorIDTest):
 
     def test_accessor(self):
         with self.temp_config() as config:
-            vendor_id, node_value = Configuration.vendor_id()
+            vendor_id, node_value, delegates = Configuration.vendor_id()
             eq_("VENDORID", vendor_id)
             eq_(114740953091845, node_value)
-
+            eq_([], delegates)
+            
     def test_accessor_vendor_id_not_configured(self):
         with self.temp_config() as config:
             del config[Configuration.INTEGRATIONS][
                 Configuration.ADOBE_VENDOR_ID_INTEGRATION
             ]
-            vendor_id, node_value = Configuration.vendor_id()
+            vendor_id, node_value, delegates = Configuration.vendor_id()
             eq_(None, vendor_id)
             eq_(None, node_value)
+            eq_([], delegates)
 
     
 class TestVendorIDRequestParsers(object):
@@ -215,8 +220,8 @@ class TestVendorIDModel(VendorIDTest):
     def setup(self):
         super(TestVendorIDModel, self).setup()
         with self.temp_config() as config:
-            vendor_id, node_value = Configuration.vendor_id()
-            self.model = AdobeVendorIDModel(self._db, node_value)
+            vendor_id, node_value, delegates = Configuration.vendor_id()
+            self.model = AdobeVendorIDModel(self._db, node_value, delegates)
 
         # Here's a library that participates in the registry.
         self.library = self._library()
@@ -284,4 +289,50 @@ class TestVendorIDModel(VendorIDTest):
             "patron alias"
         )
         eq_(None, None, (self.model.authdata_lookup, bad_signature))
+
+
+    def test_delegation(self):
+        """A model that doesn't know how to authenticate something can
+        delegate to another Vendor ID server.
+        """
+        delegate1 = MockAdobeVendorIDClient()
+        delegate2 = MockAdobeVendorIDClient()
+        
+        self.model.delegates = [delegate1, delegate2]
+
+        # Delegate 1 can't verify this user.
+        delegate1.enqueue(VendorIDAuthenticationError("Nope"))
+
+        # Delegate 2 can.
+        delegate2.enqueue(("userid", "label", "content"))
+
+        result = self.model.standard_lookup(
+            dict(username="some", password="user")
+        )
+        eq_(("userid", "label"), result)
+        
+        # We tried delegate 1 before getting the answer from delegate 2.
+        eq_([], delegate1.queue)
+        eq_([], delegate2.queue)
+
+        # Now test authentication by authdata.
+
+        # Delegate 1 can verify the authdata
+        delegate1.enqueue(("userid", "label", "content"))
+
+        # Delegate 2 is broken.
+        delegate2.enqueue(VendorIDServerException("blah"))
+
+        result = self.model.authdata_lookup("some authdata")
+        eq_(("userid", "label"), result)
+
+        # We didn't even get to delegate 2.
+        eq_(1, len(delegate2.queue))
+
+        # If we try it again, we'll get an error from delegate 1,
+        # since nothing is queued up, and then a queued error from
+        # delegate 2.
+        result = self.model.authdata_lookup("some authdata")
+        eq_((None, None), result)
+        eq_([], delegate2.queue)
 

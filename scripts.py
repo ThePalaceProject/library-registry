@@ -18,6 +18,7 @@ from model import (
     ServiceArea,
 )
 from config import Configuration
+from adobe_vendor_id import AdobeVendorIDClient
 
 class Script(object):
 
@@ -240,49 +241,32 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         base_url += 'AdobeAuth/'
         token = parsed.token
 
-        signin_url = base_url + "SignIn"
-        accountinfo_url = base_url + "AccountInfo"
-        status_url = base_url + "Status"
-
-        print "1. Checking status: %s" % status_url
-        response = requests.get(status_url)
-        print "Status code: %s" % response.status_code
-        if response.content == 'UP':
-            print 'Response was "UP", as expected.'
-        else:
-            print "Unexpected response: %r" % response.content
-        print
+        client = AdobeVendorIDClient(base_url)
+        
+        print "1. Checking status: %s" % client.status_url
+        response = client.status()
+        # status() will raise an exception if anything is wrong.
+        print 'OK Service is up and running.'
             
-        print "2. Passing token into SignIn as authdata: %s" % signin_url
-
-        body = """<signInRequest method="authData" xmlns="http://ns.adobe.com/adept">
-<authData>%s</authData>
-</signInRequest>""" % base64.encodestring(token)
-        response = requests.post(signin_url, data=body)
-        print response.content
+        print "2. Passing token into SignIn as authdata: %s" % client.signin_url
+        identifier, label, content = client.sign_in_authdata(token)
+        print "OK Found user identifier and label."
+        print "   User identifier: %s" % identifier
+        print "   Label: %s" % label
+        print "   Full content: %s" % content
 
         print
         print "3. Passing token into SignIn as username/password."
         username, password = token.rsplit('|', 1)
-        body = """<signInRequest method="standard" xmlns="http://ns.adobe.com/adept">
-<username>%s</username>
-<password>%s</password>
-</signInRequest>""" % (username, password)
-        response = requests.post(signin_url, data=body)
-        print response.content
+        identifier, label, content = client.sign_in_standard(username, password)
+        print "OK Found user identifier and label."
+        print "   User identifier: %s" % identifier
+        print "   Label: %s" % label
+        print "   Full content: %s" % content
+            
+        print
+        print "4. Passing identifier into UserInfo to get user info: %s" % client.accountinfo_url
+        user_info, content = client.user_info(identifier)
+        print "OK Found user info: %s" % user_info
+        print "   Full content: %s" % content
 
-        match = re.compile("<user>([^<]+)</user>").search(response.content)
-        if match:
-            urn = match.groups()[0]
-        else:
-            print "No URN found, cannot continue."
-            urn = None
-
-        if urn:
-            print
-            print "4. Passing result into UserInfo to get user info."
-            body = """<accountInfoRequest method="standard" xmlns="http://ns.adobe.com/adept">
-<user>%s</user>
-</accountInfoRequest>""" % urn
-            response = requests.post(accountinfo_url, data=body)
-            print response.content

@@ -45,6 +45,7 @@ class Configuration(object):
     ADOBE_VENDOR_ID_INTEGRATION = "Adobe Vendor ID"
     ADOBE_VENDOR_ID = "vendor_id"
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
+    ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
     
     @classmethod
     def load(cls):
@@ -124,15 +125,20 @@ class Configuration(object):
     def vendor_id(cls):
         """Look up the Adobe Vendor ID configuration for this registry.
 
-        :return: a 2-tuple (vendor ID, node value)
+        :return: a 3-tuple (vendor ID, node value, [delegates])
         """
         integration = cls.integration(cls.ADOBE_VENDOR_ID_INTEGRATION,
                                       required=False)
         if not integration:
-            return None, None
+            return None, None, []
+        delegates = []
+        delegate_url = integration.get(cls.ADOBE_VENDOR_ID_DELEGATE_URL)
+        if delegate_url:
+            delegates.append(delegate_url)
         return (
             integration[cls.ADOBE_VENDOR_ID],
             integration[cls.ADOBE_VENDOR_ID_NODE_VALUE],
+            delegates
         )
     
     @classmethod
