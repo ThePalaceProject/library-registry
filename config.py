@@ -130,7 +130,7 @@ class Configuration(object):
         integration = cls.integration(cls.ADOBE_VENDOR_ID_INTEGRATION,
                                       required=False)
         if not integration:
-            return None, None
+            return None, None, []
         delegates = []
         delegate_url = integration.get(cls.ADOBE_VENDOR_ID_DELEGATE_URL)
         if delegate_url:

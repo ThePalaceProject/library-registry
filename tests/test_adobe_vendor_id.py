@@ -46,18 +46,20 @@ class TestConfiguration(VendorIDTest):
 
     def test_accessor(self):
         with self.temp_config() as config:
-            vendor_id, node_value = Configuration.vendor_id()
+            vendor_id, node_value, delegates = Configuration.vendor_id()
             eq_("VENDORID", vendor_id)
             eq_(114740953091845, node_value)
-
+            eq_([], delegates)
+            
     def test_accessor_vendor_id_not_configured(self):
         with self.temp_config() as config:
             del config[Configuration.INTEGRATIONS][
                 Configuration.ADOBE_VENDOR_ID_INTEGRATION
             ]
-            vendor_id, node_value = Configuration.vendor_id()
+            vendor_id, node_value, delegates = Configuration.vendor_id()
             eq_(None, vendor_id)
             eq_(None, node_value)
+            eq_([], delegates)
 
     
 class TestVendorIDRequestParsers(object):
@@ -215,8 +217,8 @@ class TestVendorIDModel(VendorIDTest):
     def setup(self):
         super(TestVendorIDModel, self).setup()
         with self.temp_config() as config:
-            vendor_id, node_value = Configuration.vendor_id()
-            self.model = AdobeVendorIDModel(self._db, node_value)
+            vendor_id, node_value, delegates = Configuration.vendor_id()
+            self.model = AdobeVendorIDModel(self._db, node_value, delegates)
 
         # Here's a library that participates in the registry.
         self.library = self._library()
@@ -285,3 +287,9 @@ class TestVendorIDModel(VendorIDTest):
         )
         eq_(None, None, (self.model.authdata_lookup, bad_signature))
 
+
+    def test_delegation(self):
+        """A model that doesn't know how to handle something can delegate
+        to another Vendor ID server.
+        """
+        
