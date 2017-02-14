@@ -257,7 +257,7 @@ class AdobeVendorIDModel(object):
             for delegate in self.delegates:
                 try:
                     account_id, label, content = delegate.sign_in_authdata(
-                        username, password
+                        authdata
                     )
                     return account_id, label
                 except Exception, e:
@@ -395,7 +395,7 @@ class MockAdobeVendorIDClient(AdobeVendorIDClient):
     def __init__(self):
         self.queue = []
 
-    def queue(self, response):
+    def enqueue(self, response):
         """Queue a response."""
         self.queue.insert(0, response)
         
@@ -404,6 +404,8 @@ class MockAdobeVendorIDClient(AdobeVendorIDClient):
 
         If it's an exception, raise it. Otherwise return it.
         """
+        if not self.queue:
+            raise VendorIDServerException("No response queued.")
         response = self.queue.pop()
         if isinstance(response, Exception):
             raise response
