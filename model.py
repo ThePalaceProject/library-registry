@@ -272,13 +272,15 @@ class Library(Base):
                                  Place.geometry,
                                  distance_to_other_point)
 
-        # For each such place, calculate the distance to Point A in
-        # meters.
-        distance = func.ST_Distance_Sphere(target, Place.geometry)
+        # For each library served by such a place, calculate the
+        # minimum distance between the library's service area and
+        # Point A in meters.
+        min_distance = func.min(func.ST_Distance_Sphere(target, Place.geometry))
         
         qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place).filter(nearby).add_column(distance).order_by(
-                distance.asc())
+            ServiceArea.place).filter(nearby).add_column(
+                min_distance).group_by(Library.id).order_by(
+                min_distance.asc())
         return qu
 
     @classmethod
@@ -349,9 +351,14 @@ class Library(Base):
         qu = qu.filter(or_(name_matches, alias_matches))
 
         if here:
-            distance = func.ST_Distance_Sphere(here, Place.geometry)
-            qu = qu.add_column(distance)
-            qu = qu.order_by(distance.asc())
+            # Order by the minimum distance between one of the
+            # library's service areas and the current location.
+            min_distance = func.min(
+                func.ST_Distance_Sphere(here, Place.geometry)
+            )
+            qu = qu.add_column(min_distance)
+            qu = qu.group_by(Library.id)
+            qu = qu.order_by(min_distance.asc())
         return qu
 
     @classmethod
