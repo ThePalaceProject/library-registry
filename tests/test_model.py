@@ -248,7 +248,7 @@ class TestLibrary(DatabaseTest):
 
         # The Brooklyn Public Library serves New York City.
         brooklyn = self._library(
-            "Brooklyn Public Library", [self.new_york_city]
+            "Brooklyn Public Library", [self.new_york_city, self.zip_11212]
         )
 
         # We can find the library by its name.
