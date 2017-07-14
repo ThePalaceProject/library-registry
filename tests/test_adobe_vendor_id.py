@@ -5,7 +5,7 @@ from nose.tools import (
     eq_,
     set_trace,
 )
-import contextlib
+import json
 from config import (
     CannotLoadConfiguration,
     Configuration,
@@ -24,6 +24,8 @@ from adobe_vendor_id import (
 
 from model import(
     DelegatedPatronIdentifier,
+    ExternalIntegration,
+    create,
 )
 
 from util.short_client_token import ShortClientTokenEncoder
@@ -34,35 +36,40 @@ from . import (
 
 class VendorIDTest(DatabaseTest):
        
-    @contextlib.contextmanager
-    def temp_config(self):
+    def _integration(self):
         """Configure a basic Vendor ID Service setup."""
-        name = Configuration.ADOBE_VENDOR_ID_INTEGRATION
-        with temp_config() as config:
-            config[Configuration.INTEGRATIONS][name] = {
-                Configuration.ADOBE_VENDOR_ID: "VENDORID",
-                Configuration.ADOBE_VENDOR_ID_NODE_VALUE: 114740953091845,
-            }
-            yield config
+        
+        integration, ignore = create(
+            self._db, ExternalIntegration,
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
+            goal=ExternalIntegration.DRM_GOAL,
+        )
+        integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
+        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = 114740953091845
+        return integration
 
 class TestConfiguration(VendorIDTest):
 
     def test_accessor(self):
-        with self.temp_config() as config:
-            vendor_id, node_value, delegates = Configuration.vendor_id()
-            eq_("VENDORID", vendor_id)
-            eq_(114740953091845, node_value)
-            eq_([], delegates)
+        self._integration()
+        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
+        eq_("VENDORID", vendor_id)
+        eq_(114740953091845, node_value)
+        eq_([], delegates)
             
     def test_accessor_vendor_id_not_configured(self):
-        with self.temp_config() as config:
-            del config[Configuration.INTEGRATIONS][
-                Configuration.ADOBE_VENDOR_ID_INTEGRATION
-            ]
-            vendor_id, node_value, delegates = Configuration.vendor_id()
-            eq_(None, vendor_id)
-            eq_(None, node_value)
-            eq_([], delegates)
+        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
+        eq_(None, vendor_id)
+        eq_(None, node_value)
+        eq_([], delegates)
+
+    def test_accessor_with_delegates(self):
+        integration = self._integration()
+        integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = json.dumps(["delegate"])
+        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
+        eq_("VENDORID", vendor_id)
+        eq_(114740953091845, node_value)
+        eq_(["delegate"], delegates)
 
     
 class TestVendorIDRequestParsers(object):
@@ -219,9 +226,9 @@ class TestVendorIDModel(VendorIDTest):
 
     def setup(self):
         super(TestVendorIDModel, self).setup()
-        with self.temp_config() as config:
-            vendor_id, node_value, delegates = Configuration.vendor_id()
-            self.model = AdobeVendorIDModel(self._db, node_value, delegates)
+        self._integration()
+        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
+        self.model = AdobeVendorIDModel(self._db, node_value, delegates)
 
         # Here's a library that participates in the registry.
         self.library = self._library()

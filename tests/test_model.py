@@ -1,17 +1,22 @@
 from nose.tools import (
     assert_raises_regexp,
+    assert_raises,
     eq_,
     set_trace,
 )
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 import base64
 import datetime
 import operator
 
 from model import (
+    create,
     get_one,
     get_one_or_create,
+    ConfigurationSetting,
     DelegatedPatronIdentifier,
+    ExternalIntegration,
     Library,
     LibraryAlias,
     Place,
@@ -429,3 +434,246 @@ class TestDelegatedPatronIdentifier(DatabaseTest):
         eq_(identifier2.id, identifier.id)
         # id_2() was not called.
         eq_("id1", identifier2.delegated_identifier)
+
+class TestExternalIntegration(DatabaseTest):
+
+    def setup(self):
+        super(TestExternalIntegration, self).setup()
+        self.external_integration, ignore = create(
+            self._db, ExternalIntegration, goal=self._str, protocol=self._str
+        )
+
+    def test_set_key_value_pair(self):
+        """Test the ability to associate extra key-value pairs with
+        an ExternalIntegration.
+        """
+        eq_([], self.external_integration.settings)
+
+        setting = self.external_integration.set_setting("website_id", "id1")
+        eq_("website_id", setting.key)
+        eq_("id1", setting.value)
+
+        # Calling set() again updates the key-value pair.
+        eq_([setting], self.external_integration.settings)
+        setting2 = self.external_integration.set_setting("website_id", "id2")
+        eq_(setting, setting2)
+        eq_("id2", setting2.value)
+
+        eq_(setting2, self.external_integration.setting("website_id"))
+
+    def test_explain(self):
+        integration, ignore = create(
+            self._db, ExternalIntegration,
+            protocol="protocol", goal="goal"
+        )
+        integration.name = "The Integration"
+        integration.setting("somesetting").value = "somevalue"
+        integration.setting("password").value = "somepass"
+
+        expect = """ID: %s
+Name: The Integration
+Protocol/Goal: protocol/goal
+somesetting='somevalue'""" % integration.id
+        actual = integration.explain()
+        eq_(expect, "\n".join(actual))
+        
+        # If we pass in True for include_secrets, we see the passwords.
+        with_secrets = integration.explain(include_secrets=True)
+        assert "password='somepass'" in with_secrets
+
+class TestConfigurationSetting(DatabaseTest):
+
+    def test_is_secret(self):
+        """Some configuration settings are considered secrets, 
+        and some are not.
+        """
+        m = ConfigurationSetting._is_secret
+        eq_(True, m('secret'))
+        eq_(True, m('password'))
+        eq_(True, m('its_a_secret_to_everybody'))
+        eq_(True, m('the_password'))
+        eq_(True, m('password_for_the_account'))
+        eq_(False, m('public_information'))
+
+        eq_(True,
+            ConfigurationSetting.sitewide(self._db, "secret_key").is_secret)
+        eq_(False,
+            ConfigurationSetting.sitewide(self._db, "public_key").is_secret)
+
+    def test_value_or_default(self):
+        integration, ignore = create(
+            self._db, ExternalIntegration, goal=self._str, protocol=self._str
+        )
+        setting = integration.setting("key")
+        eq_(None, setting.value)
+        
+        # If the setting has no value, value_or_default sets the value to
+        # the default, and returns the default.
+        eq_("default value", setting.value_or_default("default value"))
+        eq_("default value", setting.value)
+
+        # Once the value is set, value_or_default returns the value.
+        eq_("default value", setting.value_or_default("new default"))
+        
+        # If the setting has any value at all, even the empty string,
+        # it's returned instead of the default.
+        setting.value = ""
+        eq_("", setting.value_or_default("default"))
+
+    def test_value_inheritance(self):
+
+        key = "SomeKey"
+
+        # Here's a sitewide configuration setting.
+        sitewide_conf = ConfigurationSetting.sitewide(self._db, key)
+
+        # Its value is not set.
+        eq_(None, sitewide_conf.value)
+
+        # Set it.
+        sitewide_conf.value = "Sitewide value"
+        eq_("Sitewide value", sitewide_conf.value)
+        
+        # Here's an integration, let's say the Adobe Vendor ID setup.
+        adobe, ignore = create(
+            self._db, ExternalIntegration,
+            goal=ExternalIntegration.DRM_GOAL, protocol="Adobe Vendor ID"
+        )
+
+        # It happens to a ConfigurationSetting for the same key used
+        # in the sitewide configuration.
+        adobe_conf = ConfigurationSetting.for_externalintegration(key, adobe)
+
+        # But because the meaning of a configuration key differ so
+        # widely across integrations, the Adobe integration does not
+        # inherit the sitewide value for the key.
+        eq_(None, adobe_conf.value)
+        adobe_conf.value = "Adobe value"
+        
+        # Here's a library which has a ConfigurationSetting for the same
+        # key used in the sitewide configuration.
+        library = self._library()
+        library_conf = ConfigurationSetting.for_library(key, library)
+        
+        # Since all libraries use a given ConfigurationSetting to mean
+        # the same thing, a library _does_ inherit the sitewide value
+        # for a configuration setting.
+        eq_("Sitewide value", library_conf.value)
+
+        # Change the site-wide configuration, and the default also changes.
+        sitewide_conf.value = "New site-wide value"
+        eq_("New site-wide value", library_conf.value)
+
+        # The per-library value takes precedence over the site-wide
+        # value.
+        library_conf.value = "Per-library value"
+        eq_("Per-library value", library_conf.value)
+        
+        # Now let's consider a setting like on the combination of a library and an
+        # integration integration.
+        key = "patron_identifier_prefix"
+        library_patron_prefix_conf = ConfigurationSetting.for_library_and_externalintegration(
+            self._db, key, library, adobe
+        )
+        eq_(None, library_patron_prefix_conf.value)
+
+        # If the integration has a value set for this
+        # ConfigurationSetting, that value is inherited for every
+        # individual library that uses the integration.
+        generic_patron_prefix_conf = ConfigurationSetting.for_externalintegration(
+            key, adobe
+        )
+        eq_(None, generic_patron_prefix_conf.value)
+        generic_patron_prefix_conf.value = "Integration-specific value"
+        eq_("Integration-specific value", library_patron_prefix_conf.value)
+
+        # Change the value on the integration, and the default changes
+        # for each individual library.
+        generic_patron_prefix_conf.value = "New integration-specific value"
+        eq_("New integration-specific value", library_patron_prefix_conf.value)
+
+        # The library+integration setting takes precedence over the
+        # integration setting.
+        library_patron_prefix_conf.value = "Library-specific value"
+        eq_("Library-specific value", library_patron_prefix_conf.value)
+        
+    def test_duplicate(self):
+        """You can't have two ConfigurationSettings for the same key,
+        library, and external integration.
+
+        (test_relationships shows that you can have two settings for the same
+        key as long as library or integration is different.)
+        """
+        key = self._str
+        integration, ignore = create(
+            self._db, ExternalIntegration, goal=self._str, protocol=self._str
+        )
+        library = self._library()
+        setting = ConfigurationSetting.for_library_and_externalintegration(
+            self._db, key, library, integration
+        )
+        setting2 = ConfigurationSetting.for_library_and_externalintegration(
+            self._db, key, library, integration
+        )
+        eq_(setting, setting2)
+        assert_raises(
+            IntegrityError,
+            create, self._db, ConfigurationSetting,
+            key=key,
+            library_id=library.id, external_integration=integration
+        )
+    
+    def test_int_value(self):
+        number = ConfigurationSetting.sitewide(self._db, "number")
+        eq_(None, number.int_value)
+        
+        number.value = "1234"
+        eq_(1234, number.int_value)
+
+        number.value = "tra la la"
+        assert_raises(ValueError, lambda: number.int_value)
+
+    def test_float_value(self):
+        number = ConfigurationSetting.sitewide(self._db, "number")
+        eq_(None, number.int_value)
+        
+        number.value = "1234.5"
+        eq_(1234.5, number.float_value)
+
+        number.value = "tra la la"
+        assert_raises(ValueError, lambda: number.float_value)
+        
+    def test_json_value(self):
+        jsondata = ConfigurationSetting.sitewide(self._db, "json")
+        eq_(None, jsondata.int_value)
+
+        jsondata.value = "[1,2]"
+        eq_([1,2], jsondata.json_value)
+
+        jsondata.value = "tra la la"
+        assert_raises(ValueError, lambda: jsondata.json_value)
+        
+    def test_explain(self):
+        """Test that ConfigurationSetting.explain gives information
+        about all site-wide configuration settings.
+        """
+        ConfigurationSetting.sitewide(self._db, "a_secret").value = "1"
+        ConfigurationSetting.sitewide(self._db, "nonsecret_setting").value = "2"
+
+        integration, ignore = create(
+            self._db, ExternalIntegration,
+            protocol="a protocol", goal="a goal")
+        
+        actual = ConfigurationSetting.explain(self._db, include_secrets=True)
+        expect = """Site-wide configuration settings:
+---------------------------------
+a_secret='1'
+nonsecret_setting='2'"""
+        eq_(expect, "\n".join(actual))
+        
+        without_secrets = "\n".join(ConfigurationSetting.explain(
+            self._db, include_secrets=False
+        ))
+        assert 'a_secret' not in without_secrets
+        assert 'nonsecret_setting' in without_secrets
+

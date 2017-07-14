@@ -16,6 +16,8 @@ from model import (
     Library,
     LibraryAlias,
     ServiceArea,
+    ConfigurationSetting,
+    ExternalIntegration,
 )
 from config import Configuration
 from adobe_vendor_id import AdobeVendorIDClient
@@ -269,4 +271,194 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         user_info, content = client.user_info(identifier)
         print "OK Found user info: %s" % user_info
         print "   Full content: %s" % content
+
+class ConfigurationSettingScript(Script):
+
+    @classmethod
+    def _parse_setting(self, setting):
+        """Parse a command-line setting option into a key-value pair."""
+        if not '=' in setting:
+            raise ValueError(
+                'Incorrect format for setting: "%s". Should be "key=value"'
+                % setting
+            )
+        return setting.split('=', 1)
+
+    @classmethod
+    def add_setting_argument(self, parser, help):
+        """Modify an ArgumentParser to indicate that the script takes 
+        command-line settings.
+        """
+        parser.add_argument('--setting', help=help, action="append")
+    
+    def apply_settings(self, settings, obj):
+        """Treat `settings` as a list of command-line argument settings,
+        and apply each one to `obj`.
+        """
+        if not settings:
+            return None
+        for setting in settings:
+            key, value = self._parse_setting(setting)
+            obj.setting(key).value = value
+            
+            
+class ConfigureSiteScript(ConfigurationSettingScript):
+    """View or update site-wide configuration."""
+
+    @classmethod
+    def arg_parser(cls):
+        parser = argparse.ArgumentParser()
+    
+        parser.add_argument(
+            '--show-secrets',
+            help="Include secrets when displaying site settings.",
+            action="store_true",
+            default=False
+        )
+    
+        cls.add_setting_argument(
+            parser,
+            'Set a site-wide setting, such as base_url. Format: --setting="base_url=http://localhost:7000"'
+        )
+        return parser
+
+    def do_run(self, _db=None, cmd_args=None, output=sys.stdout):
+        _db = _db or self._db
+        args = self.parse_command_line(_db, cmd_args=cmd_args)
+        if args.setting:
+            for setting in args.setting:
+                key, value = self._parse_setting(setting)
+                ConfigurationSetting.sitewide(_db, key).value = value
+        settings = _db.query(ConfigurationSetting).filter(
+            ConfigurationSetting.library_id==None).filter(
+                ConfigurationSetting.external_integration==None
+            ).order_by(ConfigurationSetting.key)
+        output.write("Current site-wide settings:\n")
+        for setting in settings:
+            if args.show_secrets or not setting.is_secret:
+                output.write("%s='%s'\n" % (setting.key, setting.value))
+        _db.commit()
+
+class ShowIntegrationsScript(Script):
+    """Show information about the external integrations on a server."""
+    
+    name = "List the external integrations on this server."
+    @classmethod
+    def arg_parser(cls):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            '--name',
+            help='Only display information for the integration with the given name or ID',
+        )
+        parser.add_argument(
+            '--show-secrets',
+            help='Display secret values such as passwords.',
+            action='store_true'
+        )
+        return parser
+    
+    def do_run(self, _db=None, cmd_args=None, output=sys.stdout):
+        _db = _db or self._db
+        args = self.parse_command_line(_db, cmd_args=cmd_args)
+        if args.name:
+            name = args.name
+            integration = get_one(_db, ExternalIntegration, name=name)
+            if not integration:
+                integration = get_one(_db, ExternalIntegration, id=name)
+            if integration:
+                integrations = [integration]
+            else:
+                output.write(
+                    "Could not locate integration by name or ID: %s\n" % args
+                )
+                integrations = []
+        else:
+            integrations = _db.query(ExternalIntegration).order_by(
+                ExternalIntegration.name, ExternalIntegration.id).all()
+        if not integrations:
+            output.write("No integrations found.\n")
+        for integration in integrations:
+            output.write(
+                "\n".join(
+                    integration.explain(include_secrets=args.show_secrets)
+                )
+            )
+            output.write("\n")
+
+class ConfigureIntegrationScript(ConfigurationSettingScript):
+    """Create a integration or change its settings."""
+    name = "Create a site-wide integration or change an integration's settings"
+
+    @classmethod
+    def parse_command_line(cls, _db=None, cmd_args=None):
+        parser = cls.arg_parser(_db)
+        return parser.parse_known_args(cmd_args)[0]
+    
+    @classmethod
+    def arg_parser(cls, _db):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            '--name',
+            help='Name of the integration',
+        )
+        parser.add_argument(
+            '--id',
+            help='ID of the integration, if it has no name',
+        )
+        parser.add_argument(
+            '--protocol', help='Protocol used by the integration.',
+        )
+        parser.add_argument(
+            '--goal', help='Goal of the integration',
+        )
+        cls.add_setting_argument(
+            parser,
+            'Set a configuration value on the integration. Format: --setting="key=value"'
+        )        
+        return parser
+
+    @classmethod
+    def _integration(self, _db, id, name, protocol, goal):
+        """Find or create the ExternalIntegration referred to."""
+        if not id and not name and not (protocol and goal):
+            raise ValueError(
+                "An integration must by identified by either ID, name, or the combination of protocol and goal."
+            )
+        integration = None
+        if id:
+            integration = get_one(
+                _db, ExternalIntegration, ExternalIntegration.id==id
+            )
+            if not integration:
+                raise ValueError("No integration with ID %s." % id)
+        if name:
+            integration = get_one(_db, ExternalIntegration, name=name)
+            if not integration and not (protocol and goal):
+                raise ValueError(
+                    'No integration with name "%s". To create it, you must also provide protocol and goal.' % name
+                )
+        if not integration and (protocol and goal):
+            integration, is_new = get_one_or_create(
+                _db, ExternalIntegration, protocol=protocol, goal=goal
+            )
+        if name:
+            integration.name = name
+        return integration
+        
+    def do_run(self, _db=None, cmd_args=None, output=sys.stdout):
+        _db = _db or self._db
+        args = self.parse_command_line(_db, cmd_args=cmd_args)
+
+        # Find or create the integration
+        protocol = None
+        id = args.id
+        name = args.name
+        protocol = args.protocol
+        goal = args.goal
+        integration = self._integration(_db, id, name, protocol, goal)
+        self.apply_settings(args.setting, integration)
+        _db.commit()
+        output.write("Configuration settings stored.\n")
+        output.write("\n".join(integration.explain()))
+        output.write("\n")
 
