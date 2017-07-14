@@ -8,7 +8,7 @@ from flask_sqlalchemy_session import flask_scoped_session
 
 from config import Configuration
 from controller import LibraryRegistry
-from model import SessionManager
+from model import SessionManager, ConfigurationSetting
 from util.problem_detail import ProblemDetail
 from util.flask_util import originating_ip
 from util.app_server import returns_problem_detail
@@ -94,8 +94,7 @@ def adobe_vendor_id_status():
 
 if __name__ == '__main__':
     debug = True
-    url = Configuration.integration_url(
-        Configuration.LIBRARY_REGISTRY_INTEGRATION, required=True)
+    url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
     scheme, netloc, path, parameters, query, fragment = urlparse.urlparse(url)
     if ':' in netloc:
         host, port = netloc.split(':')

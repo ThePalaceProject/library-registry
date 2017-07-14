@@ -36,13 +36,13 @@ class Configuration(object):
 
    
     INTEGRATIONS = 'integrations'
-    LIBRARY_REGISTRY_INTEGRATION = 'Library Registry'
-    URL = 'url'
+
+    BASE_URL = 'base_url'
+
     DATABASE_INTEGRATION = "Postgres"
     DATABASE_PRODUCTION_URL = "production_url"
     DATABASE_TEST_URL = "test_url"
 
-    ADOBE_VENDOR_ID_INTEGRATION = "Adobe Vendor ID"
     ADOBE_VENDOR_ID = "vendor_id"
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
     ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
@@ -122,22 +122,27 @@ class Configuration(object):
         return cls.integration(cls.DATABASE_INTEGRATION)[key]
 
     @classmethod
-    def vendor_id(cls):
+    def vendor_id(cls, _db):
         """Look up the Adobe Vendor ID configuration for this registry.
 
         :return: a 3-tuple (vendor ID, node value, [delegates])
         """
-        integration = cls.integration(cls.ADOBE_VENDOR_ID_INTEGRATION,
-                                      required=False)
+        from model import ExternalIntegration
+
+        integration = ExternalIntegration.lookup(
+            _db, ExternalIntegration.ADOBE_VENDOR_ID,
+            ExternalIntegration.DRM_GOAL)
         if not integration:
             return None, None, []
+        setting = integration.setting(cls.ADOBE_VENDOR_ID_DELEGATE_URL)
         delegates = []
-        delegate_url = integration.get(cls.ADOBE_VENDOR_ID_DELEGATE_URL)
-        if delegate_url:
-            delegates.append(delegate_url)
+        try:
+            delegates = setting.json_value or []
+        except ValueError, e:
+            cls.log.warn("Invalid Adobe Vendor ID delegates configured.")
         return (
-            integration[cls.ADOBE_VENDOR_ID],
-            integration[cls.ADOBE_VENDOR_ID_NODE_VALUE],
+            integration.setting(cls.ADOBE_VENDOR_ID).value,
+            integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).int_value,
             delegates
         )
     
