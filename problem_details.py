@@ -15,11 +15,11 @@ INVALID_OPDS_FEED = pd(
       _("The submitted URL did not return a valid OPDS feed."),
 )
 
-NO_SHELF_LINK = pd(
-    "http://librarysimplified.org/terms/problem/no-shelf-link",
+AUTH_DOCUMENT_NOT_FOUND = pd(
+    "http://librarysimplified.org/terms/problem/auth-document-not-found",
     400,
-    title=_("No shelf link"),
-    detail=_("The submitted OPDS feed did not have a link with rel 'http://opds-spec.org/shelf'.")
+    title=_("Authentication document not found"),
+    detail=_("You submitted an OPDS server, but I couldn't find an OPDS authentication document."),
 )
 
 INVALID_AUTH_DOCUMENT = pd(

@@ -154,27 +154,69 @@ class LibraryRegistryController(object):
         if not opds_url:
             return NO_OPDS_URL
 
+        auth_response = None
+        links = []
         try:
-            response = do_get(opds_url, allowed_response_codes=["2xx", "3xx"])
-            feed = feedparser.parse(response.content)
+            response = do_get(opds_url, allowed_response_codes=["2xx", "3xx", 401])
+            if response.status_code == 401:
+                # The OPDS feed requires authentication, so this response
+                # should contain the auth document.
+                auth_response = response
+            else:
+                feed = feedparser.parse(response.content)
+                links = feed.get("feed", {}).get("links", [])
         except Exception, e:
             return INVALID_OPDS_FEED
-        links = feed.get("feed", {}).get("links", [])
 
-        auth_url = None
-        for link in links:
-            # TODO: Define a rel for the auth document itself, and
-            # look for that instead.
-            if link.get("rel") == "http://opds-spec.org/shelf":
-                auth_url = link.get("href")
-                break
+        if not auth_response:
+            # The feed didn't require authentication, so we'll need to find
+            # the auth document.
 
-        if not auth_url:
-            return NO_SHELF_LINK
+            # First, look for a link to the auth document.
+            auth_url = None
+            for link in links:
+                if link.get("rel") == "http://opds-spec.org/auth/document":
+                    auth_url = link.get("href")
+                    break
+
+            if auth_url:
+                try:
+                    auth_response = do_get(auth_url, allowed_response_codes=["2xx", "3xx"])
+                except Exception, e:
+                    pass
+
+        if not auth_response:
+            # There was no link to the auth document, but maybe there's a shelf
+            # link that requires authentication or links to the document.
+            shelf_url = None
+            for link in links:
+                if link.get("rel") == "http://opds-spec.org/shelf":
+                    shelf_url = link.get("href")
+                    break
+
+            if shelf_url:
+                try:
+                    response = do_get(shelf_url, allowed_response_codes=["2xx", "3xx", 401])
+                    if response.status_code == 401:
+                        # This response should have the auth document.
+                        auth_response = response
+                    else:
+                        # This response didn't require authentication, so maybe it's a feed
+                        # that links to the auth document.
+                        feed = feedparser.parse(response.content)
+                        links = feed.get("feed", {}).get("links", [])
+                        for link in links:
+                            if link.get("rel") == "http://opds-spec.org/auth/document":
+                                auth_response = do_get(link.get("href"), allowed_response_codes=["2xx", "3xx"])
+                                break
+                except Exception, e:
+                    pass
+
+        if not auth_response:
+            return AUTH_DOCUMENT_NOT_FOUND
 
         try:
-            response = do_get(auth_url, allowed_response_codes=["2xx", "3xx", "4xx"])
-            auth_document = json.loads(response.content)
+            auth_document = json.loads(auth_response.content)
         except Exception, e:
             return INVALID_AUTH_DOCUMENT
 

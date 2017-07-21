@@ -185,9 +185,6 @@ class TestLibraryRegistryController(ControllerTest):
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
 
-            opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
-            http_client.queue_response(200, content=opds_feed)
-
             response = self.controller.register(do_get=http_client.do_get)
 
             eq_(201, response.status_code)
@@ -199,10 +196,11 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("http://alibrary.org", library.web_url)
             eq_("image data", library.logo)
 
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests)
+            eq_(["http://circmanager.org"], http_client.requests)
 
 
-        # Register changes to the same library..
+        # Register changes to the same library, and test all the places
+        # the auth document could be.
         with self.app.test_request_context("/"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org"),
@@ -210,28 +208,65 @@ class TestLibraryRegistryController(ControllerTest):
 
             auth_document = {
                 "name": "A Library",
-                "service_description": "New Description",
+                "service_description": "My feed requires authentication",
                 "links": {
                     "logo": { "href": "new image data" },
                 }
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
 
-            opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
-            http_client.queue_response(200, content=opds_feed)
-
             response = self.controller.register(do_get=http_client.do_get)
-
             eq_(200, response.status_code)
 
             library = get_one(self._db, Library, opds_url="http://circmanager.org")
             assert library != None
             eq_("A Library", library.name)
-            eq_("New Description", library.description)
+            eq_("My feed requires authentication", library.description)
             eq_(None, library.web_url)
             eq_("new image data", library.logo)
+            eq_(["http://circmanager.org"], http_client.requests[1:])
 
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[2:])
+            auth_document = {
+                "name": "A Library",
+                "service_description": "My feed links to the auth document",
+            }
+            http_client.queue_response(200, content=json.dumps(auth_document))
+            feed = '<feed><link rel="http://opds-spec.org/auth/document" href="http://circmanager.org/auth"/></feed>'
+            http_client.queue_response(200, content=feed)
+
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(200, response.status_code)
+            eq_("My feed links to the auth document", library.description)
+            eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[2:])
+
+            auth_document = {
+                "name": "A Library",
+                "service_description": "My feed links to the shelf, which requires auth",
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
+            http_client.queue_response(200, content=feed)
+
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(200, response.status_code)
+            eq_("My feed links to the shelf, which requires auth", library.description)
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[4:])
+            
+            auth_document = {
+                "name": "A Library",
+                "service_description": "My feed links to a shelf which links to the auth document",
+            }
+            http_client.queue_response(200, content=json.dumps(auth_document))
+            shelf_feed = '<feed><link rel="http://opds-spec.org/auth/document" href="http://circmanager.org/auth"/></feed>'
+            http_client.queue_response(200, content=shelf_feed)
+            feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
+            http_client.queue_response(200, content=feed)
+
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(200, response.status_code)
+            eq_("My feed links to a shelf which links to the auth document", library.description)
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf", "http://circmanager.org/auth"], http_client.requests[6:])
+
 
     def test_register_errors(self):
         http_client = DummyHTTPClient()
@@ -246,15 +281,34 @@ class TestLibraryRegistryController(ControllerTest):
                 ("url", "http://circmanager.org"),
             ])
 
+            # This feed doesn't work.
             http_client.queue_response(500)
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_OPDS_FEED, response)
 
+            # This feed doesn't link to the auth document or the shelf.
             opds_feed = '<feed></feed>'
             http_client.queue_response(200, content=opds_feed)
             response = self.controller.register(do_get=http_client.do_get)
-            eq_(NO_SHELF_LINK, response)
+            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
 
+            # This feed links to the auth document, but that link is broken.
+            opds_feed = '<feed><link rel="http://opds-spec.org/auth/document" href="broken"/></feed>'
+            http_client.queue_response(404)
+            http_client.queue_response(200, content=opds_feed)
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
+
+            # This feed links to the shelf, but it doesn't require auth and it
+            # doesn't link to the auth document.
+            shelf_feed = '<feed></feed>'
+            opds_feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
+            http_client.queue_response(200, content=shelf_feed)
+            http_client.queue_response(200, content=opds_feed)
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
+
+            # This feed has an auth document that's not valid.
             http_client.queue_response(401, content="not json")
             opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
             http_client.queue_response(200, content=opds_feed)
