@@ -174,9 +174,9 @@ class LibraryRegistryController(object):
         def find_and_get_url(links, rel, allowed_response_codes=None):
             for link in links:
                 if link.get("rel") == rel:
-                    auth_url = link.get("href")
+                    url = link.get("href")
                     try:
-                        return do_get(auth_url, allowed_response_codes=allowed_response_codes)
+                        return do_get(url, allowed_response_codes=allowed_response_codes)
                     except Exception, e:
                         pass
             return None
