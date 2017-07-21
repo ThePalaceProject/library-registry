@@ -181,7 +181,7 @@ class LibraryRegistryController(object):
                         pass
             return None
 
-        if not auth_response:
+        if auth_response is None:
             # The feed didn't require authentication, so we'll need to find
             # the auth document.
 
@@ -189,12 +189,12 @@ class LibraryRegistryController(object):
             auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
                                              allowed_response_codes=["2xx", "3xx"])
 
-        if not auth_response:
+        if auth_response is None:
             # There was no link to the auth document, but maybe there's a shelf
             # link that requires authentication or links to the document.
             response = find_and_get_url(links, SHELF_REL,
                                         allowed_response_codes=["2xx", "3xx", 401])
-            if response:
+            if response is not None:
                 if response.status_code == 401:
                     # This response should have the auth document.
                     auth_response = response
@@ -206,7 +206,7 @@ class LibraryRegistryController(object):
                     auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
                                                      allowed_response_codes=["2xx", "3xx"])
 
-        if not auth_response:
+        if auth_response is None:
             return AUTH_DOCUMENT_NOT_FOUND
 
         try:
