@@ -4,17 +4,27 @@ from nose.tools import (
 )
 import os
 import feedparser
+import json
 
 from controller import (
     LibraryRegistry,
     LibraryRegistryController,
 )
 
+import flask
 from flask import Response
+from werkzeug import ImmutableMultiDict
 
 from . import DatabaseTest
+from testing import DummyHTTPClient
 
 from opds import OPDSFeed
+from model import (
+  get_one,
+  Library,
+)
+from problem_details import *
+
 
 class TestLibraryRegistry(LibraryRegistry):
     pass
@@ -67,7 +77,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             # If that's not good enough, there's a link to the search
             # controller, so you can do a search.
-            [search_link, self_link] = sorted(
+            [register_link, search_link, self_link] = sorted(
                 feed['feed']['links'], key=lambda x: x['rel']
             )
             url_for = self.app.library_registry.url_for
@@ -79,7 +89,9 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("search"), search_link['href'])
             eq_("search", search_link['rel'])
             eq_("application/opensearchdescription+xml", search_link['type'])
-            
+
+            eq_(url_for("register"), register_link["href"])
+            eq_("register", register_link["rel"])
             
     def test_nearby_no_ip_address(self):
         with self.app.test_request_context("/"):
@@ -136,7 +148,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Kansas State Library", ks['title'])
             eq_("1922 km.", ks['schema_distance'])
 
-            [search_link, self_link] = sorted(
+            [register_link, search_link, self_link] = sorted(
                 feed['feed']['links'], key=lambda x: x['rel']
             )
             url_for = self.app.library_registry.url_for
@@ -150,3 +162,104 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("search"), search_link['href'])
             eq_("search", search_link['rel'])
             eq_("application/opensearchdescription+xml", search_link['type'])
+
+            eq_(url_for("register"), register_link["href"])
+            eq_("register", register_link["rel"])
+
+    def test_register_success(self):
+        http_client = DummyHTTPClient()
+
+        # Register a new library.
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org"),
+            ])
+
+            auth_document = {
+                "name": "A Library",
+                "service_description": "Description",
+                "links": {
+                    "alternate": { "href": "http://alibrary.org" },
+                    "logo": { "href": "image data" },
+                }
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+
+            opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
+            http_client.queue_response(200, content=opds_feed)
+
+            response = self.controller.register(do_get=http_client.do_get)
+
+            eq_(201, response.status_code)
+
+            library = get_one(self._db, Library, opds_url="http://circmanager.org")
+            assert library != None
+            eq_("A Library", library.name)
+            eq_("Description", library.description)
+            eq_("http://alibrary.org", library.web_url)
+            eq_("image data", library.logo)
+
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests)
+
+
+        # Register changes to the same library..
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org"),
+            ])
+
+            auth_document = {
+                "name": "A Library",
+                "service_description": "New Description",
+                "links": {
+                    "logo": { "href": "new image data" },
+                }
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+
+            opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
+            http_client.queue_response(200, content=opds_feed)
+
+            response = self.controller.register(do_get=http_client.do_get)
+
+            eq_(200, response.status_code)
+
+            library = get_one(self._db, Library, opds_url="http://circmanager.org")
+            assert library != None
+            eq_("A Library", library.name)
+            eq_("New Description", library.description)
+            eq_(None, library.web_url)
+            eq_("new image data", library.logo)
+
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[2:])
+
+    def test_register_errors(self):
+        http_client = DummyHTTPClient()
+
+        with self.app.test_request_context("/"):
+            response = self.controller.register(do_get=http_client.do_get)
+
+            eq_(NO_OPDS_URL, response)
+
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org"),
+            ])
+
+            http_client.queue_response(500)
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_OPDS_FEED, response)
+
+            opds_feed = '<feed></feed>'
+            http_client.queue_response(200, content=opds_feed)
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(NO_SHELF_LINK, response)
+
+            http_client.queue_response(401, content="not json")
+            opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
+            http_client.queue_response(200, content=opds_feed)
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT, response)
+
+
+

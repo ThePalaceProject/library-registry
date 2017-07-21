@@ -6,12 +6,16 @@ from flask import (
     Response,
     url_for,
 )
+import requests
+import json
+import feedparser
 
 from adobe_vendor_id import AdobeVendorIDController
 
 from model import (
     production_session,
     Library,
+    get_one_or_create,
 )
 from config import (
     Configuration,
@@ -27,6 +31,8 @@ from util.app_server import (
     HeartbeatController,
     feed_response,
 )
+from util.http import HTTP
+from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 
@@ -77,6 +83,10 @@ class LibraryRegistryAnnotator(Annotator):
         search_url = self.app.url_for("search")
         feed.add_link_to_feed(
             feed.feed, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
+        )
+        register_url = self.app.url_for("register")
+        feed.add_link_to_feed(
+            feed.feed, href=register_url, rel="register"
         )
 
     
@@ -138,3 +148,50 @@ class LibraryRegistryController(object):
                 3600 * 24 * 30
             )
             return Response(body, 200, headers)
+
+    def register(self, do_get=HTTP.get_with_timeout):
+        opds_url = flask.request.form.get("url")
+        if not opds_url:
+            return NO_OPDS_URL
+
+        try:
+            response = do_get(opds_url, allowed_response_codes=["2xx", "3xx"])
+            feed = feedparser.parse(response.content)
+        except Exception, e:
+            return INVALID_OPDS_FEED
+        links = feed.get("feed", {}).get("links", [])
+
+        auth_url = None
+        for link in links:
+            # TODO: Define a rel for the auth document itself, and
+            # look for that instead.
+            if link.get("rel") == "http://opds-spec.org/shelf":
+                auth_url = link.get("href")
+                break
+
+        if not auth_url:
+            return NO_SHELF_LINK
+
+        try:
+            response = do_get(auth_url, allowed_response_codes=["2xx", "3xx", "4xx"])
+            auth_document = json.loads(response.content)
+        except Exception, e:
+            return INVALID_AUTH_DOCUMENT
+
+        library, is_new = get_one_or_create(
+            self._db, Library,
+            opds_url=opds_url
+        )
+
+        library.name = auth_document.get("name")
+        library.description = auth_document.get("service_description")
+
+        links = auth_document.get("links", {})
+        library.web_url = links.get("alternate", {}).get("href", None)
+        # TODO: Fetch the logo image and convert to base64 if it's a URL.
+        library.logo = links.get("logo", {}).get("href", None)
+
+        if is_new:
+            return Response(_("Success"), 201)
+        else:
+            return Response(_("Success"), 200)
