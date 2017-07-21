@@ -55,6 +55,11 @@ def nearby():
         originating_ip()
     )
 
+@app.route("/register", methods=["POST"])
+@returns_problem_detail
+def register():
+    return app.library_registry.registry_controller.register()
+
 @app.route('/search')
 @returns_problem_detail
 def search():

@@ -6,12 +6,16 @@ from flask import (
     Response,
     url_for,
 )
+import requests
+import json
+import feedparser
 
 from adobe_vendor_id import AdobeVendorIDController
 
 from model import (
     production_session,
     Library,
+    get_one_or_create,
 )
 from config import (
     Configuration,
@@ -27,6 +31,8 @@ from util.app_server import (
     HeartbeatController,
     feed_response,
 )
+from util.http import HTTP
+from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 
@@ -77,6 +83,10 @@ class LibraryRegistryAnnotator(Annotator):
         search_url = self.app.url_for("search")
         feed.add_link_to_feed(
             feed.feed, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
+        )
+        register_url = self.app.url_for("register")
+        feed.add_link_to_feed(
+            feed.feed, href=register_url, rel="register"
         )
 
     
@@ -138,3 +148,86 @@ class LibraryRegistryController(object):
                 3600 * 24 * 30
             )
             return Response(body, 200, headers)
+
+    def register(self, do_get=HTTP.get_with_timeout):
+        opds_url = flask.request.form.get("url")
+        if not opds_url:
+            return NO_OPDS_URL
+
+        AUTH_DOCUMENT_REL = "http://opds-spec.org/auth/document"
+        SHELF_REL = "http://opds-spec.org/shelf"
+
+        auth_response = None
+        links = []
+        try:
+            response = do_get(opds_url, allowed_response_codes=["2xx", "3xx", 401])
+            if response.status_code == 401:
+                # The OPDS feed requires authentication, so this response
+                # should contain the auth document.
+                auth_response = response
+            else:
+                feed = feedparser.parse(response.content)
+                links = feed.get("feed", {}).get("links", [])
+        except Exception, e:
+            return INVALID_OPDS_FEED
+
+        def find_and_get_url(links, rel, allowed_response_codes=None):
+            for link in links:
+                if link.get("rel") == rel:
+                    url = link.get("href")
+                    try:
+                        return do_get(url, allowed_response_codes=allowed_response_codes)
+                    except Exception, e:
+                        pass
+            return None
+
+        if not auth_response:
+            # The feed didn't require authentication, so we'll need to find
+            # the auth document.
+
+            # First, look for a link to the auth document.
+            auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
+                                             allowed_response_codes=["2xx", "3xx"])
+
+        if not auth_response:
+            # There was no link to the auth document, but maybe there's a shelf
+            # link that requires authentication or links to the document.
+            response = find_and_get_url(links, SHELF_REL,
+                                        allowed_response_codes=["2xx", "3xx", 401])
+            if response:
+                if response.status_code == 401:
+                    # This response should have the auth document.
+                    auth_response = response
+                else:
+                    # This response didn't require authentication, so maybe it's a feed
+                    # that links to the auth document.
+                    feed = feedparser.parse(response.content)
+                    links = feed.get("feed", {}).get("links", [])
+                    auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
+                                                     allowed_response_codes=["2xx", "3xx"])
+
+        if not auth_response:
+            return AUTH_DOCUMENT_NOT_FOUND
+
+        try:
+            auth_document = json.loads(auth_response.content)
+        except Exception, e:
+            return INVALID_AUTH_DOCUMENT
+
+        library, is_new = get_one_or_create(
+            self._db, Library,
+            opds_url=opds_url
+        )
+
+        library.name = auth_document.get("name")
+        library.description = auth_document.get("service_description")
+
+        links = auth_document.get("links", {})
+        library.web_url = links.get("alternate", {}).get("href", None)
+        # TODO: Fetch the logo image and convert to base64 if it's a URL.
+        library.logo = links.get("logo", {}).get("href", None)
+
+        if is_new:
+            return Response(_("Success"), 201)
+        else:
+            return Response(_("Success"), 200)

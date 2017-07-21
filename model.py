@@ -206,7 +206,7 @@ class Library(Base):
                        onupdate=lambda: datetime.datetime.utcnow())
 
     # The library's logo.
-    logo = Column(Binary)
+    logo = Column(Unicode)
 
     # To issue Adobe IDs for this library, the registry must share a
     # short name and a secret with them.
