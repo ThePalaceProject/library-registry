@@ -670,9 +670,9 @@ class Place(Base):
         """
         parts = Place.name_parts(name)
         if len(parts) > 1:
-            # We're in a situation where we're trying to look up a
-            # scoped name such as "Boston, MA". `name_parts` has
-            # turned "Boston, MA" into ["MA", "Boston"].
+            # We're trying to look up a scoped name such as "Boston,
+            # MA". `name_parts` has turned "Boston, MA" into ["MA",
+            # "Boston"].
             #
             # Now we need to look for "MA" inside ourselves, and then
             # look for "Boston" inside the object we get back.
