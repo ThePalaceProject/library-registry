@@ -7,6 +7,12 @@ class Annotator(object):
         pass
 
 class OPDSCatalog(object):
+    """Represents an OPDS 2 Catalog document.
+    https://github.com/opds-community/opds-revision/blob/master/opds-2.0.md
+
+    Within the collection role "catalogs", metadata and the navigation
+    collection role have the same semantics as in the overall OPDS 2 Catalog spec.
+    """
 
     TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ%z'
 
