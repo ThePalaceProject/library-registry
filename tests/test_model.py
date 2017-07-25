@@ -137,6 +137,7 @@ class TestPlace(DatabaseTest):
         m = Place.parse_name
         eq_(("Kern", Place.COUNTY), m("Kern County"))
         eq_(("New York", Place.STATE), m("New York State"))
+        eq_(("Chicago, IL", None), m("Chicago, IL"))
         
     def test_name_parts(self):
         m = Place.name_parts
