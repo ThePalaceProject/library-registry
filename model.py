@@ -667,14 +667,13 @@ class Place(Base):
         """
         return [x.strip() for x in reversed(name.split(",")) if x.strip()]
     
-    def strictly_intersects(self, qu):
-        """Modifies a filter to find places inside this Place but not
-        bordering it.
+    def overlaps_not_counting_border(self, qu):
+        """Modifies a filter to find places that have points inside this
+        Place, not counting the border.
 
-        Connecticut does not overlap New York, but they intersect
-        because the two states share a border. This method creates a
-        more real-world notion of 'inside' that does not count a
-        shared border.
+        Connecticut has no points inside New York, but the two states
+        share a border. This method creates a more real-world notion
+        of 'inside' that does not count a shared border.
         """
         intersects = Place.geometry.intersects(self.geometry)
         touches = func.ST_Touches(Place.geometry, self.geometry)
@@ -724,8 +723,8 @@ class Place(Base):
         exclude_types = Place.larger_place_types(self.type)
         qu = qu.filter(~Place.type.in_(exclude_types))
         
-        if self.type != Place.EVERYWHERE:
-            qu = self.strictly_intersects(qu)
+        if self.geometry is not None:
+            qu = self.overlaps_not_counting_border(qu)
         places = qu.all()
         if len(places) == 0:
             return None
@@ -738,8 +737,8 @@ class Place(Base):
         return places[0]
     
     def served_by(self):
-        """Find all Libraries with a ServiceArea whose Place intersects
-        this Place.
+        """Find all Libraries with a ServiceArea whose Place overlaps
+        this Place, not counting the border.
 
         A Library whose ServiceArea borders this place, but does not
         intersect this place, is not counted. This way, the state
@@ -749,7 +748,7 @@ class Place(Base):
         _db = Session.object_session(self)
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place)
-        qu = self.strictly_intersects(qu)
+        qu = self.overlaps_not_counting_border(qu)
         return qu
     
     def __repr__(self):

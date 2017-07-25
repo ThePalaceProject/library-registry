@@ -102,8 +102,8 @@ class TestPlace(DatabaseTest):
         )
         eq_([alias], new_york.aliases)
 
-    def test_strictly_intersects(self):
-        """Test that strictly_intersects does not count places
+    def test_overlaps_not_counting_border(self):
+        """Test that overlaps_not_counting_border does not count places
         that share a border as intersecting, the way the PostGIS
         'intersect' logic does.
         """
@@ -112,11 +112,11 @@ class TestPlace(DatabaseTest):
         connecticut = self.connecticut_state
 
         def s_i(place1, place2):
-            """Use strictly_intersects to provide a boolean answer
+            """Use overlaps_not_counting_border to provide a boolean answer
             to the question: does place 2 strictly intersect place 1?
             """
             qu = self._db.query(Place)
-            qu = place1.strictly_intersects(qu)
+            qu = place1.overlaps_not_counting_border(qu)
             return place2 in qu.all()
 
         # Places that contain each other intersect.
@@ -129,7 +129,7 @@ class TestPlace(DatabaseTest):
         
         # Connecticut and New York share a border, so PostGIS says they
         # intersect, but they don't "intersect" in the everyday sense,
-        # so strictly_intersects excludes them.
+        # so overlaps_not_counting_border excludes them.
         eq_(False, s_i(new_york, connecticut))
         eq_(False, s_i(connecticut, new_york))
 
@@ -235,7 +235,7 @@ class TestPlace(DatabaseTest):
 
         # New York and Connecticut share a border, and the Connecticut
         # state library serves the entire state, including the
-        # border. Internally, we use strictly_intersects() to avoid
+        # border. Internally, we use overlaps_not_counting_border() to avoid
         # concluding that the Connecticut state library serves New
         # York.
         eq_([nypl], new_york.served_by().all())
