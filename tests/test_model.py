@@ -153,6 +153,7 @@ class TestPlace(DatabaseTest):
         new_york = self.new_york_state
         connecticut = self.connecticut_state
         manhattan_ks = self.manhattan_ks
+        kings_county = self.crude_kings_county
         
         everywhere = Place.everywhere(self._db)
         
@@ -163,6 +164,12 @@ class TestPlace(DatabaseTest):
         eq_(zip_10018, new_york.lookup_inside("10018"))
         eq_(zip_10018, us.lookup_inside("10018, NY"))
         eq_(nyc, us.lookup_inside("New York, NY"))
+
+        # Test that the disambiguators "State" and "County" are handled
+        # properly.
+        eq_(new_york, us.lookup_inside("New York State"))
+        eq_(kings_county, us.lookup_inside("Kings County, NY"))
+        eq_(kings_county, everywhere.lookup_inside("Kings County, US"))
 
         assert_raises_regexp(
             MultipleResultsFound,
