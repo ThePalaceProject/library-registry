@@ -603,12 +603,13 @@ class Place(Base):
         "Chicago" becaomes ("Chicago", None)
         """
         check = place_name.lower()
+        place_type = None
         if check.endswith(' county'):
-            place_name = place_query[:-7]
+            place_name = place_name[:-7]
             place_type = Place.COUNTY
 
         if check.endswith(' state'):
-            place_name = place_query[:-6]
+            place_name = place_name[:-6]
             place_type = Place.STATE
         return place_name, place_type
 
@@ -645,9 +646,8 @@ class Place(Base):
         """
         return [x.strip() for x in reverse(name.split(","))]
     
-    @classmethod
-    def strictly_inside(cls, qu, place):
-        """Modifies a filter to find places inside the given Place but not
+    def strictly_intersects(self, qu):
+        """Modifies a filter to find places inside this Place but not
         bordering it.
 
         Connecticut does not overlap New York, but they intersect
@@ -655,8 +655,8 @@ class Place(Base):
         more real-world notion of 'inside' that does not count a
         shared border.
         """
-        intersects = Place.geometry.intersects(inside.geometry)
-        touches = func.ST_Touches(Place.geometry, inside.geometry)
+        intersects = Place.geometry.intersects(self.geometry)
+        touches = func.ST_Touches(Place.geometry, self.geometry)
         return qu.filter(intersects).filter(touches==False)
     
     @classmethod
@@ -701,7 +701,7 @@ class Place(Base):
         # instead of specifying which state you're talking about.
         qu = cls.lookup_by_name(_db, name)
         if must_be_inside.type != cls.EVERYWHERE:
-            qu = cls.strictly_inside(qu, place)
+            qu = place.strictly_intersects(qu)
         places = qu.all()
         if len(places) == 0:
             return None
@@ -724,7 +724,7 @@ class Place(Base):
         _db = Session.object_session(self)
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place)
-        qu = self.strictly_inside(qu, self.geometry)
+        qu = self.strictly_intersects(qu)
         return qu
     
     def __repr__(self):
