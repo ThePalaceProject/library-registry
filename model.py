@@ -629,6 +629,23 @@ class Place(Base):
         return qu
 
     @classmethod
+    def name_parts(cls, name):
+        """Split a nested geographic name into parts.
+
+        "Boston, MA" is split into ["MA", "Boston"]
+        "Lake County, Ohio, USA" is split into
+        ["USA", "Ohio", "Lake County"]
+
+        There is no guarantee that these place names correspond to
+        Places in the database.
+
+        :param name: The name to split into parts.
+        :return: A list of place names, with the largest place at the front
+           of the list.
+        """
+        return [x.strip() for x in reverse(name.split(","))]
+    
+    @classmethod
     def strictly_inside(cls, qu, place):
         """Modifies a filter to find places inside the given Place but not
         bordering it.
@@ -653,6 +670,35 @@ class Place(Base):
         :raise MultipleResultsFound: If more than one Place with the
         given name is inside `place`.
         """
+        parts = cls.name_parts(name)
+        if len(parts) > 1:
+            # We're in a situation where we're trying to look up a
+            # scoped name inside a Place object, e.g. looking for
+            # "Boston, MA" inside the US. `name_parts` has turned "Boston,
+            # MA" into ["MA", "Boston"].
+            #
+            # Now we need to look for "MA" inside the US, and then
+            # look for "Boston" inside the object representing
+            # Massachussets.
+            for part in parts:
+                must_be_inside = cls.lookup_inside(_db, part, must_be_inside)
+                if not must_be_inside:
+                    # A link in the chain has failed. Return None
+                    # immediately.
+                    return None
+            # Every link in the chain has succeeded, and `must_be_inside`
+            # now contains the Place we were looking for.
+            return must_be_inside
+
+        # If we get here, it means we're looking up "Boston" within
+        # Massachussets, or "Kern County" within the United States.
+        # In other words, we expect to find at most one place with
+        # this name inside the `must_be_inside` object.
+        #
+        # If we find more than one, it's an error. The name should
+        # have been scoped better. This will happen if you search for
+        # "Springfield" or "Lake County" within the United States,
+        # instead of specifying which state you're talking about.
         qu = cls.lookup_by_name(_db, name)
         if must_be_inside.type != cls.EVERYWHERE:
             qu = cls.strictly_inside(qu, place)
