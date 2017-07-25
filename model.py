@@ -596,6 +596,26 @@ class Place(Base):
         return place
 
     @classmethod
+    def larger_place_types(cls, type):
+        """Return a list of place types known to be bigger than `type`.
+
+        Places don't form a strict heirarchy. In particular, ZIP codes
+        are not 'smaller' than cities. But counties and cities are
+        smaller than states, and states are smaller than nations, so
+        if you're searching inside a state for a place called "Japan",
+        you know that the nation of Japan is not what you're looking
+        for.
+        """
+        larger = [Place.EVERYWHERE]
+        if type not in (Place.NATION, Place.EVERYWHERE):
+            larger.append(Place.NATION)
+        if type in (Place.COUNTY, Place.CITY, Place.POSTAL_CODE):
+            larger.append(Place.STATE)
+        if type == Place.CITY:
+            larger.append(Place.COUNTY)
+        return larger
+    
+    @classmethod
     def parse_name(cls, place_name):
         """Try to extract a place type from a name.
 
@@ -700,17 +720,8 @@ class Place(Base):
         qu = Place.lookup_by_name(_db, name).filter(Place.type!=self.type)
 
         # Don't look in a place type known to be 'bigger' than this
-        # place. Scoping always moves from a bigger place to a smaller
-        # place. Places don't form a strict heirarchy (e.g. ZIP codes
-        # are not 'smaller' than cities'), but counties and cities are
-        # smaller than states
-        exclude_types = [self.type]
-        if self.type not in (Place.NATION, Place.EVERYWHERE):
-            exclude_types.append(Place.NATION)
-        if self.type in (Place.COUNTY, Place.CITY, Place.POSTAL_CODE):
-            exclude_types.append(Place.STATE)
-        if self.type == Place.CITY:
-            exclude_types.append(Place.COUNTY)
+        # place.
+        exclude_types = Place.larger_place_types(self.type)
         qu = qu.filter(~Place.type.in_(exclude_types))
         
         if self.type != Place.EVERYWHERE:
@@ -725,7 +736,7 @@ class Place(Base):
                 )
             )
         return places[0]
-        
+    
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place intersects
         this Place.
