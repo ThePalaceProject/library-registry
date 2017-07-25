@@ -153,6 +153,7 @@ class TestPlace(DatabaseTest):
         new_york = self.new_york_state
         connecticut = self.connecticut_state
         manhattan_ks = self.manhattan_ks
+        kansas = manhattan_ks.parent
         kings_county = self.crude_kings_county
         
         everywhere = Place.everywhere(self._db)
@@ -177,6 +178,7 @@ class TestPlace(DatabaseTest):
             us.lookup_inside, "Manhattan"
         )
         eq_(manhattan_ks, us.lookup_inside("Manhattan, KS"))
+        eq_(manhattan_ks, us.lookup_inside("Manhattan, Kansas"))
         eq_(None, new_york.lookup_inside("Manhattan, KS"))
         eq_(None, connecticut.lookup_inside("New York"))
         eq_(None, connecticut.lookup_inside("New York, NY"))
@@ -190,6 +192,13 @@ class TestPlace(DatabaseTest):
             us.lookup_inside, "New York"
         )
 
+        # However, we should be able to do better here.
+        assert_raises_regexp(
+            MultipleResultsFound,
+            "More than one place called New York inside United States.",
+            us.lookup_inside, "New York"
+        )
+        
         # These maybe shouldn't work -- they expose that we're saying
         # "inside" but our algorithm uses intersection.
         eq_(new_york, us.lookup_inside("NY, 10018"))
