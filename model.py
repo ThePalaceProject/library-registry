@@ -452,7 +452,7 @@ class Library(Base):
             if indicator in place_query:
                 place_query = place_query.replace(indicator, '').strip()
 
-        place_query, place_type = Place.parse_place_name(place_query)
+        place_query, place_type = Place.parse_name(place_query)
 
         return library_query, place_query, place_type
     
@@ -575,7 +575,7 @@ class Place(Base):
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
-    geometry = Column(Geometry(srid=4326), nullable=False)
+    geometry = Column(Geometry(srid=4326))
 
     aliases = relationship("PlaceAlias", backref='place')
 
@@ -583,20 +583,23 @@ class Place(Base):
 
     @classmethod
     def everywhere(self, _db):
-        """Return a special Place that represents everywhere."""
-        place = get_one_or_create(
+        """Return a special Place that represents everywhere.
+
+        This place has no .geometry, so attempts to use it in
+        geographic comparisons will fail.
+        """
+        place, is_new = get_one_or_create(
             _db, Place, type=self.EVERYWHERE,
             create_method_kwargs=dict(external_id="Everywhere",
                                       external_name="Everywhere")
         )
-        # TODO: We need to allow this Place to exist without a
-        # geometry.
+        return place
 
     @classmethod
-    def parse_place_name(cls, place_name):
+    def parse_name(cls, place_name):
         """Try to extract a place type from a name.
 
-        :return: A 2-tule (place_name, place_type)
+        :return: A 2-tuple (place_name, place_type)
 
         e.g. "Kern County" becomes ("Kern", Place.COUNTY)
         "Arizona State" becomes ("Arizona", Place.STATE)
@@ -616,14 +619,12 @@ class Place(Base):
     @classmethod
     def lookup_by_name(cls, _db, name, place_type=None):
         """Look up one or more Places by name.
-
-        TODO: We need to support "Chicago, IL"
         """
         if not place_type:
-            name, place_type = cls.parse_place_name(name)
+            name, place_type = cls.parse_name(name)
         qu = _db.query(Place).outerjoin(PlaceAlias).filter(
             or_(Place.external_name==name, Place.abbreviated_name==name,
-                PlaceAlias.alias==name)
+                PlaceAlias.name==name)
         )
         if place_type:
             qu = qu.filter(Place.type==place_type)
@@ -644,7 +645,7 @@ class Place(Base):
         :return: A list of place names, with the largest place at the front
            of the list.
         """
-        return [x.strip() for x in reverse(name.split(","))]
+        return [x.strip() for x in reversed(name.split(",")) if x.strip()]
     
     def strictly_intersects(self, qu):
         """Modifies a filter to find places inside this Place but not
@@ -659,36 +660,32 @@ class Place(Base):
         touches = func.ST_Touches(Place.geometry, self.geometry)
         return qu.filter(intersects).filter(touches==False)
     
-    @classmethod
-    def lookup_inside(cls, _db, name, must_be_inside):
-        """Look up a named Place geographically within another Place.
-
-        :param must_be_inside: A Place object representing the place
-        to look inside.
+    def lookup_inside(self, name):
+        """Look up a named Place that geographically intersects this Place.
 
         :return: A Place object, or None if no match could be found.
+
         :raise MultipleResultsFound: If more than one Place with the
-        given name is inside `place`.
+        given name intersects with this Place.
         """
-        parts = cls.name_parts(name)
+        parts = Place.name_parts(name)
         if len(parts) > 1:
             # We're in a situation where we're trying to look up a
-            # scoped name inside a Place object, e.g. looking for
-            # "Boston, MA" inside the US. `name_parts` has turned "Boston,
-            # MA" into ["MA", "Boston"].
+            # scoped name such as "Boston, MA". `name_parts` has
+            # turned "Boston, MA" into ["MA", "Boston"].
             #
-            # Now we need to look for "MA" inside the US, and then
-            # look for "Boston" inside the object representing
-            # Massachussets.
+            # Now we need to look for "MA" inside ourselves, and then
+            # look for "Boston" inside the object we get back.
+            look_in_here = self
             for part in parts:
-                must_be_inside = cls.lookup_inside(_db, part, must_be_inside)
-                if not must_be_inside:
+                look_in_here = look_in_here.lookup_inside(part)
+                if not look_in_here:
                     # A link in the chain has failed. Return None
                     # immediately.
                     return None
             # Every link in the chain has succeeded, and `must_be_inside`
             # now contains the Place we were looking for.
-            return must_be_inside
+            return look_in_here
 
         # If we get here, it means we're looking up "Boston" within
         # Massachussets, or "Kern County" within the United States.
@@ -699,18 +696,20 @@ class Place(Base):
         # have been scoped better. This will happen if you search for
         # "Springfield" or "Lake County" within the United States,
         # instead of specifying which state you're talking about.
-        qu = cls.lookup_by_name(_db, name)
-        if must_be_inside.type != cls.EVERYWHERE:
-            qu = place.strictly_intersects(qu)
+        _db = Session.object_session(self)
+        qu = Place.lookup_by_name(_db, name).filter(Place.type!=self.type)
+        if self.type != Place.EVERYWHERE:
+            qu = self.strictly_intersects(qu)
         places = qu.all()
         if len(places) == 0:
             return None
         if len(places) > 1:
             raise MultipleResultsFound(
                 "More than one place called %s inside %s." % (
-                    name, must_be_inside.external_name
+                    name, self.external_name
                 )
             )
+        return places[0]
         
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place intersects

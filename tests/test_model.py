@@ -6,6 +6,7 @@ from nose.tools import (
 )
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import MultipleResultsFound
 import base64
 import datetime
 import operator
@@ -122,12 +123,70 @@ class TestPlace(DatabaseTest):
         eq_(True, s_i(nyc, new_york))
         eq_(True, s_i(new_york, nyc))
 
+        # Places that don't share a border don't intersect.
+        eq_(False, s_i(nyc, connecticut))
+        eq_(False, s_i(connecticut, nyc))
+        
         # Connecticut and New York share a border, so PostGIS says they
         # intersect, but they don't "intersect" in the everyday sense,
         # so strictly_intersects excludes them.
-        eq_(False, s_i(nyc, connecticut))
         eq_(False, s_i(new_york, connecticut))
         eq_(False, s_i(connecticut, new_york))
+
+    def test_parse_name(self):
+        m = Place.parse_name
+        eq_(("Kern", Place.COUNTY), m("Kern County"))
+        eq_(("New York", Place.STATE), m("New York State"))
+        
+    def test_name_parts(self):
+        m = Place.name_parts
+        eq_(["MA", "Boston"], m("Boston, MA"))
+        eq_(["MA", "Boston"], m("Boston, MA,"))
+        eq_(["USA", "Anytown"], m("Anytown, USA"))
+        eq_(["US", "Ohio", "Lake County"], m("Lake County, Ohio, US"))
+        
+    def test_lookup_inside(self):
+        us = self.crude_us
+        zip_10018 = self.zip_10018
+        nyc = self.new_york_city
+        new_york = self.new_york_state
+        connecticut = self.connecticut_state
+        manhattan_ks = self.manhattan_ks
+        
+        everywhere = Place.everywhere(self._db)
+        
+        eq_(us, everywhere.lookup_inside("US"))
+        eq_(new_york, everywhere.lookup_inside("NY"))
+        eq_(new_york, us.lookup_inside("NY"))
+
+        eq_(zip_10018, new_york.lookup_inside("10018"))
+        eq_(zip_10018, us.lookup_inside("10018, NY"))
+        eq_(nyc, us.lookup_inside("New York, NY"))
+
+        assert_raises_regexp(
+            MultipleResultsFound,
+            "More than one place called Manhattan inside United States.",
+            us.lookup_inside, "Manhattan"
+        )
+        eq_(manhattan_ks, us.lookup_inside("Manhattan, KS"))
+        eq_(None, new_york.lookup_inside("Manhattan, KS"))
+        eq_(None, connecticut.lookup_inside("New York"))
+        eq_(None, connecticut.lookup_inside("New York, NY"))
+        eq_(None, connecticut.lookup_inside("10018"))
+        
+        # This is annoying, but I think it's the best overall
+        # solution. "New York, USA" really is ambiguous.
+        assert_raises_regexp(
+            MultipleResultsFound,
+            "More than one place called New York inside United States.",
+            us.lookup_inside, "New York"
+        )
+
+        # These maybe shouldn't work -- they expose that we're saying
+        # "inside" but our algorithm uses intersection.
+        eq_(new_york, us.lookup_inside("NY, 10018"))
+        eq_(new_york, new_york.lookup_inside("NY, US, 10018"))
+        eq_(new_york, zip_10018.lookup_inside("NY"))        
         
     def test_served_by(self):
         zip = self.zip_10018
