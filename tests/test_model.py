@@ -196,7 +196,7 @@ class TestPlace(DatabaseTest):
         assert_raises_regexp(
             MultipleResultsFound,
             "More than one place called New York inside United States.",
-            us.lookup_inside, "New York"
+            us.lookup_inside, "New York, New York"
         )
         
         # These maybe shouldn't work -- they expose that we're saying
