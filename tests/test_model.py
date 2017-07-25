@@ -157,7 +157,6 @@ class TestPlace(DatabaseTest):
         kings_county = self.crude_kings_county
         
         everywhere = Place.everywhere(self._db)
-        
         eq_(us, everywhere.lookup_inside("US"))
         eq_(new_york, everywhere.lookup_inside("NY"))
         eq_(new_york, us.lookup_inside("NY"))
@@ -165,7 +164,8 @@ class TestPlace(DatabaseTest):
         eq_(zip_10018, new_york.lookup_inside("10018"))
         eq_(zip_10018, us.lookup_inside("10018, NY"))
         eq_(nyc, us.lookup_inside("New York, NY"))
-
+        eq_(nyc, new_york.lookup_inside("New York"))
+        
         # Test that the disambiguators "State" and "County" are handled
         # properly.
         eq_(new_york, us.lookup_inside("New York State"))
@@ -183,6 +183,15 @@ class TestPlace(DatabaseTest):
         eq_(None, connecticut.lookup_inside("New York"))
         eq_(None, connecticut.lookup_inside("New York, NY"))
         eq_(None, connecticut.lookup_inside("10018"))
+
+        # You can't find a place 'inside' itself.
+        eq_(None, us.lookup_inside("US"))
+        eq_(None, new_york.lookup_inside("NY, US, 10018"))
+
+        # Or 'inside' a place that's known to be smaller than it.
+        eq_(None, kings_county.lookup_inside("NY"))
+        eq_(None, us.lookup_inside("NY, 10018"))
+        eq_(None, zip_10018.lookup_inside("NY"))
         
         # This is annoying, but I think it's the best overall
         # solution. "New York, USA" really is ambiguous.
@@ -199,11 +208,12 @@ class TestPlace(DatabaseTest):
             us.lookup_inside, "New York, New York"
         )
         
-        # These maybe shouldn't work -- they expose that we're saying
-        # "inside" but our algorithm uses intersection.
-        eq_(new_york, us.lookup_inside("NY, 10018"))
-        eq_(new_york, new_york.lookup_inside("NY, US, 10018"))
-        eq_(new_york, zip_10018.lookup_inside("NY"))        
+        # This maybe shouldn't work -- it exposes that we're saying
+        # "inside", but our algorithm uses intersection. We handle
+        # most such cases by only looking at certain types of places,
+        # but ZIP codes don't nest within cities, so that trick
+        # doesn't work here.
+        eq_(nyc, zip_10018.lookup_inside("New York"))
         
     def test_served_by(self):
         zip = self.zip_10018

@@ -698,6 +698,21 @@ class Place(Base):
         # instead of specifying which state you're talking about.
         _db = Session.object_session(self)
         qu = Place.lookup_by_name(_db, name).filter(Place.type!=self.type)
+
+        # Don't look in a place type known to be 'bigger' than this
+        # place. Scoping always moves from a bigger place to a smaller
+        # place. Places don't form a strict heirarchy (e.g. ZIP codes
+        # are not 'smaller' than cities'), but counties and cities are
+        # smaller than states
+        exclude_types = [self.type]
+        if self.type not in (Place.NATION, Place.EVERYWHERE):
+            exclude_types.append(Place.NATION)
+        if self.type in (Place.COUNTY, Place.CITY, Place.POSTAL_CODE):
+            exclude_types.append(Place.STATE)
+        if self.type == Place.CITY:
+            exclude_types.append(Place.COUNTY)
+        qu = qu.filter(~Place.type.in_(exclude_types))
+        
         if self.type != Place.EVERYWHERE:
             qu = self.strictly_intersects(qu)
         places = qu.all()
