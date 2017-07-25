@@ -28,16 +28,12 @@ class OPDSCatalog(object):
     @classmethod
     def add_link_to_catalog(cls, catalog, children=None, **kwargs):
         link = dict(**kwargs)
-        links = catalog.get("links", [])
-        links.append(link)
-        catalog["links"] = links
+        catalog.setdefault("links", []).append(link)
 
     @classmethod
     def add_image_to_catalog(cls, catalog, children=None, **kwargs):
         image = dict(**kwargs)
-        images = catalog.get("images", [])
-        images.append(image)
-        catalog["images"] = images
+        catalog.setdefault("images", []).append(image)
 
     def __init__(self, _db, title, url, libraries, annotator=None):
         """Turn a list of libraries into a catalog."""
