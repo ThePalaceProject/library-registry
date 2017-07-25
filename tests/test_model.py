@@ -6,6 +6,7 @@ from nose.tools import (
 )
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import MultipleResultsFound
 import base64
 import datetime
 import operator
@@ -101,6 +102,119 @@ class TestPlace(DatabaseTest):
         )
         eq_([alias], new_york.aliases)
 
+    def test_overlaps_not_counting_border(self):
+        """Test that overlaps_not_counting_border does not count places
+        that share a border as intersecting, the way the PostGIS
+        'intersect' logic does.
+        """
+        nyc = self.new_york_city
+        new_york = self.new_york_state
+        connecticut = self.connecticut_state
+
+        def s_i(place1, place2):
+            """Use overlaps_not_counting_border to provide a boolean answer
+            to the question: does place 2 strictly intersect place 1?
+            """
+            qu = self._db.query(Place)
+            qu = place1.overlaps_not_counting_border(qu)
+            return place2 in qu.all()
+
+        # Places that contain each other intersect.
+        eq_(True, s_i(nyc, new_york))
+        eq_(True, s_i(new_york, nyc))
+
+        # Places that don't share a border don't intersect.
+        eq_(False, s_i(nyc, connecticut))
+        eq_(False, s_i(connecticut, nyc))
+        
+        # Connecticut and New York share a border, so PostGIS says they
+        # intersect, but they don't "intersect" in the everyday sense,
+        # so overlaps_not_counting_border excludes them.
+        eq_(False, s_i(new_york, connecticut))
+        eq_(False, s_i(connecticut, new_york))
+
+    def test_parse_name(self):
+        m = Place.parse_name
+        eq_(("Kern", Place.COUNTY), m("Kern County"))
+        eq_(("New York", Place.STATE), m("New York State"))
+        eq_(("Chicago, IL", None), m("Chicago, IL"))
+        
+    def test_name_parts(self):
+        m = Place.name_parts
+        eq_(["MA", "Boston"], m("Boston, MA"))
+        eq_(["MA", "Boston"], m("Boston, MA,"))
+        eq_(["USA", "Anytown"], m("Anytown, USA"))
+        eq_(["US", "Ohio", "Lake County"], m("Lake County, Ohio, US"))
+        
+    def test_lookup_inside(self):
+        us = self.crude_us
+        zip_10018 = self.zip_10018
+        nyc = self.new_york_city
+        new_york = self.new_york_state
+        connecticut = self.connecticut_state
+        manhattan_ks = self.manhattan_ks
+        kansas = manhattan_ks.parent
+        kings_county = self.crude_kings_county
+        
+        everywhere = Place.everywhere(self._db)
+        eq_(us, everywhere.lookup_inside("US"))
+        eq_(new_york, everywhere.lookup_inside("NY"))
+        eq_(new_york, us.lookup_inside("NY"))
+
+        eq_(zip_10018, new_york.lookup_inside("10018"))
+        eq_(zip_10018, us.lookup_inside("10018, NY"))
+        eq_(nyc, us.lookup_inside("New York, NY"))
+        eq_(nyc, new_york.lookup_inside("New York"))
+        
+        # Test that the disambiguators "State" and "County" are handled
+        # properly.
+        eq_(new_york, us.lookup_inside("New York State"))
+        eq_(kings_county, us.lookup_inside("Kings County, NY"))
+        eq_(kings_county, everywhere.lookup_inside("Kings County, US"))
+
+        assert_raises_regexp(
+            MultipleResultsFound,
+            "More than one place called Manhattan inside United States.",
+            us.lookup_inside, "Manhattan"
+        )
+        eq_(manhattan_ks, us.lookup_inside("Manhattan, KS"))
+        eq_(manhattan_ks, us.lookup_inside("Manhattan, Kansas"))
+        eq_(None, new_york.lookup_inside("Manhattan, KS"))
+        eq_(None, connecticut.lookup_inside("New York"))
+        eq_(None, connecticut.lookup_inside("New York, NY"))
+        eq_(None, connecticut.lookup_inside("10018"))
+
+        # You can't find a place 'inside' itself.
+        eq_(None, us.lookup_inside("US"))
+        eq_(None, new_york.lookup_inside("NY, US, 10018"))
+
+        # Or 'inside' a place that's known to be smaller than it.
+        eq_(None, kings_county.lookup_inside("NY"))
+        eq_(None, us.lookup_inside("NY, 10018"))
+        eq_(None, zip_10018.lookup_inside("NY"))
+        
+        # This is annoying, but I think it's the best overall
+        # solution. "New York, USA" really is ambiguous.
+        assert_raises_regexp(
+            MultipleResultsFound,
+            "More than one place called New York inside United States.",
+            us.lookup_inside, "New York"
+        )
+
+        # However, we should be able to do better here.
+        assert_raises_regexp(
+            MultipleResultsFound,
+            "More than one place called New York inside United States.",
+            us.lookup_inside, "New York, New York"
+        )
+        
+        # This maybe shouldn't work -- it exposes that we're saying
+        # "inside", but our algorithm uses intersection. We handle
+        # most such cases by only looking at certain types of places,
+        # but ZIP codes don't nest within cities, so that trick
+        # doesn't work here.
+        eq_(nyc, zip_10018.lookup_inside("New York"))
+        
     def test_served_by(self):
         zip = self.zip_10018
         nyc = self.new_york_city
@@ -121,14 +235,11 @@ class TestPlace(DatabaseTest):
 
         # New York and Connecticut share a border, and the Connecticut
         # state library serves the entire state, including the
-        # border. According to PostGIS 'intersect' logic, Connecticut
-        # intersects New York at the border. This implies that the
-        # Connecticut state library also serves New York state. We
-        # avoid this by, when searching for libraries on the state or
-        # national level, only considering results located in the same
-        # state or nation.
+        # border. Internally, we use overlaps_not_counting_border() to avoid
+        # concluding that the Connecticut state library serves New
+        # York.
         eq_([nypl], new_york.served_by().all())
-        
+
 
 class TestLibrary(DatabaseTest):
 

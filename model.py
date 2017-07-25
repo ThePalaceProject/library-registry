@@ -233,7 +233,7 @@ class Library(Base):
             raise ValueError(
                 'Adobe short name cannot contain the pipe character.'
             )
-        return value.upper()    
+        return value.upper()
     
     @classmethod
     def nearby(cls, _db, target, max_radius=150):
@@ -452,20 +452,8 @@ class Library(Base):
             if indicator in place_query:
                 place_query = place_query.replace(indicator, '').strip()
 
-        if place_query.endswith(' county'):
-            # It's common for someone to search for e.g. 'kern county
-            # library'. If we have a library system named after the
-            # county, it will show up in the library name search. But
-            # we should also look up counties with that name and find
-            # all the libraries that cover some part of one of those
-            # counties.
-            place_query = place_query[:-7]
-            place_type = Place.COUNTY
+        place_query, place_type = Place.parse_name(place_query)
 
-        if place_query.endswith(' state'):
-            place_query = place_query[:-6]
-            place_type = Place.STATE
-            
         return library_query, place_query, place_type
     
     @classmethod
@@ -551,6 +539,7 @@ class Place(Base):
     CITY = 'city'
     POSTAL_CODE = 'postal_code'
     LIBRARY_SERVICE_AREA = 'library_service_area'
+    EVERYWHERE = 'everywhere'
     
     id = Column(Integer, primary_key=True)
 
@@ -571,7 +560,8 @@ class Place(Base):
     
     # The most convenient place that 'contains' this place. For most
     # places the most convenient parent will be a state. For states,
-    # the best parent will be a nation. A nation has no parent.
+    # the best parent will be a nation. A nation has no parent; neither
+    # does 'everywhere'.
     parent_id = Column(
         Integer, ForeignKey('places.id'), index=True
     )
@@ -585,15 +575,170 @@ class Place(Base):
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
-    geometry = Column(Geometry(srid=4326), nullable=False)
+    geometry = Column(Geometry(srid=4326))
 
     aliases = relationship("PlaceAlias", backref='place')
 
     service_areas = relationship("ServiceArea", backref="place")
+
+    @classmethod
+    def everywhere(self, _db):
+        """Return a special Place that represents everywhere.
+
+        This place has no .geometry, so attempts to use it in
+        geographic comparisons will fail.
+        """
+        place, is_new = get_one_or_create(
+            _db, Place, type=self.EVERYWHERE,
+            create_method_kwargs=dict(external_id="Everywhere",
+                                      external_name="Everywhere")
+        )
+        return place
+
+    @classmethod
+    def larger_place_types(cls, type):
+        """Return a list of place types known to be bigger than `type`.
+
+        Places don't form a strict heirarchy. In particular, ZIP codes
+        are not 'smaller' than cities. But counties and cities are
+        smaller than states, and states are smaller than nations, so
+        if you're searching inside a state for a place called "Japan",
+        you know that the nation of Japan is not what you're looking
+        for.
+        """
+        larger = [Place.EVERYWHERE]
+        if type not in (Place.NATION, Place.EVERYWHERE):
+            larger.append(Place.NATION)
+        if type in (Place.COUNTY, Place.CITY, Place.POSTAL_CODE):
+            larger.append(Place.STATE)
+        if type == Place.CITY:
+            larger.append(Place.COUNTY)
+        return larger
+    
+    @classmethod
+    def parse_name(cls, place_name):
+        """Try to extract a place type from a name.
+
+        :return: A 2-tuple (place_name, place_type)
+
+        e.g. "Kern County" becomes ("Kern", Place.COUNTY)
+        "Arizona State" becomes ("Arizona", Place.STATE)
+        "Chicago" becaomes ("Chicago", None)
+        """
+        check = place_name.lower()
+        place_type = None
+        if check.endswith(' county'):
+            place_name = place_name[:-7]
+            place_type = Place.COUNTY
+
+        if check.endswith(' state'):
+            place_name = place_name[:-6]
+            place_type = Place.STATE
+        return place_name, place_type
+
+    @classmethod
+    def lookup_by_name(cls, _db, name, place_type=None):
+        """Look up one or more Places by name.
+        """
+        if not place_type:
+            name, place_type = cls.parse_name(name)
+        qu = _db.query(Place).outerjoin(PlaceAlias).filter(
+            or_(Place.external_name==name, Place.abbreviated_name==name,
+                PlaceAlias.name==name)
+        )
+        if place_type:
+            qu = qu.filter(Place.type==place_type)
+        return qu
+
+    @classmethod
+    def name_parts(cls, name):
+        """Split a nested geographic name into parts.
+
+        "Boston, MA" is split into ["MA", "Boston"]
+        "Lake County, Ohio, USA" is split into
+        ["USA", "Ohio", "Lake County"]
+
+        There is no guarantee that these place names correspond to
+        Places in the database.
+
+        :param name: The name to split into parts.
+        :return: A list of place names, with the largest place at the front
+           of the list.
+        """
+        return [x.strip() for x in reversed(name.split(",")) if x.strip()]
+    
+    def overlaps_not_counting_border(self, qu):
+        """Modifies a filter to find places that have points inside this
+        Place, not counting the border.
+
+        Connecticut has no points inside New York, but the two states
+        share a border. This method creates a more real-world notion
+        of 'inside' that does not count a shared border.
+        """
+        intersects = Place.geometry.intersects(self.geometry)
+        touches = func.ST_Touches(Place.geometry, self.geometry)
+        return qu.filter(intersects).filter(touches==False)
+    
+    def lookup_inside(self, name):
+        """Look up a named Place that geographically intersects this Place.
+
+        :return: A Place object, or None if no match could be found.
+
+        :raise MultipleResultsFound: If more than one Place with the
+        given name intersects with this Place.
+        """
+        parts = Place.name_parts(name)
+        if len(parts) > 1:
+            # We're trying to look up a scoped name such as "Boston,
+            # MA". `name_parts` has turned "Boston, MA" into ["MA",
+            # "Boston"].
+            #
+            # Now we need to look for "MA" inside ourselves, and then
+            # look for "Boston" inside the object we get back.
+            look_in_here = self
+            for part in parts:
+                look_in_here = look_in_here.lookup_inside(part)
+                if not look_in_here:
+                    # A link in the chain has failed. Return None
+                    # immediately.
+                    return None
+            # Every link in the chain has succeeded, and `must_be_inside`
+            # now contains the Place we were looking for.
+            return look_in_here
+
+        # If we get here, it means we're looking up "Boston" within
+        # Massachussets, or "Kern County" within the United States.
+        # In other words, we expect to find at most one place with
+        # this name inside the `must_be_inside` object.
+        #
+        # If we find more than one, it's an error. The name should
+        # have been scoped better. This will happen if you search for
+        # "Springfield" or "Lake County" within the United States,
+        # instead of specifying which state you're talking about.
+        _db = Session.object_session(self)
+        qu = Place.lookup_by_name(_db, name).filter(Place.type!=self.type)
+
+        # Don't look in a place type known to be 'bigger' than this
+        # place.
+        exclude_types = Place.larger_place_types(self.type)
+        qu = qu.filter(~Place.type.in_(exclude_types))
+        
+        if self.geometry is not None:
+            qu = self.overlaps_not_counting_border(qu)
+        places = qu.all()
+        if len(places) == 0:
+            return None
+        if len(places) > 1:
+            raise MultipleResultsFound(
+                "More than one place called %s inside %s." % (
+                    name, self.external_name
+                )
+            )
+        return places[0]
     
     def served_by(self):
-        """Find all Libraries with a ServiceArea whose Place intersects
-        this Place.
+        """Find all Libraries with a ServiceArea whose Place overlaps
+        this Place, not counting the border.
 
         A Library whose ServiceArea borders this place, but does not
         intersect this place, is not counted. This way, the state
@@ -601,10 +746,9 @@ class Place(Base):
         state.
         """
         _db = Session.object_session(self)
-        intersects = Place.geometry.intersects(self.geometry)
-        does_not_touch = func.ST_Touches(Place.geometry, self.geometry) == False
         qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place).filter(intersects).filter(does_not_touch)
+            ServiceArea.place)
+        qu = self.overlaps_not_counting_border(qu)
         return qu
     
     def __repr__(self):
