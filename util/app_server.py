@@ -12,22 +12,16 @@ from util.flask_util import problem
 from util.problem_detail import ProblemDetail
 import traceback
 import logging
-from opds import (
-    OPDSFeed,
-    NavigationFeed,
-)
+from opds import OPDSCatalog
+
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm.exc import (
     NoResultFound,
 )
 
-def feed_response(feed, cache_for=OPDSFeed.CACHE_TIME):
-    content_type = OPDSFeed.NAVIGATION_FEED_TYPE
-    return _make_response(feed, content_type, cache_for)
-
-def entry_response(entry, cache_for=OPDSFeed.CACHE_TIME):
-    content_type = OPDSFeed.ENTRY_TYPE
-    return _make_response(entry, content_type, cache_for)
+def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):
+    content_type = OPDSCatalog.OPDS_TYPE
+    return _make_response(catalog, content_type, cache_for)
 
 def _make_response(content, content_type, cache_for):
     if isinstance(content, etree._Element):

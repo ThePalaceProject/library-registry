@@ -3,7 +3,6 @@ from nose.tools import (
     set_trace,
 )
 import os
-import feedparser
 import json
 
 from controller import (
@@ -18,7 +17,7 @@ from werkzeug import ImmutableMultiDict
 from . import DatabaseTest
 from testing import DummyHTTPClient
 
-from opds import OPDSFeed
+from opds import OPDSCatalog
 from model import (
   get_one,
   Library,
@@ -59,32 +58,32 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.nearby("65.88.88.124")
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
-            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, response.headers['Content-Type'])
-            feed = feedparser.parse(response.data)
+            eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
+            catalog = json.loads(response.data)
 
-            # The feed can be cached for a while, since the list of libraries
+            # The catalog can be cached for a while, since the list of libraries
             # doesn't change very quickly.
             eq_("public, no-transform, max-age: 43200, s-maxage: 21600",
                 response.headers['Cache-Control'])
 
             # We found both libraries within a 150-kilometer radius of the
             # starting point.
-            nypl, ct = feed['entries']
-            eq_("NYPL", nypl['title'])
-            eq_("0 km.", nypl['schema_distance'])
-            eq_("Connecticut State Library", ct['title'])
-            eq_("35 km.", ct['schema_distance'])
+            nypl, ct = catalog['catalogs']
+            eq_("NYPL", nypl['metadata']['title'])
+            eq_("0 km.", nypl['metadata']['distance'])
+            eq_("Connecticut State Library", ct['metadata']['title'])
+            eq_("35 km.", ct['metadata']['distance'])
 
             # If that's not good enough, there's a link to the search
             # controller, so you can do a search.
             [register_link, search_link, self_link] = sorted(
-                feed['feed']['links'], key=lambda x: x['rel']
+                catalog['links'], key=lambda x: x['rel']
             )
             url_for = self.app.library_registry.url_for
 
             eq_(url_for("nearby"), self_link['href'])
             eq_("self", self_link['rel'])
-            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, self_link['type'])
+            eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
 
             eq_(url_for("search"), search_link['href'])
             eq_("search", search_link['rel'])
@@ -98,24 +97,24 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.nearby(None)
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
-            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, response.headers['Content-Type'])
-            feed = feedparser.parse(response.data)
+            eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
+            catalog = json.loads(response.data)
 
             # We found no nearby libraries, because we had no IP address to
             # start with.
-            eq_([], feed['entries'])
+            eq_([], catalog['catalogs'])
 
     def test_nearby_no_libraries(self):
         with self.app.test_request_context("/"):
             response = self.controller.nearby("8.8.8.8") # California
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
-            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, response.headers['Content-Type'])
-            feed = feedparser.parse(response.data)
+            eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
+            catalog = json.loads(response.data)
 
             # We found no nearby libraries, because we were too far away
             # from them.
-            eq_([], feed['entries'])
+            eq_([], catalog['catalogs'])
             
     def test_search_form(self):
         with self.app.test_request_context("/"):
@@ -137,19 +136,19 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124")
             eq_("200 OK", response.status)
-            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, response.headers['Content-Type'])
-            feed = feedparser.parse(response.data)
+            eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
+            catalog = json.loads(response.data)
 
             # We found the two matching results.
-            [nypl, ks] = feed['entries']
-            eq_("NYPL", nypl['title'])
-            eq_("0 km.", nypl['schema_distance'])
+            [nypl, ks] = catalog['catalogs']
+            eq_("NYPL", nypl['metadata']['title'])
+            eq_("0 km.", nypl['metadata']['distance'])
 
-            eq_("Kansas State Library", ks['title'])
-            eq_("1922 km.", ks['schema_distance'])
+            eq_("Kansas State Library", ks['metadata']['title'])
+            eq_("1922 km.", ks['metadata']['distance'])
 
             [register_link, search_link, self_link] = sorted(
-                feed['feed']['links'], key=lambda x: x['rel']
+                catalog['links'], key=lambda x: x['rel']
             )
             url_for = self.app.library_registry.url_for
 
@@ -157,7 +156,7 @@ class TestLibraryRegistryController(ControllerTest):
             # the search form.
             eq_(url_for("search", q="manhattan"), self_link['href'])
             eq_("self", self_link['rel'])
-            eq_(OPDSFeed.NAVIGATION_FEED_TYPE, self_link['type'])
+            eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
 
             eq_(url_for("search"), search_link['href'])
             eq_("search", search_link['rel'])
@@ -198,6 +197,10 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_(["http://circmanager.org"], http_client.requests)
 
+            catalog = json.loads(response.data)
+            eq_("A Library", catalog['metadata']['title'])
+            eq_('Description', catalog['metadata']['description'])
+
 
         # Register changes to the same library, and test all the places
         # the auth document could be.
@@ -225,6 +228,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(None, library.web_url)
             eq_("new image data", library.logo)
             eq_(["http://circmanager.org"], http_client.requests[1:])
+
+            catalog = json.loads(response.data)
+            eq_("A Library", catalog['metadata']['title'])
+            eq_('My feed requires authentication', catalog['metadata']['description'])
 
             auth_document = {
                 "name": "A Library",

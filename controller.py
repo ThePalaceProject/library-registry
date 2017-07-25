@@ -22,14 +22,14 @@ from config import (
     CannotLoadConfiguration,
 )
 from opds import (
-    NavigationFeed,
     Annotator,
+    OPDSCatalog,
 )
 
 from util import GeometryUtility
 from util.app_server import (
     HeartbeatController,
-    feed_response,
+    catalog_response,
 )
 from util.http import HTTP
 from problem_details import *
@@ -78,15 +78,15 @@ class LibraryRegistryAnnotator(Annotator):
     def __init__(self, app):
         self.app = app
     
-    def annotate_feed(self, feed):
-        """Add a search link to every feed."""
+    def annotate_catalog(self, catalog):
+        """Add links to every catalog."""
         search_url = self.app.url_for("search")
-        feed.add_link_to_feed(
-            feed.feed, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
+        catalog.add_link_to_catalog(
+            catalog.catalog, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
         )
         register_url = self.app.url_for("register")
-        feed.add_link_to_feed(
-            feed.feed, href=register_url, rel="register"
+        catalog.add_link_to_catalog(
+            catalog.catalog, href=register_url, rel="register"
         )
 
     
@@ -115,11 +115,11 @@ class LibraryRegistryController(object):
         qu = Library.nearby(self._db, point)
         qu = qu.limit(5)
         this_url = self.app.url_for('nearby')
-        feed = NavigationFeed(
+        catalog = OPDSCatalog(
             self._db, unicode(_("Libraries near you")), this_url, qu,
             annotator=self.annotator
         )
-        return feed_response(feed)
+        return catalog_response(catalog)
         
     def search(self, ip_address=None):
         point = self.point_from_ip(ip_address)
@@ -128,12 +128,12 @@ class LibraryRegistryController(object):
             # Run the query and send the results.
             results = Library.search(self._db, point, query)
             this_url = self.app.url_for('search', q=query)
-            feed = NavigationFeed(
+            catalog = OPDSCatalog(
                 self._db, unicode(_('Search results for "%s"')) % query,
                 this_url, results,
                 annotator=self.annotator
             )
-            return feed_response(feed)
+            return catalog_response(catalog)
         else:
             # Send the search form.
             body = self.OPENSEARCH_TEMPLATE % dict(
@@ -227,7 +227,10 @@ class LibraryRegistryController(object):
         # TODO: Fetch the logo image and convert to base64 if it's a URL.
         library.logo = links.get("logo", {}).get("href", None)
 
+        catalog = OPDSCatalog.library_catalog(library)
+        content = json.dumps(catalog)
+
         if is_new:
-            return Response(_("Success"), 201)
+            return Response(content, 201)
         else:
-            return Response(_("Success"), 200)
+            return Response(content, 200)
