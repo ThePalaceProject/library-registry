@@ -239,9 +239,27 @@ class TestLinkExtractor(object):
         eq_(None, parsed.logo_link)
         eq_(False, parsed.anonymous_access)
 
+#"start": [{"href": "http://catalog.example.com/", "type": "text/html/"}, {"href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}
+
+#    "providers": {"http://librarysimplified.org/terms/auth/library-barcode": {"methods": {"http://opds-spec.org/auth/basic": {"inputs": {"login": {"keyboard": "Default"}, "password": {"keyboard": "Default"}}, "labels": {"login": "Barcode", "password": "PIN"}}}, "name": "Library Barcode"}},
+        
     def test_minimal_document(self):
         """Test a real, albeit minimal, Authentication For OPDS document."""
-        document = """{"title": "Ansonia Public Library", "links": {"logo": {"href": "data:image/png;base64,some-image-data", "type": "image/png"}, "alternate": {"href": "http://ansonialibrary.org", "type": "text/html"}}, "providers": {"http://librarysimplified.org/terms/auth/library-barcode": {"methods": {"http://opds-spec.org/auth/basic": {"inputs": {"login": {"keyboard": "Default"}, "password": {"keyboard": "Default"}}, "labels": {"login": "Barcode", "password": "PIN"}}}, "name": "Library Barcode"}}, "service_description": "Serving Ansonia, CT", "color_scheme": "gold", "id": "c90903e0-d438-4c8d-ac35-94824d769e2c", "features": {"disabled": [], "enabled": ["https://librarysimplified.org/rel/policy/reservations"]}}"""
+        document = """
+{"id": "c90903e0-d438-4c8d-ac35-94824d769e2c",
+ "title": "Ansonia Public Library", 
+ "links": {
+    "logo": {"href": "data:image/png;base64,some-image-data", "type": "image/png"}, 
+    "alternate": {"href": "http://ansonialibrary.org", "type": "text/html"},
+    "register": {"href": "http://example.com/get-a-card/", "type": "text/html"}
+ },
+    "service_description": "Serving Ansonia, CT",
+    "color_scheme": "gold",
+
+    "collection_size": {"eng": 100, "spa": 20},
+    "public_key": "a public key",
+    "features": {"disabled": [], "enabled": ["https://librarysimplified.org/rel/policy/reservations"]}
+}"""
         place = MockPlace()
         everywhere = place.everywhere(None)
         parsed = AuthDoc.from_string(None, document, place)
@@ -252,11 +270,12 @@ class TestLinkExtractor(object):
         eq_("Ansonia Public Library", parsed.title)
         eq_("Serving Ansonia, CT", parsed.service_description)
         eq_("gold", parsed.color_scheme)
-        # collection size
-        # public key
+        eq_({"eng": 100, "spa": 20}, parsed.collection_size)
+        eq_("a public key", parsed.public_key)
         eq_({u'href': u'http://ansonialibrary.org', u'type': u'text/html'},
             parsed.website)
-        # registration
+        eq_({"href": "http://exmample.com/get-a-card/", "type": "text/html"},
+            parsed.registration)
         # root
         # links
         eq_("data:image/png;base64,some-image-data", parsed.logo)
