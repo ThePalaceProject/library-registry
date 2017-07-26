@@ -1,4 +1,12 @@
+from collections import defaultdict
 import json
+from sqlalchemy.orm.exc import (
+    MultipleResultsFound,
+)
+
+from model import (
+    Place
+)
 
 class AuthenticationDocument(object):
     """Parse an Authentication For OPDS document, including the
@@ -60,7 +68,7 @@ class AuthenticationDocument(object):
         )
 
     @classmethod
-    def parse_coverage(self, _db, coverage, place_class=Place):
+    def parse_coverage(cls, _db, coverage, place_class=Place):
         """Derive Place objects from an Authentication For OPDS coverage
         object (i.e. a value for `service_area` or `focus_area`)
 
@@ -83,14 +91,14 @@ class AuthenticationDocument(object):
         place_objs = []
         unknown = defaultdict(list)
         ambiguous = defaultdict(list)
-        if coverage == self.COVERAGE_EVERYWHERE:
+        if coverage == cls.COVERAGE_EVERYWHERE:
             # This library covers the entire universe! No need to
             # parse anything.
             place_objs.append(place_class.everywhere(_db))
             coverage = dict()
             
         for country, places in coverage.items():
-            if places == self.COVERAGE_EVERYWHERE:
+            if places == cls.COVERAGE_EVERYWHERE:
                 # This library covers an entire country.
                 try:
                     place = place_class.lookup_by_name(
@@ -98,13 +106,13 @@ class AuthenticationDocument(object):
                     )
                 except MultipleResultsFound, e:
                     # A country was ambiguously named -- not very likely.
-                    ambiguous[country] = self.COVERAGE_EVERYWHERE
+                    ambiguous[country] = cls.COVERAGE_EVERYWHERE
                 if place:
                     places.append(place)
                 else:
                     # Either this isn't a recognized country
                     # or we don't have a geography for it.
-                    unknown[country] = self.COVERAGE_EVERYWHERE
+                    unknown[country] = cls.COVERAGE_EVERYWHERE
             else:
                 # This library covers a list of places within a
                 # country.
@@ -130,7 +138,7 @@ class AuthenticationDocument(object):
         return place_objs, unknown, ambiguous
     
     @classmethod
-    def _extract_link(self, links, require_type=None, prefer_type=None):
+    def _extract_link(cls, links, require_type=None, prefer_type=None):
         if not links:
             # There are no links with this relation.
             return None
@@ -162,7 +170,7 @@ class AuthenticationDocument(object):
         return good_enough
             
     @classmethod
-    def from_string(self, s):
+    def from_string(cls, s):
         data = json.loads(s)
         return AuthenticationDocument(
             id=data.get('id', None),
