@@ -28,17 +28,18 @@ class MockPlace(object):
         self.by_name = by_name or dict()
         self.is_inside = is_inside or dict()
 
-    def _lookup(self, look_in, name):
-        place = look_in.get(name)
+    def lookup_by_name(self, _db, name, place_type):
+        place = self.by_name.get(name)
         if place is self.AMBIGUOUS:
             raise MultipleResultsFound()
         return place
-
-    def lookup_by_name(self, _db, name, place_type):
-        return self._lookup(self.by_name, name)
         
     def lookup_inside(self, _db, name, must_be_inside):
-        return self._lookup(self.is_inside, name)
+        places_inside = self.is_inside.get(must_be_inside)
+        place = places_inside.get(name)
+        if place is self.AMBIGUOUS:
+            raise MultipleResultsFound()
+        return place
 
     def everywhere(self, _db):
         return self.EVERYWHERE
@@ -60,7 +61,7 @@ class TestParseCoverage(object):
         expected_places = expected_places or []
         expected_unknown = expected_unknown or empty
         expected_ambiguous = expected_ambiguous or empty
-        eq_(expected_places, place_objs)
+        eq_(sorted(expected_places), sorted(place_objs))
         eq_(expected_unknown, unknown)
         eq_(expected_ambiguous, ambiguous)
         
@@ -85,22 +86,19 @@ class TestParseCoverage(object):
         )
 
     def test_ambiguous_country(self):
-        """Test an authentication document that says a library covers an
-        entire country, but it's ambiguous which country is being referred
-        to.
+        """Test the unlikely scenario where an authentication document says a
+        library covers an entire country, but it's ambiguous which
+        country is being referred to.
         """
 
         places = MockPlace(
-            {
-                "CA": "Canada",
-                "US": MockPlace.AMBIGUOUS,
-            }
+            {"CA": "Canada", "Europe I think?": MockPlace.AMBIGUOUS}
         )
         self.parse_places(
             places, 
-            {"US": self.EVERYWHERE, "CA": self.EVERYWHERE },
+            {"Europe I think?": self.EVERYWHERE, "CA": self.EVERYWHERE },
             expected_places=["Canada"],
-            expected_ambiguous={"US": self.EVERYWHERE}
+            expected_ambiguous={"Europe I think?": self.EVERYWHERE}
         )
 
     def test_unknown_country(self):
@@ -109,14 +107,58 @@ class TestParseCoverage(object):
         that country's geography.
         """
 
-        places = MockPlace(
-            {
-                "CA": "Canada",
-            }
-        )
+        places = MockPlace({"CA": "Canada"})
         self.parse_places(
             places, 
-            {"US": self.EVERYWHERE, "CA": self.EVERYWHERE },
+            {"Memory Alpha": self.EVERYWHERE, "CA": self.EVERYWHERE },
             expected_places=["Canada"],
-            expected_unknown={"US": self.EVERYWHERE}
+            expected_unknown={"Memory Alpha": self.EVERYWHERE}
+        )
+
+    def test_places_within_country(self):
+        """Test an authentication document that says a library
+        covers one or more places within a country.
+        """
+        # This authentication document covers two places called
+        # "San Francisco" (one in the US and one in Mexico) as well as a
+        # place called "Mexico City" in Mexico.
+        #
+        # Note that it's invalid to map a country name to a single
+        # place name (it's supposed to always be a list), but our
+        # parser can handle it.
+        doc = {"US": "San Francisco", "MX": ["San Francisco", "Mexico City"]}
+        
+        is_inside = {
+            "US": {"San Francisco": "object1", "San Jose": "object2"},
+            "MX": {"San Francisco": "object3", "Mexico City": "object4"}
+        }
+        places = MockPlace(is_inside=is_inside)
+
+        # AuthenticationDocument.parse_coverage is able to turn those
+        # three place names into place objects.
+        self.parse_places(
+            places, doc,
+            expected_places=["object1", "object3", "object4"]
+        )
+
+    def test_ambiguous_place_within_country(self):
+        """Test an authentication document that names an ambiguous
+        place within a country.
+        """
+        is_inside = {"US": {"Springfield": MockPlace.AMBIGUOUS}}
+        places = MockPlace(is_inside=is_inside)
+        self.parse_places(
+            places, {"US": ["Springfield"]},
+            expected_ambiguous={"US": ["Springfield"]}
+        )
+
+    def test_unknown_place_within_country(self):
+        """Test an authentication document that names an unknown
+        place within a country.
+        """
+        is_inside = {"US": {"San Francisco": "object1"}}
+        places = MockPlace(is_inside=is_inside)
+        self.parse_places(
+            places, {"US": "Nowheresville"},
+            expected_unknown={"US": ["Nowheresville"]}
         )

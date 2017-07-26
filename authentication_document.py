@@ -126,16 +126,15 @@ class AuthenticationDocument(object):
                         place_obj = place_class.lookup_inside(
                             _db, place, must_be_inside=country
                         )
+                        if place_obj:
+                            # We found it.
+                            place_objs.append(place_obj)
+                        else:
+                            # We couldn't find any place with this name.
+                            unknown[country].append(place)
                     except MultipleResultsFound, e:
                         # The place was ambiguously named.
-                        append_to = ambiguous[country] 
-                    if place_obj:
-                        # We found it.
-                        append_to = place_objs
-                    else:
-                        # We couldn't find any place with this name.
-                        append_to = unknown[country]
-                    append_to.append(place)
+                        ambiguous[country].append(place)
         return place_objs, unknown, ambiguous
     
     @classmethod
