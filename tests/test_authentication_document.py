@@ -50,9 +50,9 @@ class TestParseCoverage(object):
     
     def parse_places(self, mock_place, coverage_object, expected_places=None,
                      expected_unknown=None, expected_ambiguous=None):
-        """Call AuthenticationDocument.parse_coverage. Verify that the
-        dictionaries of unknown and ambiguous place names are empty,
-        and that the parsed list of places is `expected`.
+        """Call AuthenticationDocument.parse_coverage. Verify that the parsed
+        list of places, as well as the dictionaries of unknown and
+        ambiguous place names, are as expected.
         """
         place_objs, unknown, ambiguous = AuthDoc.parse_coverage(
             None, coverage_object, mock_place
