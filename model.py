@@ -475,6 +475,8 @@ class Library(Base):
     @property
     def urn_uri(self):
         "Return the URN as a urn: URI."
+        if not self.urn:
+            return None
         if self.urn.startswith('urn:'):
             return self.urn
         else:
