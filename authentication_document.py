@@ -189,10 +189,14 @@ class AuthenticationDocument(object):
     @classmethod
     def from_string(cls, _db, s, place_class=Place):
         data = json.loads(s)
+        return cls.from_dict(_db, data, place_class)
+
+    @classmethod
+    def from_dict(cls, _db, data, place_class=Place):
         return AuthenticationDocument(
             _db,
             id=data.get('id', None),
-            title=data.get('title', None),
+            title=data.get('title', data.get('name', None)),
             type=data.get('type', []),
             service_description=data.get('service_description', None),
             color_scheme=data.get('color_scheme'),
