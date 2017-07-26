@@ -29,19 +29,28 @@ class AuthenticationDocument(object):
                  'educational-secondary', 'research', 'print-disability',
                  'other']
     
-    def __init__(self, id, type, service_description, color_scheme, 
+    def __init__(self, _db, id, title, type, service_description, color_scheme, 
                  collection_size, public_key, audiences, service_area,
-                 focus_area, links):
+                 focus_area, links, place_class=Place):
         self.id = id
         self.title = title
         self.service_description = service_description
         self.color_scheme = color_scheme
-        self.logo = logo
         self.collection_size = collection_size
         self.public_key = public_key
         self.audiences = audiences or [self.PUBLIC_AUDIENCE]
-        self.service_area = self.parse_geography(service_area)
-        self.focus_area = self.parse_geography(focus_area)
+        if service_area:
+            self.service_area = self.parse_coverage(
+                _db, service_area, place_class=place_class
+            )
+        else:
+            self.service_area = place_class.everywhere(_db)
+        if focus_area:
+            self.focus_area = self.parse_coverage(
+                _db, focus_area, place_class=place_class
+            )
+        else:
+            self.focus_area = place_class.everywhere(_db)
         self.links = links
         self.website = self.extract_link(
             rel="alternate", require_type="text/html"
@@ -52,15 +61,17 @@ class AuthenticationDocument(object):
             prefer_type="application/atom+xml;profile=opds-catalog"
         )
         logo = self.extract_link(rel="logo")
-        if logo.startswith('data:'):
-            self.logo = logo
-            self.logo_link = None
-        else:
-            self.logo = None
-            self.logo_link = logo
+        self.logo = None
+        self.logo_link = None
+        if logo:
+            data = logo.get('href', '')
+            if data and data.startswith('data:'):
+                self.logo = data
+            else:
+                self.logo_link = logo
         self.anonymous_access = False
-        if (type == self.ANONYMOUS_ACCESS
-            or isinstance(type, list) and self.ANONYMOUS_ACCESS in type):
+        if (type == self.ANONYMOUS_ACCESS_REL
+            or isinstance(type, list) and self.ANONYMOUS_ACCESS_REL in type):
             self.anonymous_access = True
 
     def extract_link(self, rel, require_type=None, prefer_type=None):
@@ -176,10 +187,12 @@ class AuthenticationDocument(object):
         return good_enough
             
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, _db, s, place_class=Place):
         data = json.loads(s)
         return AuthenticationDocument(
+            _db,
             id=data.get('id', None),
+            title=data.get('title', None),
             type=data.get('type', []),
             service_description=data.get('service_description', None),
             color_scheme=data.get('color_scheme'),
@@ -188,5 +201,6 @@ class AuthenticationDocument(object):
             audiences=data.get('audience'),
             service_area=data.get('service_area'),
             focus_area=data.get('service_area'),
-            links=data.get('links', {})
+            links=data.get('links', {}),
+            place_class=place_class
         )

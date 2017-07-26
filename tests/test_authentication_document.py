@@ -210,3 +210,55 @@ class TestLinkExtractor(object):
                 links, 'alternate', prefer_type="application/xhtml+xml"
             )
         )
+
+    def test_empty_document(self):
+        """Provide an empty Authentication For OPDS document to test
+        default values.
+        """
+        place = MockPlace()
+        everywhere = place.everywhere(None)
+        parsed = AuthDoc.from_string(None, "{}", place)        
+        
+        # In the absence of specific information, it's assumed the
+        # OPDS server is open to everyone.
+        eq_(everywhere, parsed.service_area)
+        eq_(everywhere, parsed.focus_area)
+        eq_([parsed.PUBLIC_AUDIENCE], parsed.audiences)
+
+        eq_(None, parsed.id)
+        eq_(None, parsed.title)
+        eq_(None, parsed.service_description)
+        eq_(None, parsed.color_scheme)
+        eq_(None, parsed.collection_size)
+        eq_(None, parsed.public_key)
+        eq_(None, parsed.website)
+        eq_(None, parsed.registration)
+        eq_(None, parsed.root)
+        eq_({}, parsed.links)
+        eq_(None, parsed.logo)
+        eq_(None, parsed.logo_link)
+        eq_(False, parsed.anonymous_access)
+
+    def test_minimal_document(self):
+        """Test a real, albeit minimal, Authentication For OPDS document."""
+        document = """{"title": "Ansonia Public Library", "links": {"logo": {"href": "data:image/png;base64,some-image-data", "type": "image/png"}, "alternate": {"href": "http://ansonialibrary.org", "type": "text/html"}}, "providers": {"http://librarysimplified.org/terms/auth/library-barcode": {"methods": {"http://opds-spec.org/auth/basic": {"inputs": {"login": {"keyboard": "Default"}, "password": {"keyboard": "Default"}}, "labels": {"login": "Barcode", "password": "PIN"}}}, "name": "Library Barcode"}}, "service_description": "Serving Ansonia, CT", "color_scheme": "gold", "id": "c90903e0-d438-4c8d-ac35-94824d769e2c", "features": {"disabled": [], "enabled": ["https://librarysimplified.org/rel/policy/reservations"]}}"""
+        place = MockPlace()
+        everywhere = place.everywhere(None)
+        parsed = AuthDoc.from_string(None, document, place)
+        
+        # Basic information about the OPDS server has been put into
+        # the AuthenticationDocument object.
+        eq_("c90903e0-d438-4c8d-ac35-94824d769e2c", parsed.id)
+        eq_("Ansonia Public Library", parsed.title)
+        eq_("Serving Ansonia, CT", parsed.service_description)
+        eq_("gold", parsed.color_scheme)
+        # collection size
+        # public key
+        eq_({u'href': u'http://ansonialibrary.org', u'type': u'text/html'},
+            parsed.website)
+        # registration
+        # root
+        # links
+        eq_("data:image/png;base64,some-image-data", parsed.logo)
+        eq_(None, parsed.logo_link)
+        # anonymous access
