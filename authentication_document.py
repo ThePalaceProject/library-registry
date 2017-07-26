@@ -1,5 +1,6 @@
 from collections import defaultdict
 import json
+from nose.tools import set_trace
 from sqlalchemy.orm.exc import (
     MultipleResultsFound,
 )
@@ -101,18 +102,18 @@ class AuthenticationDocument(object):
             if places == cls.COVERAGE_EVERYWHERE:
                 # This library covers an entire country.
                 try:
-                    place = place_class.lookup_by_name(
-                        _db, country, place_type=Place.COUNTRY,
+                    place_obj = place_class.lookup_by_name(
+                        _db, country, place_type=Place.NATION,
                     )
+                    if place_obj:
+                        place_objs.append(place_obj)
+                    else:
+                        # Either this isn't a recognized country
+                        # or we don't have a geography for it.
+                        unknown[country] = cls.COVERAGE_EVERYWHERE
                 except MultipleResultsFound, e:
                     # A country was ambiguously named -- not very likely.
                     ambiguous[country] = cls.COVERAGE_EVERYWHERE
-                if place:
-                    places.append(place)
-                else:
-                    # Either this isn't a recognized country
-                    # or we don't have a geography for it.
-                    unknown[country] = cls.COVERAGE_EVERYWHERE
             else:
                 # This library covers a list of places within a
                 # country.
