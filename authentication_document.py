@@ -65,7 +65,7 @@ class AuthenticationDocument(object):
 
     def extract_link(self, rel, require_type=None, prefer_type=None):
         return self._extract_link(
-            self.links.get(rel), require_type, prefer_type
+            self.links, rel, require_type, prefer_type
         )
 
     @classmethod
@@ -138,9 +138,13 @@ class AuthenticationDocument(object):
         return place_objs, unknown, ambiguous
     
     @classmethod
-    def _extract_link(cls, links, require_type=None, prefer_type=None):
+    def _extract_link(cls, links, rel, require_type=None, prefer_type=None):
         if not links:
-            # There are no links with this relation.
+            # There are no links, period.
+            return None
+        links = links.get(rel)
+        if not links:
+            # There are no links with this link relation.
             return None
         if not isinstance(links, list):
             # A single link.
@@ -156,12 +160,14 @@ class AuthenticationDocument(object):
             # set, so the type of the link becomes relevant.
             type = link.get('type', '')
             
-            if type.startswith(require_type):
-                # If require_type is True, this means we have found a
-                # link of the required type. If prefer_type is True,
-                # this means we will never find a better link than
-                # this one. Return it immediately.
-                return link
+            if type:
+                if (require_type and type.startswith(require_type)
+                    or prefer_type and type.startswith(prefer_type)):
+                    # If we have a require_type, this means we have
+                    # met the requirement. If we have a prefer_type,
+                    # we will not find a better link than this
+                    # one. Return it immediately.
+                    return link
             if not require_type and not good_enough:
                 # We would prefer a link of a certain type, but if it
                 # turns out there is no such link, we will accept the

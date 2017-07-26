@@ -162,3 +162,51 @@ class TestParseCoverage(object):
             places, {"US": "Nowheresville"},
             expected_unknown={"US": ["Nowheresville"]}
         )
+
+
+class TestLinkExtractor(object):
+    """Test the _extract_link helper method."""
+
+    def test_no_matching_link(self):
+        links = {'alternate': [dict(href="http://foo/", type="text/html")]}
+
+        # There is no link with the given relation.
+        eq_(None, AuthDoc._extract_link(links, 'self'))
+
+        # There is a link with the given relation, but the type is wrong.
+        eq_(
+            None,
+            AuthDoc._extract_link(
+                links, 'alternate', require_type="text/plain"
+            )
+        )
+        
+
+    def test_prefer_type(self):
+        """Test that prefer_type holds out for the link you're
+        looking for.
+        """
+        first_link = dict(href="http://foo/", type="text/html")
+        second_link = dict(href="http://bar/", type="text/plain;charset=utf-8")
+        links = {'alternate': [first_link, second_link]}
+
+        # We would prefer the second link.
+        eq_(second_link,
+            AuthDoc._extract_link(
+                links, 'alternate', prefer_type="text/plain"
+            )
+        )
+
+        # We would prefer the first link.
+        eq_(first_link,
+            AuthDoc._extract_link(
+                links, 'alternate', prefer_type="text/html"
+            )
+        )
+        
+        # The type we prefer is not available, so we get the first link.
+        eq_(first_link,
+            AuthDoc._extract_link(
+                links, 'alternate', prefer_type="application/xhtml+xml"
+            )
+        )
