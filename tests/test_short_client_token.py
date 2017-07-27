@@ -119,8 +119,8 @@ class TestShortClientTokenDecoder(DatabaseTest):
         self.encoder = ShortClientTokenEncoder()
         self.decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE)
         self.library = self._library()
-        self.library.adobe_short_name='LIBRARY'
-        self.library.adobe_shared_secret='My shared secret'
+        self.library.short_name='LIBRARY'
+        self.library.shared_secret='My shared secret'
 
     def test_uuid(self):
         u = self.decoder.uuid()
@@ -135,7 +135,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
         by one of its libraries.
         """
         short_client_token = self.encoder.encode(
-            self.library.adobe_short_name, self.library.adobe_shared_secret,
+            self.library.short_name, self.library.shared_secret,
             "Foreign Patron"
         )
 

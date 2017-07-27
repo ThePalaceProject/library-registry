@@ -78,8 +78,8 @@ class TestAddLibraryScript(DatabaseTest):
                 '--web=https://nypl.org/',
                 '--opds=https://circulation.librarysimplified.org/',
                 '--description=Serving the five boroughs of New York, NY.',
-                '--adobe-short-name=NYNYPL',
-                '--adobe-shared-secret=12345',
+                '--short-name=NYNYPL',
+                '--shared-secret=12345',
         ]
         script = AddLibraryScript(self._db)
         script.run(cmd_args=args)
@@ -92,8 +92,8 @@ class TestAddLibraryScript(DatabaseTest):
         eq_(u"https://nypl.org/", library.web_url)
         eq_(u"https://circulation.librarysimplified.org/", library.opds_url)
         eq_(u"Serving the five boroughs of New York, NY.", library.description)
-        eq_(u"NYNYPL", library.adobe_short_name)
-        eq_(u"12345", library.adobe_shared_secret)
+        eq_(u"NYNYPL", library.short_name)
+        eq_(u"12345", library.shared_secret)
         
         [alias] = library.aliases
         eq_("NYPL", alias.name)

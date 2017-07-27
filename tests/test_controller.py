@@ -4,6 +4,7 @@ from nose.tools import (
 )
 import os
 import json
+import base64
 
 from controller import (
     LibraryRegistry,
@@ -13,6 +14,8 @@ from controller import (
 import flask
 from flask import Response
 from werkzeug import ImmutableMultiDict
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 
 from . import DatabaseTest
 from testing import DummyHTTPClient
@@ -20,9 +23,12 @@ from testing import DummyHTTPClient
 from opds import OPDSCatalog
 from model import (
   get_one,
+  get_one_or_create,
+  ExternalIntegration,
   Library,
 )
 from problem_details import *
+from config import Configuration
 
 
 class TestLibraryRegistry(LibraryRegistry):
@@ -45,6 +51,14 @@ class ControllerTest(DatabaseTest):
         nyc = self.new_york_city
         boston = self.boston_ma
         manhattan_ks = self.manhattan_ks
+
+        # Configure a basic vendor id service.
+        integration, ignore = get_one_or_create(
+            self._db, ExternalIntegration,
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
+            goal=ExternalIntegration.DRM_GOAL,
+        )
+        integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
         
         self.library_registry = TestLibraryRegistry(self._db, testing=True)
         self.app.library_registry = self.library_registry
@@ -91,6 +105,8 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
+
+            eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
             
     def test_nearby_no_ip_address(self):
         with self.app.test_request_context("/"):
@@ -165,6 +181,8 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
 
+            eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
+
     def test_register_success(self):
         http_client = DummyHTTPClient()
 
@@ -174,13 +192,18 @@ class TestLibraryRegistryController(ControllerTest):
                 ("url", "http://circmanager.org"),
             ])
 
+            key = RSA.generate(1024)
             auth_document = {
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
                     "alternate": { "href": "http://alibrary.org" },
                     "logo": { "href": "image data" },
-                }
+                },
+                "public_key": {
+                    "type": "RSA",
+                    "value": key.publickey().exportKey(),
+                 }
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
 
@@ -201,6 +224,20 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("A Library", catalog['metadata']['title'])
             eq_('Description', catalog['metadata']['description'])
 
+            # Since the auth document had a public key, the registry
+            # generated a short name and shared secret for the library.
+            eq_(6, len(library.short_name))
+            eq_(48, len(library.shared_secret))
+
+            eq_(library.short_name, catalog["metadata"]["short_name"])
+            # The registry encrypted the secret with the public key, and
+            # it can be decrypted with the private key.
+            encryptor = PKCS1_OAEP.new(key)
+            encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
+            eq_(library.shared_secret, encryptor.decrypt(encrypted_secret))
+
+
+        old_secret = library.shared_secret
 
         # Register changes to the same library, and test all the places
         # the auth document could be.
@@ -274,6 +311,72 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("My feed links to a shelf which links to the auth document", library.description)
             eq_(["http://circmanager.org", "http://circmanager.org/shelf", "http://circmanager.org/auth"], http_client.requests[6:])
 
+            # The request did not include the old secret, so the secret wasn't changed.
+            eq_(old_secret, library.shared_secret)
+
+        # If we include the old secret in a request, the registry will generate a new secret.
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org"),
+                ("shared_secret", old_secret),
+            ])
+
+            key = RSA.generate(1024)
+            auth_document = {
+                "name": "A Library",
+                "service_description": "Description",
+                "links": {
+                    "alternate": { "href": "http://alibrary.org" },
+                    "logo": { "href": "image data" },
+                },
+                "public_key": {
+                    "type": "RSA",
+                    "value": key.publickey().exportKey(),
+                 }
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+
+            response = self.controller.register(do_get=http_client.do_get)
+
+            eq_(200, response.status_code)
+            catalog = json.loads(response.data)
+
+            assert library.shared_secret != old_secret
+
+            # The registry encrypted the new secret with the public key, and
+            # it can be decrypted with the private key.
+            encryptor = PKCS1_OAEP.new(key)
+            encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
+            eq_(library.shared_secret, encryptor.decrypt(encrypted_secret))
+
+        old_secret = library.shared_secret
+
+        # If we include an incorrect secret in the request, the secret stays the same.
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org"),
+                ("shared_secret", "not the secret"),
+            ])
+
+            key = RSA.generate(1024)
+            auth_document = {
+                "name": "A Library",
+                "service_description": "Description",
+                "links": {
+                    "alternate": { "href": "http://alibrary.org" },
+                    "logo": { "href": "image data" },
+                },
+                "public_key": {
+                    "type": "RSA",
+                    "value": key.publickey().exportKey(),
+                 }
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+
+            response = self.controller.register(do_get=http_client.do_get)
+
+            eq_(200, response.status_code)
+            eq_(old_secret, library.shared_secret)
 
     def test_register_errors(self):
         http_client = DummyHTTPClient()
