@@ -170,10 +170,10 @@ class AddLibraryScript(Script):
             '--web', help="URL of the library's web server."
         )
         parser.add_argument(
-            '--adobe-short-name', help="Short name of the library for Adobe Vendor ID purposes."
+            '--short-name', help="Short name of the library for Adobe Vendor ID purposes."
         )
         parser.add_argument(
-            '--adobe-shared-secret', help="Shared secret between the library and the registry for Adobe Vendor ID purposes."
+            '--shared-secret', help="Shared secret between the library and the registry for Adobe Vendor ID purposes."
         )
         parser.add_argument('--place', nargs='+',
                             help="External ID of the library's service area.")
@@ -188,8 +188,8 @@ class AddLibraryScript(Script):
         description = parsed.description
         aliases = parsed.alias
         places = parsed.place
-        adobe_short_name = parsed.adobe_short_name
-        adobe_shared_secret = parsed.adobe_shared_secret
+        short_name = parsed.short_name
+        shared_secret = parsed.shared_secret
         
         library, is_new = get_one_or_create(self._db, Library, urn=urn)
         if name:
@@ -200,10 +200,10 @@ class AddLibraryScript(Script):
             library.web_url = web
         if description:
             library.description = description
-        if adobe_short_name:
-            library.adobe_short_name = adobe_short_name
-        if adobe_shared_secret:
-            library.adobe_shared_secret = adobe_shared_secret
+        if short_name:
+            library.short_name = short_name
+        if shared_secret:
+            library.shared_secret = shared_secret
         if aliases:
             for alias in aliases:
                 get_one_or_create(self._db, LibraryAlias, library=library,

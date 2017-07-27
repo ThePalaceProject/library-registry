@@ -12,3 +12,4 @@ requests
 sqlalchemy
 uwsgi
 Flask-Babel
+pycryptodome

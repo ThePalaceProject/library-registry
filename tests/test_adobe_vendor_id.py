@@ -243,7 +243,7 @@ class TestVendorIDModel(VendorIDTest):
         # is created for one of the patrons.
         encoder = ShortClientTokenEncoder()
         short_client_token = encoder.encode(
-            self.library.adobe_short_name, self.library.adobe_shared_secret,
+            self.library.short_name, self.library.shared_secret,
             "patron alias"
         )
 
@@ -291,8 +291,8 @@ class TestVendorIDModel(VendorIDTest):
         # This token is correctly formed but the signature doesn't match.
         encoder = ShortClientTokenEncoder()
         bad_signature = encoder.encode(
-            self.library.adobe_short_name, 
-            self.library.adobe_shared_secret + "bad",
+            self.library.short_name, 
+            self.library.shared_secret + "bad",
             "patron alias"
         )
         eq_(None, None, (self.model.authdata_lookup, bad_signature))

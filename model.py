@@ -208,11 +208,11 @@ class Library(Base):
     # The library's logo.
     logo = Column(Unicode)
 
-    # To issue Adobe IDs for this library, the registry must share a
+    # To issue Short Client Tokens for this library, the registry must share a
     # short name and a secret with them.
 
-    adobe_short_name = Column(Unicode, index=True)
-    adobe_shared_secret = Column(Unicode)
+    short_name = Column(Unicode, index=True)
+    shared_secret = Column(Unicode)
 
     aliases = relationship("LibraryAlias", backref='library')
     delegated_patron_identifiers = relationship(
@@ -222,16 +222,16 @@ class Library(Base):
 
     __table_args__ = (
         UniqueConstraint('urn'),
-        UniqueConstraint('adobe_short_name'),
+        UniqueConstraint('short_name'),
     )
 
-    @validates('adobe_short_name')
-    def validate_adobe_short_name(self, key, value):
+    @validates('short_name')
+    def validate_short_name(self, key, value):
         if not value:
             return value
         if '|' in value:
             raise ValueError(
-                'Adobe short name cannot contain the pipe character.'
+                'Short name cannot contain the pipe character.'
             )
         return value.upper()
     
@@ -897,12 +897,12 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         library_short_name = library_short_name.upper()
 
         # Look up the Library object based on short name.
-        library = get_one(_db, Library, adobe_short_name=library_short_name)
+        library = get_one(_db, Library, short_name=library_short_name)
         if not library:
             raise ValueError(
                 "I don't know how to handle tokens from library \"%s\"" % library_short_name
             )
-        secret = library.adobe_shared_secret
+        secret = library.shared_secret
         
         try:
             expiration = float(expiration)

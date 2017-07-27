@@ -111,8 +111,8 @@ class DatabaseTest(object):
         name = name or self._str
         library, ignore = get_one_or_create(self._db, Library, name=name)
         library.urn = self._str
-        library.adobe_short_name = self._str
-        library.adobe_shared_secret = self._str
+        library.short_name = self._str
+        library.shared_secret = self._str
         for place in service_areas:
             get_one_or_create(self._db, ServiceArea, library=library,
                               place=place)

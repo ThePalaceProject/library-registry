@@ -9,6 +9,10 @@ from flask import (
 import requests
 import json
 import feedparser
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import base64
+import os
 
 from adobe_vendor_id import AdobeVendorIDController
 
@@ -79,7 +83,7 @@ class LibraryRegistryAnnotator(Annotator):
         self.app = app
     
     def annotate_catalog(self, catalog):
-        """Add links to every catalog."""
+        """Add links and metadata to every catalog."""
         search_url = self.app.url_for("search")
         catalog.add_link_to_catalog(
             catalog.catalog, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
@@ -89,6 +93,8 @@ class LibraryRegistryAnnotator(Annotator):
             catalog.catalog, href=register_url, rel="register"
         )
 
+        vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
+        catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
     
 class LibraryRegistryController(object):
 
@@ -228,6 +234,26 @@ class LibraryRegistryController(object):
         library.logo = links.get("logo", {}).get("href", None)
 
         catalog = OPDSCatalog.library_catalog(library)
+
+        public_key = auth_document.get("public_key", {}).get("value")
+        if public_key:
+            public_key = RSA.import_key(public_key)
+            encryptor = PKCS1_OAEP.new(public_key)
+
+            if not library.short_name:
+                # TODO: Generate a short name based on the library's service area.
+                library.short_name = os.urandom(3).encode('hex')
+
+            submitted_secret = flask.request.form.get("shared_secret")
+            generate_secret = (library.shared_secret is None) or (submitted_secret == library.shared_secret)
+            if generate_secret:
+                library.shared_secret = os.urandom(24).encode('hex')
+
+            encrypted_secret = encryptor.encrypt(str(library.shared_secret))
+
+            catalog["metadata"]["short_name"] = library.short_name
+            catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
+
         content = json.dumps(catalog)
 
         if is_new:
