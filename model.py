@@ -577,7 +577,7 @@ class Place(Base):
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
-    geometry = Column(Geometry(srid=4326))
+    geometry = Column(Geometry(srid=4326), nullable=True)
 
     aliases = relationship("PlaceAlias", backref='place')
 
