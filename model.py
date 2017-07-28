@@ -482,14 +482,6 @@ class Library(Base):
         else:
             return 'urn:' + self.urn
     
-    @property
-    def logo_data_uri(self):
-        """Return the logo as a data: URI."""
-        if not self.logo:
-            return None
-        return "data:image/png;base64,%s" % base64.b64encode(self.logo)
-
-
 class LibraryAlias(Base):
 
     """An alternate name for a library."""

@@ -8,6 +8,7 @@ from geoalchemy2 import Geometry
 from sqlalchemy import func
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import cast
+from StringIO import StringIO
 
 from config import Configuration
 from model import (
@@ -271,6 +272,10 @@ class DummyHTTPResponse(object):
         self.status_code = status_code
         self.headers = headers
         self.content = content
+
+    @property
+    def raw(self):
+        return StringIO(self.content)
 
 class DummyHTTPClient(object):
 

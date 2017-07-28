@@ -250,11 +250,13 @@ class TestLibraryRegistryController(ControllerTest):
                 ("url", "http://circmanager.org"),
             ])
 
+            image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
+            http_client.queue_response(200, content=image_data)
             auth_document = {
                 "name": "A Library",
                 "service_description": "My feed requires authentication",
                 "links": {
-                    "logo": { "href": "data:image/png;newimagedata" },
+                    "logo": { "href": "http://example.com/logo.png", "type": "image/png" },
                 },
                 "service_area": { "US": "Connecticut" },
             }
@@ -268,12 +270,12 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("A Library", library.name)
             eq_("My feed requires authentication", library.description)
             eq_(None, library.web_url)
-            eq_("data:image/png;newimagedata", library.logo)
+            eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
             # Commit to update library.service_areas.
             self._db.commit()
             [service_area] = library.service_areas
             eq_(self.connecticut_state.id, service_area.place_id)
-            eq_(["http://circmanager.org"], http_client.requests[1:])
+            eq_(["http://circmanager.org", "http://example.com/logo.png"], http_client.requests[1:])
 
             catalog = json.loads(response.data)
             eq_("A Library", catalog['metadata']['title'])
@@ -290,7 +292,7 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
             eq_("My feed links to the auth document", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[2:])
+            eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[3:])
 
             auth_document = {
                 "name": "A Library",
@@ -303,7 +305,7 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
             eq_("My feed links to the shelf, which requires auth", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[4:])
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[5:])
             
             auth_document = {
                 "name": "A Library",
@@ -318,7 +320,7 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
             eq_("My feed links to a shelf which links to the auth document", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf", "http://circmanager.org/auth"], http_client.requests[6:])
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf", "http://circmanager.org/auth"], http_client.requests[7:])
 
             # The request did not include the old secret, so the secret wasn't changed.
             eq_(old_secret, library.shared_secret)
@@ -442,6 +444,19 @@ class TestLibraryRegistryController(ControllerTest):
             http_client.queue_response(401, content=json.dumps(auth_document))
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
+            # This feed links to a broken logo image.
+            http_client.queue_response(500)
+            auth_document = {
+                "name": "A Library",
+                "links": {
+                    "logo": { "href": "http://example.com/logo.png", "type": "image/png" },
+                },
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
 
 
 

@@ -66,7 +66,7 @@ class TestOPDSCatalog(DatabaseTest):
         eq_(OPDSCatalog.CATALOG_REL, opds['rel'])
         eq_(OPDSCatalog.OPDS_1_TYPE, opds['type'])
 
-        eq_(library.logo_data_uri, logo['href'])
+        eq_(library.logo, logo['href'])
         eq_(OPDSCatalog.THUMBNAIL_REL, logo['rel'])
         eq_("image/png", logo['type'])
 

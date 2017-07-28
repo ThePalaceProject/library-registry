@@ -13,6 +13,8 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import base64
 import os
+from PIL import Image
+from StringIO import StringIO
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
@@ -236,8 +238,20 @@ class LibraryRegistryController(object):
             library.web_url = None
 
         if auth_document.logo:
-            # TODO: Fetch the logo image and convert to base64 if it's a URL.
             library.logo = auth_document.logo
+        elif auth_document.logo_link:
+            logo_response = do_get(auth_document.logo_link.get("href"), stream=True)
+            try:
+                image = Image.open(logo_response.raw)
+            except Exception, e:
+                return INVALID_AUTH_DOCUMENT.detailed(_("Could not read logo image %(image_url)s", image_url=auth_document.logo_link.get("href")))
+            # Convert to PNG.
+            buffer = StringIO()
+            image.save(buffer, format="PNG")
+            b64 = base64.b64encode(buffer.getvalue())
+            type = logo_response.headers.get("Content-Type") or auth_document.logo_link.get("type")
+            if type:
+                library.logo = "data:%s;base64,%s" % (type, b64)
         else:
             library.logo = None
 

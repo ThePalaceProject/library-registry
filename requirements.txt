@@ -13,3 +13,4 @@ sqlalchemy
 uwsgi
 Flask-Babel
 pycryptodome
+pillow
