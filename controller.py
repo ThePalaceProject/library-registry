@@ -169,6 +169,22 @@ class LibraryRegistryController(object):
         SHELF_REL = "http://opds-spec.org/shelf"
 
         auth_response = None
+        def get_opds_links(response):
+            type = response.headers.get("Content-Type")
+            if type == "application/opds+json":
+                # This is an OPDS 2 catalog.
+                catalog = json.loads(response.content)
+                links = []
+                for k,v in catalog.get("links", {}).iteritems():
+                    links.append(dict(rel=k, href=v.get("href")))
+                return links
+                
+            elif type and type.startswith("application/atom+xml;profile=opds-catalog"):
+                # This is an OPDS 1 feed.
+                feed = feedparser.parse(response.content)
+                return feed.get("feed", {}).get("links", [])
+            return []
+
         links = []
         try:
             response = do_get(opds_url, allowed_response_codes=["2xx", "3xx", 401])
@@ -177,8 +193,7 @@ class LibraryRegistryController(object):
                 # should contain the auth document.
                 auth_response = response
             else:
-                feed = feedparser.parse(response.content)
-                links = feed.get("feed", {}).get("links", [])
+                links = get_opds_links(response)
         except Exception, e:
             return INVALID_OPDS_FEED
 
@@ -212,8 +227,7 @@ class LibraryRegistryController(object):
                 else:
                     # This response didn't require authentication, so maybe it's a feed
                     # that links to the auth document.
-                    feed = feedparser.parse(response.content)
-                    links = feed.get("feed", {}).get("links", [])
+                    links = get_opds_links(response)
                     auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
                                                      allowed_response_codes=["2xx", "3xx"])
 
