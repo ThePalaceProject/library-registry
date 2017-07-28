@@ -444,6 +444,17 @@ class TestLibraryRegistryController(ControllerTest):
             http_client.queue_response(401, content=json.dumps(auth_document))
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
+
+            # This feed has an ambiguous service area.
+            auth_document = {
+                "name": "A Library",
+                "service_area": {"US": ["Manhattan"]},
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
 
             # This feed links to a broken logo image.
             http_client.queue_response(500)
@@ -456,7 +467,6 @@ class TestLibraryRegistryController(ControllerTest):
             http_client.queue_response(401, content=json.dumps(auth_document))
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-
 
 
 

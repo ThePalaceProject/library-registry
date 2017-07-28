@@ -258,7 +258,12 @@ class LibraryRegistryController(object):
         if auth_document.service_area:
             places, unknown, ambiguous = auth_document.service_area
             if unknown or ambiguous:
-                return INVALID_AUTH_DOCUMENT.detailed(_("The authentication document has an unknown or ambiguous service area."))
+                msgs = []
+                if unknown:
+                    msgs.append(str(_("The following service area was unknown: %(service_area)s.", service_area=json.dumps(unknown))))
+                if ambiguous:
+                    msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
+                return INVALID_AUTH_DOCUMENT.detailed(" ".join(msgs))
             for place in places:
                 service_area = get_one_or_create(self._db, ServiceArea,
                                                  library_id=library.id,
