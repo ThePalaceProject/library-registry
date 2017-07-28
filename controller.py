@@ -20,6 +20,7 @@ from authentication_document import AuthenticationDocument
 from model import (
     production_session,
     Library,
+    ServiceArea,
     get_one_or_create,
 )
 from config import (
@@ -240,6 +241,18 @@ class LibraryRegistryController(object):
         else:
             library.logo = None
 
+        if auth_document.service_area:
+            places, unknown, ambiguous = auth_document.service_area
+            if unknown or ambiguous:
+                return INVALID_AUTH_DOCUMENT.detailed(_("The authentication document has an unknown or ambiguous service area."))
+            for place in places:
+                service_area = get_one_or_create(self._db, ServiceArea,
+                                                 library_id=library.id,
+                                                 place_id=place.id)
+            for service_area in library.service_areas:
+                if service_area.place_id not in [p.id for p in places]:
+                    self._db.delete(service_area)
+                    
         catalog = OPDSCatalog.library_catalog(library)
 
         public_key = auth_document.public_key

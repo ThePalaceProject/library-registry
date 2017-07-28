@@ -51,6 +51,7 @@ class ControllerTest(DatabaseTest):
         nyc = self.new_york_city
         boston = self.boston_ma
         manhattan_ks = self.manhattan_ks
+        us = self.crude_us
 
         # Configure a basic vendor id service.
         integration, ignore = get_one_or_create(
@@ -200,6 +201,7 @@ class TestLibraryRegistryController(ControllerTest):
                     "alternate": { "href": "http://alibrary.org", "type": "text/html" },
                     "logo": { "href": "data:image/png;imagedata" },
                 },
+                "service_area": { "US": "Kansas" },
                 "public_key": {
                     "type": "RSA",
                     "value": key.publickey().exportKey(),
@@ -217,6 +219,8 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Description", library.description)
             eq_("http://alibrary.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
+            [service_area] = library.service_areas
+            eq_(self.kansas_state.id, service_area.place_id)
 
             eq_(["http://circmanager.org"], http_client.requests)
 
@@ -251,7 +255,8 @@ class TestLibraryRegistryController(ControllerTest):
                 "service_description": "My feed requires authentication",
                 "links": {
                     "logo": { "href": "data:image/png;newimagedata" },
-                }
+                },
+                "service_area": { "US": "Connecticut" },
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
 
@@ -264,6 +269,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("My feed requires authentication", library.description)
             eq_(None, library.web_url)
             eq_("data:image/png;newimagedata", library.logo)
+            # Commit to update library.service_areas.
+            self._db.commit()
+            [service_area] = library.service_areas
+            eq_(self.connecticut_state.id, service_area.place_id)
             eq_(["http://circmanager.org"], http_client.requests[1:])
 
             catalog = json.loads(response.data)
@@ -424,6 +433,15 @@ class TestLibraryRegistryController(ControllerTest):
             http_client.queue_response(200, content=opds_feed)
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT, response)
+
+            # This feed has an unknown service area.
+            auth_document = {
+                "name": "A Library",
+                "service_area": {"US": ["Somewhere"]},
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
 
 
 

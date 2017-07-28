@@ -653,6 +653,10 @@ class Place(Base):
         return qu
 
     @classmethod
+    def lookup_one_by_name(cls, _db, name, place_type=None):
+        return cls.lookup_by_name(_db, name, place_type).one()
+
+    @classmethod
     def name_parts(cls, name):
         """Split a nested geographic name into parts.
 
