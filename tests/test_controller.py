@@ -199,6 +199,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             key = RSA.generate(1024)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
@@ -259,6 +260,7 @@ class TestLibraryRegistryController(ControllerTest):
             image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
             http_client.queue_response(200, content=image_data, media_type="image/png")
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed requires authentication",
                 "links": {
@@ -290,6 +292,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_('My feed requires authentication', catalog['metadata']['description'])
 
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed links to the auth document",
             }
@@ -303,6 +306,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[3:])
 
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My catalog links to the auth document",
             }
@@ -322,6 +326,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[5:])
 
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed links to the shelf, which requires auth",
             }
@@ -335,6 +340,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[7:])
             
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed links to a shelf which links to the auth document",
             }
@@ -361,6 +367,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             key = RSA.generate(1024)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
@@ -398,6 +405,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             key = RSA.generate(1024)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
@@ -470,8 +478,34 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT, response)
 
+            # This feed is missing an id.
+            auth_document = {
+                "title": "A Library",
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
+            # This feed is missing a title.
+            auth_document = {
+                "id": "http://circmanager.org",
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
+            # This feed's id doesn't match the request url.
+            auth_document = {
+                "id": "http://example.org",
+                "title": "A Library",
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
             # This feed has an unknown service area.
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_area": {"US": ["Somewhere"]},
             }
@@ -482,6 +516,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             # This feed has an ambiguous service area.
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_area": {"US": ["Manhattan"]},
             }
@@ -493,6 +528,7 @@ class TestLibraryRegistryController(ControllerTest):
             # This feed links to a broken logo image.
             http_client.queue_response(500)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "links": {
                     "logo": { "href": "http://example.com/logo.png", "type": "image/png" },

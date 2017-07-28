@@ -239,6 +239,13 @@ class LibraryRegistryController(object):
         except Exception, e:
             return INVALID_AUTH_DOCUMENT
 
+        if not auth_document.id:
+            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document is missing an id."))
+        if not auth_document.title:
+            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document is missing a title."))
+        if auth_document.id != opds_url:
+            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document's id doesn't match the submitted url."))
+
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url
