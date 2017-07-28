@@ -106,6 +106,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory", register_link["type"])
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
             
@@ -181,6 +182,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory", register_link["type"])
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
@@ -212,6 +214,8 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
 
             eq_(201, response.status_code)
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory",
+                response.headers.get("Content-Type"))
 
             library = get_one(self._db, Library, opds_url="http://circmanager.org")
             assert library != None
@@ -264,6 +268,8 @@ class TestLibraryRegistryController(ControllerTest):
 
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory",
+                response.headers.get("Content-Type"))
 
             library = get_one(self._db, Library, opds_url="http://circmanager.org")
             assert library != None

@@ -43,6 +43,7 @@ from util.http import HTTP
 from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
+OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
 
 class LibraryRegistry(object):
 
@@ -94,7 +95,7 @@ class LibraryRegistryAnnotator(Annotator):
         )
         register_url = self.app.url_for("register")
         catalog.add_link_to_catalog(
-            catalog.catalog, href=register_url, rel="register"
+            catalog.catalog, href=register_url, rel="register", type=OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
         )
 
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
@@ -296,8 +297,10 @@ class LibraryRegistryController(object):
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
 
         content = json.dumps(catalog)
+        headers = dict()
+        headers["Content-Type"] = OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
 
         if is_new:
-            return Response(content, 201)
+            return Response(content, 201, headers=headers)
         else:
-            return Response(content, 200)
+            return Response(content, 200, headers=headers)
