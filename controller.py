@@ -264,12 +264,14 @@ class LibraryRegistryController(object):
                 if ambiguous:
                     msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
                 return INVALID_AUTH_DOCUMENT.detailed(" ".join(msgs))
+            place_ids = []
             for place in places:
                 service_area = get_one_or_create(self._db, ServiceArea,
                                                  library_id=library.id,
                                                  place_id=place.id)
+                place_ids.append(place.id)
             for service_area in library.service_areas:
-                if service_area.place_id not in [p.id for p in places]:
+                if service_area.place_id not in place_ids:
                     self._db.delete(service_area)
                     
         catalog = OPDSCatalog.library_catalog(library)
