@@ -359,10 +359,9 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(old_secret, library.shared_secret)
 
         # If we include the old secret in a request, the registry will generate a new secret.
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org"),
-                ("shared_secret", old_secret),
             ])
 
             key = RSA.generate(1024)
@@ -397,10 +396,9 @@ class TestLibraryRegistryController(ControllerTest):
         old_secret = library.shared_secret
 
         # If we include an incorrect secret in the request, the secret stays the same.
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", headers={"Authorization": "Bearer notthesecret"}):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org"),
-                ("shared_secret", "not the secret"),
             ])
 
             key = RSA.generate(1024)

@@ -307,7 +307,10 @@ class LibraryRegistryController(object):
                 # TODO: Generate a short name based on the library's service area.
                 library.short_name = os.urandom(3).encode('hex')
 
-            submitted_secret = flask.request.form.get("shared_secret")
+            submitted_secret = None
+            auth_header = flask.request.headers.get('Authorization')
+            if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
+                submitted_secret = auth_header.split(' ')[1]
             generate_secret = (library.shared_secret is None) or (submitted_secret == library.shared_secret)
             if generate_secret:
                 library.shared_secret = os.urandom(24).encode('hex')
