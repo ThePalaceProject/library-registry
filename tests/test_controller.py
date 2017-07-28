@@ -197,8 +197,8 @@ class TestLibraryRegistryController(ControllerTest):
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
-                    "alternate": { "href": "http://alibrary.org" },
-                    "logo": { "href": "image data" },
+                    "alternate": { "href": "http://alibrary.org", "type": "text/html" },
+                    "logo": { "href": "data:image/png;imagedata" },
                 },
                 "public_key": {
                     "type": "RSA",
@@ -216,7 +216,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("A Library", library.name)
             eq_("Description", library.description)
             eq_("http://alibrary.org", library.web_url)
-            eq_("image data", library.logo)
+            eq_("data:image/png;imagedata", library.logo)
 
             eq_(["http://circmanager.org"], http_client.requests)
 
@@ -250,7 +250,7 @@ class TestLibraryRegistryController(ControllerTest):
                 "name": "A Library",
                 "service_description": "My feed requires authentication",
                 "links": {
-                    "logo": { "href": "new image data" },
+                    "logo": { "href": "data:image/png;newimagedata" },
                 }
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
@@ -263,7 +263,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("A Library", library.name)
             eq_("My feed requires authentication", library.description)
             eq_(None, library.web_url)
-            eq_("new image data", library.logo)
+            eq_("data:image/png;newimagedata", library.logo)
             eq_(["http://circmanager.org"], http_client.requests[1:])
 
             catalog = json.loads(response.data)
@@ -326,8 +326,8 @@ class TestLibraryRegistryController(ControllerTest):
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
-                    "alternate": { "href": "http://alibrary.org" },
-                    "logo": { "href": "image data" },
+                    "alternate": { "href": "http://alibrary.org", "type": "text/html" },
+                    "logo": { "href": "data:image/png;imagedata" },
                 },
                 "public_key": {
                     "type": "RSA",
@@ -363,8 +363,8 @@ class TestLibraryRegistryController(ControllerTest):
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
-                    "alternate": { "href": "http://alibrary.org" },
-                    "logo": { "href": "image data" },
+                    "alternate": { "href": "http://alibrary.org", "type": "text/html" },
+                    "logo": { "href": "data:image/png;imagedata" },
                 },
                 "public_key": {
                     "type": "RSA",

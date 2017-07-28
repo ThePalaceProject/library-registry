@@ -15,6 +15,7 @@ import base64
 import os
 
 from adobe_vendor_id import AdobeVendorIDController
+from authentication_document import AuthenticationDocument
 
 from model import (
     production_session,
@@ -216,7 +217,7 @@ class LibraryRegistryController(object):
             return AUTH_DOCUMENT_NOT_FOUND
 
         try:
-            auth_document = json.loads(auth_response.content)
+            auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception, e:
             return INVALID_AUTH_DOCUMENT
 
@@ -225,19 +226,25 @@ class LibraryRegistryController(object):
             opds_url=opds_url
         )
 
-        library.name = auth_document.get("name")
-        library.description = auth_document.get("service_description")
+        library.name = auth_document.title
+        library.description = auth_document.service_description
 
-        links = auth_document.get("links", {})
-        library.web_url = links.get("alternate", {}).get("href", None)
-        # TODO: Fetch the logo image and convert to base64 if it's a URL.
-        library.logo = links.get("logo", {}).get("href", None)
+        if auth_document.website:
+            library.web_url = auth_document.website.get("href")
+        else:
+            library.web_url = None
+
+        if auth_document.logo:
+            # TODO: Fetch the logo image and convert to base64 if it's a URL.
+            library.logo = auth_document.logo
+        else:
+            library.logo = None
 
         catalog = OPDSCatalog.library_catalog(library)
 
-        public_key = auth_document.get("public_key", {}).get("value")
-        if public_key:
-            public_key = RSA.import_key(public_key)
+        public_key = auth_document.public_key
+        if public_key and public_key.get("type") == "RSA":
+            public_key = RSA.import_key(public_key.get("value"))
             encryptor = PKCS1_OAEP.new(public_key)
 
             if not library.short_name:
