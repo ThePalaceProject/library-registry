@@ -106,6 +106,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory", register_link["type"])
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
             
@@ -181,11 +182,14 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory", register_link["type"])
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
     def test_register_success(self):
         http_client = DummyHTTPClient()
+        opds1_type = "application/atom+xml;profile=opds-catalog;kind=acquisition"
+        opds2_type = "application/opds+json"
 
         # Register a new library.
         with self.app.test_request_context("/"):
@@ -195,6 +199,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             key = RSA.generate(1024)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
@@ -212,6 +217,8 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
 
             eq_(201, response.status_code)
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory",
+                response.headers.get("Content-Type"))
 
             library = get_one(self._db, Library, opds_url="http://circmanager.org")
             assert library != None
@@ -251,12 +258,13 @@ class TestLibraryRegistryController(ControllerTest):
             ])
 
             image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
-            http_client.queue_response(200, content=image_data)
+            http_client.queue_response(200, content=image_data, media_type="image/png")
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed requires authentication",
                 "links": {
-                    "logo": { "href": "http://example.com/logo.png", "type": "image/png" },
+                    "logo": { "href": "/logo.png", "type": "image/png" },
                 },
                 "service_area": { "US": "Connecticut" },
             }
@@ -264,6 +272,8 @@ class TestLibraryRegistryController(ControllerTest):
 
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
+            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory",
+                response.headers.get("Content-Type"))
 
             library = get_one(self._db, Library, opds_url="http://circmanager.org")
             assert library != None
@@ -275,19 +285,20 @@ class TestLibraryRegistryController(ControllerTest):
             self._db.commit()
             [service_area] = library.service_areas
             eq_(self.connecticut_state.id, service_area.place_id)
-            eq_(["http://circmanager.org", "http://example.com/logo.png"], http_client.requests[1:])
+            eq_(["http://circmanager.org", "http://circmanager.org/logo.png"], http_client.requests[1:])
 
             catalog = json.loads(response.data)
             eq_("A Library", catalog['metadata']['title'])
             eq_('My feed requires authentication', catalog['metadata']['description'])
 
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed links to the auth document",
             }
             http_client.queue_response(200, content=json.dumps(auth_document))
             feed = '<feed><link rel="http://opds-spec.org/auth/document" href="http://circmanager.org/auth"/></feed>'
-            http_client.queue_response(200, content=feed)
+            http_client.queue_response(200, content=feed, media_type=opds1_type)
 
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
@@ -295,45 +306,67 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[3:])
 
             auth_document = {
+                "id": "http://circmanager.org",
+                "name": "A Library",
+                "service_description": "My catalog links to the auth document",
+            }
+            http_client.queue_response(200, content=json.dumps(auth_document))
+            catalog = json.dumps({
+                "links": {
+                    "http://opds-spec.org/auth/document": {
+                        "href": "http://circmanager.org/auth"
+                    }
+                }
+            })
+            http_client.queue_response(200, content=catalog, media_type=opds2_type)
+
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(200, response.status_code)
+            eq_("My catalog links to the auth document", library.description)
+            eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[5:])
+
+            auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed links to the shelf, which requires auth",
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
             feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
-            http_client.queue_response(200, content=feed)
+            http_client.queue_response(200, content=feed, media_type=opds1_type)
 
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
             eq_("My feed links to the shelf, which requires auth", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[5:])
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[7:])
             
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed links to a shelf which links to the auth document",
             }
             http_client.queue_response(200, content=json.dumps(auth_document))
             shelf_feed = '<feed><link rel="http://opds-spec.org/auth/document" href="http://circmanager.org/auth"/></feed>'
-            http_client.queue_response(200, content=shelf_feed)
+            http_client.queue_response(200, content=shelf_feed, media_type=opds1_type)
             feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
-            http_client.queue_response(200, content=feed)
+            http_client.queue_response(200, content=feed, media_type=opds1_type)
 
             response = self.controller.register(do_get=http_client.do_get)
             eq_(200, response.status_code)
             eq_("My feed links to a shelf which links to the auth document", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf", "http://circmanager.org/auth"], http_client.requests[7:])
+            eq_(["http://circmanager.org", "http://circmanager.org/shelf", "http://circmanager.org/auth"], http_client.requests[9:])
 
             # The request did not include the old secret, so the secret wasn't changed.
             eq_(old_secret, library.shared_secret)
 
         # If we include the old secret in a request, the registry will generate a new secret.
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org"),
-                ("shared_secret", old_secret),
             ])
 
             key = RSA.generate(1024)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
@@ -363,14 +396,14 @@ class TestLibraryRegistryController(ControllerTest):
         old_secret = library.shared_secret
 
         # If we include an incorrect secret in the request, the secret stays the same.
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", headers={"Authorization": "Bearer notthesecret"}):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org"),
-                ("shared_secret", "not the secret"),
             ])
 
             key = RSA.generate(1024)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
                 "links": {
@@ -391,6 +424,8 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_register_errors(self):
         http_client = DummyHTTPClient()
+        opds1_type = "application/atom+xml;profile=opds-catalog;kind=acquisition"
+        opds2_type = "application/opds+json"
 
         with self.app.test_request_context("/"):
             response = self.controller.register(do_get=http_client.do_get)
@@ -407,16 +442,21 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_OPDS_FEED, response)
 
+            # This feed claims to be OPDS 2 but isn't valid JSON.
+            http_client.queue_response(200, content="not json", media_type=opds2_type)
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_OPDS_FEED, response)
+
             # This feed doesn't link to the auth document or the shelf.
             opds_feed = '<feed></feed>'
-            http_client.queue_response(200, content=opds_feed)
+            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
             response = self.controller.register(do_get=http_client.do_get)
             eq_(AUTH_DOCUMENT_NOT_FOUND, response)
 
             # This feed links to the auth document, but that link is broken.
             opds_feed = '<feed><link rel="http://opds-spec.org/auth/document" href="broken"/></feed>'
             http_client.queue_response(404)
-            http_client.queue_response(200, content=opds_feed)
+            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
             response = self.controller.register(do_get=http_client.do_get)
             eq_(AUTH_DOCUMENT_NOT_FOUND, response)
 
@@ -424,20 +464,46 @@ class TestLibraryRegistryController(ControllerTest):
             # doesn't link to the auth document.
             shelf_feed = '<feed></feed>'
             opds_feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
-            http_client.queue_response(200, content=shelf_feed)
-            http_client.queue_response(200, content=opds_feed)
+            http_client.queue_response(200, content=shelf_feed, media_type=opds1_type)
+            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
             response = self.controller.register(do_get=http_client.do_get)
             eq_(AUTH_DOCUMENT_NOT_FOUND, response)
 
             # This feed has an auth document that's not valid.
             http_client.queue_response(401, content="not json")
             opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
-            http_client.queue_response(200, content=opds_feed)
+            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT, response)
 
+            # This feed is missing an id.
+            auth_document = {
+                "title": "A Library",
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
+            # This feed is missing a title.
+            auth_document = {
+                "id": "http://circmanager.org",
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
+            # This feed's id doesn't match the request url.
+            auth_document = {
+                "id": "http://example.org",
+                "title": "A Library",
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
             # This feed has an unknown service area.
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_area": {"US": ["Somewhere"]},
             }
@@ -448,6 +514,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             # This feed has an ambiguous service area.
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_area": {"US": ["Manhattan"]},
             }
@@ -459,6 +526,7 @@ class TestLibraryRegistryController(ControllerTest):
             # This feed links to a broken logo image.
             http_client.queue_response(500)
             auth_document = {
+                "id": "http://circmanager.org",
                 "name": "A Library",
                 "links": {
                     "logo": { "href": "http://example.com/logo.png", "type": "image/png" },

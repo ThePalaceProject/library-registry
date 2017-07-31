@@ -287,7 +287,7 @@ class DummyHTTPClient(object):
                        other_headers=None, content=''):
         headers = {}
         if media_type:
-            headers["content-type"] = media_type
+            headers["Content-Type"] = media_type
         if other_headers:
             for k, v in other_headers.items():
                 headers[k.lower()] = v

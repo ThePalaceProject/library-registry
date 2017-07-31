@@ -15,6 +15,7 @@ import base64
 import os
 from PIL import Image
 from StringIO import StringIO
+from urlparse import urljoin
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
@@ -43,6 +44,7 @@ from util.http import HTTP
 from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
+OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
 
 class LibraryRegistry(object):
 
@@ -94,7 +96,7 @@ class LibraryRegistryAnnotator(Annotator):
         )
         register_url = self.app.url_for("register")
         catalog.add_link_to_catalog(
-            catalog.catalog, href=register_url, rel="register"
+            catalog.catalog, href=register_url, rel="register", type=OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
         )
 
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
@@ -168,6 +170,22 @@ class LibraryRegistryController(object):
         SHELF_REL = "http://opds-spec.org/shelf"
 
         auth_response = None
+        def get_opds_links(response):
+            type = response.headers.get("Content-Type")
+            if type == "application/opds+json":
+                # This is an OPDS 2 catalog.
+                catalog = json.loads(response.content)
+                links = []
+                for k,v in catalog.get("links", {}).iteritems():
+                    links.append(dict(rel=k, href=v.get("href")))
+                return links
+                
+            elif type and type.startswith("application/atom+xml;profile=opds-catalog"):
+                # This is an OPDS 1 feed.
+                feed = feedparser.parse(response.content)
+                return feed.get("feed", {}).get("links", [])
+            return []
+
         links = []
         try:
             response = do_get(opds_url, allowed_response_codes=["2xx", "3xx", 401])
@@ -176,8 +194,7 @@ class LibraryRegistryController(object):
                 # should contain the auth document.
                 auth_response = response
             else:
-                feed = feedparser.parse(response.content)
-                links = feed.get("feed", {}).get("links", [])
+                links = get_opds_links(response)
         except Exception, e:
             return INVALID_OPDS_FEED
 
@@ -185,6 +202,9 @@ class LibraryRegistryController(object):
             for link in links:
                 if link.get("rel") == rel:
                     url = link.get("href")
+                    if url:
+                        # Expand relative urls.
+                        url = urljoin(opds_url, url)
                     try:
                         return do_get(url, allowed_response_codes=allowed_response_codes)
                     except Exception, e:
@@ -211,8 +231,7 @@ class LibraryRegistryController(object):
                 else:
                     # This response didn't require authentication, so maybe it's a feed
                     # that links to the auth document.
-                    feed = feedparser.parse(response.content)
-                    links = feed.get("feed", {}).get("links", [])
+                    links = get_opds_links(response)
                     auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
                                                      allowed_response_codes=["2xx", "3xx"])
 
@@ -224,6 +243,13 @@ class LibraryRegistryController(object):
         except Exception, e:
             return INVALID_AUTH_DOCUMENT
 
+        if not auth_document.id:
+            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document is missing an id."))
+        if not auth_document.title:
+            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document is missing a title."))
+        if auth_document.id != opds_url:
+            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document's id doesn't match the submitted url."))
+
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url
@@ -233,6 +259,9 @@ class LibraryRegistryController(object):
         library.description = auth_document.service_description
 
         if auth_document.website:
+            url = auth_document.website.get("href")
+            if url:
+                url = urljoin(opds_url, url)
             library.web_url = auth_document.website.get("href")
         else:
             library.web_url = None
@@ -240,7 +269,10 @@ class LibraryRegistryController(object):
         if auth_document.logo:
             library.logo = auth_document.logo
         elif auth_document.logo_link:
-            logo_response = do_get(auth_document.logo_link.get("href"), stream=True)
+            url = auth_document.logo_link.get("href")
+            if url:
+                url = urljoin(opds_url, url)
+            logo_response = do_get(url, stream=True)
             try:
                 image = Image.open(logo_response.raw)
             except Exception, e:
@@ -285,7 +317,10 @@ class LibraryRegistryController(object):
                 # TODO: Generate a short name based on the library's service area.
                 library.short_name = os.urandom(3).encode('hex')
 
-            submitted_secret = flask.request.form.get("shared_secret")
+            submitted_secret = None
+            auth_header = flask.request.headers.get('Authorization')
+            if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
+                submitted_secret = auth_header.split(' ')[1]
             generate_secret = (library.shared_secret is None) or (submitted_secret == library.shared_secret)
             if generate_secret:
                 library.shared_secret = os.urandom(24).encode('hex')
@@ -296,8 +331,10 @@ class LibraryRegistryController(object):
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
 
         content = json.dumps(catalog)
+        headers = dict()
+        headers["Content-Type"] = OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
 
         if is_new:
-            return Response(content, 201)
+            return Response(content, 201, headers=headers)
         else:
-            return Response(content, 200)
+            return Response(content, 200, headers=headers)
