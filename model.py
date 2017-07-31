@@ -482,14 +482,6 @@ class Library(Base):
         else:
             return 'urn:' + self.urn
     
-    @property
-    def logo_data_uri(self):
-        """Return the logo as a data: URI."""
-        if not self.logo:
-            return None
-        return "data:image/png;base64,%s" % base64.b64encode(self.logo)
-
-
 class LibraryAlias(Base):
 
     """An alternate name for a library."""
@@ -577,7 +569,7 @@ class Place(Base):
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
-    geometry = Column(Geometry(srid=4326))
+    geometry = Column(Geometry(srid=4326), nullable=True)
 
     aliases = relationship("PlaceAlias", backref='place')
 
@@ -651,6 +643,10 @@ class Place(Base):
         if place_type:
             qu = qu.filter(Place.type==place_type)
         return qu
+
+    @classmethod
+    def lookup_one_by_name(cls, _db, name, place_type=None):
+        return cls.lookup_by_name(_db, name, place_type).one()
 
     @classmethod
     def name_parts(cls, name):

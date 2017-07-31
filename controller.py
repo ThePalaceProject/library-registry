@@ -13,12 +13,16 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import base64
 import os
+from PIL import Image
+from StringIO import StringIO
 
 from adobe_vendor_id import AdobeVendorIDController
+from authentication_document import AuthenticationDocument
 
 from model import (
     production_session,
     Library,
+    ServiceArea,
     get_one_or_create,
 )
 from config import (
@@ -216,7 +220,7 @@ class LibraryRegistryController(object):
             return AUTH_DOCUMENT_NOT_FOUND
 
         try:
-            auth_document = json.loads(auth_response.content)
+            auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception, e:
             return INVALID_AUTH_DOCUMENT
 
@@ -225,19 +229,56 @@ class LibraryRegistryController(object):
             opds_url=opds_url
         )
 
-        library.name = auth_document.get("name")
-        library.description = auth_document.get("service_description")
+        library.name = auth_document.title
+        library.description = auth_document.service_description
 
-        links = auth_document.get("links", {})
-        library.web_url = links.get("alternate", {}).get("href", None)
-        # TODO: Fetch the logo image and convert to base64 if it's a URL.
-        library.logo = links.get("logo", {}).get("href", None)
+        if auth_document.website:
+            library.web_url = auth_document.website.get("href")
+        else:
+            library.web_url = None
 
+        if auth_document.logo:
+            library.logo = auth_document.logo
+        elif auth_document.logo_link:
+            logo_response = do_get(auth_document.logo_link.get("href"), stream=True)
+            try:
+                image = Image.open(logo_response.raw)
+            except Exception, e:
+                return INVALID_AUTH_DOCUMENT.detailed(_("Could not read logo image %(image_url)s", image_url=auth_document.logo_link.get("href")))
+            # Convert to PNG.
+            buffer = StringIO()
+            image.save(buffer, format="PNG")
+            b64 = base64.b64encode(buffer.getvalue())
+            type = logo_response.headers.get("Content-Type") or auth_document.logo_link.get("type")
+            if type:
+                library.logo = "data:%s;base64,%s" % (type, b64)
+        else:
+            library.logo = None
+
+        if auth_document.service_area:
+            places, unknown, ambiguous = auth_document.service_area
+            if unknown or ambiguous:
+                msgs = []
+                if unknown:
+                    msgs.append(str(_("The following service area was unknown: %(service_area)s.", service_area=json.dumps(unknown))))
+                if ambiguous:
+                    msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
+                return INVALID_AUTH_DOCUMENT.detailed(" ".join(msgs))
+            place_ids = []
+            for place in places:
+                service_area = get_one_or_create(self._db, ServiceArea,
+                                                 library_id=library.id,
+                                                 place_id=place.id)
+                place_ids.append(place.id)
+            for service_area in library.service_areas:
+                if service_area.place_id not in place_ids:
+                    self._db.delete(service_area)
+                    
         catalog = OPDSCatalog.library_catalog(library)
 
-        public_key = auth_document.get("public_key", {}).get("value")
-        if public_key:
-            public_key = RSA.import_key(public_key)
+        public_key = auth_document.public_key
+        if public_key and public_key.get("type") == "RSA":
+            public_key = RSA.import_key(public_key.get("value"))
             encryptor = PKCS1_OAEP.new(public_key)
 
             if not library.short_name:

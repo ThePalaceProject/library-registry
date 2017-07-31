@@ -261,13 +261,6 @@ class TestLibrary(DatabaseTest):
         eq_("urn:foo", nypl.urn_uri)
         nypl.urn = 'urn:bar'
         eq_('urn:bar', nypl.urn_uri)
-        
-    def test_logo_data_uri(self):
-        """The library's logo can be converted into a data: URI."""
-        nypl = self._library("New York Public Library")
-        nypl.logo = "Fake logo"
-        expect = 'data:image/png;base64,' + base64.b64encode(nypl.logo)
-        eq_(expect, nypl.logo_data_uri)
 
     def test_short_name(self):
         lib = self._library("A Library")

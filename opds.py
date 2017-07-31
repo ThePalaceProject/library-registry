@@ -86,7 +86,7 @@ class OPDSCatalog(object):
 
         if library.logo:
             cls.add_image_to_catalog(catalog, rel=cls.THUMBNAIL_REL,
-                                     href=library.logo_data_uri,
+                                     href=library.logo,
                                      type="image/png")
 
         return catalog

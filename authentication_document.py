@@ -3,6 +3,7 @@ import json
 from nose.tools import set_trace
 from sqlalchemy.orm.exc import (
     MultipleResultsFound,
+    NoResultFound,
 )
 
 from model import (
@@ -44,13 +45,13 @@ class AuthenticationDocument(object):
                 _db, service_area, place_class=place_class
             )
         else:
-            self.service_area = place_class.everywhere(_db)
+            self.service_area = [place_class.everywhere(_db)], [], []
         if focus_area:
             self.focus_area = self.parse_coverage(
                 _db, focus_area, place_class=place_class
             )
         else:
-            self.focus_area = place_class.everywhere(_db)
+            self.focus_area = [place_class.everywhere(_db)], [], []
         self.links = links
         self.website = self.extract_link(
             rel="alternate", require_type="text/html"
@@ -110,42 +111,40 @@ class AuthenticationDocument(object):
             coverage = dict()
             
         for country, places in coverage.items():
-            if places == cls.COVERAGE_EVERYWHERE:
-                # This library covers an entire country.
-                try:
-                    place_obj = place_class.lookup_by_name(
-                        _db, country, place_type=Place.NATION,
-                    )
-                    if place_obj:
-                        place_objs.append(place_obj)
-                    else:
-                        # Either this isn't a recognized country
-                        # or we don't have a geography for it.
-                        unknown[country] = cls.COVERAGE_EVERYWHERE
-                except MultipleResultsFound, e:
-                    # A country was ambiguously named -- not very likely.
-                    ambiguous[country] = cls.COVERAGE_EVERYWHERE
-            else:
-                # This library covers a list of places within a
-                # country.
-                if isinstance(places, basestring):
-                    # This is invalid -- you're supposed to always
-                    # pass in a list -- but we can support it.
-                    places = [places]
-                for place in places:
-                    try:
-                        place_obj = place_class.lookup_inside(
-                            _db, place, must_be_inside=country
-                        )
-                        if place_obj:
-                            # We found it.
-                            place_objs.append(place_obj)
-                        else:
-                            # We couldn't find any place with this name.
-                            unknown[country].append(place)
-                    except MultipleResultsFound, e:
-                        # The place was ambiguously named.
-                        ambiguous[country].append(place)
+            try:
+                country_obj = place_class.lookup_one_by_name(
+                    _db, country, place_type=Place.NATION,
+                )
+                if places == cls.COVERAGE_EVERYWHERE:
+                    # This library covers an entire country.
+                    place_objs.append(country_obj)
+                else:
+                    # This library covers a list of places within a
+                    # country.
+                    if isinstance(places, basestring):
+                        # This is invalid -- you're supposed to always
+                        # pass in a list -- but we can support it.
+                        places = [places]
+                    for place in places:
+                        try:
+                            place_obj = country_obj.lookup_inside(place)
+                            if place_obj:
+                                # We found it.
+                                place_objs.append(place_obj)
+                            else:
+                                # We couldn't find any place with this name.
+                                unknown[country].append(place)
+                        except MultipleResultsFound, e:
+                            # The place was ambiguously named.
+                            ambiguous[country].append(place)
+            except MultipleResultsFound, e:
+                # A country was ambiguously named -- not very likely.
+                ambiguous[country] = places
+            except NoResultFound, e:
+                # Either this isn't a recognized country
+                # or we don't have a geography for it.
+                unknown[country] = places
+
         return place_objs, unknown, ambiguous
     
     @classmethod
