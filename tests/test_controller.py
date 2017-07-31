@@ -264,7 +264,7 @@ class TestLibraryRegistryController(ControllerTest):
                 "name": "A Library",
                 "service_description": "My feed requires authentication",
                 "links": {
-                    "logo": { "href": "http://example.com/logo.png", "type": "image/png" },
+                    "logo": { "href": "/logo.png", "type": "image/png" },
                 },
                 "service_area": { "US": "Connecticut" },
             }
@@ -285,7 +285,7 @@ class TestLibraryRegistryController(ControllerTest):
             self._db.commit()
             [service_area] = library.service_areas
             eq_(self.connecticut_state.id, service_area.place_id)
-            eq_(["http://circmanager.org", "http://example.com/logo.png"], http_client.requests[1:])
+            eq_(["http://circmanager.org", "http://circmanager.org/logo.png"], http_client.requests[1:])
 
             catalog = json.loads(response.data)
             eq_("A Library", catalog['metadata']['title'])

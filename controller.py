@@ -15,6 +15,7 @@ import base64
 import os
 from PIL import Image
 from StringIO import StringIO
+from urlparse import urljoin
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
@@ -201,6 +202,9 @@ class LibraryRegistryController(object):
             for link in links:
                 if link.get("rel") == rel:
                     url = link.get("href")
+                    if url:
+                        # Expand relative urls.
+                        url = urljoin(opds_url, url)
                     try:
                         return do_get(url, allowed_response_codes=allowed_response_codes)
                     except Exception, e:
@@ -255,6 +259,9 @@ class LibraryRegistryController(object):
         library.description = auth_document.service_description
 
         if auth_document.website:
+            url = auth_document.website.get("href")
+            if url:
+                url = urljoin(opds_url, url)
             library.web_url = auth_document.website.get("href")
         else:
             library.web_url = None
@@ -262,7 +269,10 @@ class LibraryRegistryController(object):
         if auth_document.logo:
             library.logo = auth_document.logo
         elif auth_document.logo_link:
-            logo_response = do_get(auth_document.logo_link.get("href"), stream=True)
+            url = auth_document.logo_link.get("href")
+            if url:
+                url = urljoin(opds_url, url)
+            logo_response = do_get(url, stream=True)
             try:
                 image = Image.open(logo_response.raw)
             except Exception, e:
