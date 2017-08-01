@@ -59,7 +59,7 @@ def nearby():
 @returns_problem_detail
 def nearby_qa():
     return app.library_registry.registry_controller.nearby(
-        originating_ip(), qa=True
+        originating_ip(), live=False
     )
 
 @app.route("/register", methods=["POST"])
@@ -78,7 +78,7 @@ def search():
 @returns_problem_detail
 def search_qa():
     return app.library_registry.registry_controller.search(
-        originating_ip(), qa=True
+        originating_ip(), live=False
     )
 
 @app.route('/heartbeat')
