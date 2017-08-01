@@ -252,7 +252,8 @@ class LibraryRegistryController(object):
 
         library, is_new = get_one_or_create(
             self._db, Library,
-            opds_url=opds_url
+            opds_url=opds_url,
+            create_method_kwargs=dict(status=Library.REGISTERED)
         )
 
         library.name = auth_document.title
