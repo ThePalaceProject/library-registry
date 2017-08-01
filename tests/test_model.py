@@ -327,7 +327,7 @@ class TestLibrary(DatabaseTest):
         # we find nothing.
         eq_([],
             Library.nearby(self._db, (41.3, -73.3),
-                           allowed_statuses=[Library.APPROVED]).all()
+                           allowed_stages=[Library.APPROVED]).all()
         )
         
     def test_query_cleanup(self):
@@ -418,7 +418,7 @@ class TestLibrary(DatabaseTest):
         # with the LIVE status. If we look for libraries with the
         # APPROVED status, we find nothing.
         eq_([],
-            search("bpl", allowed_statuses=[Library.APPROVED])
+            search("bpl", allowed_stages=[Library.APPROVED])
         )
         
 
@@ -482,7 +482,7 @@ class TestLibrary(DatabaseTest):
         eq_([],
             Library.search_by_location_name(
                 self._db, "brooklyn", here=GeometryUtility.point(43, -70),
-                allowed_statuses=[Library.APPROVED]
+                allowed_stages=[Library.APPROVED]
             ).all()
         )
         
@@ -525,7 +525,7 @@ class TestLibrary(DatabaseTest):
         eq_([],
             Library.search(
                 self._db, (40.7, -73.9), "New York",
-                allowed_statuses=[Library.APPROVED]
+                allowed_stages=[Library.APPROVED]
             )
         )
         

@@ -111,8 +111,8 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
     def test_nearby_qa(self):
-        # The library we used in the previous test has status=LIVE.
-        # If we switch to looking for libraries with status=APPROVED,
+        # The library we used in the previous test has stage=LIVE.
+        # If we switch to looking for libraries with stage=APPROVED,
         # we won't find anything.
         with self.app.test_request_context("/"):
             response = self.controller.nearby("65.88.88.124", live=False)
@@ -121,7 +121,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         # If we move the LIVE library to APPROVED, it shows up in
         # the feed.
-        self.connecticut_state_library.status = Library.APPROVED
+        self.connecticut_state_library.stage = Library.APPROVED
         with self.app.test_request_context("/"):
             response = self.controller.nearby("65.88.88.124", live=False)
             catalogs = json.loads(response.data)
@@ -237,15 +237,15 @@ class TestLibraryRegistryController(ControllerTest):
         # As we saw in the previous test, this search picks up two
         # libraries when we run it looking for LIVE libraries. But
         # since we're only searching for libraries in the APPROVED
-        # status, we don't find anything.
+        # stage, we don't find anything.
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124", live=False)
             catalog = json.loads(response.data)
             eq_([], catalog['catalogs'])
 
         # If we move one of the libraries back into the APPROVED
-        # status, we find it.
-        self.kansas_state_library.status = Library.APPROVED
+        # stage, we find it.
+        self.kansas_state_library.stage = Library.APPROVED
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124", live=False)
             catalog = json.loads(response.data)
@@ -292,7 +292,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Description", library.description)
             eq_("http://alibrary.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
-            eq_(Library.REGISTERED, library.status)
+            eq_(Library.REGISTERED, library.stage)
             [service_area] = library.service_areas
             eq_(self.kansas_state.id, service_area.place_id)
 
@@ -319,7 +319,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         # Register changes to the same library, and test all the places
         # the auth document could be.
-        library.status = Library.LIVE
+        library.stage = Library.LIVE
         with self.app.test_request_context("/"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org"),
@@ -349,9 +349,9 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("My feed requires authentication", library.description)
             eq_(None, library.web_url)
             eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
-            # The library's status is still LIVE, it has not gone back to
+            # The library's stage is still LIVE, it has not gone back to
             # REGISTERED.
-            eq_(Library.LIVE, library.status)
+            eq_(Library.LIVE, library.stage)
             
             # Commit to update library.service_areas.
             self._db.commit()
