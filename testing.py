@@ -108,7 +108,7 @@ class DatabaseTest(object):
         self.time_counter = self.time_counter + timedelta(days=1)
         return v
 
-    def _library(self, name=None, service_areas=[], status=Library.LIVE):
+    def _library(self, name=None, service_areas=[], stage=Library.LIVE):
         name = name or self._str
         library, ignore = get_one_or_create(self._db, Library, name=name)
         library.urn = self._str
@@ -117,7 +117,7 @@ class DatabaseTest(object):
         for place in service_areas:
             get_one_or_create(self._db, ServiceArea, library=library,
                               place=place)
-        library.status = status
+        library.stage = stage
         return library
 
     def _place(self, external_id=None, external_name=None, type=None,

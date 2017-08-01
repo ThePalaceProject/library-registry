@@ -209,7 +209,7 @@ class Library(Base):
     # The library's logo.
     logo = Column(Unicode)
 
-    # A Library may have one of four statuses:
+    # A Library may inhabit one of four stages:
     #
     # 'registered' - An OPDS server successfully completed the registration
     #                process.
@@ -225,10 +225,10 @@ class Library(Base):
     APPROVED = 'approved'
     REJECTED = 'rejected'
     LIVE = 'live'
-    status_enum = Enum(
-        REGISTERED, APPROVED, REJECTED, LIVE, name='library_status'
+    stage_enum = Enum(
+        REGISTERED, APPROVED, REJECTED, LIVE, name='library_stage'
     )
-    status = Column(status_enum, index=True, nullable=False, default=REGISTERED)
+    stage = Column(stage_enum, index=True, nullable=False, default=REGISTERED)
     
     # To issue Short Client Tokens for this library, the registry must share a
     # short name and a secret with them.
@@ -258,19 +258,19 @@ class Library(Base):
         return value.upper()
 
     @classmethod
-    def _restrict_to_statuses(cls, qu, allowed_statuses=None):
+    def _restrict_to_stages(cls, qu, allowed_stages=None):
         """Restrict the given query to libraries that are in one of
-        the given statuses.
+        the given stages.
 
-        :param allowed_statuses: A list of allowable values for
-        `Library.status`. By default, only libraries in the LIVE status
+        :param allowed_stages: A list of allowable values for
+        `Library.stage`. By default, only libraries in the LIVE stage
         are shown.
         """
-        allowed_statuses = allowed_statuses or [Library.LIVE]
-        return qu.filter(Library.status.in_(allowed_statuses))
+        allowed_stages = allowed_stages or [Library.LIVE]
+        return qu.filter(Library.stage.in_(allowed_stages))
     
     @classmethod
-    def nearby(cls, _db, target, max_radius=150, allowed_statuses=None):
+    def nearby(cls, _db, target, max_radius=150, allowed_stages=None):
         """Find libraries whose service areas include or are close to the
         given point.
 
@@ -285,7 +285,7 @@ class Library(Base):
         """
 
         # By default, only show libraries that have been approved.
-        allowed_statuses = allowed_statuses or [cls.LIVE]
+        allowed_stages = allowed_stages or [cls.LIVE]
         
         # We start with a single point on the globe. Call this Point
         # A.
@@ -320,11 +320,11 @@ class Library(Base):
             ServiceArea.place).filter(nearby).add_column(
                 min_distance).group_by(Library.id).order_by(
                 min_distance.asc())
-        qu = cls._restrict_to_statuses(qu, allowed_statuses)
+        qu = cls._restrict_to_stages(qu, allowed_stages)
         return qu
 
     @classmethod
-    def search(cls, _db, target, query, allowed_statuses=None):
+    def search(cls, _db, target, query, allowed_stages=None):
         """Try as hard as possible to find a small number of libraries
         that match the given query.
 
@@ -354,7 +354,7 @@ class Library(Base):
         # We start with libraries that match the name query.
         if library_query:
             libraries_for_name = cls.search_by_library_name(
-                _db, library_query, here, allowed_statuses).limit(
+                _db, library_query, here, allowed_stages).limit(
                     max_libraries).all()
         else:
             libraries_for_name = []
@@ -362,7 +362,7 @@ class Library(Base):
         # We tack on any additional libraries that match a place query.
         if place_query:
             libraries_for_location = cls.search_by_location_name(
-                _db, place_query, place_type, here, allowed_statuses
+                _db, place_query, place_type, here, allowed_stages
             ).limit(max_libraries).all()
         else:
             libraries_for_location = []
@@ -376,12 +376,12 @@ class Library(Base):
         return libraries_for_name + libraries_for_location
 
     @classmethod
-    def search_by_library_name(cls, _db, name, here=None, allowed_statuses=None):
+    def search_by_library_name(cls, _db, name, here=None, allowed_stages=None):
         """Find libraries whose name or alias matches the given name.
 
         :param name: Name of the library to search for.
         :param here: Order results by proximity to this location.
-        :param allowed_statuses: Only find libraries whose .status is one
+        :param allowed_stages: Only find libraries whose .stage is one
             of these values.
         """
        
@@ -402,19 +402,19 @@ class Library(Base):
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
-        qu = cls._restrict_to_statuses(qu, allowed_statuses)
+        qu = cls._restrict_to_stages(qu, allowed_stages)
         return qu
 
     @classmethod
     def search_by_location_name(cls, _db, query, type=None, here=None,
-                                allowed_statuses=None):
+                                allowed_stages=None):
         """Find libraries whose service area overlaps a place with
         the given name.
 
         :param query: Name of the place to search for.
         :param type: Restrict results to places of this type.
         :param here: Order results by proximity to this location.
-        :param allowed_statuses: Only find libraries whose .status is one
+        :param allowed_stages: Only find libraries whose .stage is one
             of these values.
         """
         # For a library to match, the Place named by the query must
@@ -437,7 +437,7 @@ class Library(Base):
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
-        qu = cls._restrict_to_statuses(qu, allowed_statuses)
+        qu = cls._restrict_to_stages(qu, allowed_stages)
         return qu
     
     us_zip = re.compile("^[0-9]{5}$")
