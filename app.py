@@ -55,6 +55,13 @@ def nearby():
         originating_ip()
     )
 
+@app.route('/qa')
+@returns_problem_detail
+def nearby_qa():
+    return app.library_registry.registry_controller.nearby(
+        originating_ip(), live=False
+    )
+
 @app.route("/register", methods=["POST"])
 @returns_problem_detail
 def register():
@@ -65,6 +72,13 @@ def register():
 def search():
     return app.library_registry.registry_controller.search(
         originating_ip()
+    )
+
+@app.route('/qa/search')
+@returns_problem_detail
+def search_qa():
+    return app.library_registry.registry_controller.search(
+        originating_ip(), live=False
     )
 
 @app.route('/heartbeat')
