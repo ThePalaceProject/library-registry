@@ -109,18 +109,55 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory", register_link["type"])
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
-            
+
+    def test_nearby_qa(self):
+        # The library we used in the previous test has status=LIVE.
+        # If we switch to looking for libraries with status=APPROVED,
+        # we won't find anything.
+        with self.app.test_request_context("/"):
+            response = self.controller.nearby("65.88.88.124", live=False)
+            catalogs = json.loads(response.data)
+            eq_([], catalogs['catalogs'])
+
+        # If we move the LIVE library to APPROVED, it shows up in
+        # the feed.
+        self.connecticut_state_library.status = Library.APPROVED
+        with self.app.test_request_context("/"):
+            response = self.controller.nearby("65.88.88.124", live=False)
+            catalogs = json.loads(response.data)
+            [catalog] = catalogs['catalogs']
+            assert("", catalog['metadata']['title'])
+
+            # Some of the links are the same as in the production feed;
+            # others are different.
+            url_for = self.app.library_registry.url_for
+            [register_link, search_link, self_link] = sorted(
+                catalogs['links'], key=lambda x: x['rel']
+            )
+
+            # The 'register' link is the same as in the main feed.
+            eq_(url_for("register"), register_link["href"])
+            eq_("register", register_link["rel"])
+
+            # This is a QA feed, and the 'search' and 'self' links
+            # will give results from the QA feed.
+            eq_(url_for("nearby_qa"), self_link['href'])
+            eq_("self", self_link['rel'])
+
+            eq_(url_for("search_qa"), search_link['href'])
+            eq_("search", search_link['rel'])
+
     def test_nearby_no_ip_address(self):
         with self.app.test_request_context("/"):
             response = self.controller.nearby(None)
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
-            catalog = json.loads(response.data)
+            catalogs = json.loads(response.data)
 
             # We found no nearby libraries, because we had no IP address to
             # start with.
-            eq_([], catalog['catalogs'])
+            eq_([], catalogs['catalogs'])
 
     def test_nearby_no_libraries(self):
         with self.app.test_request_context("/"):
@@ -150,6 +187,16 @@ class TestLibraryRegistryController(ControllerTest):
             expect_url_tag = '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
             assert expect_url_tag in response.data
 
+    def test_qa_search_form(self):
+        """The QA search form links to the QA search controller."""
+        with self.app.test_request_context("/"):
+            response = self.controller.search(live=False)
+            eq_("200 OK", response.status)
+
+            expect_url = self.library_registry.url_for("search_qa")
+            expect_url_tag = '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
+            assert expect_url_tag in response.data
+            
     def test_search(self):
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124")
@@ -186,6 +233,25 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
+    def test_search_qa(self):
+        # As we saw in the previous test, this search picks up two
+        # libraries when we run it looking for LIVE libraries. But
+        # since we're only searching for libraries in the APPROVED
+        # status, we don't find anything.
+        with self.app.test_request_context("/?q=manhattan"):
+            response = self.controller.search("65.88.88.124", live=False)
+            catalog = json.loads(response.data)
+            eq_([], catalog['catalogs'])
+
+        # If we move one of the libraries back into the APPROVED
+        # status, we find it.
+        self.kansas_state_library.status = Library.APPROVED
+        with self.app.test_request_context("/?q=manhattan"):
+            response = self.controller.search("65.88.88.124", live=False)
+            catalog = json.loads(response.data)
+            [catalog] = catalog['catalogs']
+            eq_('Kansas State Library', catalog['metadata']['title'])
+        
     def test_register_success(self):
         http_client = DummyHTTPClient()
         opds1_type = "application/atom+xml;profile=opds-catalog;kind=acquisition"

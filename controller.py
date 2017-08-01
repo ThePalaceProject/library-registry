@@ -88,9 +88,13 @@ class LibraryRegistryAnnotator(Annotator):
     def __init__(self, app):
         self.app = app
     
-    def annotate_catalog(self, catalog):
+    def annotate_catalog(self, catalog, live=True):
         """Add links and metadata to every catalog."""
-        search_url = self.app.url_for("search")
+        if live:
+            search_controller = "search"
+        else:
+            search_controller = "search_qa"
+        search_url = self.app.url_for(search_controller)
         catalog.add_link_to_catalog(
             catalog.catalog, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
         )
@@ -121,29 +125,53 @@ class LibraryRegistryController(object):
         if not ip_address:
             return None
         return GeometryUtility.point_from_ip(ip_address)
+
+    def statuses(self, show_live):
+        """Turn a boolean flag into an appropriate list of library statuses.
+
+        The list can be passed into one of the Library query methods.
+        """
+        if show_live:
+            return [Library.LIVE]
+        else:
+            return [Library.APPROVED]
         
-    def nearby(self, ip_address):
+    def nearby(self, ip_address, live=True):
         point = self.point_from_ip(ip_address)
-        qu = Library.nearby(self._db, point)
+        qu = Library.nearby(self._db, point,
+                            allowed_statuses=self.statuses(live))
         qu = qu.limit(5)
-        this_url = self.app.url_for('nearby')
+        if live:
+            nearby_controller = 'nearby'
+        else:
+            nearby_controller = 'nearby_qa'
+        this_url = self.app.url_for(nearby_controller)
         catalog = OPDSCatalog(
             self._db, unicode(_("Libraries near you")), this_url, qu,
-            annotator=self.annotator
+            annotator=self.annotator, live=live
         )
         return catalog_response(catalog)
         
-    def search(self, ip_address=None):
+    def search(self, ip_address=None, live=True):
         point = self.point_from_ip(ip_address)
         query = flask.request.args.get('q')
+        if live:
+            search_controller = 'search'
+        else:
+            search_controller = 'search_qa'
         if query:
             # Run the query and send the results.
-            results = Library.search(self._db, point, query)
-            this_url = self.app.url_for('search', q=query)
+            results = Library.search(
+                self._db, point, query, allowed_statuses=self.statuses(live)
+            )
+                
+            this_url = this_url = self.app.url_for(
+                search_controller, q=query
+            )
             catalog = OPDSCatalog(
                 self._db, unicode(_('Search results for "%s"')) % query,
                 this_url, results,
-                annotator=self.annotator
+                annotator=self.annotator, live=live
             )
             return catalog_response(catalog)
         else:
@@ -152,7 +180,7 @@ class LibraryRegistryController(object):
                 name=_("Find your library"),
                 description=_("Search by ZIP code, city or library name."),
                 tags="",
-                url_template = self.app.url_for('search') + "?q={searchTerms}"
+                url_template = self.app.url_for(search_controller) + "?q={searchTerms}"
             )
             headers = {}
             headers['Content-Type'] = OPENSEARCH_MEDIA_TYPE

@@ -44,7 +44,8 @@ class OPDSCatalog(object):
         image = dict(**kwargs)
         catalog.setdefault("images", []).append(image)
 
-    def __init__(self, _db, title, url, libraries, annotator=None):
+    def __init__(self, _db, title, url, libraries, annotator=None,
+                 live=True):
         """Turn a list of libraries into a catalog."""
         if not annotator:
             annotator = Annotator()
@@ -57,7 +58,7 @@ class OPDSCatalog(object):
             if not isinstance(library, tuple):
                 library = (library,)
             self.catalog["catalogs"].append(self.library_catalog(*library))
-        annotator.annotate_catalog(self)
+        annotator.annotate_catalog(self, live=live)
 
     @classmethod
     def library_catalog(cls, library, distance=None):
