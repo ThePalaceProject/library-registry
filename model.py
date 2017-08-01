@@ -225,7 +225,9 @@ class Library(Base):
     APPROVED = 'approved'
     REJECTED = 'rejected'
     LIVE = 'live'
-    status_enum = Enum(REGISTERED, APPROVED, LIVE, name='library_status')
+    status_enum = Enum(
+        REGISTERED, APPROVED, REJECTED, LIVE, name='library_status'
+    )
     status = Column(status_enum, index=True, nullable=False, default=REGISTERED)
     
     # To issue Short Client Tokens for this library, the registry must share a
