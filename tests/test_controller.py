@@ -226,6 +226,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Description", library.description)
             eq_("http://alibrary.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
+            eq_(Library.REGISTERED, library.status)
             [service_area] = library.service_areas
             eq_(self.kansas_state.id, service_area.place_id)
 
@@ -252,6 +253,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         # Register changes to the same library, and test all the places
         # the auth document could be.
+        library.status = Library.LIVE
         with self.app.test_request_context("/"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org"),
@@ -281,6 +283,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("My feed requires authentication", library.description)
             eq_(None, library.web_url)
             eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
+            # The library's status is still LIVE, it has not gone back to
+            # REGISTERED.
+            eq_(Library.LIVE, library.status)
+            
             # Commit to update library.service_areas.
             self._db.commit()
             [service_area] = library.service_areas

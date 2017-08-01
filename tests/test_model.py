@@ -322,6 +322,14 @@ class TestLibrary(DatabaseTest):
         # libraries near that point in Pennsylvania.
         eq_([], Library.nearby(self._db, (40, -75.8), 100).all())
 
+        # By default, nearby() only finds libraries with the LIVE
+        # status. If we look for libraries with the APPROVED status,
+        # we find nothing.
+        eq_([],
+            Library.nearby(self._db, (41.3, -73.3),
+                           allowed_statuses=[Library.APPROVED]).all()
+        )
+        
     def test_query_cleanup(self):
         m = Library.query_cleanup
 
@@ -352,8 +360,10 @@ class TestLibrary(DatabaseTest):
         eq_(("lapl", "lapl", None), m("lapl"))
 
     def test_search_by_library_name(self):
-        def search(name, here=None):
-            return list(Library.search_by_library_name(self._db, name, here))
+        def search(name, here=None, **kwargs):
+            return list(
+                Library.search_by_library_name(self._db, name, here, **kwargs)
+            )
 
         # The Brooklyn Public Library serves New York City.
         brooklyn = self._library(
@@ -402,6 +412,13 @@ class TestLibrary(DatabaseTest):
         eq_(["Boston Public Library",
              "Brooklyn Public Library"],
             [x[0].name for x in search("bpl", GeometryUtility.point(43, -70))]
+        )
+
+        # By default, search_by_library_name() only finds libraries
+        # with the LIVE status. If we look for libraries with the
+        # APPROVED status, we find nothing.
+        eq_([],
+            search("bpl", allowed_statuses=[Library.APPROVED])
         )
         
 
@@ -458,6 +475,16 @@ class TestLibrary(DatabaseTest):
             self._db, "brooklyn", here=GeometryUtility.point(43, -70)
         )
         eq_(nypl, brooklyn_results[0])
+
+        # By default, search_by_location_name() only finds libraries
+        # with the LIVE status. If we look for libraries with the
+        # APPROVED status, we find nothing.
+        eq_([],
+            Library.search_by_location_name(
+                self._db, "brooklyn", here=GeometryUtility.point(43, -70),
+                allowed_statuses=[Library.APPROVED]
+            ).all()
+        )
         
     def test_search(self):
         """Test the overall search method."""
@@ -492,6 +519,16 @@ class TestLibrary(DatabaseTest):
         libraries = Library.search(self._db, (40.7, -73.9), "Kansas")
         eq_(['Now Work'], [x[0].name for x in libraries])
 
+        # By default, search() only finds libraries with the LIVE
+        # status. If we look for libraries with the APPROVED status,
+        # we find nothing.
+        eq_([],
+            Library.search(
+                self._db, (40.7, -73.9), "New York",
+                allowed_statuses=[Library.APPROVED]
+            )
+        )
+        
     def test_search_excludes_duplicates(self):
         # Here's a library that serves a place called Kansas
         # whose name is also "Kansas"
