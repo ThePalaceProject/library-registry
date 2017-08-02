@@ -13,6 +13,7 @@ from sqlalchemy.orm.exc import (
 from authentication_document import AuthenticationDocument
 from . import DatabaseTest
 from model import (
+    Audience,
     Place,
     ServiceArea,
 )
@@ -486,3 +487,13 @@ class TestUpdateServiceAreas(DatabaseTest):
         [area] = library.service_areas
         eq_(Place.EVERYWHERE, area.place.type)
         eq_(ServiceArea.FOCUS, area.type)
+
+
+class TestUpdateAudiences(DatabaseTest):
+
+    def test_update_audiences(self):
+        library = self._library()
+        doc_dict = dict(audience=[Audience.PUBLIC, Audience.RESEARCH])
+        doc = AuthenticationDocument.from_dict(self._db, doc_dict)
+        problem = doc.update_audiences(library)
+        eq_([Audience.Public], [x.name for x in library.audiences])

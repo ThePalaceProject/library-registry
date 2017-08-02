@@ -215,6 +215,40 @@ class AuthenticationDocument(object):
             place_class=place_class
         )
 
+    def update_audiences(self, library):
+        old_audiences = list(library.audiences)
+
+        # 
+        new_audiences = self.audiences
+        if isinstance(new_audiences, basestring):
+            # This is invalid but we can easily support it.
+            new_audiences = [new_audiences]
+        if not isinstance(new_audiences, list):
+            return INVALID_AUTH_DOCUMENT.detailed(
+                _("'audience' must be a list") % new_audiences
+            )
+
+        # Ignore unrecognized audiences rather than rejecting the
+        # whole document.
+        valid_audiences = [x for x in new_audiences
+                           if x not in Audience.VALID_AUDIENCES]
+
+        # But there must be at least one audience we recognize.
+        if not valid_audiences:
+            return INVALID_AUTH_DOCUMENT.detailed(
+                _("None of the provided audiences were recognized.")
+            )
+
+        # If your audience is the general public, you don't get to say
+        # that your audience is _also_ (e.g.) researchers, who are
+        # part of the general public.
+        if Audience.PUBLIC in valid_audiences:
+            valid_audiences = [Audience.PUBLIC]
+
+        for audience in valid_audiences:
+            pass
+        pass
+    
     def update_service_areas(self, library):
         """Update a library's ServiceAreas based on the contents of this
         document.
