@@ -116,7 +116,7 @@ class AuthenticationDocument(object):
             # parse anything.
             place_objs.append(place_class.everywhere(_db))
             coverage = dict()
-            
+
         for country, places in coverage.items():
             try:
                 country_obj = place_class.lookup_one_by_name(
@@ -286,9 +286,9 @@ class AuthenticationDocument(object):
                 msgs.append(str(_("The following service area was unknown: %(service_area)s.", service_area=json.dumps(unknown))))
             if ambiguous:
                 msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
+            _db.rollback()
             return INVALID_AUTH_DOCUMENT.detailed(" ".join(msgs))
 
-        place_ids = []
         for place in places:
             service_area, is_new = get_one_or_create(
                 _db, ServiceArea, library_id=library.id,
