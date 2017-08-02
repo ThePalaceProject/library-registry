@@ -11,6 +11,13 @@ from sqlalchemy.orm.exc import (
     NoResultFound,
 )
 from authentication_document import AuthenticationDocument
+from . import DatabaseTest
+from model import (
+    Place,
+    ServiceArea,
+)
+from util.problem_detail import ProblemDetail
+from problem_details import INVALID_AUTH_DOCUMENT
 
 # Alias for a long class name
 AuthDoc = AuthenticationDocument
@@ -226,8 +233,8 @@ class TestLinkExtractor(object):
         
         # In the absence of specific information, it's assumed the
         # OPDS server is open to everyone.
-        eq_(([everywhere], [], []), parsed.service_area)
-        eq_(([everywhere], [], []), parsed.focus_area)
+        eq_(([everywhere], {}, {}), parsed.service_area)
+        eq_(([everywhere], {}, {}), parsed.focus_area)
         eq_([parsed.PUBLIC_AUDIENCE], parsed.audiences)
 
         eq_(None, parsed.id)
@@ -318,3 +325,164 @@ class TestLinkExtractor(object):
                              "https://librarysimplified.org/rel/auth/anonymous"]}
         auth = AuthDoc.from_dict(None, document, MockPlace())
         eq_(True, auth.anonymous_access)
+
+
+class TestUpdateServiceAreas(DatabaseTest):
+
+    def test_known_place_becomes_servicearea(self):
+        """Test the helper method in a successful case."""
+        library = self._library()
+        
+        # We identified two places, with no ambiguous or unknown
+        # places.
+        p1 = self._place()
+        p2 = self._place()
+        valid = [p1, p2]
+        ambiguous = []
+        unknown = []
+
+        ids = []
+
+        # This will use those places to create new ServiceAreas.
+        problem = AuthenticationDocument._update_service_areas(
+            library, [valid, unknown, ambiguous], ServiceArea.FOCUS,
+            ids
+        )
+        eq_(None, problem)
+        
+        [a1, a2] = sorted(library.service_areas, key = lambda x: x.place_id)
+        eq_(p1, a1.place)
+        eq_(ServiceArea.FOCUS, a1.type)
+
+        eq_(p2, a2.place)
+        eq_(ServiceArea.FOCUS, a2.type)
+
+        # The ServiceArea IDs were added to the `ids` list.
+        eq_(set([a1.id, a2.id]), set(ids))
+
+        
+    def test_ambiguous_and_unknown_places_become_problemdetail(self):
+        """Test the helper method in a case that ends in failure."""
+        library = self._library()
+        
+        # We were able to identify one valid place.
+        valid = [self._place()]
+
+        # But we also found unknown and ambiguous places.
+        ambiguous = ["Ambiguous"]
+        unknown = ["Unknown 1", "Unknown 2"]
+
+        ids = []
+        problem = AuthenticationDocument._update_service_areas(
+            library, [valid, unknown, ambiguous], ServiceArea.ELIGIBILITY,
+            ids
+        )
+
+        # We got a ProblemDetail explaining the problem
+        assert isinstance(problem, ProblemDetail)
+        eq_(INVALID_AUTH_DOCUMENT.uri, problem.uri)
+        eq_(
+            'The following service area was unknown: ["Unknown 1", "Unknown 2"]. The following service area was ambiguous: ["Ambiguous"].',
+            problem.detail
+        )
+
+        # No IDs were added to the list.
+        eq_([], ids)
+
+    def test_update_service_areas(self):
+
+        # This Library has no ServiceAreas associated with it.
+        library = self._library()
+
+        country1 = self._place(abbreviated_name="C1", type=Place.NATION)
+        country2 = self._place(abbreviated_name="C2", type=Place.NATION)
+
+        everywhere = AuthenticationDocument.COVERAGE_EVERYWHERE
+        doc_dict = dict(
+            service_area=everywhere,
+            focus_area = { country1.abbreviated_name : everywhere,
+                           country2.abbreviated_name : everywhere }
+        )
+        doc = AuthenticationDocument.from_dict(self._db, doc_dict)
+        problem = doc.update_service_areas(library)
+        self._db.commit()
+        eq_(None, problem)
+
+        # Now this Library has three associated ServiceAreas.
+        [a1, a2, a3] = sorted(
+            [(x.type, x.place.abbreviated_name)
+             for x in library.service_areas]
+        )
+        everywhere_place = Place.everywhere(self._db)
+
+        # Anyone is eligible for access.
+        eq_(('eligibility', everywhere_place.abbreviated_name), a1)
+
+        # But people in two particular countries are the focus.
+        eq_(('focus', country1.abbreviated_name), a2)
+        eq_(('focus', country2.abbreviated_name), a3)
+
+        # Remove one of the countries from the focus, add a new one,
+        # and try again.
+        country3 = self._place(abbreviated_name="C3", type=Place.NATION)
+        doc_dict = dict(
+            service_area=everywhere,
+            focus_area = { country1.abbreviated_name : everywhere,
+                           country3.abbreviated_name : everywhere }
+        )
+        doc = AuthenticationDocument.from_dict(self._db, doc_dict)
+        doc.update_service_areas(library)
+        self._db.commit()
+        
+        # The ServiceArea for country #2 has been removed.
+        assert a2 not in library.service_areas
+        assert not any(a.place == country2 for a in library.service_areas)
+        
+        [a1, a2, a3] = sorted(
+            [(x.type, x.place.abbreviated_name)
+             for x in library.service_areas]
+        )
+        eq_(('eligibility', everywhere_place.abbreviated_name), a1)
+        eq_(('focus', country1.abbreviated_name), a2)
+        eq_(('focus', country3.abbreviated_name), a3)
+
+    def test_service_area_registered_as_focus_area_if_no_focus_area(self):
+
+        library = self._library()
+        # Create an authentication document that defines service_area
+        # but not focus_area.
+        everywhere = AuthenticationDocument.COVERAGE_EVERYWHERE
+        doc_dict = dict(service_area=everywhere)
+        doc = AuthenticationDocument.from_dict(self._db, doc_dict)
+        problem = doc.update_service_areas(library)
+        self._db.commit()
+        eq_(None, problem)
+
+        # We have a focus area but no explicit eligibility area. This
+        # means that the library's eligibility area and focus area are
+        # the same.
+        [area] = library.service_areas
+        eq_(Place.EVERYWHERE, area.place.type)
+        eq_(ServiceArea.FOCUS, area.type)
+
+
+    def test_service_area_registered_as_focus_area_if_identical_to_focus_area(self):
+        library = self._library()
+
+        # Create an authentication document that defines service_area
+        # and focus_area as the same value.
+        everywhere = AuthenticationDocument.COVERAGE_EVERYWHERE
+        doc_dict = dict(
+            service_area=everywhere,
+            focus_area=everywhere,
+        )
+        doc = AuthenticationDocument.from_dict(self._db, doc_dict)
+        problem = doc.update_service_areas(library)
+        self._db.commit()
+        eq_(None, problem)
+
+        # Since focus area and eligibility area are the same, only the
+        # focus area was registered.
+        [area] = library.service_areas
+        eq_(Place.EVERYWHERE, area.place.type)
+        eq_(ServiceArea.FOCUS, area.type)

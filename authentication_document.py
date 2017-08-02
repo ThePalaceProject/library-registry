@@ -52,13 +52,13 @@ class AuthenticationDocument(object):
                 _db, service_area, place_class=place_class
             )
         else:
-            self.service_area = [place_class.everywhere(_db)], [], []
+            self.service_area = [place_class.everywhere(_db)], {}, {}
         if focus_area:
             self.focus_area = self.parse_coverage(
                 _db, focus_area, place_class=place_class
             )
         else:
-            self.focus_area = [place_class.everywhere(_db)], [], []
+            self.focus_area = self.service_area
         self.links = links
         self.website = self.extract_link(
             rel="alternate", require_type="text/html"
@@ -210,7 +210,7 @@ class AuthenticationDocument(object):
             public_key=data.get('public_key'),
             audiences=data.get('audience'),
             service_area=data.get('service_area'),
-            focus_area=data.get('service_area'),
+            focus_area=data.get('focus_area'),
             links=data.get('links', {}),
             place_class=place_class
         )
@@ -220,7 +220,14 @@ class AuthenticationDocument(object):
         document.
         """
         service_area_ids = []
-        if (self.service_area and not self.focus_area
+
+        old_service_areas = list(library.service_areas)
+        
+        # What service_area or focus_area looks like when
+        # no input was specified.
+        empty = [[],{},{}]
+        
+        if (self.focus_area == empty and self.service_area != empty
             or self.service_area == self.focus_area):
             # Service area and focus area are the same, either because
             # they were defined that way explicitly or because focus
@@ -236,7 +243,7 @@ class AuthenticationDocument(object):
                 return problem
         else:
             # Service area and focus area are different.
-            areas = self._update_service_areas(
+            problem = self._update_service_areas(
                 library, self.service_area, ServiceArea.ELIGIBILITY,
                 service_area_ids
             )
@@ -252,7 +259,7 @@ class AuthenticationDocument(object):
         # Delete any ServiceAreas associated with the given library
         # which are not mentioned in the list we just gathered.
         _db = Session.object_session(library)
-        for service_area in library.service_areas:
+        for service_area in old_service_areas:
             if service_area.id not in service_area_ids:
                 _db.delete(service_area)
 
@@ -271,10 +278,6 @@ class AuthenticationDocument(object):
         :return: A ProblemDetailDocument if any of the service areas could
             not be transformed into Place objects. Otherwise, None.
         """
-        if not areas:
-            # No areas were specified. Do nothing.
-            return
-
         _db = Session.object_session(library)
         places, unknown, ambiguous = areas
         if unknown or ambiguous:
