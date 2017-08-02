@@ -1,14 +1,21 @@
 from collections import defaultdict
 import json
 from nose.tools import set_trace
+from flask.ext.babel import lazy_gettext as _
 from sqlalchemy.orm.exc import (
     MultipleResultsFound,
     NoResultFound,
 )
 
 from model import (
-    Place
+    get_one_or_create,
+    Place,
+    ServiceArea,
 )
+
+from problem_details import INVALID_AUTH_DOCUMENT
+from sqlalchemy.orm.session import Session
+
 
 class AuthenticationDocument(object):
     """Parse an Authentication For OPDS document, including the
@@ -45,13 +52,13 @@ class AuthenticationDocument(object):
                 _db, service_area, place_class=place_class
             )
         else:
-            self.service_area = [place_class.everywhere(_db)], [], []
+            self.service_area = [place_class.everywhere(_db)], {}, {}
         if focus_area:
             self.focus_area = self.parse_coverage(
                 _db, focus_area, place_class=place_class
             )
         else:
-            self.focus_area = [place_class.everywhere(_db)], [], []
+            self.focus_area = self.service_area
         self.links = links
         self.website = self.extract_link(
             rel="alternate", require_type="text/html"
@@ -109,7 +116,7 @@ class AuthenticationDocument(object):
             # parse anything.
             place_objs.append(place_class.everywhere(_db))
             coverage = dict()
-            
+
         for country, places in coverage.items():
             try:
                 country_obj = place_class.lookup_one_by_name(
@@ -203,7 +210,88 @@ class AuthenticationDocument(object):
             public_key=data.get('public_key'),
             audiences=data.get('audience'),
             service_area=data.get('service_area'),
-            focus_area=data.get('service_area'),
+            focus_area=data.get('focus_area'),
             links=data.get('links', {}),
             place_class=place_class
         )
+
+    def update_service_areas(self, library):
+        """Update a library's ServiceAreas based on the contents of this
+        document.
+        """
+        service_area_ids = []
+
+        old_service_areas = list(library.service_areas)
+        
+        # What service_area or focus_area looks like when
+        # no input was specified.
+        empty = [[],{},{}]
+        
+        if (self.focus_area == empty and self.service_area != empty
+            or self.service_area == self.focus_area):
+            # Service area and focus area are the same, either because
+            # they were defined that way explicitly or because focus
+            # area was not specified.
+            #
+            # Register the service area as the focus area and call it
+            # a day.
+            problem = self._update_service_areas(
+                library, self.service_area, ServiceArea.FOCUS,
+                service_area_ids
+            )
+            if problem:
+                return problem
+        else:
+            # Service area and focus area are different.
+            problem = self._update_service_areas(
+                library, self.service_area, ServiceArea.ELIGIBILITY,
+                service_area_ids
+            )
+            if problem:
+                return problem
+            problem = self._update_service_areas(
+                library, self.focus_area, ServiceArea.FOCUS,
+                service_area_ids
+            )
+            if problem:
+                return problem
+
+        # Delete any ServiceAreas associated with the given library
+        # which are not mentioned in the list we just gathered.
+        _db = Session.object_session(library)
+        for service_area in old_service_areas:
+            if service_area.id not in service_area_ids:
+                _db.delete(service_area)
+
+    @classmethod
+    def _update_service_areas(cls, library, areas, type, service_area_ids):
+        """Update a Library's ServiceAreas with a new set based on
+        `areas`.
+        
+        :param library: A Library.
+        :param areas: A list [place_objs, unknown, ambiguous]
+            of the sort returned by `parse_coverage()`.
+        :param type: A value to use for `ServiceAreas.type`.
+        :param service_area_ids: All ServiceAreas that became associated
+            with the Library will have their IDs inserted into this list.
+
+        :return: A ProblemDetailDocument if any of the service areas could
+            not be transformed into Place objects. Otherwise, None.
+        """
+        _db = Session.object_session(library)
+        places, unknown, ambiguous = areas
+        if unknown or ambiguous:
+            msgs = []
+            if unknown:
+                msgs.append(str(_("The following service area was unknown: %(service_area)s.", service_area=json.dumps(unknown))))
+            if ambiguous:
+                msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
+            _db.rollback()
+            return INVALID_AUTH_DOCUMENT.detailed(" ".join(msgs))
+
+        for place in places:
+            service_area, is_new = get_one_or_create(
+                _db, ServiceArea, library_id=library.id,
+                place_id=place.id, type=type
+            )
+            service_area_ids.append(service_area.id)

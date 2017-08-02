@@ -495,10 +495,11 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(old_secret, library.shared_secret)
 
     def test_register_errors(self):
-        http_client = DummyHTTPClient()
+
         opds1_type = "application/atom+xml;profile=opds-catalog;kind=acquisition"
         opds2_type = "application/opds+json"
 
+        http_client = DummyHTTPClient()
         with self.app.test_request_context("/"):
             response = self.controller.register(do_get=http_client.do_get)
 
@@ -573,28 +574,6 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
 
-            # This feed has an unknown service area.
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_area": {"US": ["Somewhere"]},
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-            eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
-
-            # This feed has an ambiguous service area.
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_area": {"US": ["Manhattan"]},
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-            eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
-
             # This feed links to a broken logo image.
             http_client.queue_response(500)
             auth_document = {
@@ -607,6 +586,43 @@ class TestLibraryRegistryController(ControllerTest):
             http_client.queue_response(401, content=json.dumps(auth_document))
             response = self.controller.register(do_get=http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+
+
+    def test_register_errors_unknown_service_area(self):
+        http_client = DummyHTTPClient()
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org"),
+            ])
+
+            # This feed has an unknown service area.
+            auth_document = {
+                "id": "http://circmanager.org",
+                "name": "A Library",
+                "service_area": {"US": ["Somewhere"]},
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
+
+    def test_register_errors_ambiguous_service_area(self):
+        http_client = DummyHTTPClient()
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org"),
+            ])
+
+            # This feed has an ambiguous service area.
+            auth_document = {
+                "id": "http://circmanager.org",
+                "name": "A Library",
+                "service_area": {"US": ["Manhattan"]},
+            }
+            http_client.queue_response(401, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
 
 
 

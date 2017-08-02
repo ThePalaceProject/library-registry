@@ -316,24 +316,9 @@ class LibraryRegistryController(object):
         else:
             library.logo = None
 
-        if auth_document.service_area:
-            places, unknown, ambiguous = auth_document.service_area
-            if unknown or ambiguous:
-                msgs = []
-                if unknown:
-                    msgs.append(str(_("The following service area was unknown: %(service_area)s.", service_area=json.dumps(unknown))))
-                if ambiguous:
-                    msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
-                return INVALID_AUTH_DOCUMENT.detailed(" ".join(msgs))
-            place_ids = []
-            for place in places:
-                service_area = get_one_or_create(self._db, ServiceArea,
-                                                 library_id=library.id,
-                                                 place_id=place.id)
-                place_ids.append(place.id)
-            for service_area in library.service_areas:
-                if service_area.place_id not in place_ids:
-                    self._db.delete(service_area)
+        problem = auth_document.update_service_areas(library)
+        if problem:
+            return problem
                     
         catalog = OPDSCatalog.library_catalog(library)
 

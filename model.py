@@ -241,7 +241,7 @@ class Library(Base):
         "DelegatedPatronIdentifier", backref='library'
     )
     service_areas = relationship('ServiceArea', backref='library')
-
+    
     __table_args__ = (
         UniqueConstraint('urn'),
         UniqueConstraint('short_name'),
@@ -557,8 +557,19 @@ class ServiceArea(Base):
         Integer, ForeignKey('places.id'), index=True
     )
 
+    # A library may have a ServiceArea because people in that area are
+    # eligible for service, or because the library specifically
+    # focuses on that area.
+    ELIGIBILITY = 'eligibility'
+    FOCUS = 'focus'
+    servicearea_type_enum = Enum(
+        ELIGIBILITY, FOCUS, name='servicearea_type'
+    )
+    type = Column(servicearea_type_enum,
+                  index=True, nullable=False, default=ELIGIBILITY)
+    
     __table_args__ = (
-        UniqueConstraint('library_id', 'place_id'),
+        UniqueConstraint('library_id', 'place_id', 'type'),
     )
     
 
