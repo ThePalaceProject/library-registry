@@ -241,7 +241,6 @@ class Library(Base):
         "DelegatedPatronIdentifier", backref='library'
     )
     service_areas = relationship('ServiceArea', backref='library')
-    focus_areas = relationship('ServiceArea', backref='library_focus')
     
     __table_args__ = (
         UniqueConstraint('urn'),
