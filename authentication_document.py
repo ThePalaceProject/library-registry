@@ -226,8 +226,9 @@ class AuthenticationDocument(object):
         problem = self.update_audiences(library)
         if not problem:
             problem = self.update_service_areas(library)
+        if not problem:
+            problem = self.update_collection_summaries(library)
         return problem
-
         
     def update_audiences(self, library):
         audiences = self.audiences
@@ -351,3 +352,9 @@ class AuthenticationDocument(object):
                 place_id=place.id, type=type
             )
             service_area_ids.append(service_area.id)
+
+    def update_collection_summaries(self, library):
+        return self._update_collection_summaries(library, self.collections)
+
+    @classmethod
+    def _update_collection_summaries(self)
