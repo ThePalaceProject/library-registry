@@ -349,4 +349,12 @@ class AuthenticationDocument(object):
 
     @classmethod
     def _update_collection_summaries(self, library, sizes):
-        pass
+        try:
+            if isinstance(sizes, string) or isinstance(sizes, int):
+                # A single collection with no known language.
+                Collection.set(library, None, sizes)
+            elif isinstance(sizes, dict):
+                for language, size in sizes.items():
+                    Collection.set(library, language, size)
+        except ValueError, e:
+            return INVALID_AUTH_DOCUMENT.detailed(e.message())
