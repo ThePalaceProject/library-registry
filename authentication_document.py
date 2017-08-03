@@ -268,7 +268,7 @@ class AuthenticationDocument(object):
         """Update a library's ServiceAreas based on the contents of this
         document.
         """
-        service_area_ids = []
+        service_areas = []
 
         old_service_areas = list(library.service_areas)
         
@@ -286,7 +286,7 @@ class AuthenticationDocument(object):
             # a day.
             problem = self._update_service_areas(
                 library, self.service_area, ServiceArea.FOCUS,
-                service_area_ids
+                service_areas
             )
             if problem:
                 return problem
@@ -294,26 +294,23 @@ class AuthenticationDocument(object):
             # Service area and focus area are different.
             problem = self._update_service_areas(
                 library, self.service_area, ServiceArea.ELIGIBILITY,
-                service_area_ids
+                service_areas
             )
             if problem:
                 return problem
             problem = self._update_service_areas(
                 library, self.focus_area, ServiceArea.FOCUS,
-                service_area_ids
+                service_areas
             )
             if problem:
                 return problem
 
         # Delete any ServiceAreas associated with the given library
         # which are not mentioned in the list we just gathered.
-        _db = Session.object_session(library)
-        for service_area in old_service_areas:
-            if service_area.id not in service_area_ids:
-                _db.delete(service_area)
+        library.service_areas = service_areas
 
     @classmethod
-    def _update_service_areas(cls, library, areas, type, service_area_ids):
+    def _update_service_areas(cls, library, areas, type, service_areas):
         """Update a Library's ServiceAreas with a new set based on
         `areas`.
         
@@ -321,8 +318,8 @@ class AuthenticationDocument(object):
         :param areas: A list [place_objs, unknown, ambiguous]
             of the sort returned by `parse_coverage()`.
         :param type: A value to use for `ServiceAreas.type`.
-        :param service_area_ids: All ServiceAreas that became associated
-            with the Library will have their IDs inserted into this list.
+        :param service_areas: All ServiceAreas that became associated
+            with the Library will be inserted into this list.
 
         :return: A ProblemDetailDocument if any of the service areas could
             not be transformed into Place objects. Otherwise, None.
@@ -343,7 +340,7 @@ class AuthenticationDocument(object):
                 _db, ServiceArea, library_id=library.id,
                 place_id=place.id, type=type
             )
-            service_area_ids.append(service_area.id)
+            service_areas.append(service_area)
 
     def update_collection_size(self, library):
         return self._update_collection_size(library, self.collection_size)

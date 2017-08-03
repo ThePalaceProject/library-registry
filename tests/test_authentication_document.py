@@ -342,12 +342,13 @@ class TestUpdateServiceAreas(DatabaseTest):
         ambiguous = []
         unknown = []
 
-        ids = []
+        areas = []
 
-        # This will use those places to create new ServiceAreas.
+        # This will use those places to create new ServiceAreas,
+        # which will be gathered in the 'areas' array.
         problem = AuthenticationDocument._update_service_areas(
             library, [valid, unknown, ambiguous], ServiceArea.FOCUS,
-            ids
+            areas
         )
         eq_(None, problem)
         
@@ -359,7 +360,7 @@ class TestUpdateServiceAreas(DatabaseTest):
         eq_(ServiceArea.FOCUS, a2.type)
 
         # The ServiceArea IDs were added to the `ids` list.
-        eq_(set([a1.id, a2.id]), set(ids))
+        eq_(set([a1, a2]), set(areas))
 
         
     def test_ambiguous_and_unknown_places_become_problemdetail(self):
