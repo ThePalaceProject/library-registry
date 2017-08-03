@@ -230,7 +230,6 @@ class AuthenticationDocument(object):
 
         
     def update_audiences(self, library):
-        audiences = self.audiences
         return self._update_audiences(library, self.audiences)
 
     @classmethod
