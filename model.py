@@ -1,5 +1,6 @@
 import base64
 from config import Configuration
+from flask.ext.babel import lazy_gettext as _
 import datetime
 import logging
 from nose.tools import set_trace
@@ -866,9 +867,9 @@ class Audience(Base):
                              back_populates="audiences")
     
     @classmethod
-    def lookup(cls, _db, name, allow_unknown=False):
-        if not allow_unknown and name not in cls.KNOWN_AUDIENCES:
-            raise ValueError("Unknown audience: %s" % anme)
+    def lookup(cls, _db, name):
+        if name not in cls.KNOWN_AUDIENCES:
+            raise ValueError(_("Unknown audience: %(name)s", name=name))
         audience, is_new = get_one_or_create(_db, Audience, name=name)
         return audience
     
