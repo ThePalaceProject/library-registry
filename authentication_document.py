@@ -9,6 +9,7 @@ from sqlalchemy.orm.exc import (
 
 from model import (
     get_one_or_create,
+    Audience,
     Place,
     ServiceArea,
 )
@@ -215,6 +216,52 @@ class AuthenticationDocument(object):
             place_class=place_class
         )
 
+    def update_library(self, library):
+        """Modify a library to reflect the current state of this
+        AuthenticationDocument.
+        
+        :param library: A Library.
+        :return: A ProblemDetail if there's a problem, otherwise None.
+        """
+        problem = self.update_audiences(library)
+        if not problem:
+            problem = self.update_service_areas(library)
+        return problem
+
+        
+    def update_audiences(self, library):
+        return self._update_audiences(library, self.audiences)
+
+    @classmethod
+    def _update_audiences(self, library, audiences):
+        original_audiences = audiences
+        if not audiences:
+            audiences = [Audience.PUBLIC]
+        if isinstance(audiences, basestring):
+            # This is invalid but we can easily support it.
+            audiences = [audiences]
+        if not isinstance(audiences, list):
+            return INVALID_AUTH_DOCUMENT.detailed(
+                _("'audience' must be a list: %(audiences)r",
+                  audiences=audiences)
+            )
+
+        # Unrecognized audiences become Audience.OTHER.
+        filtered_audiences = set()
+        for audience in audiences:
+            if audience in Audience.KNOWN_AUDIENCES:
+                filtered_audiences.add(audience)
+            else:
+                filtered_audiences.add(Audience.OTHER)
+        audiences = filtered_audiences
+
+        audience_objs = []
+        _db = Session.object_session(library)
+        for audience in audiences:
+            audience_obj = Audience.lookup(_db, audience)
+            audience_objs.append(audience_obj)
+        library.audiences = audience_objs
+    
     def update_service_areas(self, library):
         """Update a library's ServiceAreas based on the contents of this
         document.

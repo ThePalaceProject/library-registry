@@ -13,6 +13,7 @@ from sqlalchemy.orm.exc import (
 from authentication_document import AuthenticationDocument
 from . import DatabaseTest
 from model import (
+    Audience,
     Place,
     ServiceArea,
 )
@@ -486,3 +487,66 @@ class TestUpdateServiceAreas(DatabaseTest):
         [area] = library.service_areas
         eq_(Place.EVERYWHERE, area.place.type)
         eq_(ServiceArea.FOCUS, area.type)
+
+
+class TestUpdateAudiences(DatabaseTest):
+
+    def setup(self):
+        super(TestUpdateAudiences, self).setup()
+        self.library = self._library()
+
+    def update(self, audiences):
+        """Wrapper around AuthenticationDocument._update_audiences."""
+        result = AuthenticationDocument._update_audiences(
+            self.library, audiences
+        )
+
+        # If there's a problem detail document, it must be of the type
+        # INVALID_AUTH_DOCUMENT. The caller may perform additional
+        # checks.
+        if isinstance(result, ProblemDetail):
+            eq_(result.uri, INVALID_AUTH_DOCUMENT.uri)
+        return result
+        
+    def test_update_audiences(self):
+
+        # Set the library's audiences.
+        audiences = [Audience.EDUCATIONAL_SECONDARY, Audience.RESEARCH]
+        doc_dict = dict(audience=audiences)
+        doc = AuthenticationDocument.from_dict(self._db, doc_dict)
+        problem = doc.update_audiences(self.library)
+        eq_(None, problem)
+        eq_(audiences, [x.name for x in self.library.audiences])
+
+        # Set them again to different but partially overlapping values.
+        audiences = [
+            Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY
+        ]
+        problem = self.update(audiences)
+        eq_(set(audiences), set([x.name for x in self.library.audiences]))
+
+    def test_update_audiences_to_invalid_value(self):
+        # You're not supposed to specify a single string as `audience`,
+        # but we can handle it.
+        audience = Audience.EDUCATIONAL_PRIMARY
+        problem = self.update(audience)
+        eq_([audience], [x.name for x in self.library.audiences])
+
+        # But you can't specify some other random object.
+        value = dict(k="v")
+        problem = self.update(value)
+        eq_(u"'audience' must be a list: %r" % value, problem.detail)
+
+    def test_unrecognized_audiences_become_other(self):
+        # If you specify an audience that we don't recognize, it becomes
+        # Audience.OTHER.
+        audiences = ["Some random audience", Audience.PUBLIC]
+        self.update(audiences)
+        eq_(set([Audience.OTHER, Audience.PUBLIC]),
+            set([x.name for x in self.library.audiences]))
+
+    def test_audience_defaults_to_public(self):
+        # If a library doesn't specify its audience, we assume it's open
+        # to the general public.
+        self.update(None)
+        eq_([Audience.PUBLIC], [x.name for x in self.library.audiences])

@@ -316,7 +316,7 @@ class LibraryRegistryController(object):
         else:
             library.logo = None
 
-        problem = auth_document.update_service_areas(library)
+        problem = auth_document.update_library(library)
         if problem:
             return problem
                     
