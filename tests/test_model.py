@@ -15,6 +15,7 @@ from model import (
     create,
     get_one,
     get_one_or_create,
+    Audience,
     CollectionSummary,
     ConfigurationSetting,
     DelegatedPatronIdentifier,
@@ -571,7 +572,17 @@ class TestCollectionSummary(DatabaseTest):
             ValueError, CollectionSummary.set, library, "eng", -1
         )
 
-        
+class TestAudience(DatabaseTest):
+    def test_unrecognized_audience(self):
+        assert_raises_regexp(
+            ValueError,
+            "Unknown audience: no such audience",
+            Audience.lookup,
+            self._db,
+            "no such audience"
+        )
+
+
 class TestDelegatedPatronIdentifier(DatabaseTest):
 
     def test_get_one_or_create(self):
