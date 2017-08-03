@@ -11,6 +11,7 @@ import warnings
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
     Binary,
+    Boolean,
     Column,
     DateTime,
     Enum,
@@ -228,6 +229,13 @@ class Library(Base):
         REGISTERED, APPROVED, REJECTED, LIVE, name='library_stage'
     )
     stage = Column(stage_enum, index=True, nullable=False, default=REGISTERED)
+
+    # Can people get books from this library without authenticating?
+    anonymous_access = Column(Boolean, default=False)
+
+    # Can eligible people get credentials for this library through
+    # an online registration process?
+    online_registration = Column(Boolean, default=False)
     
     # To issue Short Client Tokens for this library, the registry must share a
     # short name and a secret with them.

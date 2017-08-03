@@ -284,9 +284,6 @@ class LibraryRegistryController(object):
             create_method_kwargs=dict(stage=Library.REGISTERED)
         )
 
-        library.name = auth_document.title
-        library.description = auth_document.service_description
-
         if auth_document.website:
             url = auth_document.website.get("href")
             if url:

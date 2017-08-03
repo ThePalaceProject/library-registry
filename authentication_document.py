@@ -65,7 +65,7 @@ class AuthenticationDocument(object):
         self.website = self.extract_link(
             rel="alternate", require_type="text/html"
         )
-        self.registration = self.extract_link(rel="register")
+        self.online_registration = self.extract_link(rel="register") is not None
         self.root = self.extract_link(
             rel="start",
             prefer_type="application/atom+xml;profile=opds-catalog"
@@ -224,11 +224,17 @@ class AuthenticationDocument(object):
         :param library: A Library.
         :return: A ProblemDetail if there's a problem, otherwise None.
         """
+        library.name = self.title
+        library.description = self.service_description
+        library.online_registration = self.online_registration
+        library.anonymous_access = self.anonymous_access
+
         problem = self.update_audiences(library)
         if not problem:
             problem = self.update_service_areas(library)
         if not problem:
             problem = self.update_collection_size(library)
+
         return problem
         
     def update_audiences(self, library):

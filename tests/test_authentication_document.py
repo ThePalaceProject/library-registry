@@ -245,7 +245,7 @@ class TestLinkExtractor(object):
         eq_(None, parsed.collection_size)
         eq_(None, parsed.public_key)
         eq_(None, parsed.website)
-        eq_(None, parsed.registration)
+        eq_(False, parsed.online_registration)
         eq_(None, parsed.root)
         eq_({}, parsed.links)
         eq_(None, parsed.logo)
@@ -288,8 +288,7 @@ class TestLinkExtractor(object):
         eq_("a public key", parsed.public_key)
         eq_({u'href': u'http://ansonialibrary.org', u'type': u'text/html'},
             parsed.website)
-        eq_({"href": "http://example.com/get-a-card/", "type": "text/html"},
-            parsed.registration)
+        eq_(True, parsed.online_registration)
         eq_({"href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}, parsed.root)
         eq_("data:image/png;base64,some-image-data", parsed.logo)
         eq_(None, parsed.logo_link)
