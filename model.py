@@ -895,8 +895,7 @@ class CollectionSummary(Base):
         """Create or update a CollectionSummary for the given
         library and language.
 
-        :return: An up-to-date CollectionSummary, or None if the language
-         is not recognized.
+        :return: An up-to-date CollectionSummary.
         """
         _db = Session.object_session(library)
 
