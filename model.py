@@ -902,7 +902,7 @@ class CollectionSummary(Base):
 
         size = int(size)
         if size < 0:
-            raise ValueError("Collection size cannot be negative.")
+            raise ValueError(_("Collection size cannot be negative."))
         
         language_code = LanguageCodes.string_to_alpha_3(language)
         if not language_code:

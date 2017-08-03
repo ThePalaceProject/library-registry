@@ -566,10 +566,20 @@ class TestCollectionSummary(DatabaseTest):
         summary = CollectionSummary.set(library, "mmmmmm", 100)
         eq_(None, summary)
 
+    def test_size_must_be_integerable(self):
+        library  = self._library()
+        assert_raises_regexp(
+            ValueError,
+            "invalid literal for.*",
+            CollectionSummary.set, library, "eng",
+            "fruit"
+        )
+        
     def test_negative_size_is_not_allowed(self):
         library  = self._library()
-        assert_raises(
-            ValueError, CollectionSummary.set, library, "eng", -1
+        assert_raises_regexp(
+            ValueError, "Collection size cannot be negative.",
+            CollectionSummary.set, library, "eng", "-1"
         )
 
 class TestAudience(DatabaseTest):
