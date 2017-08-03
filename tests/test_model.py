@@ -15,6 +15,7 @@ from model import (
     create,
     get_one,
     get_one_or_create,
+    CollectionSummary,
     ConfigurationSetting,
     DelegatedPatronIdentifier,
     ExternalIntegration,
@@ -543,6 +544,32 @@ class TestLibrary(DatabaseTest):
         # But when we do the general search, the library only shows up once.
         [(result, distance)] = Library.search(self._db, (0, 0), "Kansas")
         eq_(library, result)
+
+
+class TestCollectionSummary(DatabaseTest):
+
+    def test_set(self):
+        library = self._library()
+        summary = CollectionSummary.set(library, "eng", 100)
+        eq_(library, summary.library)
+        eq_("eng", summary.language)
+        eq_(100, summary.size)
+
+        # Call set() again and we get the same object back.
+        summary2 = CollectionSummary.set(library, "eng", "0")
+        eq_(summary, summary2)
+        eq_(0, summary.size)
+
+    def test_unknown_language_is_ignored(self):
+        library = self._library()
+        summary = CollectionSummary.set(library, "mmmmmm", 100)
+        eq_(None, summary)
+
+    def test_negative_size_is_not_allowed(self):
+        library  = self._library()
+        assert_raises(
+            ValueError, CollectionSummary.set, library, "eng", -1
+        )
 
         
 class TestDelegatedPatronIdentifier(DatabaseTest):

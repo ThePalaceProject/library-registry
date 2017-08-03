@@ -354,7 +354,8 @@ class AuthenticationDocument(object):
             service_area_ids.append(service_area.id)
 
     def update_collection_summaries(self, library):
-        return self._update_collection_summaries(library, self.collections)
+        return self._update_collection_summaries(library, self.collection_size)
 
     @classmethod
-    def _update_collection_summaries(self)
+    def _update_collection_summaries(self, library, sizes):
+        pass
