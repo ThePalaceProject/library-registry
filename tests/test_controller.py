@@ -273,6 +273,7 @@ class TestLibraryRegistryController(ControllerTest):
                     "logo": { "href": "data:image/png;imagedata" },
                 },
                 "service_area": { "US": "Kansas" },
+                "collection_size": 100,
                 "public_key": {
                     "type": "RSA",
                     "value": key.publickey().exportKey(),
@@ -293,6 +294,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("http://alibrary.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
             eq_(Library.REGISTERED, library.stage)
+
+            [collection_summary] = library.collections
+            eq_(None, collection_summary.language)
+            eq_(100, collection_summary.size)
             [service_area] = library.service_areas
             eq_(self.kansas_state.id, service_area.place_id)
 

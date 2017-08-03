@@ -16,6 +16,7 @@ from model import (
     get_one,
     get_one_or_create,
     Audience,
+    CollectionSummary,
     ConfigurationSetting,
     DelegatedPatronIdentifier,
     ExternalIntegration,
@@ -545,6 +546,42 @@ class TestLibrary(DatabaseTest):
         [(result, distance)] = Library.search(self._db, (0, 0), "Kansas")
         eq_(library, result)
 
+
+class TestCollectionSummary(DatabaseTest):
+
+    def test_set(self):
+        library = self._library()
+        summary = CollectionSummary.set(library, "eng", 100)
+        eq_(library, summary.library)
+        eq_("eng", summary.language)
+        eq_(100, summary.size)
+
+        # Call set() again and we get the same object back.
+        summary2 = CollectionSummary.set(library, "eng", "0")
+        eq_(summary, summary2)
+        eq_(0, summary.size)
+
+    def test_unrecognized_language_is_set_as_unknown(self):
+        library = self._library()
+        summary = CollectionSummary.set(library, "mmmmmm", 100)
+        eq_(None, summary.language)
+        eq_(100, summary.size)
+
+    def test_size_must_be_integerable(self):
+        library  = self._library()
+        assert_raises_regexp(
+            ValueError,
+            "invalid literal for.*",
+            CollectionSummary.set, library, "eng",
+            "fruit"
+        )
+        
+    def test_negative_size_is_not_allowed(self):
+        library  = self._library()
+        assert_raises_regexp(
+            ValueError, "Collection size cannot be negative.",
+            CollectionSummary.set, library, "eng", "-1"
+        )
 
 class TestAudience(DatabaseTest):
     def test_unrecognized_audience(self):

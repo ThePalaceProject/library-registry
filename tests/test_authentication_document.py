@@ -342,12 +342,13 @@ class TestUpdateServiceAreas(DatabaseTest):
         ambiguous = []
         unknown = []
 
-        ids = []
+        areas = []
 
-        # This will use those places to create new ServiceAreas.
+        # This will use those places to create new ServiceAreas,
+        # which will be gathered in the 'areas' array.
         problem = AuthenticationDocument._update_service_areas(
             library, [valid, unknown, ambiguous], ServiceArea.FOCUS,
-            ids
+            areas
         )
         eq_(None, problem)
         
@@ -359,7 +360,7 @@ class TestUpdateServiceAreas(DatabaseTest):
         eq_(ServiceArea.FOCUS, a2.type)
 
         # The ServiceArea IDs were added to the `ids` list.
-        eq_(set([a1.id, a2.id]), set(ids))
+        eq_(set([a1, a2]), set(areas))
 
         
     def test_ambiguous_and_unknown_places_become_problemdetail(self):
@@ -550,3 +551,82 @@ class TestUpdateAudiences(DatabaseTest):
         # to the general public.
         self.update(None)
         eq_([Audience.PUBLIC], [x.name for x in self.library.audiences])
+
+
+class TestUpdateCollectionSize(DatabaseTest):
+
+    def setup(self):
+        super(TestUpdateCollectionSize, self).setup()
+        self.library = self._library()
+
+    def update(self, value):
+        result = AuthenticationDocument._update_collection_size(
+            self.library, value
+        )
+        # If there's a problem detail document, it must be of the type
+        # INVALID_AUTH_DOCUMENT. The caller may perform additional
+        # checks.
+        if isinstance(result, ProblemDetail):
+            eq_(result.uri, INVALID_AUTH_DOCUMENT.uri)
+        return result
+        
+    def test_success(self):
+        sizes = dict(eng=100, jpn=0)
+        doc_dict = dict(collection_size=sizes)
+        doc = AuthenticationDocument.from_dict(self._db, doc_dict)
+        problem = doc.update_collection_size(self.library)
+        eq_(None, problem)
+
+        # Two CollectionSummaries have been created, for the English
+        # collection and the (empty) Japanese collection.
+        eq_([(u'eng', 100), (u'jpn', 0)],
+            sorted([(x.language, x.size) for x in self.library.collections]))
+
+        # Update the library with new data.
+        self.update({"eng": "200"})
+        # The Japanese collection has been removed altogether, since
+        # it was not mentioned in the input.
+        [english] = self.library.collections
+        eq_("eng", english.language)
+        eq_(200, english.size)
+
+        self.update(None)
+        # Now both collections have been removed.
+        eq_([], self.library.collections)
+        
+    def test_single_collection(self):
+        # Register a single collection not differentiated by language.
+        self.update(100)
+
+        [unknown] = self.library.collections
+        eq_(None, unknown.language)
+        eq_(100, unknown.size)
+
+        # A string will also work.
+        self.update("51")
+
+        [unknown] = self.library.collections
+        eq_(None, unknown.language)
+        eq_(51, unknown.size)
+
+    def test_unknown_language_registered_as_unknown(self):
+        self.update(dict(mmmmm=100))
+        [unknown] = self.library.collections
+        eq_(None, unknown.language)
+        eq_(100, unknown.size)
+
+        # Here's a tricky case with multiple unknown languages.  They
+        # all get grouped together into a single 'unknown language'
+        # collection.
+        self.update({None: 100, "mmmmm":200, "zzzzz":300})
+        [unknown] = self.library.collections
+        eq_(None, unknown.language)
+        eq_(100+200+300, unknown.size)
+        
+    def test_invalid_collection_size(self):
+        problem = self.update([1,2,3])
+        eq_("'collection_size' must be a number or an object mapping language codes to numbers", problem.detail)
+
+    def test_negative_collection_size(self):
+        problem = self.update(-100)
+        eq_("Collection size cannot be negative.", problem.detail)
