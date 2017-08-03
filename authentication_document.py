@@ -9,6 +9,7 @@ from sqlalchemy.orm.exc import (
 
 from model import (
     get_one_or_create,
+    Audience,
     Place,
     ServiceArea,
 )
@@ -215,39 +216,60 @@ class AuthenticationDocument(object):
             place_class=place_class
         )
 
-    def update_audiences(self, library):
-        old_audiences = list(library.audiences)
+    def update_library(self, library):
+        """Modify a library to reflect the current state of this
+        AuthenticationDocument.
+        
+        :param library: A Library.
+        :return: A ProblemDetail if there's a problem, otherwise None.
+        """
+        problem = self.update_audiences(library)
+        if not problem:
+            problem = self.update_service_areas(library)
+        return problem
 
-        # 
-        new_audiences = self.audiences
-        if isinstance(new_audiences, basestring):
+        
+    def update_audiences(self, library):
+        audiences = self.audiences
+        return self._update_audiences(library, self.audiences)
+
+    @classmethod
+    def _update_audiences(self, library, audiences):
+        original_audiences = audiences
+        if not audiences:
+            audiences = [Audience.PUBLIC]
+        if isinstance(audiences, basestring):
             # This is invalid but we can easily support it.
-            new_audiences = [new_audiences]
-        if not isinstance(new_audiences, list):
+            audiences = [audiences]
+        if not isinstance(audiences, list):
             return INVALID_AUTH_DOCUMENT.detailed(
-                _("'audience' must be a list") % new_audiences
+                _("'audience' must be a list") % audiences
             )
 
         # Ignore unrecognized audiences rather than rejecting the
         # whole document.
-        valid_audiences = [x for x in new_audiences
-                           if x not in Audience.VALID_AUDIENCES]
+        audiences = [x for x in audiences
+                     if x in Audience.KNOWN_AUDIENCES]
 
         # But there must be at least one audience we recognize.
-        if not valid_audiences:
+        if original_audiences and not audiences:
             return INVALID_AUTH_DOCUMENT.detailed(
-                _("None of the provided audiences were recognized.")
+                _("None of the provided audiences were recognized: %r") %
+                original_audiences
             )
 
-        # If your audience is the general public, you don't get to say
-        # that your audience is _also_ (e.g.) researchers, who are
-        # part of the general public.
-        if Audience.PUBLIC in valid_audiences:
-            valid_audiences = [Audience.PUBLIC]
+        # If you say your audience is the general public, you can't
+        # specify that your audience is _also_ (e.g.)  researchers,
+        # who are part of the general public.
+        if Audience.PUBLIC in audiences:
+            audiences = [Audience.PUBLIC]
 
-        for audience in valid_audiences:
-            pass
-        pass
+        new_audiences = []
+        _db = Session.object_session(library)
+        for audience in audiences:
+            audience_obj = Audience.lookup(_db, audience)
+            new_audiences.append(audience_obj)
+        library.audiences = new_audiences
     
     def update_service_areas(self, library):
         """Update a library's ServiceAreas based on the contents of this

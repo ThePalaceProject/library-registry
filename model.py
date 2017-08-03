@@ -854,7 +854,7 @@ class Audience(Base):
     # A catch-all for other specialized audiences.
     OTHER = "other"
 
-    VALID_AUDIENCES = [
+    KNOWN_AUDIENCES = [
         PUBLIC, EDUCATIONAL_PRIMARY, EDUCATIONAL_SECONDARY, RESEARCH,
         PRINT_DISABILITY, OTHER
     ]
@@ -866,7 +866,9 @@ class Audience(Base):
                              back_populates="audiences")
     
     @classmethod
-    def lookup(cls, _db, name):
+    def lookup(cls, _db, name, allow_unknown=False):
+        if not allow_unknown and name not in cls.KNOWN_AUDIENCES:
+            raise ValueError("Unknown audience: %s" % anme)
         audience, is_new = get_one_or_create(_db, Audience, name=name)
         return audience
     

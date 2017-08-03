@@ -491,9 +491,75 @@ class TestUpdateServiceAreas(DatabaseTest):
 
 class TestUpdateAudiences(DatabaseTest):
 
+    def setup(self):
+        super(TestUpdateAudiences, self).setup()
+        self.library = self._library()
+
+    def update(self, audiences):
+        """Wrapper around AuthenticationDocument._update_audiences."""
+        result = AuthenticationDocument._update_audiences(
+            self.library, audiences
+        )
+
+        # If there's a problem detail document, it must be of the type
+        # INVALID_AUTH_DOCUMENT. The caller may perform additional
+        # checks.
+        if isinstance(result, ProblemDetail):
+            eq_(result.uri, INVALID_AUTH_DOCUMENT.uri)
+        return result
+        
     def test_update_audiences(self):
-        library = self._library()
-        doc_dict = dict(audience=[Audience.PUBLIC, Audience.RESEARCH])
+
+        # Set the library's audiences.
+        audiences = [Audience.EDUCATIONAL_SECONDARY, Audience.RESEARCH]
+        doc_dict = dict(audience=audiences)
         doc = AuthenticationDocument.from_dict(self._db, doc_dict)
-        problem = doc.update_audiences(library)
-        eq_([Audience.Public], [x.name for x in library.audiences])
+        problem = doc.update_audiences(self.library)
+        eq_(None, problem)
+        eq_(audiences, [x.name for x in self.library.audiences])
+
+        # Set them again to different but partially overlapping values.
+        audiences = [
+            Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY
+        ]
+        problem = self.update(audiences)
+        eq_(audiences, [x.name for x in self.library.audiences])
+
+    def test_update_audiences_to_invalid_value(self):
+        # You're not supposed to specify a single string as `audience`,
+        # but we can handle it.
+        audience = Audience.EDUCATIONAL_PRIMARY
+        problem = self.update(audience)
+        eq_([audience], [x.name for x in self.library.audiences])
+
+        # But you can't specify some other random object.
+        problem = self.update(dict(k="v"))
+        eq_(u"'audience' must be a list", problem.detail)
+
+    def test_unrecognized_audiences_are_ignored(self):
+        # If you specify an audience that we don't recognize, we can
+        # proceed so long as there is some audience we _do_ recognize.
+        audiences = ["Some random audience", Audience.OTHER]
+        self.update(audiences)
+        eq_([Audience.OTHER], [x.name for x in self.library.audiences])
+
+        # If every audience you specify is unrecognized, we can't
+        # add your library to the registry.
+        audiences = ["Unknown 1", "Unknown 2"]
+        problem = self.update(audiences)
+        eq_("None of the provided audiences were recognized: %r" % audiences,
+            problem.detail)
+
+    def test_audience_defaults_to_public(self):
+        # If a library doesn't specify its audience, we assume it's open
+        # to the general public.
+        self.update(None)
+        eq_([Audience.PUBLIC], [x.name for x in self.library.audiences])
+
+    def test_everybody_plus_you_equals_everbody(self):
+        # If a library says its audience is the general public, plus
+        # somebody else, we take them to mean their audience is the
+        # general public.
+        audiences = [Audience.PUBLIC, Audience.EDUCATIONAL_PRIMARY]
+        self.update(audiences)
+        eq_([Audience.PUBLIC], [x.name for x in self.library.audiences])
