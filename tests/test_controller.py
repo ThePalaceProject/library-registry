@@ -298,6 +298,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(Library.REGISTERED, library.stage)
 
             eq_(True, library.anonymous_access)
+            eq_(True, library.online_registration)
             
             [collection_summary] = library.collections
             eq_(None, collection_summary.language)
