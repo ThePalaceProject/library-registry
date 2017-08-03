@@ -523,7 +523,7 @@ class TestUpdateAudiences(DatabaseTest):
             Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY
         ]
         problem = self.update(audiences)
-        eq_(audiences, [x.name for x in self.library.audiences])
+        eq_(set(audiences), set([x.name for x in self.library.audiences]))
 
     def test_update_audiences_to_invalid_value(self):
         # You're not supposed to specify a single string as `audience`,
@@ -533,33 +533,20 @@ class TestUpdateAudiences(DatabaseTest):
         eq_([audience], [x.name for x in self.library.audiences])
 
         # But you can't specify some other random object.
-        problem = self.update(dict(k="v"))
-        eq_(u"'audience' must be a list", problem.detail)
+        value = dict(k="v")
+        problem = self.update(value)
+        eq_(u"'audience' must be a list: %r" % value, problem.detail)
 
-    def test_unrecognized_audiences_are_ignored(self):
-        # If you specify an audience that we don't recognize, we can
-        # proceed so long as there is some audience we _do_ recognize.
-        audiences = ["Some random audience", Audience.OTHER]
+    def test_unrecognized_audiences_become_other(self):
+        # If you specify an audience that we don't recognize, it becomes
+        # Audience.OTHER.
+        audiences = ["Some random audience", Audience.PUBLIC]
         self.update(audiences)
-        eq_([Audience.OTHER], [x.name for x in self.library.audiences])
-
-        # If every audience you specify is unrecognized, we can't
-        # add your library to the registry.
-        audiences = ["Unknown 1", "Unknown 2"]
-        problem = self.update(audiences)
-        eq_("None of the provided audiences were recognized: %r" % audiences,
-            problem.detail)
+        eq_(set([Audience.OTHER, Audience.PUBLIC]),
+            set([x.name for x in self.library.audiences]))
 
     def test_audience_defaults_to_public(self):
         # If a library doesn't specify its audience, we assume it's open
         # to the general public.
         self.update(None)
-        eq_([Audience.PUBLIC], [x.name for x in self.library.audiences])
-
-    def test_everybody_plus_you_equals_everbody(self):
-        # If a library says its audience is the general public, plus
-        # somebody else, we take them to mean their audience is the
-        # general public.
-        audiences = [Audience.PUBLIC, Audience.EDUCATIONAL_PRIMARY]
-        self.update(audiences)
         eq_([Audience.PUBLIC], [x.name for x in self.library.audiences])

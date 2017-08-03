@@ -231,7 +231,6 @@ class AuthenticationDocument(object):
         return problem
         
     def update_audiences(self, library):
-        audiences = self.audiences
         return self._update_audiences(library, self.audiences)
 
     @classmethod
@@ -244,33 +243,25 @@ class AuthenticationDocument(object):
             audiences = [audiences]
         if not isinstance(audiences, list):
             return INVALID_AUTH_DOCUMENT.detailed(
-                _("'audience' must be a list") % audiences
+                _("'audience' must be a list: %(audiences)r",
+                  audiences=audiences)
             )
 
-        # Ignore unrecognized audiences rather than rejecting the
-        # whole document.
-        audiences = [x for x in audiences
-                     if x in Audience.KNOWN_AUDIENCES]
+        # Unrecognized audiences become Audience.OTHER.
+        filtered_audiences = set()
+        for audience in audiences:
+            if audience in Audience.KNOWN_AUDIENCES:
+                filtered_audiences.add(audience)
+            else:
+                filtered_audiences.add(Audience.OTHER)
+        audiences = filtered_audiences
 
-        # But there must be at least one audience we recognize.
-        if original_audiences and not audiences:
-            return INVALID_AUTH_DOCUMENT.detailed(
-                _("None of the provided audiences were recognized: %r") %
-                original_audiences
-            )
-
-        # If you say your audience is the general public, you can't
-        # specify that your audience is _also_ (e.g.)  researchers,
-        # who are part of the general public.
-        if Audience.PUBLIC in audiences:
-            audiences = [Audience.PUBLIC]
-
-        new_audiences = []
+        audience_objs = []
         _db = Session.object_session(library)
         for audience in audiences:
             audience_obj = Audience.lookup(_db, audience)
-            new_audiences.append(audience_obj)
-        library.audiences = new_audiences
+            audience_objs.append(audience_obj)
+        library.audiences = audience_objs
     
     def update_service_areas(self, library):
         """Update a library's ServiceAreas based on the contents of this
