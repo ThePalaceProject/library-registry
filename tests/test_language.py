@@ -4,7 +4,7 @@ from nose.tools import (
     assert_raises,
     set_trace
 )
-from util.languages import LanguageCodes
+from util.language import LanguageCodes
 
 class TestLanguageCodes(object):
 
