@@ -268,9 +268,11 @@ class TestLibraryRegistryController(ControllerTest):
                 "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
+                "type": ["https://librarysimplified.org/rel/auth/anonymous"],
                 "links": {
                     "alternate": { "href": "http://alibrary.org", "type": "text/html" },
                     "logo": { "href": "data:image/png;imagedata" },
+                    "register": { "href": "http://alibrary.org/new-account" }
                 },
                 "service_area": { "US": "Kansas" },
                 "collection_size": 100,
@@ -295,6 +297,8 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("data:image/png;imagedata", library.logo)
             eq_(Library.REGISTERED, library.stage)
 
+            eq_(True, library.anonymous_access)
+            
             [collection_summary] = library.collections
             eq_(None, collection_summary.language)
             eq_(100, collection_summary.size)
