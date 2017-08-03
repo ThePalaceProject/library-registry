@@ -52,7 +52,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from geoalchemy2 import Geography, Geometry
 
-from util.languages import LanguageCodes
+from util.language import LanguageCodes
 from util import (
     GeometryUtility,
 )
