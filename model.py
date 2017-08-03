@@ -903,10 +903,12 @@ class CollectionSummary(Base):
         size = int(size)
         if size < 0:
             raise ValueError(_("Collection size cannot be negative."))
-        
+
+        # This might return None, which is fine. We'll store it as a
+        # collection with an unknown language. This also covers the
+        # case where the library specifies its collection size but
+        # doesn't mention any languages.
         language_code = LanguageCodes.string_to_alpha_3(language)
-        if not language_code:
-            return None
         
         summary, is_new = get_one_or_create(
             _db, CollectionSummary, library=library,

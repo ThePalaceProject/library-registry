@@ -10,6 +10,7 @@ from sqlalchemy.orm.exc import (
 from model import (
     get_one_or_create,
     Audience,
+    CollectionSummary,
     Place,
     ServiceArea,
 )
@@ -227,7 +228,7 @@ class AuthenticationDocument(object):
         if not problem:
             problem = self.update_service_areas(library)
         if not problem:
-            problem = self.update_collection_summaries(library)
+            problem = self.update_collection_size(library)
         return problem
         
     def update_audiences(self, library):
@@ -344,17 +345,37 @@ class AuthenticationDocument(object):
             )
             service_area_ids.append(service_area.id)
 
-    def update_collection_summaries(self, library):
-        return self._update_collection_summaries(library, self.collection_size)
+    def update_collection_size(self, library):
+        return self._update_collection_size(library, self.collection_size)
 
     @classmethod
-    def _update_collection_summaries(self, library, sizes):
+    def _update_collection_size(self, library, sizes):
+        if isinstance(sizes, basestring) or isinstance(sizes, int):
+            # A single collection with no known language.
+            sizes = { None: sizes }
+        if not isinstance(sizes, dict):
+            return INVALID_AUTH_DOCUMENT.detailed(
+                _("'collection_size' must be a number or an object mapping language codes to numbers")
+            )
+
+        new_collections = set()
+        unknown_size = 0
         try:
-            if isinstance(sizes, string) or isinstance(sizes, int):
-                # A single collection with no known language.
-                Collection.set(library, None, sizes)
-            elif isinstance(sizes, dict):
-                for language, size in sizes.items():
-                    Collection.set(library, language, size)
+            for language, size in sizes.items():
+                summary = CollectionSummary.set(library, language, size)
+                if summary.language is None:
+                    unknown_size += summary.size
+                new_collections.add(summary)
+            if unknown_size:
+                # We found one or more collections in languages we
+                # didn't recognize. Set the total size of this collection
+                # as the size of a collection with unknown language.
+                new_collections.add(
+                    CollectionSummary.set(library, None, unknown_size)
+                )
         except ValueError, e:
-            return INVALID_AUTH_DOCUMENT.detailed(e.message())
+            return INVALID_AUTH_DOCUMENT.detailed(e.message)
+
+        # Destroy any CollectionSummaries representing collections
+        # no longer associated with this library.
+        library.collections = list(new_collections)

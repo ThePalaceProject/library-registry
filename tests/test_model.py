@@ -561,10 +561,11 @@ class TestCollectionSummary(DatabaseTest):
         eq_(summary, summary2)
         eq_(0, summary.size)
 
-    def test_unknown_language_is_ignored(self):
+    def test_unrecognized_language_is_set_as_unknown(self):
         library = self._library()
         summary = CollectionSummary.set(library, "mmmmmm", 100)
-        eq_(None, summary)
+        eq_(None, summary.language)
+        eq_(100, summary.size)
 
     def test_size_must_be_integerable(self):
         library  = self._library()
