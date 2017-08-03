@@ -353,6 +353,9 @@ class AuthenticationDocument(object):
         if isinstance(sizes, basestring) or isinstance(sizes, int):
             # A single collection with no known language.
             sizes = { None: sizes }
+        if sizes is None:
+            # No collections are specified.
+            sizes = {}
         if not isinstance(sizes, dict):
             return INVALID_AUTH_DOCUMENT.detailed(
                 _("'collection_size' must be a number or an object mapping language codes to numbers")

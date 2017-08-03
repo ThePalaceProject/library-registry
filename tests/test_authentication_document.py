@@ -589,6 +589,10 @@ class TestUpdateCollectionSize(DatabaseTest):
         eq_("eng", english.language)
         eq_(200, english.size)
 
+        self.update(None)
+        # Now both collections have been removed.
+        eq_([], self.library.collections)
+        
     def test_single_collection(self):
         # Register a single collection not differentiated by language.
         self.update(100)
@@ -622,6 +626,6 @@ class TestUpdateCollectionSize(DatabaseTest):
         problem = self.update([1,2,3])
         eq_("'collection_size' must be a number or an object mapping language codes to numbers", problem.detail)
 
-    def test_negavite_collection_size(self):
+    def test_negative_collection_size(self):
         problem = self.update(-100)
         eq_("Collection size cannot be negative.", problem.detail)
