@@ -594,9 +594,9 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = {
                 "id": "http://circmanager.org",
                 "name": "A Library",
-                "links": {
-                    "logo": { "href": "http://example.com/logo.png", "type": "image/png" },
-                },
+                "links": [
+                    {"rel": "logo", "href": "http://example.com/logo.png", "type": "image/png" },
+                ],
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
             response = self.controller.register(do_get=http_client.do_get)
