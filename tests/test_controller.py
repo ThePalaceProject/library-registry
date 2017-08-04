@@ -268,12 +268,17 @@ class TestLibraryRegistryController(ControllerTest):
                 "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
-                "type": ["https://librarysimplified.org/rel/auth/anonymous"],
-                "links": {
-                    "alternate": { "href": "http://alibrary.org", "type": "text/html" },
-                    "logo": { "href": "data:image/png;imagedata" },
-                    "register": { "href": "http://alibrary.org/new-account" }
-                },
+                "authentication": [
+                    {
+                        "type": "https://librarysimplified.org/rel/auth/anonymous"
+                    }
+                ],
+                "links": [
+                    { "rel": "alternate", "href": "http://alibrary.org",
+                      "type": "text/html" },
+                    {"rel": "logo", "href": "data:image/png;imagedata" },
+                    {"rel": "register", "href": "http://alibrary.org/new-account" }
+                ],
                 "service_area": { "US": "Kansas" },
                 "collection_size": 100,
                 "public_key": {
@@ -341,9 +346,9 @@ class TestLibraryRegistryController(ControllerTest):
                 "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "My feed requires authentication",
-                "links": {
-                    "logo": { "href": "/logo.png", "type": "image/png" },
-                },
+                "links": [
+                    {"rel": "logo", "href": "/logo.png", "type": "image/png" },
+                ],
                 "service_area": { "US": "Connecticut" },
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
@@ -451,10 +456,10 @@ class TestLibraryRegistryController(ControllerTest):
                 "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
-                "links": {
-                    "alternate": { "href": "http://alibrary.org", "type": "text/html" },
-                    "logo": { "href": "data:image/png;imagedata" },
-                },
+                "links": [
+                    {"rel": "alternate", "href": "http://alibrary.org", "type": "text/html" },
+                    {"rel": "logo", "href": "data:image/png;imagedata" },
+                ],
                 "public_key": {
                     "type": "RSA",
                     "value": key.publickey().exportKey(),
@@ -488,10 +493,10 @@ class TestLibraryRegistryController(ControllerTest):
                 "id": "http://circmanager.org",
                 "name": "A Library",
                 "service_description": "Description",
-                "links": {
-                    "alternate": { "href": "http://alibrary.org", "type": "text/html" },
-                    "logo": { "href": "data:image/png;imagedata" },
-                },
+                "links": [
+                    {"rel": "alternate", "href": "http://alibrary.org", "type": "text/html" },
+                    {"rel": "logo", "href": "data:image/png;imagedata" },
+                ],
                 "public_key": {
                     "type": "RSA",
                     "value": key.publickey().exportKey(),
@@ -589,9 +594,9 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = {
                 "id": "http://circmanager.org",
                 "name": "A Library",
-                "links": {
-                    "logo": { "href": "http://example.com/logo.png", "type": "image/png" },
-                },
+                "links": [
+                    {"rel": "logo", "href": "http://example.com/logo.png", "type": "image/png" },
+                ],
             }
             http_client.queue_response(401, content=json.dumps(auth_document))
             response = self.controller.register(do_get=http_client.do_get)

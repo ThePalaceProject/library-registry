@@ -181,10 +181,10 @@ class TestLinkExtractor(object):
     """Test the _extract_link helper method."""
 
     def test_no_matching_link(self):
-        links = {'alternate': [dict(href="http://foo/", type="text/html")]}
+        links = [dict(rel="alternate", href="http://foo/", type="text/html")]
 
         # There is no link with the given relation.
-        eq_(None, AuthDoc._extract_link(links, 'self'))
+        eq_(None, AuthDoc._extract_link(links, rel='self'))
 
         # There is a link with the given relation, but the type is wrong.
         eq_(
@@ -199,9 +199,14 @@ class TestLinkExtractor(object):
         """Test that prefer_type holds out for the link you're
         looking for.
         """
-        first_link = dict(href="http://foo/", type="text/html")
-        second_link = dict(href="http://bar/", type="text/plain;charset=utf-8")
-        links = {'alternate': [first_link, second_link]}
+        first_link = dict(
+            rel="alternate", href="http://foo/", type="text/html"
+        )
+        second_link = dict(
+            rel="alternate", href="http://bar/",
+            type="text/plain;charset=utf-8"
+        )
+        links = [first_link, second_link]
 
         # We would prefer the second link.
         eq_(second_link,
@@ -247,7 +252,7 @@ class TestLinkExtractor(object):
         eq_(None, parsed.website)
         eq_(False, parsed.online_registration)
         eq_(None, parsed.root)
-        eq_({}, parsed.links)
+        eq_([], parsed.links)
         eq_(None, parsed.logo)
         eq_(None, parsed.logo_link)
         eq_(False, parsed.anonymous_access)
@@ -256,44 +261,80 @@ class TestLinkExtractor(object):
         """Test an Authentication For OPDS document that demonstrates
         most of the features we're looking for.
         """
-        document = {"id": "c90903e0-d438-4c8d-ac35-94824d769e2c",
- "title": "Ansonia Public Library", 
- "links": {
-    "logo": {"href": "data:image/png;base64,some-image-data", "type": "image/png"}, 
-    "alternate": {"href": "http://ansonialibrary.org", "type": "text/html"},
-    "register": {"href": "http://example.com/get-a-card/", "type": "text/html"},
-    "start": [
-      {"href": "http://catalog.example.com/", "type": "text/html/"}, 
-      {"href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}
-    ]
- },
-    "service_description": "Serving Ansonia, CT",
-    "color_scheme": "gold",
-    "collection_size": {"eng": 100, "spa": 20},
-    "public_key": "a public key",
-    "features": {"disabled": [], "enabled": ["https://librarysimplified.org/rel/policy/reservations"]},
-    "providers": {"http://librarysimplified.org/terms/auth/library-barcode": {"methods": {"http://opds-spec.org/auth/basic": {"inputs": {"login": {"keyboard": "Default"}, "password": {"keyboard": "Default"}}, "labels": {"login": "Barcode", "password": "PIN"}}}, "name": "Library Barcode"}}
-}
+        document = {
+            "id": "http://library/authentication-for-opds-file",
+            "title": "Ansonia Public Library", 
+            "links": [
+                {"rel": "logo", "href": "data:image/png;base64,some-image-data", "type": "image/png"}, 
+                {"rel": "alternate", "href": "http://ansonialibrary.org", "type": "text/html"},
+                {"rel": "register", "href": "http://example.com/get-a-card/", "type": "text/html"},
+                {"rel": "start", "href": "http://catalog.example.com/", "type": "text/html/"}, 
+                {"rel": "start", "href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}
+            ],
+            "service_description": "Serving Ansonia, CT",
+            "color_scheme": "gold",
+            "collection_size": {"eng": 100, "spa": 20},
+            "public_key": "a public key",
+            "features": {"disabled": [], "enabled": ["https://librarysimplified.org/rel/policy/reservations"]},
+            "authentication": [
+                {
+                    "type": "http://opds-spec.org/auth/basic",
+                    "description": "Log in with your library barcode",
+                    "inputs": {"login": {"keyboard": "Default"},
+                               "password": {"keyboard": "Default"}},
+                    "labels": {"login": "Barcode", "password": "PIN"}
+                }
+            ]
+        }
+        
         place = MockPlace()
         everywhere = place.everywhere(None)
         parsed = AuthDoc.from_dict(None, document, place)
         
         # Information about the OPDS server has been extracted from
         # JSON and put into the AuthenticationDocument object.
-        eq_("c90903e0-d438-4c8d-ac35-94824d769e2c", parsed.id)
+        eq_("http://library/authentication-for-opds-file", parsed.id)
         eq_("Ansonia Public Library", parsed.title)
         eq_("Serving Ansonia, CT", parsed.service_description)
         eq_("gold", parsed.color_scheme)
         eq_({"eng": 100, "spa": 20}, parsed.collection_size)
         eq_("a public key", parsed.public_key)
-        eq_({u'href': u'http://ansonialibrary.org', u'type': u'text/html'},
+        eq_({u'rel': 'alternate', u'href': u'http://ansonialibrary.org',
+             u'type': u'text/html'},
             parsed.website)
         eq_(True, parsed.online_registration)
-        eq_({"href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}, parsed.root)
+        eq_({"rel": "start", "href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}, parsed.root)
         eq_("data:image/png;base64,some-image-data", parsed.logo)
         eq_(None, parsed.logo_link)
         eq_(False, parsed.anonymous_access)
 
+    def online_registration_for_one_authentication_mechanism(self):
+        """An OPDS server offers online registration if _any_ of its 
+        authentication flows offer online registration.
+
+        It also works if the server itself offers registration (see
+        previous test).
+        """
+        document = {
+            "authentication": [
+                {
+                    "description": "You'll never guess the secret code.",
+                    "type": "http://opds-spec.org/auth/basic"
+                },
+                {
+                    "description": "But anyone can get a library card.",
+                    "type": "http://opds-spec.org/auth/basic",
+                    "links": [
+                        { "rel": "register",
+                          "href": "http://get-a-library-card/"
+                        }
+                    ]
+                }
+            ]
+        }
+        eq_(True, parsed.online_registration)
+        
+        
     def test_name_treated_as_title(self):
         """Some invalid documents put the library name in 'name' instead of title.
         We can handle these documents.
@@ -306,10 +347,14 @@ class TestLinkExtractor(object):
         """You can link to your logo, instead of including it in the
         document.
         """
-        document = {"links": {"logo": {"href": "http://logo.com/logo.jpg"}}}
+        document = {
+            "links": [
+                dict(rel="logo", href="http://logo.com/logo.jpg")
+            ]
+        }
         auth = AuthDoc.from_dict(None, document, MockPlace())
         eq_(None, auth.logo)
-        eq_({"href": "http://logo.com/logo.jpg"}, auth.logo_link)
+        eq_({"href": "http://logo.com/logo.jpg", "rel": "logo"}, auth.logo_link)
 
     def test_audiences(self):
         """You can specify the target audiences for your OPDS server."""
@@ -321,8 +366,10 @@ class TestLinkExtractor(object):
         """You can signal that your OPDS server allows anonymous access by
         including it as an authentication type.
         """
-        document = {"type": ["http://opds-spec.org/auth/basic", 
-                             "https://librarysimplified.org/rel/auth/anonymous"]}
+        document = dict(authentication=[
+            dict(type="http://opds-spec.org/auth/basic"),
+            dict(type="https://librarysimplified.org/rel/auth/anonymous")
+        ])
         auth = AuthDoc.from_dict(None, document, MockPlace())
         eq_(True, auth.anonymous_access)
 
