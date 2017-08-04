@@ -293,7 +293,7 @@ class TestLinkExtractor(object):
         
         # Information about the OPDS server has been extracted from
         # JSON and put into the AuthenticationDocument object.
-        eq_("c90903e0-d438-4c8d-ac35-94824d769e2c", parsed.id)
+        eq_("http://library/authentication-for-opds-file", parsed.id)
         eq_("Ansonia Public Library", parsed.title)
         eq_("Serving Ansonia, CT", parsed.service_description)
         eq_("gold", parsed.color_scheme)
