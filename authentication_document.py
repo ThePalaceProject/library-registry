@@ -39,11 +39,12 @@ class AuthenticationDocument(object):
                  'educational-secondary', 'research', 'print-disability',
                  'other']
     
-    def __init__(self, _db, id, title, type, service_description, color_scheme, 
-                 collection_size, public_key, audiences, service_area,
-                 focus_area, links, place_class=Place):
+    def __init__(self, _db, id, title, authentication, service_description,
+                 color_scheme, collection_size, public_key, audiences,
+                 service_area, focus_area, links, place_class=Place):
         self.id = id
         self.title = title
+        self.authentication = authentication
         self.service_description = service_description
         self.color_scheme = color_scheme
         self.collection_size = collection_size
@@ -65,7 +66,7 @@ class AuthenticationDocument(object):
         self.website = self.extract_link(
             rel="alternate", require_type="text/html"
         )
-        self.online_registration = self.extract_link(rel="register") is not None
+        self.online_registration = self.has_link(rel="register")
         self.root = self.extract_link(
             rel="start",
             prefer_type="application/atom+xml;profile=opds-catalog"
@@ -80,15 +81,55 @@ class AuthenticationDocument(object):
             else:
                 self.logo_link = logo
         self.anonymous_access = False
-        if (type == self.ANONYMOUS_ACCESS_REL
-            or isinstance(type, list) and self.ANONYMOUS_ACCESS_REL in type):
-            self.anonymous_access = True
+        for flow in self.authentication_flows:
+            if flow.get('type') == self.ANONYMOUS_ACCESS_REL:
+                self.anonymous_access = True
+                break
 
+    @property
+    def authentication_flows(self):
+        """Return all valid authentication flows in this document."""
+        for i in self.authentication:
+            if not isinstance(i, dict):
+                # Not a valid authentication flow.
+                continue
+            yield i
+        
     def extract_link(self, rel, require_type=None, prefer_type=None):
+        """Find a link with the given link relation in the main authentication
+        document.
+
+        Does not consider links found in the authentication flows.
+
+        :param rel: The link must use this as the link relation.
+        :param require_type: The link must have this as its type.
+        :param prefer_type: A link with this type is better than a link of
+            some other type.
+        """
         return self._extract_link(
             self.links, rel, require_type, prefer_type
         )
 
+    def has_link(self, rel):
+        """Is there a link with this link relation anywhere in the document?
+        
+        This checks both the main document and the authentication flows.
+
+        :rel: The link must have this link relation.
+        :return: True if there is a link with the link relation in the document,
+            False otherwise.
+        """
+        if self._extract_link(self.links, rel):
+            return True
+
+        # We couldn't find a matching link in the main set of
+        # links, but maybe there's a matching link associated with
+        # a particular authentication flow.
+        for flow in self.authentication_flows:
+            if self._extract_link(flow.get('links', []), rel):
+                return True
+        return False        
+                
     @classmethod
     def parse_coverage(cls, _db, coverage, place_class=Place):
         """Derive Place objects from an Authentication For OPDS coverage
@@ -158,18 +199,19 @@ class AuthenticationDocument(object):
     
     @classmethod
     def _extract_link(cls, links, rel, require_type=None, prefer_type=None):
+        if require_type and prefer_type:
+            raise ValueError(
+                "At most one of require_type and prefer_type may be specified."
+            )
         if not links:
             # There are no links, period.
             return None
-        links = links.get(rel)
-        if not links:
-            # There are no links with this link relation.
-            return None
-        if not isinstance(links, list):
-            # A single link.
-            links = [links]
         good_enough = None
+        if not isinstance(links, list):
+            raise ValueError("links must be a list (got %r)" % links)
         for link in links:
+            if rel != link.get('rel'):
+                continue
             if not require_type and not prefer_type:
                 # Any link with this relation will work. Return the
                 # first one we see.
@@ -205,7 +247,7 @@ class AuthenticationDocument(object):
             _db,
             id=data.get('id', None),
             title=data.get('title', data.get('name', None)),
-            type=data.get('type', []),
+            authentication=data.get('authentication', []),
             service_description=data.get('service_description', None),
             color_scheme=data.get('color_scheme'),
             collection_size=data.get('collection_size'),
@@ -213,7 +255,7 @@ class AuthenticationDocument(object):
             audiences=data.get('audience'),
             service_area=data.get('service_area'),
             focus_area=data.get('focus_area'),
-            links=data.get('links', {}),
+            links=data.get('links', []),
             place_class=place_class
         )
 
