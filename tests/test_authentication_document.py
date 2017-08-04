@@ -262,7 +262,7 @@ class TestLinkExtractor(object):
         most of the features we're looking for.
         """
         document = {
-            "id": "c90903e0-d438-4c8d-ac35-94824d769e2c",
+            "id": "http://library/authentication-for-opds-file",
             "title": "Ansonia Public Library", 
             "links": [
                 {"rel": "logo", "href": "data:image/png;base64,some-image-data", "type": "image/png"}, 
