@@ -208,7 +208,8 @@ class AuthenticationDocument(object):
             return None
         good_enough = None
         if not isinstance(links, list):
-            raise ValueError("links must be a list (got %r)" % links)
+            # Invalid links object; ignore it.
+            return
         for link in links:
             if rel != link.get('rel'):
                 continue
