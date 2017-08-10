@@ -224,9 +224,9 @@ class TestPlace(DatabaseTest):
         connecticut = self.connecticut_state
 
         # There are two libraries here...
-        nypl = self._library("New York Public Library", service_areas=[nyc])
+        nypl = self._library("New York Public Library", eligibility_areas=[nyc])
         ct_state = self._library(
-            "Connecticut State Library", service_areas=[connecticut]
+            "Connecticut State Library", eligibility_areas=[connecticut]
         )
 
         # ...but only one serves the 10018 ZIP code.
@@ -277,19 +277,293 @@ class TestLibrary(DatabaseTest):
         
     def test_library_service_area(self):
         zip = self.zip_10018
-        nypl = self._library("New York Public Library", service_areas=[zip])
+        nypl = self._library("New York Public Library", eligibility_areas=[zip])
         [service_area] = nypl.service_areas
         eq_(zip, service_area.place)
         eq_(nypl, service_area.library)
         
+    def test_relevant_audience(self):
+        research = self._library(
+            "NYU Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city],
+            audiences=[Audience.RESEARCH],
+        )
+        public = self._library(
+            "New York Public Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city],
+            audiences=[Audience.PUBLIC],
+        )
+        education = self._library(
+            "School", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city],
+            audiences=[Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY],
+        )
+        self._db.flush()
+
+        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.PUBLIC])
+        eq_(public, lib)
+
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.RESEARCH])
+        eq_(research, lib1)
+        eq_(public, lib2)
+
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.EDUCATIONAL_PRIMARY])
+        eq_(education, lib1)
+        eq_(public, lib2)
+
+    def test_relevant_collection_size(self):
+        small = self._library(
+            "Small Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+        )
+        CollectionSummary.set(small, "eng", 10)
+        large = self._library(
+            "Large Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+        )
+        CollectionSummary.set(large, "eng", 100000)
+        empty = self._library(
+            "Empty Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+        )
+        CollectionSummary.set(empty, "eng", 0)
+        unknown = self._library(
+            "Unknown Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+        )
+        self._db.flush()
+
+        [(lib1, s1), (lib2, s2), (lib3, s3)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        eq_(large, lib1)
+        eq_(small, lib2)
+        eq_(unknown, lib3)
+        # Empty isn't included because we're sure it has no books in English.
+
+    def test_relevant_eligibility_area(self):
+        # Create two libraries. One serves New York City, and one serves
+        # the entire state of Connecticut. They have the same focus area
+        # so this only tests eligibility area.
+        nypl = self._library(
+            "New York Public Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city, self.connecticut_state],
+        )
+        ct_state = self._library(
+            "Connecticut State Library", eligibility_areas=[self.connecticut_state], focus_areas=[self.new_york_city, self.connecticut_state],
+        )
+        self._db.flush()
+
+        # From this point in Brooklyn, NYPL is the closest library.
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        eq_(nypl, lib1)
+        eq_(ct_state, lib2)
+
+        # From this point in Connecticut, CT State is the closest.
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng')
+        eq_(ct_state, lib1)
+        eq_(nypl, lib2)
+                
+        # From this point in New Jersey, NYPL is closest.
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng')
+        eq_(nypl, lib1)
+        eq_(ct_state, lib2)
+
+        # From this point in the Indian Ocean, both libraries
+        # are so far away they're below the score threshold.
+        eq_([], Library.relevant(self._db, (-15, 91), 'eng'))
+
+    def test_relevant_focus_area(self):
+        # Create two libraries. One serves New York City, and one serves
+        # the entire state of Connecticut. They have the same eligibility
+        # area, so this only tests focus area.
+        nypl = self._library(
+            "New York Public Library", focus_areas=[self.new_york_city], eligibility_areas=[self.new_york_city, self.connecticut_state]
+        )
+        ct_state = self._library(
+            "Connecticut State Library", focus_areas=[self.connecticut_state], eligibility_areas=[self.new_york_city, self.connecticut_state]
+        )
+        self._db.flush()
+
+        # From this point in Brooklyn, NYPL is the closest library.
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        eq_(nypl, lib1)
+        eq_(ct_state, lib2)
+
+        # From this point in Connecticut, CT State is the closest.
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng')
+        eq_(ct_state, lib1)
+        eq_(nypl, lib2)
+                
+        # From this point in New Jersey, NYPL is closest.
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng')
+        eq_(nypl, lib1)
+        eq_(ct_state, lib2)
+
+        # From this point in the Indian Ocean, both libraries
+        # are so far away they're below the score threshold.
+        eq_([], Library.relevant(self._db, (-15, 91), 'eng'))
+
+    def test_relevant_focus_area_size(self):
+        # This library serves NYC.
+        nypl = self._library(
+            "New York Public Library", focus_areas=[self.new_york_city], eligibility_areas=[self.new_york_state]
+        )
+        # This library serves New York state.
+        ny_state = self._library(
+            "New York State Library", focus_areas=[self.new_york_state], eligibility_areas=[self.new_york_state]
+        )
+        self._db.flush()
+
+        # This point in Brooklyn is in both libraries' focus areas,
+        # but NYPL has a smaller focus area so it wins.
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        eq_(nypl, lib1)
+        eq_(ny_state, lib2)
+
+    def test_relevant_library_with_no_service_areas(self):
+        # Make sure a library with no service areas doesn't crash the query.
+
+        # This library serves NYC.
+        nypl = self._library(
+            "New York Public Library", focus_areas=[self.new_york_city], eligibility_areas=[self.new_york_state]
+        )
+        # This library has no service areas.
+        no_service_area = self._library(
+            "Nowhere Library"
+        )
+
+        self._db.flush()
+
+        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        eq_(nypl, lib)
+
+    def test_relevant_all_factors(self):
+        # This library serves the general public in NY state, with a focus on Manhattan.
+        nypl = self._library(
+            "New York Public Library", focus_areas=[self.crude_new_york_county],
+            eligibility_areas=[self.new_york_state], audiences=[Audience.PUBLIC],
+        )
+        CollectionSummary.set(nypl, "eng", 150000)
+        CollectionSummary.set(nypl, "spa", 20000)
+        CollectionSummary.set(nypl, "rus", 5000)
+
+        # This library serves the general public in NY state, with a focus on Brooklyn.
+        bpl = self._library(
+            "Brooklyn Public Library", focus_areas=[self.crude_kings_county],
+            eligibility_areas=[self.new_york_state], audiences=[Audience.PUBLIC],
+        )
+        CollectionSummary.set(bpl, "eng", 75000)
+        CollectionSummary.set(bpl, "spa", 10000)
+
+        # This library serves the general public in Albany.
+        albany = self._library(
+            "Albany Public Library", focus_areas=[self.crude_albany],
+            eligibility_areas=[self.crude_albany], audiences=[Audience.PUBLIC],
+        )
+        CollectionSummary.set(albany, "eng", 50000)
+        CollectionSummary.set(albany, "spa", 5000)
+
+        # This library serves NYU students.
+        nyu_lib = self._library(
+            "NYU Library", focus_areas=[self.new_york_city],
+            eligibility_areas=[self.new_york_city], audiences=[Audience.EDUCATIONAL_SECONDARY],
+        )
+        CollectionSummary.set(nyu_lib, "eng", 100000)
+
+        # These libraries serves the general public, but mostly academics.
+        nyu_press = self._library(
+            "NYU Press", focus_areas=[self.new_york_city],
+            eligibility_areas=[Place.everywhere(self._db)], audiences=[Audience.RESEARCH, Audience.PUBLIC],
+        )
+        CollectionSummary.set(nyu_press, "eng", 40)
+
+        unm = self._library(
+            "UNM Press", focus_areas=[self.kansas_state],
+            eligibility_areas=[Place.everywhere(self._db)], audiences=[Audience.RESEARCH, Audience.PUBLIC],
+        )
+        CollectionSummary.set(unm, "eng", 60)
+        CollectionSummary.set(unm, "spa", 10)
+
+        # This library serves people with print disabilities in the US.
+        bard = self._library(
+            "BARD", focus_areas=[self.crude_us],
+            eligibility_areas=[self.crude_us], audiences=[Audience.PRINT_DISABILITY],
+        )
+        CollectionSummary.set(bard, "eng", 100000)
+
+        # This library serves the general public everywhere.
+        internet_archive = self._library(
+            "Internet Archive", focus_areas=[Place.everywhere(self._db)],
+            eligibility_areas=[Place.everywhere(self._db)], audiences=[Audience.PUBLIC],
+        )
+        CollectionSummary.set(internet_archive, "eng", 10000000)
+        CollectionSummary.set(internet_archive, "spa", 1000)
+        CollectionSummary.set(internet_archive, "rus", 1000)
+
+        self._db.flush()
+
+        # In Manhattan.
+        libraries = Library.relevant(self._db, (40.75, -73.98), "eng")
+        eq_(4, len(libraries))
+        eq_([nypl, bpl, internet_archive, nyu_press],
+            [l[0] for l in libraries])
+
+        # In Brooklyn.
+        libraries = Library.relevant(self._db, (40.65, -73.94), "eng")
+        eq_(4, len(libraries))
+        eq_([bpl, nypl, internet_archive, nyu_press],
+            [l[0] for l in libraries])
+
+        # In Queens.
+        libraries = Library.relevant(self._db, (40.76, -73.91), "eng")
+        eq_(4, len(libraries))
+        eq_([nypl, bpl, internet_archive, nyu_press],
+            [l[0] for l in libraries])
+
+        # In Albany.
+        libraries = Library.relevant(self._db, (42.66, -73.77), "eng")
+        eq_(5, len(libraries))
+        eq_([albany, nypl, bpl, internet_archive, nyu_press],
+            [l[0] for l in libraries])
+
+        # In Syracuse (200km west of Albany).
+        libraries = Library.relevant(self._db, (43.06, -76.15), "eng")
+        eq_(4, len(libraries))
+        eq_([nypl, bpl, internet_archive, nyu_press],
+            [l[0] for l in libraries])
+
+        # In New Jersey.
+        libraries = Library.relevant(self._db, (40.79, -74.43), "eng")
+        eq_(4, len(libraries))
+        eq_([nypl, bpl, internet_archive, nyu_press],
+            [l[0] for l in libraries])
+
+        # In Las Cruces, NM. Internet Archive is first at the moment
+        # due to its large collection, but maybe it would be better if UNM was.
+        libraries = Library.relevant(self._db, (32.32, -106.77), "eng")
+        eq_(2, len(libraries))
+        eq_(set([unm, internet_archive]),
+            set([l[0] for l in libraries]))
+
+        # Russian speaker in Albany. Albany doesn't pass the score threshold
+        # since it didn't report having any Russian books, but maybe we should
+        # consider the total collection size as well as the user's language.
+        libraries = Library.relevant(self._db, (42.66, -73.77), "rus")
+        eq_(2, len(libraries))
+        eq_([nypl, internet_archive],
+            [l[0] for l in libraries])
+
+        # Spanish speaker in Manhattan.
+        libraries = Library.relevant(self._db, (40.75, -73.98), "spa")
+        eq_(4, len(libraries))
+        eq_([nypl, bpl, internet_archive, unm],
+            [l[0] for l in libraries])
+
+        # Patron with a print disability in Manhattan.
+        libraries = Library.relevant(self._db, (40.75, -73.98), "eng", audiences=[Audience.PRINT_DISABILITY])
+        eq_(5, len(libraries))
+        eq_([bard, nypl, bpl, internet_archive, nyu_press],
+            [l[0] for l in libraries])
+
     def test_nearby(self):
         # Create two libraries. One serves New York City, and one serves
         # the entire state of Connecticut.
         nypl = self._library(
-            "New York Public Library", service_areas=[self.new_york_city]
+            "New York Public Library", eligibility_areas=[self.new_york_city]
         )
         ct_state = self._library(
-            "Connecticut State Library", service_areas=[self.connecticut_state]
+            "Connecticut State Library", eligibility_areas=[self.connecticut_state]
         )
 
         # From this point in Brooklyn, NYPL is the closest library.
