@@ -303,8 +303,7 @@ class Library(Base):
         `Library.stage`. By default, only libraries in the LIVE stage
         are shown.
 
-        :return A database query that returns a list of libraries
-        sorted by relevance.
+        :return A list of (Library, score) tuples, sorted by relevance.
         """
 
         # Constants that determine the weights of different components of the score.
