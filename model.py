@@ -8,6 +8,7 @@ import re
 import json
 import uuid
 import warnings
+from collections import Counter
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
     Binary,
@@ -48,7 +49,16 @@ from sqlalchemy.orm.exc import (
 )
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import compiler
-from sqlalchemy.sql.expression import cast
+from sqlalchemy.sql.expression import (
+    cast, 
+    literal_column,
+    or_,
+    and_,
+    case,
+    select,
+    join,
+    outerjoin,
+)
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from geoalchemy2 import Geography, Geometry
@@ -280,7 +290,220 @@ class Library(Base):
         """
         allowed_stages = allowed_stages or [Library.LIVE]
         return qu.filter(Library.stage.in_(allowed_stages))
-    
+
+    @classmethod
+    def relevant(cls, _db, target, language, audiences=None, allowed_stages=None):
+        """Find libraries that are most relevant for a user.
+        
+        :param target: The user's current location. May be a Geometry object or
+        a 2-tuple (latitude, longitude).
+        :param language: The ISO 639-1 code for the user's language.
+        :param audiences: List of audiences the user is a member of.
+        By default, only libraries with the PUBLIC audience are shown.
+        :param allowed_stages: A list of allowable values for
+        `Library.stage`. By default, only libraries in the LIVE stage
+        are shown.
+
+        :return A Counter mapping Library objects to scores.
+        """
+
+        # Constants that determine the weights of different components of the score.
+        # These may need to be adjusted when there are more libraries in the system to
+        # test with.
+        base_score = 1
+        audience_factor = 1.01
+        collection_size_factor = 1000
+        focus_area_distance_factor = 0.005
+        eligibility_area_distance_factor = 0.1
+        focus_area_size_factor = 0.00000001
+        score_threshold = 0.00001
+
+        # By default, only show libraries that have been approved.
+        allowed_stages = allowed_stages or [cls.LIVE]
+
+        # By default, only show libraries that are for the general public.
+        audiences = audiences or [Audience.PUBLIC]
+
+        # Convert the target to a single point.
+        if isinstance(target, tuple):
+            target = GeometryUtility.point(*target)
+
+        # Convert the language to 3-letter code.
+        language_code = LanguageCodes.string_to_alpha_3(language)
+
+        # Set up an alias for libraries and collection summaries for use in subqueries.
+        libraries_collections = outerjoin(
+            Library, CollectionSummary,
+            Library.id==CollectionSummary.library_id
+        ).alias("libraries_collections")
+
+        # Check if each library has a public audience.
+        public_audiences_subquery = select(
+            [func.count()]
+        ).where(
+            and_(
+                Audience.name==Audience.PUBLIC,
+                libraries_audiences.c.library_id==libraries_collections.c.libraries_id,
+            )
+        ).select_from(
+            libraries_audiences.join(Audience)
+        ).lateral("public_audiences")
+
+        # Check if each library has a non-public audience from
+        # the user's audiences.
+        non_public_audiences_subquery = select(
+            [func.count()]
+        ).where(
+            and_(
+                Audience.name!=Audience.PUBLIC,
+                Audience.name.in_(audiences),
+                libraries_audiences.c.library_id==libraries_collections.c.libraries_id,
+            )
+        ).select_from(
+            libraries_audiences.join(Audience)
+        ).lateral("non_public_audiences")
+
+        # Increase the score if there was an audience match other than
+        # public, and set it to 0 if there's no match at all.
+        score = case(
+            [
+             # Audience match other than public.
+             (non_public_audiences_subquery!=literal_column(str(0)),
+              literal_column(str(base_score * audience_factor))),
+             # Public audience.
+             (public_audiences_subquery!=literal_column(str(0)),
+              literal_column(str(base_score)))
+            ],
+            # No match.
+            else_=literal_column(str(0)),
+        )
+
+        # Function that decreases exponentially as its input increases.
+        def exponential_decrease(value):
+            original_exponent = -1 * value
+            # Prevent underflow and overflow errors by ensuring
+            # the exponent is between -500 and 500.
+            exponent = case(
+                [(original_exponent > 500, literal_column(str(500))),
+                 (original_exponent < -500, literal_column(str(-500)))],
+                else_=original_exponent)
+            return func.exp(exponent)
+
+        # Get the maximum collection size for the user's language.
+        collections_by_size = _db.query(CollectionSummary).filter(
+            CollectionSummary.language==language_code).order_by(
+            CollectionSummary.size.desc())
+
+        if collections_by_size.count() == 0:
+            max = 0
+        else:
+            max = collections_by_size.first().size
+
+        # Only take collection size into account in the ranking if there's at
+        # least one library with a non-empty collection in the user's language.
+        if max > 0:
+            # If we don't have any information about a library's collection size,
+            # we'll just say there's one book. That way the library is ranked above
+            # a library we know has 0 books, but below any libraries with more.
+            # Maybe this should be larger, or should consider languages other than
+            # the user's language.
+            estimated_size = case(
+                [(libraries_collections.c.collectionsummaries_id==None, literal_column("1"))],
+                else_=libraries_collections.c.collectionsummaries_size
+            )
+            score_multiplier = (1 - exponential_decrease(1.0 * collection_size_factor * estimated_size / max))
+            score = score * score_multiplier
+
+        # Create a subquery for a type of service area.
+        def service_area_subquery(type):
+            return select(
+                [Place.geometry, Place.type]
+            ).where(
+                and_(
+                    ServiceArea.library_id==libraries_collections.c.libraries_id,
+                    ServiceArea.type==type,
+                )
+            ).select_from(
+                join(
+                    ServiceArea, Place,
+                    ServiceArea.place_id==Place.id
+                )
+            ).lateral()
+
+        # Find each library's eligibility areas.
+        eligibility_areas_subquery = service_area_subquery(ServiceArea.ELIGIBILITY)
+
+        # Find each library's focus areas.
+        focus_areas_subquery = service_area_subquery(ServiceArea.FOCUS)
+
+        # Get the minimum distance from the target to any service area returned
+        # by the subquery, in km. If a service area is "everywhere", the distance
+        # is 0.
+        def min_distance(subquery):
+            return func.min(
+                case(
+                    [(subquery.c.type==Place.EVERYWHERE, literal_column(str(0)))],
+                    else_=func.ST_Distance_Sphere(target, subquery.c.geometry)
+                )
+            ) / 1000
+
+        # Minimum distance to any eligibility area.
+        eligibility_min_distance = min_distance(eligibility_areas_subquery)
+
+        # Minimum distance to any focus area.
+        focus_min_distance = min_distance(focus_areas_subquery)
+
+        # Decrease the score based on how far away the library's eligibility area is.
+        score = score * exponential_decrease(1.0 * eligibility_area_distance_factor * eligibility_min_distance)
+ 
+        # Decrease the score based on how far away the library's focus area is.
+        score = score * exponential_decrease(1.0 * focus_area_distance_factor * focus_min_distance)
+
+        # Decrease the score based on the sum of the sizes of the library's focus areas, in km^2.
+        # This currently  assumes that the library's focus areas don't overlap, which may not be true.
+        # If a focus area is "everywhere", the size is the area of Earth (510 million km^2).
+        focus_area_size = func.sum(
+            case(
+                [(focus_areas_subquery.c.type==Place.EVERYWHERE, literal_column(str(510000000000000)))],
+                else_=func.ST_Area(focus_areas_subquery.c.geometry)
+            )
+        ) / 1000000
+        score = score * exponential_decrease(1.0 * focus_area_size_factor * focus_area_size)
+
+        # Rank the libraries by score, and remove any libraries
+        # that are below the score threshold.
+        library_id_and_score = select(
+            [libraries_collections.c.libraries_id,
+             score.label("score"),
+            ]
+        ).having(
+            score > literal_column(str(score_threshold))
+        ).where(
+            # Limit to the collection summaries for the user's language. If a library
+            # has no collection for the language, it's still included.
+            or_(
+                libraries_collections.c.collectionsummaries_language==language_code,
+                libraries_collections.c.collectionsummaries_language==None
+            )
+        ).select_from(
+            libraries_collections
+        ).group_by(
+            libraries_collections.c.libraries_id,
+            libraries_collections.c.collectionsummaries_id,
+            libraries_collections.c.collectionsummaries_size,
+        ).order_by(
+            score.desc()
+        )
+
+        result = _db.execute(library_id_and_score)
+        library_ids_and_scores = {r[0]: r[1] for r in result}
+        # Look up the Library objects and return them with the scores.
+        libraries = _db.query(Library).filter(Library.id.in_(library_ids_and_scores.keys()))
+        c = Counter()
+        for library in libraries:
+            c[library] = library_ids_and_scores[library.id]
+        return c
+
     @classmethod
     def nearby(cls, _db, target, max_radius=150, allowed_stages=None):
         """Find libraries whose service areas include or are close to the
@@ -1428,4 +1651,3 @@ libraries_audiences = Table(
      UniqueConstraint('library_id', 'audience_id'),
  )
 
-    
