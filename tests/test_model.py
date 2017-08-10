@@ -297,14 +297,14 @@ class TestLibrary(DatabaseTest):
         )
         self._db.flush()
 
-        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.PUBLIC])
+        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.PUBLIC]).most_common()
         eq_(public, lib)
 
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.RESEARCH])
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.RESEARCH]).most_common()
         eq_(research, lib1)
         eq_(public, lib2)
 
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.EDUCATIONAL_PRIMARY])
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.EDUCATIONAL_PRIMARY]).most_common()
         eq_(education, lib1)
         eq_(public, lib2)
 
@@ -326,7 +326,7 @@ class TestLibrary(DatabaseTest):
         )
         self._db.flush()
 
-        [(lib1, s1), (lib2, s2), (lib3, s3)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        [(lib1, s1), (lib2, s2), (lib3, s3)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
         eq_(large, lib1)
         eq_(small, lib2)
         eq_(unknown, lib3)
@@ -345,23 +345,23 @@ class TestLibrary(DatabaseTest):
         self._db.flush()
 
         # From this point in Brooklyn, NYPL is the closest library.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
         eq_(nypl, lib1)
         eq_(ct_state, lib2)
 
         # From this point in Connecticut, CT State is the closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng')
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng').most_common()
         eq_(ct_state, lib1)
         eq_(nypl, lib2)
                 
         # From this point in New Jersey, NYPL is closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng')
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng').most_common()
         eq_(nypl, lib1)
         eq_(ct_state, lib2)
 
         # From this point in the Indian Ocean, both libraries
         # are so far away they're below the score threshold.
-        eq_([], Library.relevant(self._db, (-15, 91), 'eng'))
+        eq_([], list(Library.relevant(self._db, (-15, 91), 'eng').most_common()))
 
     def test_relevant_focus_area(self):
         # Create two libraries. One serves New York City, and one serves
@@ -376,23 +376,23 @@ class TestLibrary(DatabaseTest):
         self._db.flush()
 
         # From this point in Brooklyn, NYPL is the closest library.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
         eq_(nypl, lib1)
         eq_(ct_state, lib2)
 
         # From this point in Connecticut, CT State is the closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng')
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng').most_common()
         eq_(ct_state, lib1)
         eq_(nypl, lib2)
                 
         # From this point in New Jersey, NYPL is closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng')
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng').most_common()
         eq_(nypl, lib1)
         eq_(ct_state, lib2)
 
         # From this point in the Indian Ocean, both libraries
         # are so far away they're below the score threshold.
-        eq_([], Library.relevant(self._db, (-15, 91), 'eng'))
+        eq_([], list(Library.relevant(self._db, (-15, 91), 'eng').most_common()))
 
     def test_relevant_focus_area_size(self):
         # This library serves NYC.
@@ -407,7 +407,7 @@ class TestLibrary(DatabaseTest):
 
         # This point in Brooklyn is in both libraries' focus areas,
         # but NYPL has a smaller focus area so it wins.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
         eq_(nypl, lib1)
         eq_(ny_state, lib2)
 
@@ -425,7 +425,7 @@ class TestLibrary(DatabaseTest):
 
         self._db.flush()
 
-        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng')
+        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
         eq_(nypl, lib)
 
     def test_relevant_all_factors(self):
@@ -494,44 +494,44 @@ class TestLibrary(DatabaseTest):
         self._db.flush()
 
         # In Manhattan.
-        libraries = Library.relevant(self._db, (40.75, -73.98), "eng")
+        libraries = Library.relevant(self._db, (40.75, -73.98), "eng").most_common()
         eq_(4, len(libraries))
         eq_([nypl, bpl, internet_archive, nyu_press],
             [l[0] for l in libraries])
 
         # In Brooklyn.
-        libraries = Library.relevant(self._db, (40.65, -73.94), "eng")
+        libraries = Library.relevant(self._db, (40.65, -73.94), "eng").most_common()
         eq_(4, len(libraries))
         eq_([bpl, nypl, internet_archive, nyu_press],
             [l[0] for l in libraries])
 
         # In Queens.
-        libraries = Library.relevant(self._db, (40.76, -73.91), "eng")
+        libraries = Library.relevant(self._db, (40.76, -73.91), "eng").most_common()
         eq_(4, len(libraries))
         eq_([nypl, bpl, internet_archive, nyu_press],
             [l[0] for l in libraries])
 
         # In Albany.
-        libraries = Library.relevant(self._db, (42.66, -73.77), "eng")
+        libraries = Library.relevant(self._db, (42.66, -73.77), "eng").most_common()
         eq_(5, len(libraries))
         eq_([albany, nypl, bpl, internet_archive, nyu_press],
             [l[0] for l in libraries])
 
         # In Syracuse (200km west of Albany).
-        libraries = Library.relevant(self._db, (43.06, -76.15), "eng")
+        libraries = Library.relevant(self._db, (43.06, -76.15), "eng").most_common()
         eq_(4, len(libraries))
         eq_([nypl, bpl, internet_archive, nyu_press],
             [l[0] for l in libraries])
 
         # In New Jersey.
-        libraries = Library.relevant(self._db, (40.79, -74.43), "eng")
+        libraries = Library.relevant(self._db, (40.79, -74.43), "eng").most_common()
         eq_(4, len(libraries))
         eq_([nypl, bpl, internet_archive, nyu_press],
             [l[0] for l in libraries])
 
         # In Las Cruces, NM. Internet Archive is first at the moment
         # due to its large collection, but maybe it would be better if UNM was.
-        libraries = Library.relevant(self._db, (32.32, -106.77), "eng")
+        libraries = Library.relevant(self._db, (32.32, -106.77), "eng").most_common()
         eq_(2, len(libraries))
         eq_(set([unm, internet_archive]),
             set([l[0] for l in libraries]))
@@ -539,19 +539,19 @@ class TestLibrary(DatabaseTest):
         # Russian speaker in Albany. Albany doesn't pass the score threshold
         # since it didn't report having any Russian books, but maybe we should
         # consider the total collection size as well as the user's language.
-        libraries = Library.relevant(self._db, (42.66, -73.77), "rus")
+        libraries = Library.relevant(self._db, (42.66, -73.77), "rus").most_common()
         eq_(2, len(libraries))
         eq_([nypl, internet_archive],
             [l[0] for l in libraries])
 
         # Spanish speaker in Manhattan.
-        libraries = Library.relevant(self._db, (40.75, -73.98), "spa")
+        libraries = Library.relevant(self._db, (40.75, -73.98), "spa").most_common()
         eq_(4, len(libraries))
         eq_([nypl, bpl, internet_archive, unm],
             [l[0] for l in libraries])
 
         # Patron with a print disability in Manhattan.
-        libraries = Library.relevant(self._db, (40.75, -73.98), "eng", audiences=[Audience.PRINT_DISABILITY])
+        libraries = Library.relevant(self._db, (40.75, -73.98), "eng", audiences=[Audience.PRINT_DISABILITY]).most_common()
         eq_(5, len(libraries))
         eq_([bard, nypl, bpl, internet_archive, nyu_press],
             [l[0] for l in libraries])

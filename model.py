@@ -8,6 +8,7 @@ import re
 import json
 import uuid
 import warnings
+from collections import Counter
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
     Binary,
@@ -303,7 +304,7 @@ class Library(Base):
         `Library.stage`. By default, only libraries in the LIVE stage
         are shown.
 
-        :return A list of (Library, score) tuples, sorted by relevance.
+        :return A Counter mapping Library objects to scores.
         """
 
         # Constants that determine the weights of different components of the score.
@@ -495,9 +496,13 @@ class Library(Base):
         )
 
         result = _db.execute(library_id_and_score)
-        library_ids_and_scores = [r for r in result]
+        library_ids_and_scores = {r[0]: r[1] for r in result}
         # Look up the Library objects and return them with the scores.
-        return [(get_one(_db, Library, id=lid), score) for lid, score in library_ids_and_scores]
+        libraries = _db.query(Library).filter(Library.id.in_(library_ids_and_scores.keys()))
+        c = Counter()
+        for library in libraries:
+            c[library] = library_ids_and_scores[library.id]
+        return c
 
     @classmethod
     def nearby(cls, _db, target, max_radius=150, allowed_stages=None):
