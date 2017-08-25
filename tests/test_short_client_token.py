@@ -176,7 +176,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
 
         # The patron identifier must not be blank.
         assert_raises_regexp(
-            ValueError, 'Token library|1234| has empty patron identifier',
+            ValueError, 'Token library\|1234\| has empty patron identifier',
             m, self._db, "library|1234|", "signature"
         )
         
@@ -190,10 +190,21 @@ class TestShortClientTokenDecoder(DatabaseTest):
         # The token must not have expired.
         assert_raises_regexp(
             ValueError,
-            'Token mylibrary|1234|patron expired at 1970-01-01 00:20:34',
+            'Token library\|1234\|patron expired at 2017-01-01 20:34:00',
             m, self._db, "library|1234|patron", "signature"
         )
 
+        # (Even though the expiration number here is much higher, this
+        # token is also expired, because the expiration date
+        # calculation for an old-style token starts at a different
+        # epoch and treats the expiration number as seconds rather
+        # than minutes.)
+        assert_raises_regexp(
+            ValueError,
+            'Token library\|1500000000\|patron expired at 2017-07-14 02:40:00',
+            m, self._db, "library|1500000000|patron", "signature"
+        )
+        
         # Finally, the signature must be valid.
         assert_raises_regexp(
             ValueError, 'Invalid signature for',

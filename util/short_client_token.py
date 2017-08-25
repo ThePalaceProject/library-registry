@@ -26,13 +26,26 @@ class ShortClientTokenTool(object):
         encoded = str.replace(":", "+").replace(";", "/").replace("@", "=")
         return base64.decodestring(encoded)
 
-    EPOCH = datetime.datetime(1970, 1, 1)
+    # The JWT spec takes January 1 1970 as the epoch.
+    JWT_EPOCH = datetime.datetime(1970, 1, 1)
+
+    # For the sake of shortening tokens, the Short Client Token spec
+    # takes January 1 2017 as the epoch, and measures time in minutes
+    # rather than seconds.
+    SCT_EPOCH = datetime.datetime(2017, 1, 1)
 
     @classmethod
-    def numericdate(cls, d):
-        """Turn a datetime object into a NumericDate as per RFC 7519."""
-        return (d-cls.EPOCH).total_seconds()
+    def sct_numericdate(cls, d):
+        """Turn a datetime object into a number of minutes since the epoch, as
+        per the Short Client Token spec.
+        """
+        return (d-cls.SCT_EPOCH).total_seconds() / 60
 
+    @classmethod
+    def jwt_numericdate(cls, d):
+        """Turn a datetime object into a NumericDate as per RFC 7519."""
+        return (d-cls.JWT_EPOCH).total_seconds()
+    
 
 class ShortClientTokenEncoder(ShortClientTokenTool):
 
@@ -63,7 +76,7 @@ class ShortClientTokenEncoder(ShortClientTokenTool):
             raise ValueError("No patron identifier specified.")
         
         now = datetime.datetime.utcnow()
-        expires = int(self.numericdate(now + datetime.timedelta(minutes=60)))
+        expires = int(self.sct_numericdate(now + datetime.timedelta(minutes=60)))
         return self._encode(library_short_name, library_secret,
                             patron_identifier, expires)
     

@@ -1284,8 +1284,23 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             )
 
         # Don't bother checking an expired token.
+        #
+        # Currently there are two ways of specifying a token's
+        # expiration date: as a number of minutes since self.SCT_EPOCH
+        # or as a number of seconds since self.JWT_EPOCH.
         now = datetime.datetime.utcnow()
-        expiration = self.EPOCH + datetime.timedelta(seconds=expiration)
+
+        # NOTE: The JWT code needs to be removed by the year 4869 or
+        # this will break.
+        if expiration < 1500000000:
+            # This is a number of minutes since the start of 2017.
+            expiration = self.SCT_EPOCH + datetime.timedelta(
+                minutes=expiration
+            )
+        else:
+            # This is a number of seconds since the start of 1970.
+            expiration = self.JWT_EPOCH + datetime.timedelta(seconds=expiration)
+
         if expiration < now:
             raise ValueError(
                 "Token %s expired at %s (now is %s)." % (
