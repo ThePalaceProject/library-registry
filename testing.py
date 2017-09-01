@@ -326,6 +326,10 @@ class DummyHTTPClient(object):
         self.requests.append(url)
         response = self.responses.pop()
 
+        # Simulate the behavior of requests, where response.url contains
+        # the final URL that responded to the request.
+        response.url = url
+
         code = response.status_code
         series = "%sxx" % (code / 100)
 

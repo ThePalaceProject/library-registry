@@ -15,6 +15,14 @@ INVALID_OPDS_FEED = pd(
       _("The submitted URL did not return a valid OPDS feed."),
 )
 
+OPDS_FEED_TIMEOUT = pd(
+      "http://librarysimplified.org/terms/problem/timeout",
+      408,
+      _("Request timed out"),
+      _("Attempt to retrieve an OPDS feed timed out."),
+)
+
+
 AUTH_DOCUMENT_NOT_FOUND = pd(
     "http://librarysimplified.org/terms/problem/auth-document-not-found",
     400,

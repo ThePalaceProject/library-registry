@@ -379,7 +379,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_('My feed requires authentication', catalog['metadata']['description'])
 
             auth_document = {
-                "id": "http://circmanager.org",
+                "id": "http://circmanager.org/auth",
                 "name": "A Library",
                 "service_description": "My feed links to the auth document",
             }
@@ -393,7 +393,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[3:])
 
             auth_document = {
-                "id": "http://circmanager.org",
+                "id": "http://circmanager.org/auth",
                 "name": "A Library",
                 "service_description": "My catalog links to the auth document",
             }
@@ -413,7 +413,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[5:])
 
             auth_document = {
-                "id": "http://circmanager.org",
+                "id": "http://circmanager.org/auth/",
                 "name": "A Library",
                 "service_description": "My feed links to the shelf, which requires auth",
             }
