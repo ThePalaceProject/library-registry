@@ -321,7 +321,7 @@ class LibraryRegistryController(object):
 
         public_key = auth_document.public_key
         if public_key and public_key.get("type") == "RSA":
-            public_key = RSA.import_key(public_key.get("value"))
+            public_key = RSA.importKey(public_key.get("value"))
             encryptor = PKCS1_OAEP.new(public_key)
 
             if not library.short_name:
