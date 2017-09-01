@@ -206,8 +206,8 @@ class LibraryRegistryController(object):
 
         def get_header_links(response):
             return [
-                link for link in response.links.get(AUTH_DOCUMENT_REL, [])
-                if link.get('type') == AUTH_DOCUMENT_TYPE
+                dict(href=link['url'], rel=link['rel'])
+                for link in response.links.get(AUTH_DOCUMENT_REL, [])
             ]
 
         def get_opds_links(response):
