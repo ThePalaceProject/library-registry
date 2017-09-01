@@ -198,8 +198,18 @@ class LibraryRegistryController(object):
             return NO_OPDS_URL
 
         AUTH_DOCUMENT_REL = "http://opds-spec.org/auth/document"
+        AUTH_DOCUMENT_TYPE = "application/vnd.opds.authentication.v1.0+json"
         SHELF_REL = "http://opds-spec.org/shelf"
-        auth_response = None
+
+        def get_links(response):
+            return get_opds_links(response) + get_header_links(response)
+
+        def get_header_links(response):
+            return [
+                link for link in response.links.get(AUTH_DOCUMENT_REL, [])
+                if link.get('type') == AUTH_DOCUMENT_TYPE
+            ]
+
         def get_opds_links(response):
             type = response.headers.get("Content-Type")
             if type == "application/opds+json":
@@ -221,12 +231,10 @@ class LibraryRegistryController(object):
                 opds_url, allowed_response_codes=["2xx", "3xx", 401],
                 timeout=30
             )
-            if response.status_code == 401:
-                # The OPDS feed requires authentication, so this response
-                # should contain the auth document.
-                auth_response = response
-            else:
-                links = get_opds_links(response)
+            # We either have an OPDS feed (which links to an
+            # authentication document) or we have a 401 response
+            # (which links to an authentication document).
+            links = get_links(response)
         except RequestTimedOut, e:
             logging.error(
                 "Registration of %s failed: timed out retrieving OPDS feed",
@@ -253,13 +261,14 @@ class LibraryRegistryController(object):
                         pass
             return None
 
-        if auth_response is None:
-            # The feed didn't require authentication, so we'll need to find
-            # the auth document.
+        # We know where the auth document is but we haven't actually
+        # been there yet.  The feed didn't require authentication,
+        # so we'll need to find the auth document.
 
-            # First, look for a link to the auth document.
-            auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
-                                             allowed_response_codes=["2xx", "3xx"])
+        # First, look for a link to the auth document.
+        auth_response = None
+        auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
+                                         allowed_response_codes=["2xx", "3xx"])
         if auth_response is None:
             # There was no link to the auth document, but maybe there's a shelf
             # link that requires authentication or links to the document.
