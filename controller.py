@@ -193,109 +193,38 @@ class LibraryRegistryController(object):
             return Response(body, 200, headers)
 
     def register(self, do_get=HTTP.get_with_timeout):
-        opds_url = flask.request.form.get("url")
-        if not opds_url:
-            return NO_OPDS_URL
+        auth_url = flask.request.form.get("url")
+        if not auth_url:
+            return NO_AUTH_URL
 
-        AUTH_DOCUMENT_REL = "http://opds-spec.org/auth/document"
-        AUTH_DOCUMENT_TYPE = "application/vnd.opds.authentication.v1.0+json"
-        SHELF_REL = "http://opds-spec.org/shelf"
-
-        def get_links(response):
-            return get_opds_links(response) + get_header_links(response)
-
-        def get_header_links(response):
-            return [
-                dict(href=link['url'], rel=link['rel'])
-                for link in response.links.get(AUTH_DOCUMENT_REL, [])
-            ]
-
-        def get_opds_links(response):
-            type = response.headers.get("Content-Type")
-            if type == "application/opds+json":
-                # This is an OPDS 2 catalog.
-                catalog = json.loads(response.content)
-                links = []
-                for k,v in catalog.get("links", {}).iteritems():
-                    links.append(dict(rel=k, href=v.get("href")))
-                return links
-                
-            elif type and type.startswith("application/atom+xml;profile=opds-catalog"):
-                # This is an OPDS 1 feed.
-                feed = feedparser.parse(response.content)
-                return feed.get("feed", {}).get("links", [])
-            return []
-        links = []
         try:
-            response = do_get(
-                opds_url, allowed_response_codes=["2xx", "3xx", 401],
+            auth_response = do_get(
+                auth_url, allowed_response_codes=["2xx", "3xx", 404],
                 timeout=30
             )
-            # We either have an OPDS feed (which links to an
-            # authentication document) or we have a 401 response
-            # (which links to an authentication document).
-            links = get_links(response)
+            # We only allowed 404 above so that we could return a more
+            # specific problem detail document if it happened.
+            if auth_response.status_code == 404:
+                return AUTH_DOCUMENT_NOT_FOUND
         except RequestTimedOut, e:
             logging.error(
-                "Registration of %s failed: timed out retrieving OPDS feed",
+                "Registration of %s failed: timed out retrieving authentication document",
                 opds_url, exc_info=e
             )
-            return OPDS_FEED_TIMEOUT
+            return AUTH_DOCUMENT_TIMEOUT
         except Exception, e:
             logging.error(
-                "Registration of %s failed: error retrieving OPDS feed", 
+                "Registration of %s failed: error retrieving authentication document", 
                 exc_info=e
             )
-            return INVALID_OPDS_FEED
-
-        def find_and_get_url(links, rel, allowed_response_codes=None):
-            for link in links:
-                if link.get("rel") == rel:
-                    url = link.get("href")
-                    if url:
-                        # Expand relative urls.
-                        url = urljoin(opds_url, url)
-                    try:
-                        return do_get(url, allowed_response_codes=allowed_response_codes)
-                    except Exception, e:
-                        pass
-            return None
-
-        # We know where the auth document is but we haven't actually
-        # been there yet.  The feed didn't require authentication,
-        # so we'll need to find the auth document.
-
-        # First, look for a link to the auth document.
-        auth_response = None
-        auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
-                                         allowed_response_codes=["2xx", "3xx"])
-        if auth_response is None:
-            # There was no link to the auth document, but maybe there's a shelf
-            # link that requires authentication or links to the document.
-            response = find_and_get_url(links, SHELF_REL,
-                                        allowed_response_codes=["2xx", "3xx", 401])
-            if response is not None:
-                if response.status_code == 401:
-                    # This response should have the auth document.
-                    auth_response = response
-                else:
-                    # This response didn't require authentication, so maybe it's a feed
-                    # that links to the auth document.
-                    links = get_opds_links(response)
-                    auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
-                                                     allowed_response_codes=["2xx", "3xx"])
-        if auth_response is None:
-            logging.error(
-                "Registration of %s failed: no auth document.", opds_url
-            )
-            return AUTH_DOCUMENT_NOT_FOUND
+            return ERROR_RETRIEVING_AUTH_DOCUMENT
 
         try:
             auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception, e:
             logging.error(
                 "Registration of %s failed: invalid auth document.",
-                opds_url, exc_info=e
+                auth_url, exc_info=e
             )
             return INVALID_AUTH_DOCUMENT
         failure_detail = None
@@ -303,11 +232,15 @@ class LibraryRegistryController(object):
             failure_detail = _("The OPDS authentication document is missing an id.")
         if not auth_document.title:
             failure_detail = _("The OPDS authentication document is missing a title.")
+        if auth_document.root:
+            opds_url = auth_document.root['href']
+        else:
+            failure_detail = _("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
         if auth_document.id != auth_response.url:
             failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.url)
         if failure_detail:
             logging.error(
-                "Registration of %s failed: %s", opds_url, failure_detail
+                "Registration of %s failed: %s", auth_url, failure_detail
             )
             return INVALID_AUTH_DOCUMENT.detailed(failure_detail)
 

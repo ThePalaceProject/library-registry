@@ -64,7 +64,13 @@ class ControllerTest(DatabaseTest):
         self.library_registry = TestLibraryRegistry(self._db, testing=True)
         self.app.library_registry = self.library_registry
         self.controller = LibraryRegistryController(self.library_registry)
+        self.http_client = DummyHTTPClient()
 
+        # A registration form that's valid for most of the tests 
+        # in this module.
+        self.registration_form = ImmutableMultiDict([
+            ("url", "http://circmanager.org/authentication.opds"),
+        ])
 
 class TestLibraryRegistryController(ControllerTest):
 
@@ -251,54 +257,192 @@ class TestLibraryRegistryController(ControllerTest):
             catalog = json.loads(response.data)
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])
-        
-    def test_register_success(self):
-        http_client = DummyHTTPClient()
-        opds1_type = "application/atom+xml;profile=opds-catalog;kind=acquisition"
-        opds2_type = "application/opds+json"
 
-        # Register a new library.
+    def _auth_document(self, key=None):
+        auth_document = {
+            "id": "http://circmanager.org/authentication.opds",
+            "title": "A Library",
+            "service_description": "Description",
+            "authentication": [
+                {
+                    "type": "https://librarysimplified.org/rel/auth/anonymous"
+                }
+            ],
+            "links": [
+                { "rel": "alternate", "href": "http://circmanager.org",
+                  "type": "text/html" },
+                {"rel": "logo", "href": "data:image/png;imagedata" },
+                {"rel": "register", "href": "http://circmanager.org/new-account" },
+                {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"},
+            ],
+            "service_area": { "US": "Kansas" },
+            "collection_size": 100,
+        }
+
+        if key:
+            auth_document['public_key'] = {
+                "type": "RSA",
+                "value": key.publickey().exportKey(),
+            }
+        return auth_document
+
+    def test_register_fails_when_no_auth_document_url_provided(self):
+        """Without the URL to an Authentication For OPDS document,
+        the registration process can't begin.
+        """
+        with self.app.test_request_context("/"):
+            response = self.controller.register(do_get=self.http_client.do_get)
+
+            eq_(NO_AUTH_URL, response)
+
+    def test_register_fails_on_non_200_code(self):
+        """If the URL provided results in a status code other than
+        200, the registration process can't begin.
+        """
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+
+            # This server isn't working.
+            self.http_client.queue_response(500)
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(ERROR_RETRIEVING_AUTH_DOCUMENT, response)
+
+            # This server incorrectly requires authentication to
+            # access the authentication document.
+            self.http_client.queue_response(401)
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(ERROR_RETRIEVING_AUTH_DOCUMENT, response)
+
+            # This server doesn't have an authentication document
+            # at the specified URL.
+            self.http_client.queue_response(404)
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
+        
+    def test_register_fails_on_non_authentication_document(self):
+        """The request succeeds but returns something other than
+        an authentication document.
+        """
+        self.http_client.queue_response(
+            200, content="I am not an Authentication For OPDS document."
+        )
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT, response)
+
+    def test_register_fails_on_non_matching_id(self):
+        """The request returns an authentication document but its `id`
+        doesn't match the URL it was retrieved from.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
         with self.app.test_request_context("/"):
             flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org"),
+                ("url", "http://a-different-url/"),
             ])
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The OPDS authentication document's id (http://circmanager.org/authentication.opds) doesn't match its url (http://a-different-url/).",
+                response.detail)
 
-            key = RSA.generate(1024)
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_description": "Description",
-                "authentication": [
-                    {
-                        "type": "https://librarysimplified.org/rel/auth/anonymous"
-                    }
-                ],
-                "links": [
-                    { "rel": "alternate", "href": "http://alibrary.org",
-                      "type": "text/html" },
-                    {"rel": "logo", "href": "data:image/png;imagedata" },
-                    {"rel": "register", "href": "http://alibrary.org/new-account" }
-                ],
-                "service_area": { "US": "Kansas" },
-                "collection_size": 100,
-                "public_key": {
-                    "type": "RSA",
-                    "value": key.publickey().exportKey(),
-                 }
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
+    def test_register_fails_on_missing_title(self):
+        """The request returns an authentication document but it's missing
+        a title.
+        """
+        auth_document = self._auth_document()
+        del auth_document['title']
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The OPDS authentication document is missing a title.",
+                response.detail)
 
-            response = self.controller.register(do_get=http_client.do_get)
+    def test_register_fails_on_no_start_link(self):
+        """The request returns an authentication document but it's missing
+        a link to an OPDS feed.
+        """
+        auth_document = self._auth_document()
+        for link in list(auth_document['links']):
+            if link['rel'] == 'start':
+                auth_document['links'].remove(link)
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The OPDS authentication document is missing a 'start' link to the root OPDS feed.",
+                response.detail)
+
+    def test_register_fails_on_broken_logo_link(self):
+        """The request returns a valid authentication document
+        that links to a broken logo image.
+        """
+        self.http_client.queue_response(500)
+        auth_document = self._auth_document()
+        for link in auth_document['links']:
+            if link['rel'] == 'logo':
+                link['href'] = "http://example.com/broken-logo.png"
+                break
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("Could not read logo image http://example.com/broken-logo.png",
+                response.detail)
+
+    def test_register_fails_on_unknown_service_area(self):
+        """The auth document is valid but the registry doesn't recognize the
+        library's service area.
+        """
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            auth_document['service_area'] = {"US": ["Somewhere"]}
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
+
+    def test_register_fails_on_ambiguous_service_area(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            auth_document['service_area'] = {"US": ["Manhattan"]}
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
+        
+    def test_register_success(self):
+        opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
+
+        # Pretend we are a library with a valid authentication document.
+        key = RSA.generate(1024)
+        auth_document = self._auth_document(key)
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+
+        auth_url = "http://circmanager.org/authentication.opds"
+        opds_url = "http://circmanager.org/feed/"
+
+        # Send a registration request to the registry.
+        with self.app.test_request_context("/"):
+            flask.request.form = ImmutableMultiDict([("url", auth_url)])
+            response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(201, response.status_code)
-            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory",
-                response.headers.get("Content-Type"))
+            eq_(opds_directory, response.headers.get("Content-Type"))
 
-            library = get_one(self._db, Library, opds_url="http://circmanager.org")
+            # The library has been created. Information from its
+            # authentication document has been added to the database.
+            library = get_one(self._db, Library, opds_url=opds_url)
             assert library != None
             eq_("A Library", library.name)
             eq_("Description", library.description)
-            eq_("http://alibrary.org", library.web_url)
+            eq_("http://circmanager.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
             eq_(Library.REGISTERED, library.stage)
 
@@ -311,8 +455,13 @@ class TestLibraryRegistryController(ControllerTest):
             [service_area] = library.service_areas
             eq_(self.kansas_state.id, service_area.place_id)
 
-            eq_(["http://circmanager.org"], http_client.requests)
+            # To get this information, a request was made to the
+            # circulation manager's Authentication For OPDS feed.
+            eq_(["http://circmanager.org/authentication.opds"], 
+                self.http_client.requests)
 
+            # And the document we queued up was fed into the library
+            # registry.
             catalog = json.loads(response.data)
             eq_("A Library", catalog['metadata']['title'])
             eq_('Description', catalog['metadata']['description'])
@@ -329,39 +478,48 @@ class TestLibraryRegistryController(ControllerTest):
             encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
             eq_(library.shared_secret, encryptor.decrypt(encrypted_secret))
 
-
         old_secret = library.shared_secret
+        self.http_client.requests = []
 
-        # Register changes to the same library, and test all the places
-        # the auth document could be.
+        # A human inspects the library, verifies that everything
+        # works, and makes it LIVE.
         library.stage = Library.LIVE
+
+        # Later, the library's information changes.
+        image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
+        self.http_client.queue_response(200, content=image_data, media_type="image/png")
+        auth_document = {
+            "id": auth_url,
+            "name": "A Library",
+            "service_description": "New and improved",
+            "links": [
+                {"rel": "logo", "href": "/logo.png", "type": "image/png" },
+                {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"}
+            ],
+            "service_area": { "US": "Connecticut" },
+        }
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+
+        # So the library re-registers itself, and gets an updated
+        # registry entry.
         with self.app.test_request_context("/"):
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org"),
-            ])
+            flask.request.form = ImmutableMultiDict([("url", auth_url)])
 
-            image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
-            http_client.queue_response(200, content=image_data, media_type="image/png")
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_description": "My feed requires authentication",
-                "links": [
-                    {"rel": "logo", "href": "/logo.png", "type": "image/png" },
-                ],
-                "service_area": { "US": "Connecticut" },
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-
-            response = self.controller.register(do_get=http_client.do_get)
+            response = self.controller.register(do_get=self.http_client.do_get)
             eq_(200, response.status_code)
-            eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory",
-                response.headers.get("Content-Type"))
+            eq_(opds_directory, response.headers.get("Content-Type"))
 
-            library = get_one(self._db, Library, opds_url="http://circmanager.org")
+            # The data sent in the response includes the library's new
+            # data.
+            catalog = json.loads(response.data)
+            eq_("A Library", catalog['metadata']['title'])
+            eq_('New and improved', catalog['metadata']['description'])
+
+            # The library's new data is also in the database.
+            library = get_one(self._db, Library, opds_url=opds_url)
             assert library != None
             eq_("A Library", library.name)
-            eq_("My feed requires authentication", library.description)
+            eq_("New and improved", library.description)
             eq_(None, library.web_url)
             eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
             # The library's stage is still LIVE, it has not gone back to
@@ -370,104 +528,30 @@ class TestLibraryRegistryController(ControllerTest):
             
             # Commit to update library.service_areas.
             self._db.commit()
+
+            # The library's service areas have been updated.
             [service_area] = library.service_areas
             eq_(self.connecticut_state.id, service_area.place_id)
-            eq_(["http://circmanager.org", "http://circmanager.org/logo.png"], http_client.requests[1:])
 
-            catalog = json.loads(response.data)
-            eq_("A Library", catalog['metadata']['title'])
-            eq_('My feed requires authentication', catalog['metadata']['description'])
+            # In addition to making the request to get the
+            # Authentication For OPDS document, the registry made a
+            # follow-up request to download the library's logo.
+            eq_(["http://circmanager.org/authentication.opds", 
+                 "http://circmanager.org/logo.png"], self.http_client.requests)
 
-            auth_document = {
-                "id": "http://circmanager.org/auth",
-                "name": "A Library",
-                "service_description": "My feed links to the auth document",
-            }
-            http_client.queue_response(200, content=json.dumps(auth_document))
-            feed = '<feed><link rel="http://opds-spec.org/auth/document" href="http://circmanager.org/auth"/></feed>'
-            http_client.queue_response(200, content=feed, media_type=opds1_type)
 
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(200, response.status_code)
-            eq_("My feed links to the auth document", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[3:])
-
-            auth_document = {
-                "id": "http://circmanager.org/auth",
-                "name": "A Library",
-                "service_description": "My catalog links to the auth document",
-            }
-            http_client.queue_response(200, content=json.dumps(auth_document))
-            catalog = json.dumps({
-                "links": {
-                    "http://opds-spec.org/auth/document": {
-                        "href": "http://circmanager.org/auth"
-                    }
-                }
-            })
-            http_client.queue_response(200, content=catalog, media_type=opds2_type)
-
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(200, response.status_code)
-            eq_("My catalog links to the auth document", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/auth"], http_client.requests[5:])
-
-            auth_document = {
-                "id": "http://circmanager.org/auth/",
-                "name": "A Library",
-                "service_description": "My feed links to the shelf, which requires auth",
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
-            http_client.queue_response(200, content=feed, media_type=opds1_type)
-
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(200, response.status_code)
-            eq_("My feed links to the shelf, which requires auth", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf"], http_client.requests[7:])
-            
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_description": "My feed links to a shelf which links to the auth document",
-            }
-            http_client.queue_response(200, content=json.dumps(auth_document))
-            shelf_feed = '<feed><link rel="http://opds-spec.org/auth/document" href="http://circmanager.org/auth"/></feed>'
-            http_client.queue_response(200, content=shelf_feed, media_type=opds1_type)
-            feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
-            http_client.queue_response(200, content=feed, media_type=opds1_type)
-
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(200, response.status_code)
-            eq_("My feed links to a shelf which links to the auth document", library.description)
-            eq_(["http://circmanager.org", "http://circmanager.org/shelf", "http://circmanager.org/auth"], http_client.requests[9:])
-
-            # The request did not include the old secret, so the secret wasn't changed.
-            eq_(old_secret, library.shared_secret)
-
-        # If we include the old secret in a request, the registry will generate a new secret.
+        # If we include the old secret in a request, the registry will
+        # generate a new secret.
         with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}):
             flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org"),
+                ("url", "http://circmanager.org/authentication.opds"),
             ])
 
             key = RSA.generate(1024)
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_description": "Description",
-                "links": [
-                    {"rel": "alternate", "href": "http://alibrary.org", "type": "text/html" },
-                    {"rel": "logo", "href": "data:image/png;imagedata" },
-                ],
-                "public_key": {
-                    "type": "RSA",
-                    "value": key.publickey().exportKey(),
-                 }
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
+            auth_document = self._auth_document(key)
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
 
-            response = self.controller.register(do_get=http_client.do_get)
+            response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(200, response.status_code)
             catalog = json.loads(response.data)
@@ -485,159 +569,16 @@ class TestLibraryRegistryController(ControllerTest):
         # If we include an incorrect secret in the request, the secret stays the same.
         with self.app.test_request_context("/", headers={"Authorization": "Bearer notthesecret"}):
             flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org"),
+                ("url", "http://circmanager.org/authentication.opds"),
             ])
 
             key = RSA.generate(1024)
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_description": "Description",
-                "links": [
-                    {"rel": "alternate", "href": "http://alibrary.org", "type": "text/html" },
-                    {"rel": "logo", "href": "data:image/png;imagedata" },
-                ],
-                "public_key": {
-                    "type": "RSA",
-                    "value": key.publickey().exportKey(),
-                 }
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
+            auth_document = self._auth_document(key)
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
 
-            response = self.controller.register(do_get=http_client.do_get)
+            response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(200, response.status_code)
             eq_(old_secret, library.shared_secret)
-
-    def test_register_errors(self):
-
-        opds1_type = "application/atom+xml;profile=opds-catalog;kind=acquisition"
-        opds2_type = "application/opds+json"
-
-        http_client = DummyHTTPClient()
-        with self.app.test_request_context("/"):
-            response = self.controller.register(do_get=http_client.do_get)
-
-            eq_(NO_OPDS_URL, response)
-
-        with self.app.test_request_context("/"):
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org"),
-            ])
-
-            # This feed doesn't work.
-            http_client.queue_response(500)
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_OPDS_FEED, response)
-
-            # This feed claims to be OPDS 2 but isn't valid JSON.
-            http_client.queue_response(200, content="not json", media_type=opds2_type)
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_OPDS_FEED, response)
-
-            # This feed doesn't link to the auth document or the shelf.
-            opds_feed = '<feed></feed>'
-            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
-
-            # This feed links to the auth document, but that link is broken.
-            opds_feed = '<feed><link rel="http://opds-spec.org/auth/document" href="broken"/></feed>'
-            http_client.queue_response(404)
-            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
-
-            # This feed links to the shelf, but it doesn't require auth and it
-            # doesn't link to the auth document.
-            shelf_feed = '<feed></feed>'
-            opds_feed = '<feed><link rel="http://opds-spec.org/shelf" href="http://circmanager.org/shelf"/></feed>'
-            http_client.queue_response(200, content=shelf_feed, media_type=opds1_type)
-            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
-
-            # This feed has an auth document that's not valid.
-            http_client.queue_response(401, content="not json")
-            opds_feed = '<feed><link href="http://circmanager.org/shelf" rel="http://opds-spec.org/shelf"/></feed>'
-            http_client.queue_response(200, content=opds_feed, media_type=opds1_type)
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT, response)
-
-            # This feed is missing an id.
-            auth_document = {
-                "title": "A Library",
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-
-            # This feed is missing a title.
-            auth_document = {
-                "id": "http://circmanager.org",
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-
-            # This feed's id doesn't match the request url.
-            auth_document = {
-                "id": "http://example.org",
-                "title": "A Library",
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-
-            # This feed links to a broken logo image.
-            http_client.queue_response(500)
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "links": [
-                    {"rel": "logo", "href": "http://example.com/logo.png", "type": "image/png" },
-                ],
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-
-
-    def test_register_errors_unknown_service_area(self):
-        http_client = DummyHTTPClient()
-        with self.app.test_request_context("/"):
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org"),
-            ])
-
-            # This feed has an unknown service area.
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_area": {"US": ["Somewhere"]},
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-            eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
-
-    def test_register_errors_ambiguous_service_area(self):
-        http_client = DummyHTTPClient()
-        with self.app.test_request_context("/"):
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org"),
-            ])
-
-            # This feed has an ambiguous service area.
-            auth_document = {
-                "id": "http://circmanager.org",
-                "name": "A Library",
-                "service_area": {"US": ["Manhattan"]},
-            }
-            http_client.queue_response(401, content=json.dumps(auth_document))
-            response = self.controller.register(do_get=http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
-            eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
-
 
 
