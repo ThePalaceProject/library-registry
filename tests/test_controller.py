@@ -20,6 +20,7 @@ from Crypto.Cipher import PKCS1_OAEP
 from . import DatabaseTest
 from testing import DummyHTTPClient
 
+from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
 from model import (
   get_one,
@@ -30,7 +31,7 @@ from model import (
 from util.http import RequestTimedOut
 from problem_details import *
 from config import Configuration
-
+from testing import DummyHTTPResponse
 
 class TestLibraryRegistry(LibraryRegistry):
     pass
@@ -471,7 +472,7 @@ class TestLibraryRegistryController(ControllerTest):
         # The start link returns a 200 response code and the right
         # Content-Type, but there is no Link header and the body is no
         # help.
-        self.http_client.queue_response(200, OPDSCatalog.OPDS_TYPE)
+        self.http_client.queue_response(200, OPDSCatalog.OPDS_TYPE, content='{}')
         with self.app.test_request_context("/"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -705,4 +706,76 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(200, response.status_code)
             eq_(old_secret, library.shared_secret)
 
+    def test_opds_response_links(self):
+        """Test the opds_response_links method.
 
+        This method is used to find the link back from the OPDS document to
+        the Authentication For OPDS document.
+
+        It checks the Link header and the body of an OPDS 1 or OPDS 2
+        document.
+        """
+        auth_url = "http://circmanager.org/auth"
+        rel = AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
+
+        # An OPDS 1 feed that has a link.
+        has_link_feed = '<feed><link rel="%s" href="%s"/></feed>' % (
+            rel, auth_url
+        )
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, has_link_feed
+        )
+        eq_([auth_url], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+
+        # The same feed, but with an additional link in the
+        # Link header. Both links are returned.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE},
+            has_link_feed, links={rel: {'url': "http://another-auth-document",
+                                        'rel': rel}}
+        )
+        eq_(set([auth_url, "http://another-auth-document"]),
+            set(LibraryRegistryController.opds_response_links(response, rel))
+        )
+
+        # A similar feed, but with a relative URL, which is made absolute
+        # by opds_response_links.
+        relative_url_feed = '<feed><link rel="%s" href="auth-document"/></feed>' % (
+            rel
+        )
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, relative_url_feed
+        )
+        response.url = "http://opds-server/catalog.opds"
+        eq_(["http://opds-server/auth-document"],
+            LibraryRegistryController.opds_response_links(response, rel)
+        )
+
+
+        # An OPDS 1 feed that has no link.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, "<feed></feed>"
+        )
+        eq_([], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+
+        # An OPDS 2 feed that has a link.
+        catalog = json.dumps({"links": {rel: { "href": auth_url }}})
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog
+        )
+        eq_([auth_url], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+
+        # An OPDS 2 feed that has no link.
+        catalog = json.dumps({"links": {}})
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog
+        )
+        eq_([], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))

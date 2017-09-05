@@ -193,6 +193,32 @@ class LibraryRegistryController(object):
             )
             return Response(body, 200, headers)
 
+    @classmethod
+    def opds_response_links(cls, response, rel):
+        """Find all the links in the given response for the given 
+        link relation.
+        """
+        # Look in the response itself for a Link header.
+        links = []
+        link = response.links.get(rel)
+        if link:
+            links.append(link.get('url'))
+        media_type = response.headers.get('Content-Type')
+        if media_type == OPDSCatalog.OPDS_TYPE:
+            # Parse as OPDS 2.
+            catalog = json.loads(response.content)
+            links = []
+            for k,v in catalog.get("links", {}).iteritems():
+                if k == rel:
+                    links.append(v.get("href"))
+        elif media_type == OPDSCatalog.OPDS_1_TYPE:
+            # Parse as OPDS 1.
+            feed = feedparser.parse(response.content)
+            for link in feed.get("feed", {}).get("links", []):
+                if link.get('rel') == rel:
+                    links.append(link.get('href'))
+        return [urljoin(response.url, url) for url in links if url]
+
     def opds_response_links_to_auth_document(self, opds_response, auth_url):
         """Verify that the given response links to the given URL as its
         Authentication For OPDS document.
@@ -200,23 +226,15 @@ class LibraryRegistryController(object):
         The link might happen in the `Link` header or in the body of
         an OPDS feed.
         """
-        links = opds_response.links
-        link = links.get(AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL)
-        if link and link.get('url') == auth_url:
-            return True
-
-        # That didn't work, but maybe we can parse the OPDS feed and
-        media_type = opds_response.headers.get("Content-Type")
-        if media_type == OPDSCatalog.OPDS_TYPE:
-            # Parse as OPDS 2.
-            pass
-        elif media_type == OPDSCatalog.OPDS_1_TYPE:
-            # Parse as OPDS 1.
-            pass
-        else:
-            # This method shouldn't have been called.
+        links = []
+        try:
+            links = self.opds_response_links(
+                opds_response, AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
+            )
+        except ValueError, e:
+            # The response itself is malformed.
             return False
-        return False
+        return auth_url in links
 
     def register(self, do_get=HTTP.get_with_timeout):
         auth_url = flask.request.form.get("url")
