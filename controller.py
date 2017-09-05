@@ -207,33 +207,27 @@ class LibraryRegistryController(object):
                 # We only allowed 404 above so that we could return a more
                 # specific problem detail document if it happened.
                 if response.status_code == 404:
-                    return on_404
+                    return INTEGRATION_DOCUMENT_NOT_FOUND.detailed(on_404)
             except RequestTimedOut, e:
                 logging.error(
                     "Registration of %s failed: timeout retrieving %s", 
                     auth_url, url, exc_info=e
                 )
-                return on_timeout
+                return TIMEOUT.detailed(on_timeout)
             except Exception, e:
                 logging.error(
                     "Registration of %s failed: error retrieving %s",
                     auth_url, url, exc_info=e
                 )
-                return on_exception
+                return ERROR_RETRIEVING_DOCUMENT.detailed(on_exception)
             return response
 
         auth_response = _make_request(
             auth_url, 
-            INTEGRATION_DOCUMENT_NOT_FOUND.detailed(
-                _("No Authentication For OPDS document present at %(url)s", 
-                  url=auth_url)
-            ),
-            TIMEOUT.detailed(
-                _("Timeout retrieving auth document %(url)s", url=auth_url)
-            ),
-            ERROR_RETRIEVING_DOCUMENT.detailed(
-                _("Error retrieving auth document %(url)s", url=auth_url)
-            )
+            _("No Authentication For OPDS document present at %(url)s", 
+              url=auth_url),
+            _("Timeout retrieving auth document %(url)s", url=auth_url),
+            _("Error retrieving auth document %(url)s", url=auth_url),
         )
         if isinstance(auth_response, ProblemDetail):
             return auth_response
@@ -266,15 +260,9 @@ class LibraryRegistryController(object):
         # authentication document.
         # opds_response = _make_request(
         #     opds_url, 
-        #     INTEGRATION_DOCUMENT_NOT_FOUND.detailed(
-        #         _("No OPDS document present at the root URL %s" % opds_url)
-        #     ),
-        #     TIMEOUT.detailed(
-        #         _("Timeout retrieving OPDS root document %s" % opds_url)
-        #     ),
-        #     ERROR_RETRIEVING_DOCUMENT.detailed(
-        #         _("Error retrieving OPDS root document %s" % opds_url)
-        #     )
+        #     _("No OPDS document present at the root URL %s" % opds_url),
+        #     _("Timeout retrieving OPDS root document %s" % opds_url),
+        #     _("Error retrieving OPDS root document %s" % opds_url)
         # )
             
         library, is_new = get_one_or_create(
