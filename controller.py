@@ -219,7 +219,8 @@ class LibraryRegistryController(object):
                     links.append(link.get('href'))
         return [urljoin(response.url, url) for url in links if url]
 
-    def opds_response_links_to_auth_document(self, opds_response, auth_url):
+    @classmethod
+    def opds_response_links_to_auth_document(cls, opds_response, auth_url):
         """Verify that the given response links to the given URL as its
         Authentication For OPDS document.
         
@@ -228,7 +229,7 @@ class LibraryRegistryController(object):
         """
         links = []
         try:
-            links = self.opds_response_links(
+            links = cls.opds_response_links(
                 opds_response, AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
             )
         except ValueError, e:

@@ -714,6 +714,10 @@ class TestLibraryRegistryController(ControllerTest):
 
         It checks the Link header and the body of an OPDS 1 or OPDS 2
         document.
+
+        This test also tests the related
+        opds_response_links_to_auth_document, which checks whether a
+        particular URL is found in the list of links.
         """
         auth_url = "http://circmanager.org/auth"
         rel = AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
@@ -728,6 +732,16 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([auth_url], LibraryRegistryController.opds_response_links(
             response, rel
         ))
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, "Some other URL"
+            )
+        )
 
         # The same feed, but with an additional link in the
         # Link header. Both links are returned.
@@ -738,6 +752,11 @@ class TestLibraryRegistryController(ControllerTest):
         )
         eq_(set([auth_url, "http://another-auth-document"]),
             set(LibraryRegistryController.opds_response_links(response, rel))
+        )
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
         )
 
         # A similar feed, but with a relative URL, which is made absolute
@@ -752,7 +771,11 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(["http://opds-server/auth-document"],
             LibraryRegistryController.opds_response_links(response, rel)
         )
-
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, "http://opds-server/auth-document"
+            )
+        )
 
         # An OPDS 1 feed that has no link.
         response = DummyHTTPResponse(
@@ -761,6 +784,11 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([], LibraryRegistryController.opds_response_links(
             response, rel
         ))
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
 
         # An OPDS 2 feed that has a link.
         catalog = json.dumps({"links": {rel: { "href": auth_url }}})
@@ -770,6 +798,11 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([auth_url], LibraryRegistryController.opds_response_links(
             response, rel
         ))
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
 
         # An OPDS 2 feed that has no link.
         catalog = json.dumps({"links": {}})
@@ -779,3 +812,18 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([], LibraryRegistryController.opds_response_links(
             response, rel
         ))
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # A malformed feed.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, "Not a real feed"
+        )
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
