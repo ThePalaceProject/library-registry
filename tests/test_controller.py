@@ -259,6 +259,23 @@ class TestLibraryRegistryController(ControllerTest):
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])
 
+    def queue_opds_success(
+            self, auth_url="http://circmanager.org/authentication.opds",
+            media_type=None
+    ):
+        """The next HTTP request made by the registry will appear to retrieve
+        a functional OPDS feed that links to `auth_url` as its
+        Authentication For OPDS document.
+        """
+        media_type = media_type or OPDSCatalog.OPDS_1_TYPE
+        self.http_client.queue_response(
+            200,
+            media_type,
+            {
+                "Link": "<%s>; rel=http://opds-spec.org/auth/document" % auth_url
+            }
+        )
+
     def _auth_document(self, key=None):
         auth_document = {
             "id": "http://circmanager.org/authentication.opds",
@@ -403,7 +420,7 @@ class TestLibraryRegistryController(ControllerTest):
         self.http_client.queue_response(200, content=json.dumps(auth_document))
 
         # OPDS feed request succeeds.
-        self.http_client.queue_response(200)
+        self.queue_opds_success()
 
         # Image request fails.
         self.http_client.queue_response(500)
@@ -424,7 +441,7 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Somewhere"]}
             self.http_client.queue_response(200, content=json.dumps(auth_document))
-            self.http_client.queue_response(200)
+            self.queue_opds_success()
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
             eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
@@ -435,7 +452,7 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Manhattan"]}
             self.http_client.queue_response(200, content=json.dumps(auth_document))
-            self.http_client.queue_response(200)
+            self.queue_opds_success()
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
             eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
@@ -526,7 +543,7 @@ class TestLibraryRegistryController(ControllerTest):
             "service_area": { "US": "Connecticut" },
         }
         self.http_client.queue_response(200, content=json.dumps(auth_document))
-        self.http_client.queue_response(200)
+        self.queue_opds_success()
 
         # We have a new logo as well.
         image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
@@ -585,7 +602,7 @@ class TestLibraryRegistryController(ControllerTest):
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
             self.http_client.queue_response(200, content=json.dumps(auth_document))
-            self.http_client.queue_response(200)
+            self.queue_opds_success()
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(200, response.status_code)
@@ -610,7 +627,7 @@ class TestLibraryRegistryController(ControllerTest):
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
             self.http_client.queue_response(200, content=json.dumps(auth_document))
-            self.http_client.queue_response(200)
+            self.queue_opds_success()
 
             response = self.controller.register(do_get=self.http_client.do_get)
 
