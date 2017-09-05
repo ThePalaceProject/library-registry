@@ -270,7 +270,7 @@ class LibraryRegistryController(object):
                 image_url = auth_document.logo_link.get("href")
                 logging.error(
                     "Registration of %s failed: could not read logo image %s",
-                    opds_url, image_url
+                    auth_url, image_url
                 )
                 return INVALID_AUTH_DOCUMENT.detailed(
                     _("Could not read logo image %(image_url)s", image_url=image_url)
@@ -288,7 +288,7 @@ class LibraryRegistryController(object):
         if problem:
             logging.error(
                 "Registration of %s failed: problem during registration: %r",
-                opds_url, problem
+                auth_url, problem
             )
             return problem
                     
