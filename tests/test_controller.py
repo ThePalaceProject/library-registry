@@ -320,7 +320,7 @@ class TestLibraryRegistryController(ControllerTest):
                 RequestTimedOut("http://url", "sorry")
             )
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(AUTH_DOCUMENT_TIMEOUT.uri, response.uri)
+            eq_(TIMEOUT.uri, response.uri)
             eq_('Timeout retrieving auth document http://circmanager.org/authentication.opds', response.detail)
 
     def test_register_fails_on_non_200_code(self):
@@ -406,6 +406,47 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
             eq_("The OPDS authentication document is missing a 'start' link to the root OPDS feed.",
                 response.detail)
+
+    def test_register_fails_on_start_link_not_found(self):
+        """The request returns an authentication document but an attempt
+        to retrieve the corresponding OPDS feed yields a 404.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(404)
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INTEGRATION_DOCUMENT_NOT_FOUND.uri, response.uri)
+            eq_("No OPDS root document present at http://circmanager.org/feed/",
+                response.detail)
+
+    def test_register_fails_on_start_link_timeout(self):
+        """The request returns an authentication document but an attempt
+        to retrieve the corresponding OPDS feed times out.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(RequestTimedOut("http://url", "sorry"))
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(TIMEOUT.uri, response.uri)
+            eq_("Timeout retrieving OPDS root document at http://circmanager.org/feed/", 
+                response.detail)
+
+    def test_register_fails_on_start_link_error(self):
+        """The request returns an authentication document but an attempt
+        to retrieve the corresponding OPDS feed gives a server-side error.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(500)
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(ERROR_RETRIEVING_DOCUMENT.uri, response.uri)
+            eq_("Error retrieving OPDS root document at http://circmanager.org/feed/", response.detail)
 
     def test_register_fails_on_broken_logo_link(self):
         """The request returns a valid authentication document
