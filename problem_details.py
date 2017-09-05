@@ -28,14 +28,6 @@ INTEGRATION_DOCUMENT_NOT_FOUND = pd(
     title=_("Document not found"),
 )
 
-AUTH_DOCUMENT_TIMEOUT = pd(
-      "http://librarysimplified.org/terms/problem/timeout",
-      408,
-      _("Request timed out"),
-      _("Attempt to retrieve the OPDS root feed timed out."),
-)
-
-
 ERROR_RETRIEVING_DOCUMENT = pd(
     "http://librarysimplified.org/terms/problem/remote-integration-failed",
     502,
