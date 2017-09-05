@@ -320,7 +320,7 @@ class DummyHTTPClient(object):
         if other_headers:
             for k, v in other_headers.items():
                 headers[k.lower()] = v
-        self.responses.append(DummyHTTPResponse(response_code, headers, content))
+        self.responses.insert(0, DummyHTTPResponse(response_code, headers, content))
 
     def do_get(self, url, headers=None, allowed_response_codes=None, **kwargs):
         self.requests.append(url)

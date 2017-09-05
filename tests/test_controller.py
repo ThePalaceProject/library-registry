@@ -394,13 +394,20 @@ class TestLibraryRegistryController(ControllerTest):
         """The request returns a valid authentication document
         that links to a broken logo image.
         """
-        self.http_client.queue_response(500)
         auth_document = self._auth_document()
         for link in auth_document['links']:
             if link['rel'] == 'logo':
                 link['href'] = "http://example.com/broken-logo.png"
                 break
+        # Auth document request succeeds.
         self.http_client.queue_response(200, content=json.dumps(auth_document))
+
+        # OPDS feed request succeeds.
+        self.http_client.queue_response(200)
+
+        # Image request fails.
+        self.http_client.queue_response(500)
+
         with self.app.test_request_context("/"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -417,6 +424,7 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Somewhere"]}
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(200)
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
             eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
@@ -427,6 +435,7 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Manhattan"]}
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(200)
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
             eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
@@ -438,6 +447,7 @@ class TestLibraryRegistryController(ControllerTest):
         key = RSA.generate(1024)
         auth_document = self._auth_document(key)
         self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(200, content="I am the OPDS root and I link to the auth document.")
 
         auth_url = "http://circmanager.org/authentication.opds"
         opds_url = "http://circmanager.org/feed/"
@@ -470,8 +480,13 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(self.kansas_state.id, service_area.place_id)
 
             # To get this information, a request was made to the
-            # circulation manager's Authentication For OPDS feed.
-            eq_(["http://circmanager.org/authentication.opds"], 
+            # circulation manager's Authentication For OPDS document.
+            # A follow-up request was made to the feed mentioned in that
+            # document.
+            #
+            eq_(["http://circmanager.org/authentication.opds",
+                 "http://circmanager.org/feed/"
+            ], 
                 self.http_client.requests)
 
             # And the document we queued up was fed into the library
@@ -500,8 +515,6 @@ class TestLibraryRegistryController(ControllerTest):
         library.stage = Library.LIVE
 
         # Later, the library's information changes.
-        image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
-        self.http_client.queue_response(200, content=image_data, media_type="image/png")
         auth_document = {
             "id": auth_url,
             "name": "A Library",
@@ -513,6 +526,12 @@ class TestLibraryRegistryController(ControllerTest):
             "service_area": { "US": "Connecticut" },
         }
         self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(200)
+
+        # We have a new logo as well.
+        image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
+        self.http_client.queue_response(200, content=image_data, media_type="image/png")
+
 
         # So the library re-registers itself, and gets an updated
         # registry entry.
@@ -548,9 +567,11 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(self.connecticut_state.id, service_area.place_id)
 
             # In addition to making the request to get the
-            # Authentication For OPDS document, the registry made a
+            # Authentication For OPDS document, and the request to 
+            # get the root OPDS feed, the registry made a
             # follow-up request to download the library's logo.
             eq_(["http://circmanager.org/authentication.opds", 
+                 "http://circmanager.org/feed/",
                  "http://circmanager.org/logo.png"], self.http_client.requests)
 
 
@@ -564,9 +585,9 @@ class TestLibraryRegistryController(ControllerTest):
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(200)
 
             response = self.controller.register(do_get=self.http_client.do_get)
-
             eq_(200, response.status_code)
             catalog = json.loads(response.data)
 
@@ -589,6 +610,7 @@ class TestLibraryRegistryController(ControllerTest):
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(200)
 
             response = self.controller.register(do_get=self.http_client.do_get)
 

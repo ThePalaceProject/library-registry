@@ -258,13 +258,15 @@ class LibraryRegistryController(object):
 
         # Cross-check the opds_url to make sure it links back to the
         # authentication document.
-        # opds_response = _make_request(
-        #     opds_url, 
-        #     _("No OPDS document present at the root URL %s" % opds_url),
-        #     _("Timeout retrieving OPDS root document %s" % opds_url),
-        #     _("Error retrieving OPDS root document %s" % opds_url)
-        # )
-            
+        opds_response = _make_request(
+            opds_url, 
+            _("No OPDS root document present at %s" % opds_url),
+            _("Timeout retrieving OPDS root document at %s" % opds_url),
+            _("Error retrieving OPDS root document at %s" % opds_url)
+        )
+        if isinstance(opds_response, ProblemDetail):
+            return opds_response
+
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url,
