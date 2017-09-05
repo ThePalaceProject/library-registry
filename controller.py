@@ -312,7 +312,7 @@ class LibraryRegistryController(object):
             return opds_response
 
         content_type = opds_response.headers.get('Content-Type')
-        falure_detail = None
+        failure_detail = None
         if content_type not in (OPDSCatalog.OPDS_TYPE,
                                 OPDSCatalog.OPDS_1_TYPE):
             failure_detail = _("Supposed root document at %(url)s is not an OPDS document", url=opds_url)

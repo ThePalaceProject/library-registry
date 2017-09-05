@@ -272,9 +272,7 @@ class TestLibraryRegistryController(ControllerTest):
         self.http_client.queue_response(
             200,
             media_type,
-            {
-                "Link": "<%s>; rel=http://opds-spec.org/auth/document" % auth_url
-            }
+            links = {AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL: {'url': auth_url, 'rel': AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL}}
         )
 
     def _auth_document(self, key=None):
