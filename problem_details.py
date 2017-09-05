@@ -8,11 +8,10 @@ NO_AUTH_URL = pd(
       _("You must provide the URL to an Authentication For OPDS document to register a library."),
 )
 
-INVALID_AUTH_DOCUMENT = pd(
-      "http://librarysimplified.org/terms/problem/invalid-opds-auth-document",
+INVALID_INTEGRATION_DOCUMENT = pd(
+      "http://librarysimplified.org/terms/problem/invalid-integration-document",
       400,
-      _("Invalid Authentication For OPDS document"),
-      _("The submitted URL did not return a valid Authentication For OPDS document."),
+      _("Invalid Integration document"),
 )
 
 TIMEOUT = pd(
