@@ -304,7 +304,7 @@ class TestLibraryRegistryController(ControllerTest):
             )
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(AUTH_DOCUMENT_TIMEOUT.uri, response.uri)
-            eq_('Attempt to retrieve an Authentication For OPDS document timed out.', response.detail)
+            eq_('Timeout retrieving auth document http://circmanager.org/authentication.opds', response.detail)
 
     def test_register_fails_on_non_200_code(self):
         """If the URL provided results in a status code other than
@@ -316,19 +316,22 @@ class TestLibraryRegistryController(ControllerTest):
             # This server isn't working.
             self.http_client.queue_response(500)
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(ERROR_RETRIEVING_AUTH_DOCUMENT, response)
+            eq_(ERROR_RETRIEVING_DOCUMENT.uri, response.uri)
+            eq_("Error retrieving auth document http://circmanager.org/authentication.opds", response.detail)
 
             # This server incorrectly requires authentication to
             # access the authentication document.
             self.http_client.queue_response(401)
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(ERROR_RETRIEVING_AUTH_DOCUMENT, response)
+            eq_(ERROR_RETRIEVING_DOCUMENT.uri, response.uri)
+            eq_("Error retrieving auth document http://circmanager.org/authentication.opds", response.detail)
 
             # This server doesn't have an authentication document
             # at the specified URL.
             self.http_client.queue_response(404)
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
+            eq_(INTEGRATION_DOCUMENT_NOT_FOUND.uri, response.uri)
+            eq_('No Authentication For OPDS document present at http://circmanager.org/authentication.opds', response.detail)
         
     def test_register_fails_on_non_authentication_document(self):
         """The request succeeds but returns something other than

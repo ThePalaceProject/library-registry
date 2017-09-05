@@ -15,7 +15,7 @@ INVALID_AUTH_DOCUMENT = pd(
       _("The submitted URL did not return a valid Authentication For OPDS document."),
 )
 
-AUTH_DOCUMENT_TIMEOUT = pd(
+TIMEOUT = pd(
       "http://librarysimplified.org/terms/problem/timeout",
       408,
       _("Request timed out"),
@@ -23,17 +23,24 @@ AUTH_DOCUMENT_TIMEOUT = pd(
 )
 
 
-AUTH_DOCUMENT_NOT_FOUND = pd(
-    "http://librarysimplified.org/terms/problem/auth-document-not-found",
+INTEGRATION_DOCUMENT_NOT_FOUND = pd(
+    "http://librarysimplified.org/terms/problem/integration-document-not-found",
     400,
-    title=_("Authentication document not found"),
-    detail=_("No OPDS authentication document was present at the specified URL."),
+    title=_("Document not found"),
 )
 
-ERROR_RETRIEVING_AUTH_DOCUMENT = pd(
+AUTH_DOCUMENT_TIMEOUT = pd(
+      "http://librarysimplified.org/terms/problem/timeout",
+      408,
+      _("Request timed out"),
+      _("Attempt to retrieve the OPDS root feed timed out."),
+)
+
+
+ERROR_RETRIEVING_DOCUMENT = pd(
     "http://librarysimplified.org/terms/problem/remote-integration-failed",
     502,
-    title=_("Could not retrieve authentication document"),
-    detail=_("I couldn't retrieve an authentication document from the specified URL."),
+    title=_("Could not retrieve document"),
+    detail=_("I couldn't retrieve the specified URL."),
 )
 

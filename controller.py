@@ -44,6 +44,7 @@ from util.http import (
     HTTP,
     RequestTimedOut,
 )
+from util.problem_detail import ProblemDetail
 from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
@@ -197,28 +198,45 @@ class LibraryRegistryController(object):
         if not auth_url:
             return NO_AUTH_URL
 
-        try:
-            auth_response = do_get(
-                auth_url, allowed_response_codes=["2xx", "3xx", 404],
-                timeout=30
-            )
-            # We only allowed 404 above so that we could return a more
-            # specific problem detail document if it happened.
-            if auth_response.status_code == 404:
-                return AUTH_DOCUMENT_NOT_FOUND
-        except RequestTimedOut, e:
-            logging.error(
-                "Registration of %s failed: timed out retrieving authentication document",
-                auth_url, exc_info=e
-            )
-            return AUTH_DOCUMENT_TIMEOUT
-        except Exception, e:
-            logging.error(
-                "Registration of %s failed: error retrieving authentication document", 
-                exc_info=e
-            )
-            return ERROR_RETRIEVING_AUTH_DOCUMENT
+        def _make_request(url, on_404, on_timeout, on_exception):
+            try:
+                response = do_get(
+                    url, allowed_response_codes=["2xx", "3xx", 404],
+                    timeout=30
+                )
+                # We only allowed 404 above so that we could return a more
+                # specific problem detail document if it happened.
+                if response.status_code == 404:
+                    return on_404
+            except RequestTimedOut, e:
+                logging.error(
+                    "Registration of %s failed: timeout retrieving %s", 
+                    auth_url, url, exc_info=e
+                )
+                return on_timeout
+            except Exception, e:
+                logging.error(
+                    "Registration of %s failed: error retrieving %s",
+                    auth_url, url, exc_info=e
+                )
+                return on_exception
+            return response
 
+        auth_response = _make_request(
+            auth_url, 
+            INTEGRATION_DOCUMENT_NOT_FOUND.detailed(
+                _("No Authentication For OPDS document present at %(url)s", 
+                  url=auth_url)
+            ),
+            TIMEOUT.detailed(
+                _("Timeout retrieving auth document %(url)s", url=auth_url)
+            ),
+            ERROR_RETRIEVING_DOCUMENT.detailed(
+                _("Error retrieving auth document %(url)s", url=auth_url)
+            )
+        )
+        if isinstance(auth_response, ProblemDetail):
+            return auth_response
         try:
             auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception, e:
@@ -244,6 +262,21 @@ class LibraryRegistryController(object):
             )
             return INVALID_AUTH_DOCUMENT.detailed(failure_detail)
 
+        # Cross-check the opds_url to make sure it links back to the
+        # authentication document.
+        # opds_response = _make_request(
+        #     opds_url, 
+        #     INTEGRATION_DOCUMENT_NOT_FOUND.detailed(
+        #         _("No OPDS document present at the root URL %s" % opds_url)
+        #     ),
+        #     TIMEOUT.detailed(
+        #         _("Timeout retrieving OPDS root document %s" % opds_url)
+        #     ),
+        #     ERROR_RETRIEVING_DOCUMENT.detailed(
+        #         _("Error retrieving OPDS root document %s" % opds_url)
+        #     )
+        # )
+            
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url,
