@@ -40,7 +40,10 @@ from util.app_server import (
     HeartbeatController,
     catalog_response,
 )
-from util.http import HTTP
+from util.http import (
+    HTTP,
+    RequestTimedOut,
+)
 from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
@@ -190,100 +193,62 @@ class LibraryRegistryController(object):
             return Response(body, 200, headers)
 
     def register(self, do_get=HTTP.get_with_timeout):
-        opds_url = flask.request.form.get("url")
-        if not opds_url:
-            return NO_OPDS_URL
+        auth_url = flask.request.form.get("url")
+        if not auth_url:
+            return NO_AUTH_URL
 
-        AUTH_DOCUMENT_REL = "http://opds-spec.org/auth/document"
-        SHELF_REL = "http://opds-spec.org/shelf"
-
-        auth_response = None
-        def get_opds_links(response):
-            type = response.headers.get("Content-Type")
-            if type == "application/opds+json":
-                # This is an OPDS 2 catalog.
-                catalog = json.loads(response.content)
-                links = []
-                for k,v in catalog.get("links", {}).iteritems():
-                    links.append(dict(rel=k, href=v.get("href")))
-                return links
-                
-            elif type and type.startswith("application/atom+xml;profile=opds-catalog"):
-                # This is an OPDS 1 feed.
-                feed = feedparser.parse(response.content)
-                return feed.get("feed", {}).get("links", [])
-            return []
-
-        links = []
         try:
-            response = do_get(opds_url, allowed_response_codes=["2xx", "3xx", 401])
-            if response.status_code == 401:
-                # The OPDS feed requires authentication, so this response
-                # should contain the auth document.
-                auth_response = response
-            else:
-                links = get_opds_links(response)
+            auth_response = do_get(
+                auth_url, allowed_response_codes=["2xx", "3xx", 404],
+                timeout=30
+            )
+            # We only allowed 404 above so that we could return a more
+            # specific problem detail document if it happened.
+            if auth_response.status_code == 404:
+                return AUTH_DOCUMENT_NOT_FOUND
+        except RequestTimedOut, e:
+            logging.error(
+                "Registration of %s failed: timed out retrieving authentication document",
+                auth_url, exc_info=e
+            )
+            return AUTH_DOCUMENT_TIMEOUT
         except Exception, e:
-            return INVALID_OPDS_FEED
-
-        def find_and_get_url(links, rel, allowed_response_codes=None):
-            for link in links:
-                if link.get("rel") == rel:
-                    url = link.get("href")
-                    if url:
-                        # Expand relative urls.
-                        url = urljoin(opds_url, url)
-                    try:
-                        return do_get(url, allowed_response_codes=allowed_response_codes)
-                    except Exception, e:
-                        pass
-            return None
-
-        if auth_response is None:
-            # The feed didn't require authentication, so we'll need to find
-            # the auth document.
-
-            # First, look for a link to the auth document.
-            auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
-                                             allowed_response_codes=["2xx", "3xx"])
-
-        if auth_response is None:
-            # There was no link to the auth document, but maybe there's a shelf
-            # link that requires authentication or links to the document.
-            response = find_and_get_url(links, SHELF_REL,
-                                        allowed_response_codes=["2xx", "3xx", 401])
-            if response is not None:
-                if response.status_code == 401:
-                    # This response should have the auth document.
-                    auth_response = response
-                else:
-                    # This response didn't require authentication, so maybe it's a feed
-                    # that links to the auth document.
-                    links = get_opds_links(response)
-                    auth_response = find_and_get_url(links, AUTH_DOCUMENT_REL,
-                                                     allowed_response_codes=["2xx", "3xx"])
-
-        if auth_response is None:
-            return AUTH_DOCUMENT_NOT_FOUND
+            logging.error(
+                "Registration of %s failed: error retrieving authentication document", 
+                exc_info=e
+            )
+            return ERROR_RETRIEVING_AUTH_DOCUMENT
 
         try:
             auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception, e:
+            logging.error(
+                "Registration of %s failed: invalid auth document.",
+                auth_url, exc_info=e
+            )
             return INVALID_AUTH_DOCUMENT
-
+        failure_detail = None
         if not auth_document.id:
-            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document is missing an id."))
+            failure_detail = _("The OPDS authentication document is missing an id.")
         if not auth_document.title:
-            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document is missing a title."))
-        if auth_document.id != opds_url:
-            return INVALID_AUTH_DOCUMENT.detailed(_("The OPDS authentication document's id doesn't match the submitted url."))
+            failure_detail = _("The OPDS authentication document is missing a title.")
+        if auth_document.root:
+            opds_url = auth_document.root['href']
+        else:
+            failure_detail = _("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
+        if auth_document.id != auth_response.url:
+            failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.url)
+        if failure_detail:
+            logging.error(
+                "Registration of %s failed: %s", auth_url, failure_detail
+            )
+            return INVALID_AUTH_DOCUMENT.detailed(failure_detail)
 
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url,
             create_method_kwargs=dict(stage=Library.REGISTERED)
         )
-
         if auth_document.website:
             url = auth_document.website.get("href")
             if url:
@@ -302,7 +267,14 @@ class LibraryRegistryController(object):
             try:
                 image = Image.open(logo_response.raw)
             except Exception, e:
-                return INVALID_AUTH_DOCUMENT.detailed(_("Could not read logo image %(image_url)s", image_url=auth_document.logo_link.get("href")))
+                image_url = auth_document.logo_link.get("href")
+                logging.error(
+                    "Registration of %s failed: could not read logo image %s",
+                    auth_url, image_url
+                )
+                return INVALID_AUTH_DOCUMENT.detailed(
+                    _("Could not read logo image %(image_url)s", image_url=image_url)
+                )
             # Convert to PNG.
             buffer = StringIO()
             image.save(buffer, format="PNG")
@@ -312,9 +284,12 @@ class LibraryRegistryController(object):
                 library.logo = "data:%s;base64,%s" % (type, b64)
         else:
             library.logo = None
-
         problem = auth_document.update_library(library)
         if problem:
+            logging.error(
+                "Registration of %s failed: problem during registration: %r",
+                auth_url, problem
+            )
             return problem
                     
         catalog = OPDSCatalog.library_catalog(library)
@@ -340,7 +315,6 @@ class LibraryRegistryController(object):
 
             catalog["metadata"]["short_name"] = library.short_name
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
-
         content = json.dumps(catalog)
         headers = dict()
         headers["Content-Type"] = OPDS_CATALOG_REGISTRATION_MEDIA_TYPE

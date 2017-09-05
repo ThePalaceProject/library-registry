@@ -1,5 +1,6 @@
 """Library registry web application."""
 import os
+import sys
 import urlparse
 
 from flask import Flask, url_for, redirect, Response, request
@@ -113,7 +114,10 @@ def adobe_vendor_id_status():
 
 if __name__ == '__main__':
     debug = True
-    url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
+    if len(sys.argv) > 1:
+        url = sys.argv[1]
+    else:
+        url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
     scheme, netloc, path, parameters, query, fragment = urlparse.urlparse(url)
     if ':' in netloc:
         host, port = netloc.split(':')
