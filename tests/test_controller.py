@@ -27,6 +27,7 @@ from model import (
   ExternalIntegration,
   Library,
 )
+from util.http import RequestTimedOut
 from problem_details import *
 from config import Configuration
 
@@ -294,6 +295,16 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(NO_AUTH_URL, response)
+
+    def test_register_fails_when_auth_document_url_times_out(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            self.http_client.queue_response(
+                RequestTimedOut("http://url", "sorry")
+            )
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(AUTH_DOCUMENT_TIMEOUT.uri, response.uri)
+            eq_('Attempt to retrieve an Authentication For OPDS document timed out.', response.detail)
 
     def test_register_fails_on_non_200_code(self):
         """If the URL provided results in a status code other than

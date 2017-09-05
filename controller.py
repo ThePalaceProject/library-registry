@@ -209,7 +209,7 @@ class LibraryRegistryController(object):
         except RequestTimedOut, e:
             logging.error(
                 "Registration of %s failed: timed out retrieving authentication document",
-                opds_url, exc_info=e
+                auth_url, exc_info=e
             )
             return AUTH_DOCUMENT_TIMEOUT
         except Exception, e:

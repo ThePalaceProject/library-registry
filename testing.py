@@ -326,6 +326,8 @@ class DummyHTTPClient(object):
     def do_get(self, url, headers=None, allowed_response_codes=None, **kwargs):
         self.requests.append(url)
         response = self.responses.pop()
+        if isinstance(response.status_code, Exception):
+            raise response.status_code
 
         # Simulate the behavior of requests, where response.url contains
         # the final URL that responded to the request.
