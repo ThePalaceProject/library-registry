@@ -535,7 +535,7 @@ class TestLibraryRegistryController(ControllerTest):
             self.http_client.queue_response(401)
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
-            eq_("401 response at http://circmanager.org/feed/ did not yield an Authentication For OPDS document")
+            eq_("401 response at http://circmanager.org/feed/ did not yield an Authentication For OPDS document", response.detail)
 
     def test_register_fails_on_401_if_authentication_document_ids_do_not_match(self):
         with self.app.test_request_context("/"):
