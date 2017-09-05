@@ -27,6 +27,7 @@ class AuthenticationDocument(object):
 
     ANONYMOUS_ACCESS_REL = "https://librarysimplified.org/rel/auth/anonymous"
     AUTHENTICATION_DOCUMENT_REL = "http://opds-spec.org/auth/document"
+    MEDIA_TYPE = "application/vnd.opds.authentication.v1.0+json"
 
     COVERAGE_EVERYWHERE = "everywhere"
     

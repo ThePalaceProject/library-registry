@@ -526,6 +526,42 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
+
+    def test_register_fails_on_401_with_no_authentication_document(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(401)
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
+            eq_("401 response at http://circmanager.org/feed/ did not yield an Authentication For OPDS document")
+
+    def test_register_fails_on_401_if_authentication_document_ids_do_not_match(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            auth_document['id'] = "http://some-other-id/"
+            self.http_client.queue_response(
+                401, AuthenticationDocument.MEDIA_TYPE, content=json.dumps(auth_document
+            ))
+
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
+            eq_("Authentication For OPDS document guarding http://circmanager.org/feed/ does not match the one at http://circmanager.org/authentication.opds", response.detail)
+
+    def test_register_succeeds_on_401_if_authentication_document_ids_match(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(
+                401, AuthenticationDocument.MEDIA_TYPE, content=json.dumps(auth_document
+            ))
+
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(201, response.status_code)
         
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
@@ -820,6 +856,34 @@ class TestLibraryRegistryController(ControllerTest):
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, "Not a real feed"
         )
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # An Authentication For OPDS document.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE}, 
+            json.dumps({ "id": auth_url })
+        )
+        eq_([auth_url], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # A malformed Authentication For OPDS document.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE}, 
+            json.dumps("Not a document.")
+        )
+        eq_([], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
         eq_(False, 
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url

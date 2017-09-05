@@ -217,6 +217,10 @@ class LibraryRegistryController(object):
             for link in feed.get("feed", {}).get("links", []):
                 if link.get('rel') == rel:
                     links.append(link.get('href'))
+        elif media_type == AuthenticationDocument.MEDIA_TYPE:
+            document = json.loads(response.content)
+            if isinstance(document, dict):
+                links.append(document.get('id'))
         return [urljoin(response.url, url) for url in links if url]
 
     @classmethod
@@ -242,16 +246,28 @@ class LibraryRegistryController(object):
         if not auth_url:
             return NO_AUTH_URL
 
-        def _make_request(url, on_404, on_timeout, on_exception):
+        def _make_request(url, on_404, on_timeout, on_exception, allow_401=False):
+            allowed_codes = ["2xx", "3xx", 404]
+            if allow_401:
+                allowed_codes.append(401)
             try:
                 response = do_get(
-                    url, allowed_response_codes=["2xx", "3xx", 404],
+                    url, allowed_response_codes=allowed_codes,
                     timeout=30
                 )
                 # We only allowed 404 above so that we could return a more
                 # specific problem detail document if it happened.
                 if response.status_code == 404:
                     return INTEGRATION_DOCUMENT_NOT_FOUND.detailed(on_404)
+                if not allow_401 and response.status_code == 401:
+                    logging.error(
+                        "Registration of %s failed: %s is behind authentication gateway",
+                        auth_url, url
+                    )
+                    return ERROR_RETRIEVING_DOCUMENT.detailed(
+                        _("%(url)s is behind an authentication gateway",
+                          url=url)
+                    )
             except RequestTimedOut, e:
                 logging.error(
                     "Registration of %s failed: timeout retrieving %s", 
@@ -306,14 +322,24 @@ class LibraryRegistryController(object):
             opds_url, 
             _("No OPDS root document present at %(url)s", url=opds_url),
             _("Timeout retrieving OPDS root document at %(url)s", url=opds_url),
-            _("Error retrieving OPDS root document at %(url)s", url=opds_url)
+            _("Error retrieving OPDS root document at %(url)s", url=opds_url),
+            allow_401 = True
         )
         if isinstance(opds_response, ProblemDetail):
             return opds_response
 
         content_type = opds_response.headers.get('Content-Type')
         failure_detail = None
-        if content_type not in (OPDSCatalog.OPDS_TYPE,
+        if opds_response.status_code == 401:
+            # This is only acceptable if the server returned a copy of
+            # the Authentication For OPDS document we just got.
+            if content_type != AuthenticationDocument.MEDIA_TYPE:
+                failure_detail = _("401 response at %(url)s did not yield an Authentication For OPDS document", url=opds_url)
+            elif not self.opds_response_links_to_auth_document(
+                    opds_response, auth_url
+            ):
+                failure_detail = _("Authentication For OPDS document guarding %(opds_url)s does not match the one at %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
+        elif content_type not in (OPDSCatalog.OPDS_TYPE,
                                 OPDSCatalog.OPDS_1_TYPE):
             failure_detail = _("Supposed root document at %(url)s is not an OPDS document", url=opds_url)
         elif not self.opds_response_links_to_auth_document(
