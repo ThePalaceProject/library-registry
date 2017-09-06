@@ -18,7 +18,7 @@ from model import (
     ServiceArea,
 )
 from util.problem_detail import ProblemDetail
-from problem_details import INVALID_AUTH_DOCUMENT
+from problem_details import INVALID_INTEGRATION_DOCUMENT
 
 # Alias for a long class name
 AuthDoc = AuthenticationDocument
@@ -428,7 +428,7 @@ class TestUpdateServiceAreas(DatabaseTest):
 
         # We got a ProblemDetail explaining the problem
         assert isinstance(problem, ProblemDetail)
-        eq_(INVALID_AUTH_DOCUMENT.uri, problem.uri)
+        eq_(INVALID_INTEGRATION_DOCUMENT.uri, problem.uri)
         eq_(
             'The following service area was unknown: ["Unknown 1", "Unknown 2"]. The following service area was ambiguous: ["Ambiguous"].',
             problem.detail
@@ -549,10 +549,10 @@ class TestUpdateAudiences(DatabaseTest):
         )
 
         # If there's a problem detail document, it must be of the type
-        # INVALID_AUTH_DOCUMENT. The caller may perform additional
+        # INVALID_INTEGRATION_DOCUMENT. The caller may perform additional
         # checks.
         if isinstance(result, ProblemDetail):
-            eq_(result.uri, INVALID_AUTH_DOCUMENT.uri)
+            eq_(result.uri, INVALID_INTEGRATION_DOCUMENT.uri)
         return result
         
     def test_update_audiences(self):
@@ -610,10 +610,10 @@ class TestUpdateCollectionSize(DatabaseTest):
             self.library, value
         )
         # If there's a problem detail document, it must be of the type
-        # INVALID_AUTH_DOCUMENT. The caller may perform additional
+        # INVALID_INTEGRATION_DOCUMENT. The caller may perform additional
         # checks.
         if isinstance(result, ProblemDetail):
-            eq_(result.uri, INVALID_AUTH_DOCUMENT.uri)
+            eq_(result.uri, INVALID_INTEGRATION_DOCUMENT.uri)
         return result
         
     def test_success(self):

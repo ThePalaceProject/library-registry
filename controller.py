@@ -44,6 +44,7 @@ from util.http import (
     HTTP,
     RequestTimedOut,
 )
+from util.problem_detail import ProblemDetail
 from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
@@ -192,33 +193,104 @@ class LibraryRegistryController(object):
             )
             return Response(body, 200, headers)
 
+    @classmethod
+    def opds_response_links(cls, response, rel):
+        """Find all the links in the given response for the given 
+        link relation.
+        """
+        # Look in the response itself for a Link header.
+        links = []
+        link = response.links.get(rel)
+        if link:
+            links.append(link.get('url'))
+        media_type = response.headers.get('Content-Type')
+        if media_type == OPDSCatalog.OPDS_TYPE:
+            # Parse as OPDS 2.
+            catalog = json.loads(response.content)
+            links = []
+            for k,v in catalog.get("links", {}).iteritems():
+                if k == rel:
+                    links.append(v.get("href"))
+        elif media_type == OPDSCatalog.OPDS_1_TYPE:
+            # Parse as OPDS 1.
+            feed = feedparser.parse(response.content)
+            for link in feed.get("feed", {}).get("links", []):
+                if link.get('rel') == rel:
+                    links.append(link.get('href'))
+        elif media_type == AuthenticationDocument.MEDIA_TYPE:
+            document = json.loads(response.content)
+            if isinstance(document, dict):
+                links.append(document.get('id'))
+        return [urljoin(response.url, url) for url in links if url]
+
+    @classmethod
+    def opds_response_links_to_auth_document(cls, opds_response, auth_url):
+        """Verify that the given response links to the given URL as its
+        Authentication For OPDS document.
+        
+        The link might happen in the `Link` header or in the body of
+        an OPDS feed.
+        """
+        links = []
+        try:
+            links = cls.opds_response_links(
+                opds_response, AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
+            )
+        except ValueError, e:
+            # The response itself is malformed.
+            return False
+        return auth_url in links
+
     def register(self, do_get=HTTP.get_with_timeout):
         auth_url = flask.request.form.get("url")
         if not auth_url:
             return NO_AUTH_URL
 
-        try:
-            auth_response = do_get(
-                auth_url, allowed_response_codes=["2xx", "3xx", 404],
-                timeout=30
-            )
-            # We only allowed 404 above so that we could return a more
-            # specific problem detail document if it happened.
-            if auth_response.status_code == 404:
-                return AUTH_DOCUMENT_NOT_FOUND
-        except RequestTimedOut, e:
-            logging.error(
-                "Registration of %s failed: timed out retrieving authentication document",
-                auth_url, exc_info=e
-            )
-            return AUTH_DOCUMENT_TIMEOUT
-        except Exception, e:
-            logging.error(
-                "Registration of %s failed: error retrieving authentication document", 
-                exc_info=e
-            )
-            return ERROR_RETRIEVING_AUTH_DOCUMENT
+        def _make_request(url, on_404, on_timeout, on_exception, allow_401=False):
+            allowed_codes = ["2xx", "3xx", 404]
+            if allow_401:
+                allowed_codes.append(401)
+            try:
+                response = do_get(
+                    url, allowed_response_codes=allowed_codes,
+                    timeout=30
+                )
+                # We only allowed 404 above so that we could return a more
+                # specific problem detail document if it happened.
+                if response.status_code == 404:
+                    return INTEGRATION_DOCUMENT_NOT_FOUND.detailed(on_404)
+                if not allow_401 and response.status_code == 401:
+                    logging.error(
+                        "Registration of %s failed: %s is behind authentication gateway",
+                        auth_url, url
+                    )
+                    return ERROR_RETRIEVING_DOCUMENT.detailed(
+                        _("%(url)s is behind an authentication gateway",
+                          url=url)
+                    )
+            except RequestTimedOut, e:
+                logging.error(
+                    "Registration of %s failed: timeout retrieving %s", 
+                    auth_url, url, exc_info=e
+                )
+                return TIMEOUT.detailed(on_timeout)
+            except Exception, e:
+                logging.error(
+                    "Registration of %s failed: error retrieving %s",
+                    auth_url, url, exc_info=e
+                )
+                return ERROR_RETRIEVING_DOCUMENT.detailed(on_exception)
+            return response
 
+        auth_response = _make_request(
+            auth_url, 
+            _("No Authentication For OPDS document present at %(url)s", 
+              url=auth_url),
+            _("Timeout retrieving auth document %(url)s", url=auth_url),
+            _("Error retrieving auth document %(url)s", url=auth_url),
+        )
+        if isinstance(auth_response, ProblemDetail):
+            return auth_response
         try:
             auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception, e:
@@ -226,7 +298,7 @@ class LibraryRegistryController(object):
                 "Registration of %s failed: invalid auth document.",
                 auth_url, exc_info=e
             )
-            return INVALID_AUTH_DOCUMENT
+            return INVALID_INTEGRATION_DOCUMENT
         failure_detail = None
         if not auth_document.id:
             failure_detail = _("The OPDS authentication document is missing an id.")
@@ -242,7 +314,44 @@ class LibraryRegistryController(object):
             logging.error(
                 "Registration of %s failed: %s", auth_url, failure_detail
             )
-            return INVALID_AUTH_DOCUMENT.detailed(failure_detail)
+            return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
+
+        # Cross-check the opds_url to make sure it links back to the
+        # authentication document.
+        opds_response = _make_request(
+            opds_url, 
+            _("No OPDS root document present at %(url)s", url=opds_url),
+            _("Timeout retrieving OPDS root document at %(url)s", url=opds_url),
+            _("Error retrieving OPDS root document at %(url)s", url=opds_url),
+            allow_401 = True
+        )
+        if isinstance(opds_response, ProblemDetail):
+            return opds_response
+
+        content_type = opds_response.headers.get('Content-Type')
+        failure_detail = None
+        if opds_response.status_code == 401:
+            # This is only acceptable if the server returned a copy of
+            # the Authentication For OPDS document we just got.
+            if content_type != AuthenticationDocument.MEDIA_TYPE:
+                failure_detail = _("401 response at %(url)s did not yield an Authentication For OPDS document", url=opds_url)
+            elif not self.opds_response_links_to_auth_document(
+                    opds_response, auth_url
+            ):
+                failure_detail = _("Authentication For OPDS document guarding %(opds_url)s does not match the one at %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
+        elif content_type not in (OPDSCatalog.OPDS_TYPE,
+                                OPDSCatalog.OPDS_1_TYPE):
+            failure_detail = _("Supposed root document at %(url)s is not an OPDS document", url=opds_url)
+        elif not self.opds_response_links_to_auth_document(
+                opds_response, auth_url
+        ):
+            failure_detail = _("OPDS root document at %(opds_url)s does not link back to authentication document %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
+
+        if failure_detail:
+            logging.error(
+                "Registration of %s failed: %s", auth_url, failure_detail
+            )
+            return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
         library, is_new = get_one_or_create(
             self._db, Library,
@@ -272,7 +381,7 @@ class LibraryRegistryController(object):
                     "Registration of %s failed: could not read logo image %s",
                     auth_url, image_url
                 )
-                return INVALID_AUTH_DOCUMENT.detailed(
+                return INVALID_INTEGRATION_DOCUMENT.detailed(
                     _("Could not read logo image %(image_url)s", image_url=image_url)
                 )
             # Convert to PNG.

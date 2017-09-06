@@ -15,7 +15,7 @@ from model import (
     ServiceArea,
 )
 
-from problem_details import INVALID_AUTH_DOCUMENT
+from problem_details import INVALID_INTEGRATION_DOCUMENT
 from sqlalchemy.orm.session import Session
 
 
@@ -26,6 +26,8 @@ class AuthenticationDocument(object):
     """
 
     ANONYMOUS_ACCESS_REL = "https://librarysimplified.org/rel/auth/anonymous"
+    AUTHENTICATION_DOCUMENT_REL = "http://opds-spec.org/auth/document"
+    MEDIA_TYPE = "application/vnd.opds.authentication.v1.0+json"
 
     COVERAGE_EVERYWHERE = "everywhere"
     
@@ -292,7 +294,7 @@ class AuthenticationDocument(object):
             # This is invalid but we can easily support it.
             audiences = [audiences]
         if not isinstance(audiences, list):
-            return INVALID_AUTH_DOCUMENT.detailed(
+            return INVALID_INTEGRATION_DOCUMENT.detailed(
                 _("'audience' must be a list: %(audiences)r",
                   audiences=audiences)
             )
@@ -382,7 +384,7 @@ class AuthenticationDocument(object):
             if ambiguous:
                 msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
             _db.rollback()
-            return INVALID_AUTH_DOCUMENT.detailed(" ".join(msgs))
+            return INVALID_INTEGRATION_DOCUMENT.detailed(" ".join(msgs))
 
         for place in places:
             service_area, is_new = get_one_or_create(
@@ -403,7 +405,7 @@ class AuthenticationDocument(object):
             # No collections are specified.
             sizes = {}
         if not isinstance(sizes, dict):
-            return INVALID_AUTH_DOCUMENT.detailed(
+            return INVALID_INTEGRATION_DOCUMENT.detailed(
                 _("'collection_size' must be a number or an object mapping language codes to numbers")
             )
 
@@ -423,7 +425,7 @@ class AuthenticationDocument(object):
                     CollectionSummary.set(library, None, unknown_size)
                 )
         except ValueError, e:
-            return INVALID_AUTH_DOCUMENT.detailed(e.message)
+            return INVALID_INTEGRATION_DOCUMENT.detailed(e.message)
 
         # Destroy any CollectionSummaries representing collections
         # no longer associated with this library.

@@ -20,6 +20,7 @@ from Crypto.Cipher import PKCS1_OAEP
 from . import DatabaseTest
 from testing import DummyHTTPClient
 
+from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
 from model import (
   get_one,
@@ -30,7 +31,7 @@ from model import (
 from util.http import RequestTimedOut
 from problem_details import *
 from config import Configuration
-
+from testing import DummyHTTPResponse
 
 class TestLibraryRegistry(LibraryRegistry):
     pass
@@ -259,6 +260,21 @@ class TestLibraryRegistryController(ControllerTest):
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])
 
+    def queue_opds_success(
+            self, auth_url="http://circmanager.org/authentication.opds",
+            media_type=None
+    ):
+        """The next HTTP request made by the registry will appear to retrieve
+        a functional OPDS feed that links to `auth_url` as its
+        Authentication For OPDS document.
+        """
+        media_type = media_type or OPDSCatalog.OPDS_1_TYPE
+        self.http_client.queue_response(
+            200,
+            media_type,
+            links = {AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL: {'url': auth_url, 'rel': AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL}}
+        )
+
     def _auth_document(self, key=None):
         auth_document = {
             "id": "http://circmanager.org/authentication.opds",
@@ -303,8 +319,8 @@ class TestLibraryRegistryController(ControllerTest):
                 RequestTimedOut("http://url", "sorry")
             )
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(AUTH_DOCUMENT_TIMEOUT.uri, response.uri)
-            eq_('Attempt to retrieve an Authentication For OPDS document timed out.', response.detail)
+            eq_(TIMEOUT.uri, response.uri)
+            eq_('Timeout retrieving auth document http://circmanager.org/authentication.opds', response.detail)
 
     def test_register_fails_on_non_200_code(self):
         """If the URL provided results in a status code other than
@@ -316,19 +332,22 @@ class TestLibraryRegistryController(ControllerTest):
             # This server isn't working.
             self.http_client.queue_response(500)
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(ERROR_RETRIEVING_AUTH_DOCUMENT, response)
+            eq_(ERROR_RETRIEVING_DOCUMENT.uri, response.uri)
+            eq_("Error retrieving auth document http://circmanager.org/authentication.opds", response.detail)
 
             # This server incorrectly requires authentication to
             # access the authentication document.
             self.http_client.queue_response(401)
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(ERROR_RETRIEVING_AUTH_DOCUMENT, response)
+            eq_(ERROR_RETRIEVING_DOCUMENT.uri, response.uri)
+            eq_("Error retrieving auth document http://circmanager.org/authentication.opds", response.detail)
 
             # This server doesn't have an authentication document
             # at the specified URL.
             self.http_client.queue_response(404)
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(AUTH_DOCUMENT_NOT_FOUND, response)
+            eq_(INTEGRATION_DOCUMENT_NOT_FOUND.uri, response.uri)
+            eq_('No Authentication For OPDS document present at http://circmanager.org/authentication.opds', response.detail)
         
     def test_register_fails_on_non_authentication_document(self):
         """The request succeeds but returns something other than
@@ -340,7 +359,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT, response)
+            eq_(INVALID_INTEGRATION_DOCUMENT, response)
 
     def test_register_fails_on_non_matching_id(self):
         """The request returns an authentication document but its `id`
@@ -353,7 +372,7 @@ class TestLibraryRegistryController(ControllerTest):
                 ("url", "http://a-different-url/"),
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("The OPDS authentication document's id (http://circmanager.org/authentication.opds) doesn't match its url (http://a-different-url/).",
                 response.detail)
 
@@ -367,7 +386,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("The OPDS authentication document is missing a title.",
                 response.detail)
 
@@ -383,25 +402,103 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("The OPDS authentication document is missing a 'start' link to the root OPDS feed.",
                 response.detail)
+
+    def test_register_fails_on_start_link_not_found(self):
+        """The request returns an authentication document but an attempt
+        to retrieve the corresponding OPDS feed yields a 404.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(404)
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INTEGRATION_DOCUMENT_NOT_FOUND.uri, response.uri)
+            eq_("No OPDS root document present at http://circmanager.org/feed/",
+                response.detail)
+
+    def test_register_fails_on_start_link_timeout(self):
+        """The request returns an authentication document but an attempt
+        to retrieve the corresponding OPDS feed times out.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(RequestTimedOut("http://url", "sorry"))
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(TIMEOUT.uri, response.uri)
+            eq_("Timeout retrieving OPDS root document at http://circmanager.org/feed/", 
+                response.detail)
+
+    def test_register_fails_on_start_link_error(self):
+        """The request returns an authentication document but an attempt
+        to retrieve the corresponding OPDS feed gives a server-side error.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(500)
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(ERROR_RETRIEVING_DOCUMENT.uri, response.uri)
+            eq_("Error retrieving OPDS root document at http://circmanager.org/feed/", response.detail)
+
+    def test_register_fails_on_start_link_not_opds_feed(self):
+        """The request returns an authentication document but an attempt
+        to retrieve the corresponding OPDS feed gives a server-side error.
+        """
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+
+        # The start link returns a 200 response code but the wrong
+        # Content-Type.
+        self.http_client.queue_response(200, "text/html")
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
+            eq_("Supposed root document at http://circmanager.org/feed/ is not an OPDS document", response.detail)
+
+    def test_register_fails_if_start_link_does_not_link_back_to_auth_document(self):
+        auth_document = self._auth_document()
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+
+        # The start link returns a 200 response code and the right
+        # Content-Type, but there is no Link header and the body is no
+        # help.
+        self.http_client.queue_response(200, OPDSCatalog.OPDS_TYPE, content='{}')
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
+            eq_("OPDS root document at http://circmanager.org/feed/ does not link back to authentication document http://circmanager.org/authentication.opds", response.detail)
 
     def test_register_fails_on_broken_logo_link(self):
         """The request returns a valid authentication document
         that links to a broken logo image.
         """
-        self.http_client.queue_response(500)
         auth_document = self._auth_document()
         for link in auth_document['links']:
             if link['rel'] == 'logo':
                 link['href'] = "http://example.com/broken-logo.png"
                 break
+        # Auth document request succeeds.
         self.http_client.queue_response(200, content=json.dumps(auth_document))
+
+        # OPDS feed request succeeds.
+        self.queue_opds_success()
+
+        # Image request fails.
+        self.http_client.queue_response(500)
+
         with self.app.test_request_context("/"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("Could not read logo image http://example.com/broken-logo.png",
                 response.detail)
 
@@ -414,8 +511,9 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Somewhere"]}
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.queue_opds_success()
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
 
     def test_register_fails_on_ambiguous_service_area(self):
@@ -424,9 +522,46 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Manhattan"]}
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.queue_opds_success()
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_(INVALID_AUTH_DOCUMENT.uri, response.uri)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
+
+    def test_register_fails_on_401_with_no_authentication_document(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(401)
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
+            eq_("401 response at http://circmanager.org/feed/ did not yield an Authentication For OPDS document", response.detail)
+
+    def test_register_fails_on_401_if_authentication_document_ids_do_not_match(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            auth_document['id'] = "http://some-other-id/"
+            self.http_client.queue_response(
+                401, AuthenticationDocument.MEDIA_TYPE, content=json.dumps(auth_document
+            ))
+
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
+            eq_("Authentication For OPDS document guarding http://circmanager.org/feed/ does not match the one at http://circmanager.org/authentication.opds", response.detail)
+
+    def test_register_succeeds_on_401_if_authentication_document_ids_match(self):
+        with self.app.test_request_context("/"):
+            flask.request.form = self.registration_form
+            auth_document = self._auth_document()
+            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(
+                401, AuthenticationDocument.MEDIA_TYPE, content=json.dumps(auth_document
+            ))
+
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_(201, response.status_code)
         
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
@@ -435,6 +570,7 @@ class TestLibraryRegistryController(ControllerTest):
         key = RSA.generate(1024)
         auth_document = self._auth_document(key)
         self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.queue_opds_success()
 
         auth_url = "http://circmanager.org/authentication.opds"
         opds_url = "http://circmanager.org/feed/"
@@ -467,8 +603,13 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(self.kansas_state.id, service_area.place_id)
 
             # To get this information, a request was made to the
-            # circulation manager's Authentication For OPDS feed.
-            eq_(["http://circmanager.org/authentication.opds"], 
+            # circulation manager's Authentication For OPDS document.
+            # A follow-up request was made to the feed mentioned in that
+            # document.
+            #
+            eq_(["http://circmanager.org/authentication.opds",
+                 "http://circmanager.org/feed/"
+            ], 
                 self.http_client.requests)
 
             # And the document we queued up was fed into the library
@@ -497,8 +638,6 @@ class TestLibraryRegistryController(ControllerTest):
         library.stage = Library.LIVE
 
         # Later, the library's information changes.
-        image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
-        self.http_client.queue_response(200, content=image_data, media_type="image/png")
         auth_document = {
             "id": auth_url,
             "name": "A Library",
@@ -510,6 +649,12 @@ class TestLibraryRegistryController(ControllerTest):
             "service_area": { "US": "Connecticut" },
         }
         self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.queue_opds_success()
+
+        # We have a new logo as well.
+        image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
+        self.http_client.queue_response(200, content=image_data, media_type="image/png")
+
 
         # So the library re-registers itself, and gets an updated
         # registry entry.
@@ -545,9 +690,11 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(self.connecticut_state.id, service_area.place_id)
 
             # In addition to making the request to get the
-            # Authentication For OPDS document, the registry made a
+            # Authentication For OPDS document, and the request to 
+            # get the root OPDS feed, the registry made a
             # follow-up request to download the library's logo.
             eq_(["http://circmanager.org/authentication.opds", 
+                 "http://circmanager.org/feed/",
                  "http://circmanager.org/logo.png"], self.http_client.requests)
 
 
@@ -561,9 +708,9 @@ class TestLibraryRegistryController(ControllerTest):
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.queue_opds_success()
 
             response = self.controller.register(do_get=self.http_client.do_get)
-
             eq_(200, response.status_code)
             catalog = json.loads(response.data)
 
@@ -586,10 +733,159 @@ class TestLibraryRegistryController(ControllerTest):
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
             self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.queue_opds_success()
 
             response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(200, response.status_code)
             eq_(old_secret, library.shared_secret)
 
+    def test_opds_response_links(self):
+        """Test the opds_response_links method.
 
+        This method is used to find the link back from the OPDS document to
+        the Authentication For OPDS document.
+
+        It checks the Link header and the body of an OPDS 1 or OPDS 2
+        document.
+
+        This test also tests the related
+        opds_response_links_to_auth_document, which checks whether a
+        particular URL is found in the list of links.
+        """
+        auth_url = "http://circmanager.org/auth"
+        rel = AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
+
+        # An OPDS 1 feed that has a link.
+        has_link_feed = '<feed><link rel="%s" href="%s"/></feed>' % (
+            rel, auth_url
+        )
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, has_link_feed
+        )
+        eq_([auth_url], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, "Some other URL"
+            )
+        )
+
+        # The same feed, but with an additional link in the
+        # Link header. Both links are returned.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE},
+            has_link_feed, links={rel: {'url': "http://another-auth-document",
+                                        'rel': rel}}
+        )
+        eq_(set([auth_url, "http://another-auth-document"]),
+            set(LibraryRegistryController.opds_response_links(response, rel))
+        )
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # A similar feed, but with a relative URL, which is made absolute
+        # by opds_response_links.
+        relative_url_feed = '<feed><link rel="%s" href="auth-document"/></feed>' % (
+            rel
+        )
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, relative_url_feed
+        )
+        response.url = "http://opds-server/catalog.opds"
+        eq_(["http://opds-server/auth-document"],
+            LibraryRegistryController.opds_response_links(response, rel)
+        )
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, "http://opds-server/auth-document"
+            )
+        )
+
+        # An OPDS 1 feed that has no link.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, "<feed></feed>"
+        )
+        eq_([], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # An OPDS 2 feed that has a link.
+        catalog = json.dumps({"links": {rel: { "href": auth_url }}})
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog
+        )
+        eq_([auth_url], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # An OPDS 2 feed that has no link.
+        catalog = json.dumps({"links": {}})
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog
+        )
+        eq_([], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # A malformed feed.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, "Not a real feed"
+        )
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # An Authentication For OPDS document.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE}, 
+            json.dumps({ "id": auth_url })
+        )
+        eq_([auth_url], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+        eq_(True, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
+
+        # A malformed Authentication For OPDS document.
+        response = DummyHTTPResponse(
+            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE}, 
+            json.dumps("Not a document.")
+        )
+        eq_([], LibraryRegistryController.opds_response_links(
+            response, rel
+        ))
+        eq_(False, 
+            LibraryRegistryController.opds_response_links_to_auth_document(
+                response, auth_url
+            )
+        )
