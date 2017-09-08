@@ -336,6 +336,7 @@ class TestSetCoverageAreaScript(DatabaseTest):
                 "Ambiguous places:",
                 s.run, args, place_class=MockPlace
             )
+        MockPlace.by_name = {}
 
     def test_success(self):
         us = self._place(type=Place.NATION, abbreviated_name='US')
