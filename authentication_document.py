@@ -52,18 +52,9 @@ class AuthenticationDocument(object):
         self.collection_size = collection_size
         self.public_key = public_key
         self.audiences = audiences or [self.PUBLIC_AUDIENCE]
-        if service_area:
-            self.service_area = self.parse_coverage(
-                _db, service_area, place_class=place_class
-            )
-        else:
-            self.service_area = [place_class.everywhere(_db)], {}, {}
-        if focus_area:
-            self.focus_area = self.parse_coverage(
-                _db, focus_area, place_class=place_class
-            )
-        else:
-            self.focus_area = self.service_area
+        self.service_area, self.focus_area = self.parse_service_and_focus_area(
+            _db, service_area, focus_area, place_class
+        )
         self.links = links
         self.website = self.extract_link(
             rel="alternate", require_type="text/html"
@@ -131,6 +122,23 @@ class AuthenticationDocument(object):
             if self._extract_link(flow.get('links', []), rel):
                 return True
         return False        
+
+    @classmethod
+    def parse_service_and_focus_area(cls, _db, service_area, focus_area,
+                                     place_class=Place):
+        if service_area:
+            service_area = cls.parse_coverage(
+                _db, service_area, place_class=place_class
+            )
+        else:
+            service_area = [place_class.everywhere(_db)], {}, {}
+        if focus_area:
+            focus_area = cls.parse_coverage(
+                _db, focus_area, place_class=place_class
+            )
+        else:
+            focus_area = service_area
+        return service_area, focus_area
                 
     @classmethod
     def parse_coverage(cls, _db, coverage, place_class=Place):
@@ -196,7 +204,6 @@ class AuthenticationDocument(object):
                 # Either this isn't a recognized country
                 # or we don't have a geography for it.
                 unknown[country] = places
-
         return place_objs, unknown, ambiguous
     
     @classmethod
@@ -314,10 +321,18 @@ class AuthenticationDocument(object):
             audience_obj = Audience.lookup(_db, audience)
             audience_objs.append(audience_obj)
         library.audiences = audience_objs
-    
+
     def update_service_areas(self, library):
         """Update a library's ServiceAreas based on the contents of this
         document.
+        """
+        return self.set_service_areas(
+            library, self.service_area, self.focus_area
+        )
+
+    @classmethod
+    def set_service_areas(cls, library, service_area, focus_area):
+        """Replace a library's ServiceAreas with specific new values.
         """
         service_areas = []
 
@@ -327,30 +342,30 @@ class AuthenticationDocument(object):
         # no input was specified.
         empty = [[],{},{}]
         
-        if (self.focus_area == empty and self.service_area != empty
-            or self.service_area == self.focus_area):
+        if (focus_area == empty and service_area != empty
+            or service_area == focus_area):
             # Service area and focus area are the same, either because
             # they were defined that way explicitly or because focus
             # area was not specified.
             #
             # Register the service area as the focus area and call it
             # a day.
-            problem = self._update_service_areas(
-                library, self.service_area, ServiceArea.FOCUS,
+            problem = cls._update_service_areas(
+                library, service_area, ServiceArea.FOCUS,
                 service_areas
             )
             if problem:
                 return problem
         else:
             # Service area and focus area are different.
-            problem = self._update_service_areas(
-                library, self.service_area, ServiceArea.ELIGIBILITY,
+            problem = cls._update_service_areas(
+                library, service_area, ServiceArea.ELIGIBILITY,
                 service_areas
             )
             if problem:
                 return problem
-            problem = self._update_service_areas(
-                library, self.focus_area, ServiceArea.FOCUS,
+            problem = cls._update_service_areas(
+                library, focus_area, ServiceArea.FOCUS,
                 service_areas
             )
             if problem:
