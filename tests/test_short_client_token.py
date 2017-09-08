@@ -239,3 +239,8 @@ class TestShortClientTokenDecoder(DatabaseTest):
         # test failure, it ran successfully.
         eq_(True, self.decoder.test_code_ran)        
 
+        assert_raises_regexp(
+            ValueError, "Invalid password",
+            self.decoder.decode_two_part,
+            self._db, "username", "I am not a real encoded signature"
+        )

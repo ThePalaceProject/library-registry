@@ -1250,7 +1250,10 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         """Decode a short client token that has already been split into
         two parts.
         """
-        signature = self.adobe_base64_decode(password)
+        try:
+            signature = self.adobe_base64_decode(password)
+        except Exception, e:
+            raise ValueError("Invalid password: %s" % password)
         return self._decode(_db, username, signature)
 
     def _decode(self, _db, token, supposed_signature):
