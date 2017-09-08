@@ -1,6 +1,7 @@
 from nose.tools import set_trace
 import argparse
 import base64
+import json
 import logging
 import os
 import re
@@ -21,6 +22,7 @@ from model import (
 )
 from config import Configuration
 from adobe_vendor_id import AdobeVendorIDClient
+from authentication_document import AuthenticationDocument
 
 class Script(object):
 
@@ -80,6 +82,18 @@ class Script(object):
     def load_configuration(self):
         if not Configuration.instance:
             Configuration.load()
+
+
+class LibraryScript(Script):
+    """A script that operates on one specific library."""
+
+    @classmethod
+    def arg_parser(cls):
+        parser = super(LibraryScript, cls).arg_parser()
+        parser.add_argument(
+            '--library', help='Official name of the library', required=True
+        )
+        return parser
 
             
 class LoadPlacesScript(Script):
@@ -215,6 +229,60 @@ class AddLibraryScript(Script):
                     self._db, ServiceArea, library=library, place=place
                 )
         self._db.commit()
+
+
+class SetCoverageAreaScript(LibraryScript):
+
+    @classmethod
+    def arg_parser(cls):
+        parser = super(SetCoverageAreaScript, cls).arg_parser()
+        parser.add_argument(
+            '--service-area',
+            help="JSON document describing the library's service area. If no value is specified, it is assumed to be the same as --focus-area."
+        )
+        parser.add_argument(
+            '--focus-area',
+            help="JSON document describing the library's focus area. If no value is specified, it is assumed to be the same as --service-area."
+        )
+        return parser
+
+    def run(self, cmd_args=None, place_class=Place):
+        parsed = self.parse_command_line(self._db, cmd_args)
+
+        library = get_one(self._db, Library, name=parsed.library)
+        if not library:
+            raise Exception("No library with name %r" % parsed.library)
+
+        if not parsed.service_area and not parsed.focus_area:
+            raise Exception("Either --service-area or --focus-area must be specified.")
+        service_area = focus_area = None
+
+        def _load_area(x):
+            if not x:
+                return None
+            try:
+                x = json.loads(x)
+            except ValueError:
+                raise ValueError("Invalid JSON: %r" % x)
+            if not isinstance(x, dict):
+                raise ValueError("Not a place document: %r" % x)
+            return x
+
+        service_area = _load_area(parsed.service_area)
+        focus_area = _load_area(parsed.focus_area)
+
+        service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
+            self._db, service_area, focus_area, place_class
+        )         
+        for (valid, unknown, ambiguous) in [service_area, focus_area]:
+            if unknown:
+                raise ValueError("Unknown places: %r" % unknown.items())
+            if ambiguous:
+                raise ValueError("Ambiguous places: %r" % unknown.items())
+
+        AuthenticationDocument.set_service_areas(
+            library, service_area, focus_area
+        )
 
 
 class AdobeVendorIDAcceptanceTestScript(Script):

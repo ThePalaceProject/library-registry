@@ -1,3 +1,4 @@
+import json
 from nose.tools import (
     assert_raises_regexp,
     set_trace,
@@ -20,8 +21,10 @@ from scripts import (
     LoadPlacesScript,
     SearchLibraryScript,
     SearchPlacesScript,
+    SetCoverageAreaScript,
     ShowIntegrationsScript,
 )
+from testing import MockPlace
 from . import (
     DatabaseTest
 )
@@ -278,4 +281,86 @@ class TestConfigureIntegrationScript(DatabaseTest):
         eq_(expect_output, output.getvalue())
        
 
+class TestSetCoverageAreaScript(DatabaseTest):
 
+    def test_argument_parsing(self):
+        library = self._library()
+        s = SetCoverageAreaScript(_db=self._db)
+        base = ["--library=%s" % library.name]
+        assert_raises_regexp(
+            Exception,
+            "Either --service-area or --focus-area must be specified",
+            s.run, base, place_class=MockPlace
+        )
+
+        for arg in ['service-area', 'focus-area']:
+            args = base + ['--%s=NotJSON' % arg]
+            print args
+            assert_raises_regexp(
+                ValueError,
+                "Invalid JSON:",
+                s.run, args, place_class=MockPlace
+            )
+
+            not_a_place = json.dumps("Not a place")
+            args = base + ['--%s=%s' % (arg, not_a_place)]
+            assert_raises_regexp(
+                ValueError,
+                "Not a place document:",
+                s.run, args, place_class=MockPlace
+            )
+
+    def test_unrecognized_place(self):      
+        library = self._library()
+        s = SetCoverageAreaScript(_db=self._db)
+        for arg in ['service-area', 'focus-area']:        
+            args = ["--library=%s" % library.name, 
+                    '--%s={"US": "San Francisco"}' % arg]
+            assert_raises_regexp(
+                ValueError,
+                "Unknown places:",
+                s.run, args, place_class=MockPlace
+            )
+
+    def test_ambiguous_place(self):
+
+        MockPlace.by_name["OO"] = MockPlace.AMBIGUOUS
+
+        library = self._library()
+        s = SetCoverageAreaScript(_db=self._db)
+        for arg in ['service-area', 'focus-area']:        
+            args = ["--library=%s" % library.name, 
+                    '--%s={"OO": "everywhere"}' % arg]
+            assert_raises_regexp(
+                ValueError,
+                "Ambiguous places:",
+                s.run, args, place_class=MockPlace
+            )
+        MockPlace.by_name = {}
+
+    def test_success(self):
+        us = self._place(type=Place.NATION, abbreviated_name='US')
+        library = self._library()
+        s = SetCoverageAreaScript(_db=self._db)
+
+        # Setting a service area with no focus area assigns that
+        # service area to the library.
+        args = ["--library=%s" % library.name, 
+                '--service-area={"US": "everywhere"}']
+        s.run(args)
+        [area] = library.service_areas
+        eq_(us, area.place)
+
+        # Setting a focus area and not a service area treats 'everywhere'
+        # as the service area.
+        uk = self._place(type=Place.NATION, abbreviated_name='UK')
+        args = ["--library=%s" % library.name,
+                '--focus-area={"UK": "everywhere"}']
+        s.run(args)
+        places = [x.place for x in library.service_areas]
+        eq_(2, len(places))
+        assert uk in places
+        assert Place.everywhere(self._db) in places
+
+        # The library's former ServiceAreas have been removed.
+        assert us not in places

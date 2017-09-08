@@ -8,6 +8,10 @@ from geoalchemy2 import Geometry
 from sqlalchemy import func
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import cast
+from sqlalchemy.orm.exc import (
+    NoResultFound,
+    MultipleResultsFound,
+)
 from StringIO import StringIO
 
 from config import Configuration
@@ -23,6 +27,7 @@ from model import (
 )
 from util import GeometryUtility
 from util.http import BadResponseException
+
 
 def package_setup():
     """Make sure the database schema is initialized and initial
@@ -364,3 +369,41 @@ class MockRequestsResponse(object):
     @property
     def text(self):
         return self.content.decode("utf8")
+
+
+class MockPlace(object):
+    """Used to test AuthenticationDocument.parse_coverage."""
+
+    # Used to indicate that a place name is ambiguous.
+    AMBIGUOUS = object()
+
+    # Used to indicate coverage through the universe or through a
+    # country.
+    EVERYWHERE = object()
+
+    by_name = dict()
+
+    def __init__(self, inside=None):
+        self.inside = inside or dict()
+
+    @classmethod
+    def lookup_one_by_name(cls, _db, name, place_type):
+        place = cls.by_name.get(name)
+        if place is cls.AMBIGUOUS:
+            raise MultipleResultsFound()
+        if place is None:
+            raise NoResultFound()
+        print "%s->%s" % (name, place)
+        return place
+        
+    def lookup_inside(self, name):
+        place = self.inside.get(name)
+        if place is self.AMBIGUOUS:
+            raise MultipleResultsFound()
+        if place is None:
+            raise NoResultFound()
+        return place
+
+    @classmethod
+    def everywhere(cls, _db):
+        return cls.EVERYWHERE
