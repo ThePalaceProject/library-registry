@@ -164,6 +164,9 @@ class AddLibraryScript(Script):
     def arg_parser(cls):
         parser = super(AddLibraryScript, cls).arg_parser()
         parser.add_argument(
+            '--name', help='Official name of the library', required=True
+        )
+        parser.add_argument(
             '--urn',
             help="URN used in the library's Authentication for OPDS document.",
             required=True
