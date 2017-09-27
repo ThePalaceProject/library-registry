@@ -26,14 +26,6 @@ class Configuration(object):
     instance = None
     
     log = logging.getLogger("Configuration file loader")
-
-    # Logging stuff
-    LOGGING = "logging"
-    LOGGING_LEVEL = "level"
-    LOGGING_FORMAT = "format"
-    LOG_FORMAT_TEXT = "text"
-    LOG_FORMAT_JSON = "json"
-
    
     INTEGRATIONS = 'integrations'
 
@@ -145,8 +137,3 @@ class Configuration(object):
             integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).int_value,
             delegates
         )
-    
-    @classmethod
-    def logging_policy(cls):
-        default_logging = {}
-        return cls.get(cls.LOGGING, default_logging)

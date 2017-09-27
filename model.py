@@ -72,7 +72,18 @@ from util.short_client_token import ShortClientTokenTool
 def production_session():
     url = Configuration.database_url()
     logging.debug("Database url: %s", url)
-    return SessionManager.session(url)
+    _db = SessionManager.session(url)
+
+    # The first thing to do after getting a database connection is to
+    # set up the logging configuration.
+    #
+    # If called during a unit test, this will configure logging
+    # incorrectly, but 1) this method isn't normally called during
+    # unit tests, and 2) package_setup() will call initialize() again
+    # with the right arguments.
+    from log import LogConfiguration
+    LogConfiguration.initialize(_db)
+    return _db
 
 DEBUG = False
 
@@ -1344,6 +1355,14 @@ class ExternalIntegration(Base):
 
     # Integrations with DRM_GOAL
     ADOBE_VENDOR_ID = u'Adobe Vendor ID'
+
+    # These integrations are associated with external services that
+    # collect logs of server-side events.
+    LOGGING_GOAL = u'logging'
+
+    # Integrations with LOGGING_GOAL
+    INTERNAL_LOGGING = u'Internal logging'
+    LOGGLY = u'Loggly'
 
     __tablename__ = 'externalintegrations'
     id = Column(Integer, primary_key=True)
