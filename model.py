@@ -1345,6 +1345,14 @@ class ExternalIntegration(Base):
     # Integrations with DRM_GOAL
     ADOBE_VENDOR_ID = u'Adobe Vendor ID'
 
+    # These integrations are associated with external services that
+    # collect logs of server-side events.
+    LOGGING_GOAL = u'logging'
+
+    # Integrations with LOGGING_GOAL
+    INTERNAL_LOGGING = u'Internal logging'
+    LOGGLY = u'Loggly'
+
     __tablename__ = 'externalintegrations'
     id = Column(Integer, primary_key=True)
 

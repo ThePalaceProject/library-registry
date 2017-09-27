@@ -19,6 +19,7 @@ from model import (
     get_one_or_create,
     Audience,
     Base,
+    ExternalIntegration,
     Library,
     Place,
     PlaceAlias,
@@ -130,6 +131,45 @@ class DatabaseTest(object):
         library.audiences = [Audience.lookup(self._db, audience) for audience in audiences]
         library.stage = stage
         return library
+
+    def _external_integration(self, protocol, goal=None, settings=None,
+                              libraries=None, **kwargs
+    ):
+        integration = None
+        if not libraries:
+            integration, ignore = get_one_or_create(
+                self._db, ExternalIntegration, protocol=protocol, goal=goal
+            )
+        else:
+            if not isinstance(libraries, list):
+                libraries = [libraries]
+
+            # Try to find an existing integration for one of the given
+            # libraries.
+            for library in libraries:
+                integration = ExternalIntegration.lookup(
+                    self._db, protocol, goal, library=libraries[0]
+                )
+                if integration:
+                    break
+
+            if not integration:
+                # Otherwise, create a brand new integration specifically
+                # for the library.
+                integration = ExternalIntegration(
+                    protocol=protocol, goal=goal,
+                )
+                integration.libraries.extend(libraries)
+                self._db.add(integration)
+
+        for attr, value in kwargs.items():
+            setattr(integration, attr, value)
+
+        settings = settings or dict()
+        for key, value in settings.items():
+            integration.set_setting(key, value)
+
+        return integration
 
     def _place(self, external_id=None, external_name=None, type=None,
                abbreviated_name=None, parent=None, geometry=None):
