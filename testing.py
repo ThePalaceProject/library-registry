@@ -15,6 +15,7 @@ from sqlalchemy.orm.exc import (
 from StringIO import StringIO
 
 from config import Configuration
+from log import LogConfiguration
 from model import (
     get_one_or_create,
     Audience,
@@ -46,11 +47,13 @@ def package_setup():
     _db = Session(connection)
     SessionManager.initialize_data(_db)
     _db.commit()
-    connection.close()
-    engine.dispose()
 
     if not Configuration.instance:
         Configuration.load()
+    LogConfiguration.initialize(_db)
+
+    connection.close()
+    engine.dispose()
 
 class DatabaseTest(object):
 

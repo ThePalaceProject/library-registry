@@ -9,15 +9,14 @@ from flask_sqlalchemy_session import flask_scoped_session
 
 from config import Configuration
 from controller import LibraryRegistry
+from log import LogConfiguration
 from model import SessionManager, ConfigurationSetting
 from util.problem_detail import ProblemDetail
 from util.flask_util import originating_ip
 from util.app_server import returns_problem_detail
 
+
 app = Flask(__name__)
-debug = Configuration.logging_policy().get("level") == 'DEBUG'
-app.config['DEBUG'] = debug
-app.debug = debug
 babel = Babel(app)
 
 testing = 'TESTING' in os.environ
@@ -25,6 +24,11 @@ db_url = Configuration.database_url(testing)
 SessionManager.initialize(db_url)
 session_factory = SessionManager.sessionmaker(db_url)
 _db = flask_scoped_session(session_factory, app)
+
+log_level = LogConfiguration.initialize(_db, testing=testing)
+debug = log_level == 'DEBUG'
+app.config['DEBUG'] = debug
+app.debug = debug
 
 if os.environ.get('AUTOINITIALIZE') == 'False':
     pass
