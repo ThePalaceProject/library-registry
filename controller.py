@@ -54,12 +54,12 @@ class LibraryRegistry(object):
 
     def __init__(self, _db=None, testing=False):
 
-        self.log = logging.getLogger("Content server web app")
+        self.log = logging.getLogger("Library registry web app")
 
         try:
             self.config = Configuration.load()
         except CannotLoadConfiguration, e:
-            self.log.error("Could not load configuration file: %s" %e)
+            self.log.error("Could not load configuration file: %s", e)
             sys.exit()
 
         if _db is None and not testing:
