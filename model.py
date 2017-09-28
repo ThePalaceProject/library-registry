@@ -1364,6 +1364,17 @@ class ExternalIntegration(Base):
     INTERNAL_LOGGING = u'Internal logging'
     LOGGLY = u'Loggly'
 
+    # If there is a special URL to use for access to this API,
+    # put it here.
+    URL = u"url"
+
+    # If access requires authentication, these settings represent the
+    # username/password or key/secret combination necessary to
+    # authenticate. If there's a secret but no key, it's stored in
+    # 'password'.
+    USERNAME = u"username"
+    PASSWORD = u"password"
+
     __tablename__ = 'externalintegrations'
     id = Column(Integer, primary_key=True)
 
@@ -1403,6 +1414,30 @@ class ExternalIntegration(Base):
         if not integrations:
             return None
         return integrations[0]
+
+    @hybrid_property
+    def url(self):
+        return self.setting(self.URL).value
+
+    @url.setter
+    def set_url(self, new_url):
+        self.set_setting(self.URL, new_url)
+
+    @hybrid_property
+    def username(self):
+        return self.setting(self.USERNAME).value
+
+    @username.setter
+    def set_username(self, new_username):
+        self.set_setting(self.USERNAME, new_username)
+
+    @hybrid_property
+    def password(self):
+        return self.setting(self.PASSWORD).value
+
+    @password.setter
+    def set_password(self, new_password):
+        return self.set_setting(self.PASSWORD, new_password)
 
     def set_setting(self, key, value):
         """Create or update a key-value setting for this ExternalIntegration."""
