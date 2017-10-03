@@ -1631,6 +1631,14 @@ class ConfigurationSetting(Base):
     def set_value(self, new_value):
         self._value = new_value
 
+    def setdefault(self, default=None):
+        """If no value is set, set it to `default`. 
+        Then return the current value.
+        """
+        if self.value is None:
+            self.value = default
+        return self.value
+
     @classmethod
     def _is_secret(self, key):
         """Should the value of the given key be treated as secret?
