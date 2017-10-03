@@ -347,7 +347,6 @@ class LibraryRegistryController(object):
                 opds_response, auth_url
         ):
             failure_detail = _("OPDS root document at %(opds_url)s does not link back to authentication document %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
-            failure_detail = None
 
         if failure_detail:
             self.log.error(
