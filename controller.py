@@ -124,7 +124,8 @@ class LibraryRegistryController(object):
         self.app = app
         self._db = self.app._db
         self.annotator = LibraryRegistryAnnotator(app)
-        
+        self.log = self.app.log
+  
     def point_from_ip(self, ip_address):
         if not ip_address:
             return None
@@ -260,7 +261,7 @@ class LibraryRegistryController(object):
                 if response.status_code == 404:
                     return INTEGRATION_DOCUMENT_NOT_FOUND.detailed(on_404)
                 if not allow_401 and response.status_code == 401:
-                    logging.error(
+                    self.log.error(
                         "Registration of %s failed: %s is behind authentication gateway",
                         auth_url, url
                     )
@@ -269,13 +270,13 @@ class LibraryRegistryController(object):
                           url=url)
                     )
             except RequestTimedOut, e:
-                logging.error(
+                self.log.error(
                     "Registration of %s failed: timeout retrieving %s", 
                     auth_url, url, exc_info=e
                 )
                 return TIMEOUT.detailed(on_timeout)
             except Exception, e:
-                logging.error(
+                self.log.error(
                     "Registration of %s failed: error retrieving %s",
                     auth_url, url, exc_info=e
                 )
@@ -294,7 +295,7 @@ class LibraryRegistryController(object):
         try:
             auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception, e:
-            logging.error(
+            self.log.error(
                 "Registration of %s failed: invalid auth document.",
                 auth_url, exc_info=e
             )
@@ -311,7 +312,7 @@ class LibraryRegistryController(object):
         if auth_document.id != auth_response.url:
             failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.url)
         if failure_detail:
-            logging.error(
+            self.log.error(
                 "Registration of %s failed: %s", auth_url, failure_detail
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
@@ -348,7 +349,7 @@ class LibraryRegistryController(object):
             failure_detail = _("OPDS root document at %(opds_url)s does not link back to authentication document %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
 
         if failure_detail:
-            logging.error(
+            self.log.error(
                 "Registration of %s failed: %s", auth_url, failure_detail
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
@@ -377,7 +378,7 @@ class LibraryRegistryController(object):
                 image = Image.open(logo_response.raw)
             except Exception, e:
                 image_url = auth_document.logo_link.get("href")
-                logging.error(
+                self.log.error(
                     "Registration of %s failed: could not read logo image %s",
                     auth_url, image_url
                 )
@@ -395,7 +396,7 @@ class LibraryRegistryController(object):
             library.logo = None
         problem = auth_document.update_library(library)
         if problem:
-            logging.error(
+            self.log.error(
                 "Registration of %s failed: problem during registration: %r",
                 auth_url, problem
             )

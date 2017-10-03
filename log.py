@@ -53,22 +53,22 @@ class LogConfiguration(object):
     configuration from the database.
     """
 
-    DEFAULT_MESSAGE_TEMPLATE = "%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"
-    DEFAULT_LOGGLY_URL = "https://logs-01.loggly.com/inputs/%(token)s/tag/python/"
+    DEFAULT_MESSAGE_TEMPLATE = u"%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"
+    DEFAULT_LOGGLY_URL = u"https://logs-01.loggly.com/inputs/%(token)s/tag/python/"
 
-    DEBUG = "DEBUG"
-    INFO = "INFO"
-    WARN = "WARN"
-    ERROR = "ERROR"
+    DEBUG = u"DEBUG"
+    INFO = u"INFO"
+    WARN = u"WARN"
+    ERROR = u"ERROR"
 
-    JSON_LOG_FORMAT = 'json'
-    TEXT_LOG_FORMAT = 'text'
+    JSON_LOG_FORMAT = u'json'
+    TEXT_LOG_FORMAT = u'text'
 
     # Settings for the integration with protocol=INTERNAL_LOGGING
-    LOG_LEVEL = 'log_level'
-    LOG_FORMAT = 'log_format'
-    DATABASE_LOG_LEVEL = 'database_log_level'
-    LOG_MESSAGE_TEMPLATE = 'message_template'
+    LOG_LEVEL = u'log_level'
+    LOG_FORMAT = u'log_format'
+    DATABASE_LOG_LEVEL = u'database_log_level'
+    LOG_MESSAGE_TEMPLATE = u'message_template'
 
     @classmethod
     def initialize(cls, _db, testing=False):
@@ -151,21 +151,20 @@ class LogConfiguration(object):
                 _db, ExternalIntegration.LOGGLY, goal
             )
             if internal:
-                internal_log_level = (
-                    internal.setting(cls.LOG_LEVEL).value 
-                    or internal_log_level
+                internal_log_level = internal.setting(cls.LOG_LEVEL).setdefault(
+                    internal_log_level
                 )
-                internal_log_format = (
-                    internal.setting(cls.LOG_FORMAT).value 
-                    or internal_log_format
+
+                internal_log_format = internal.setting(cls.LOG_FORMAT).setdefault(
+                    internal_log_format
                 )
-                database_log_level = (
-                    internal.setting(cls.DATABASE_LOG_LEVEL).value
-                    or database_log_level
+
+                database_log_level = internal.setting(cls.DATABASE_LOG_LEVEL).setdefault(
+                    database_log_level
                 )
-                message_template = (
-                    internal.setting(cls.LOG_MESSAGE_TEMPLATE).value
-                    or message_template
+
+                message_template = internal.setting(cls.LOG_MESSAGE_TEMPLATE).setdefault(
+                    message_template
                 )
 
             if loggly:
