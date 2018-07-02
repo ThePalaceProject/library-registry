@@ -463,4 +463,4 @@ class LibraryRegistryController(object):
         else:
             status_code = 200
 
-        return self.catalog_response(content, status_code)
+        return self.catalog_response(catalog, status_code)

@@ -324,7 +324,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="GET"):
             response = self.controller.register()
             eq_(200, response.status_code)
-            data = json.loads("response.data")
+            data = json.loads(response.data)
             [link] = data['links']
             eq_("terms-of-service", link["rel"])
             eq_("data:text/html;%s" % base64.encodestring(tos),
@@ -685,7 +685,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         # So the library re-registers itself, and gets an updated
         # registry entry.
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([("url", auth_url)])
 
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -727,7 +727,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         # If we include the old secret in a request, the registry will
         # generate a new secret.
-        with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}):
+        with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}, method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org/authentication.opds"),
             ])
