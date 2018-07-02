@@ -73,6 +73,7 @@ class ControllerTest(DatabaseTest):
         # in this module.
         self.registration_form = ImmutableMultiDict([
             ("url", "http://circmanager.org/authentication.opds"),
+            ("contact", "mailto:integrationproblems@library.org"),
         ])
 
 class TestLibraryRegistryController(ControllerTest):
@@ -291,6 +292,9 @@ class TestLibraryRegistryController(ControllerTest):
                 {"rel": "logo", "href": "data:image/png;imagedata" },
                 {"rel": "register", "href": "http://circmanager.org/new-account" },
                 {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"},
+                {"rel": "help", "href": "http://help.library.org/"},
+                {"rel": "help", "href": "mailto:help@library.org"},
+                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright", "href": "mailto:dmca@library.org"},
             ],
             "service_area": { "US": "Kansas" },
             "collection_size": 100,
@@ -397,6 +401,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://a-different-url/"),
+                ("contact", "mailto:me@library.org"),
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -604,7 +609,10 @@ class TestLibraryRegistryController(ControllerTest):
 
         # Send a registration request to the registry.
         with self.app.test_request_context("/", method="POST"):
-            flask.request.form = ImmutableMultiDict([("url", auth_url)])
+            flask.request.form = ImmutableMultiDict([
+                ("url", auth_url),
+                ("contact", "mailto:me@library.org"),
+            ])
             response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(201, response.status_code)
@@ -671,7 +679,10 @@ class TestLibraryRegistryController(ControllerTest):
             "service_description": "New and improved",
             "links": [
                 {"rel": "logo", "href": "/logo.png", "type": "image/png" },
-                {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"}
+                {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"},
+                {"rel": "help", "href": "mailto:new-help@library.org"},
+                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright", "href": "mailto:new-dmca@library.org"},
+
             ],
             "service_area": { "US": "Connecticut" },
         }
@@ -686,7 +697,10 @@ class TestLibraryRegistryController(ControllerTest):
         # So the library re-registers itself, and gets an updated
         # registry entry.
         with self.app.test_request_context("/", method="POST"):
-            flask.request.form = ImmutableMultiDict([("url", auth_url)])
+            flask.request.form = ImmutableMultiDict([
+                ("url", auth_url),
+                ("contact", "mailto:me@library.org"),
+            ])
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(200, response.status_code)
@@ -730,6 +744,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}, method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org/authentication.opds"),
+                ("contact", "mailto:me@library.org"),
             ])
 
             key = RSA.generate(1024)
@@ -740,7 +755,6 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(200, response.status_code)
             catalog = json.loads(response.data)
-
             assert library.shared_secret != old_secret
 
             # The registry encrypted the new secret with the public key, and
@@ -755,6 +769,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", headers={"Authorization": "Bearer notthesecret"}):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org/authentication.opds"),
+                ("contact", "mailto:me@library.org"),
             ])
 
             key = RSA.generate(1024)

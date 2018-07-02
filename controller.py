@@ -1,3 +1,4 @@
+from collections import defaultdict
 from nose.tools import set_trace
 import logging
 import flask
@@ -271,7 +272,7 @@ class LibraryRegistryController(object):
         headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
         return Response(document, status, headers=headers)
 
-    def _required_email_address(self, uri, title):
+    def _required_email_address(self, uri, problem_title):
         """`uri` must be a mailto: URI.
 
         :return: Either an email address or a customized ProblemDetail.
@@ -282,13 +283,30 @@ class LibraryRegistryController(object):
             problem = on_error.detailed("No email address was provided")
         elif not uri.startswith("mailto:"):
             problem = on_error.detailed(
-                _("URI must start with 'mailto:' (got: %s)", uri) 
+                _("URI must start with 'mailto:' (got: %s)") % uri
             )
-        return uri
         if problem:
-            problem.title = title
+            problem.title = problem_title
             return problem
         return uri[7:]
+
+    def _locate_email_address(self, links, problem_title):
+        """Find an email address in a list of links.
+
+        :return: Either an email address or a customized ProblemDetail.
+        """
+        value = None
+        for link in links:
+            uri = link.get('href')
+            value = self._required_email_address(uri, problem_title)
+            if isinstance(value, basestring):
+                # We found an email address.
+                break
+        if value is None:
+            # There wre no relevant links at all.
+            problem = INVALID_CONTACT_URI.detail("No candidate links found.")
+            problem.title = problem_title
+        return value
 
     def register(self, do_get=HTTP.get_with_timeout):
         if flask.request.method == 'GET':
@@ -300,9 +318,11 @@ class LibraryRegistryController(object):
             return NO_AUTH_URL
 
         integration_contact_uri = flask.request.form.get("contact")
-        integration_contact_uri = self._required_email_address(
+        integration_contact_email = self._required_email_address(
             integration_contact_uri, "Invalid integration contact address"
         )
+        if isinstance(integration_contact_email, ProblemDetail):
+            return integration_contact_email
 
         def _make_request(url, on_404, on_timeout, on_exception, allow_401=False):
             allowed_codes = ["2xx", "3xx", 404]
@@ -375,21 +395,23 @@ class LibraryRegistryController(object):
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
         # Make sure the authentication document includes a way for
-        # patrons to get help or file a copyright complaint. Both are
-        # required for registration to succeed, but we don't care what
-        # the values are.
-        links_by_rel = defaultdict([])
+        # patrons to get help or file a copyright complaint.
+        links_by_rel = defaultdict(list)
         for l in auth_document.links:
             links_by_rel[l.get('rel')].append(l)
-        for rel, title in [
-                ('help', "Patron help URI is missing")
+        for rel, problem_title in [
+                ('help', "No valid patron help URI"),
                 ("http://librarysimplified.org/rel/designated-agent/copyright",
-                 "Designated copyright agent email address is missing")
+                 "No valid copyright designated agent email address")
         ]:
-            if rel not in links_by_rel:
+            links = links_by_rel.get(rel, [])
+            if not links:
                 problem = INVALID_CONTACT_URI.detailed("")
-                problem.title = title
+                problem.title = problem_title
                 return problem
+            address = self._locate_email_address(links, problem_title)
+            if isinstance(address, ProblemDetail):
+                return address
 
         # Cross-check the opds_url to make sure it links back to the
         # authentication document.
