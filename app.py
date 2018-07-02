@@ -67,7 +67,7 @@ def nearby_qa():
         originating_ip(), live=False
     )
 
-@app.route("/register", methods=["GET,POST"])
+@app.route("/register", methods=["GET","POST"])
 @returns_problem_detail
 def register():
     return app.library_registry.registry_controller.register()
