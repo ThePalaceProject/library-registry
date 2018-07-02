@@ -1,6 +1,6 @@
 import base64
 from config import Configuration
-from flask.ext.babel import lazy_gettext as _
+from flask_babel import lazy_gettext as _
 import datetime
 import logging
 from nose.tools import set_trace
@@ -1420,7 +1420,7 @@ class ExternalIntegration(Base):
         return self.setting(self.URL).value
 
     @url.setter
-    def set_url(self, new_url):
+    def url(self, new_url):
         self.set_setting(self.URL, new_url)
 
     @hybrid_property
@@ -1428,7 +1428,7 @@ class ExternalIntegration(Base):
         return self.setting(self.USERNAME).value
 
     @username.setter
-    def set_username(self, new_username):
+    def username(self, new_username):
         self.set_setting(self.USERNAME, new_username)
 
     @hybrid_property
@@ -1436,7 +1436,7 @@ class ExternalIntegration(Base):
         return self.setting(self.PASSWORD).value
 
     @password.setter
-    def set_password(self, new_password):
+    def password(self, new_password):
         return self.set_setting(self.PASSWORD, new_password)
 
     def set_setting(self, key, value):
@@ -1628,7 +1628,7 @@ class ConfigurationSetting(Base):
         return self._value
     
     @value.setter
-    def set_value(self, new_value):
+    def value(self, new_value):
         self._value = new_value
 
     def setdefault(self, default=None):

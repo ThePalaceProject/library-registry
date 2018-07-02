@@ -38,6 +38,8 @@ class Configuration(object):
     ADOBE_VENDOR_ID = "vendor_id"
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
     ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
+
+    REGISTRATION_TERMS_OF_SERVICE_TEXT = "registration_terms_of_service_text"
     
     @classmethod
     def load(cls):
