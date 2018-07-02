@@ -22,6 +22,7 @@ from authentication_document import AuthenticationDocument
 
 from model import (
     production_session,
+    ConfigurationSetting,
     Library,
     ServiceArea,
     get_one_or_create,
@@ -242,7 +243,39 @@ class LibraryRegistryController(object):
             return False
         return auth_url in links
 
+    @property
+    def registration_document(self):
+        """Serve a document that describes the registration process,
+        notably the terms of service for that process.
+
+        The terms of service are included inline as a data: URI,
+        to avoid the need to fetch them in a separate request.
+        """
+        document = dict()
+        terms_of_service = ConfigurationSetting.sitewide(
+            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_TEXT
+        ).value
+        if terms_of_service:
+            terms_of_service = base64.encodestring(terms_of_service)
+            terms_of_service_uri = "data:text/html;%s" % terms_of_service
+            OPDSCatalog.add_link_to_catalog(
+                document, rel="terms-of-service",
+                href=terms_of_service_uri
+            )
+        return document
+
+    def catalog_response(self, document, status=200):
+        """Serve an OPDS 2.0 catalog."""
+        if not isinstance(document, basestring):
+            document = json.dumps(document)
+        headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
+        return Response(document, status, headers=headers)
+
     def register(self, do_get=HTTP.get_with_timeout):
+        if flask.request.method == 'GET':
+            document = self.registration_document
+            return self.catalog_response(document)
+
         auth_url = flask.request.form.get("url")
         if not auth_url:
             return NO_AUTH_URL
@@ -425,11 +458,9 @@ class LibraryRegistryController(object):
 
             catalog["metadata"]["short_name"] = library.short_name
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
-        content = json.dumps(catalog)
-        headers = dict()
-        headers["Content-Type"] = OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
-
         if is_new:
-            return Response(content, 201, headers=headers)
+            status_code = 201
         else:
-            return Response(content, 200, headers=headers)
+            status_code = 200
+
+        return self.catalog_response(content, status_code)

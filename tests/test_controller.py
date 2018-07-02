@@ -23,10 +23,11 @@ from testing import DummyHTTPClient
 from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
 from model import (
-  get_one,
-  get_one_or_create,
-  ExternalIntegration,
-  Library,
+    get_one,
+    get_one_or_create,
+    ConfigurationSetting,
+    ExternalIntegration,
+    Library,
 )
 from util.http import RequestTimedOut
 from problem_details import *
@@ -211,7 +212,6 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
             catalog = json.loads(response.data)
-
             # We found the two matching results.
             [nypl, ks] = catalog['catalogs']
             eq_("NYPL", nypl['metadata']['title'])
@@ -303,17 +303,44 @@ class TestLibraryRegistryController(ControllerTest):
             }
         return auth_document
 
+    def test_register_get(self):
+
+        # When there is no terms-of-service document, you can get a
+        # document describing the authentication process but it's
+        # empty.
+        with self.app.test_request_context("/", method="GET"):
+            response = self.controller.register()
+            eq_(200, response.status_code)
+            eq_('{}', response.data)
+
+        # Set some terms of service.
+        tos = "Some terms"
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_TEXT
+        ).value = tos
+
+        # Now the document 'links' to the terms of service via a data:
+        # URI.
+        with self.app.test_request_context("/", method="GET"):
+            response = self.controller.register()
+            eq_(200, response.status_code)
+            data = json.loads("response.data")
+            [link] = data['links']
+            eq_("terms-of-service", link["rel"])
+            eq_("data:text/html;%s" % base64.encodestring(tos),
+                link['href'])
+
     def test_register_fails_when_no_auth_document_url_provided(self):
         """Without the URL to an Authentication For OPDS document,
         the registration process can't begin.
         """
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(NO_AUTH_URL, response)
 
     def test_register_fails_when_auth_document_url_times_out(self):
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             self.http_client.queue_response(
                 RequestTimedOut("http://url", "sorry")
@@ -326,7 +353,7 @@ class TestLibraryRegistryController(ControllerTest):
         """If the URL provided results in a status code other than
         200, the registration process can't begin.
         """
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
 
             # This server isn't working.
@@ -356,7 +383,7 @@ class TestLibraryRegistryController(ControllerTest):
         self.http_client.queue_response(
             200, content="I am not an Authentication For OPDS document."
         )
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT, response)
@@ -367,7 +394,7 @@ class TestLibraryRegistryController(ControllerTest):
         """
         auth_document = self._auth_document()
         self.http_client.queue_response(200, content=json.dumps(auth_document))
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://a-different-url/"),
             ])
@@ -383,7 +410,7 @@ class TestLibraryRegistryController(ControllerTest):
         auth_document = self._auth_document()
         del auth_document['title']
         self.http_client.queue_response(200, content=json.dumps(auth_document))
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -399,7 +426,7 @@ class TestLibraryRegistryController(ControllerTest):
             if link['rel'] == 'start':
                 auth_document['links'].remove(link)
         self.http_client.queue_response(200, content=json.dumps(auth_document))
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -413,7 +440,7 @@ class TestLibraryRegistryController(ControllerTest):
         auth_document = self._auth_document()
         self.http_client.queue_response(200, content=json.dumps(auth_document))
         self.http_client.queue_response(404)
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INTEGRATION_DOCUMENT_NOT_FOUND.uri, response.uri)
@@ -427,7 +454,7 @@ class TestLibraryRegistryController(ControllerTest):
         auth_document = self._auth_document()
         self.http_client.queue_response(200, content=json.dumps(auth_document))
         self.http_client.queue_response(RequestTimedOut("http://url", "sorry"))
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(TIMEOUT.uri, response.uri)
@@ -441,7 +468,7 @@ class TestLibraryRegistryController(ControllerTest):
         auth_document = self._auth_document()
         self.http_client.queue_response(200, content=json.dumps(auth_document))
         self.http_client.queue_response(500)
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(ERROR_RETRIEVING_DOCUMENT.uri, response.uri)
@@ -457,7 +484,7 @@ class TestLibraryRegistryController(ControllerTest):
         # The start link returns a 200 response code but the wrong
         # Content-Type.
         self.http_client.queue_response(200, "text/html")
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -471,7 +498,7 @@ class TestLibraryRegistryController(ControllerTest):
         # Content-Type, but there is no Link header and the body is no
         # help.
         self.http_client.queue_response(200, OPDSCatalog.OPDS_TYPE, content='{}')
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -495,7 +522,7 @@ class TestLibraryRegistryController(ControllerTest):
         # Image request fails.
         self.http_client.queue_response(500)
 
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -506,7 +533,7 @@ class TestLibraryRegistryController(ControllerTest):
         """The auth document is valid but the registry doesn't recognize the
         library's service area.
         """
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Somewhere"]}
@@ -517,7 +544,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
 
     def test_register_fails_on_ambiguous_service_area(self):
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Manhattan"]}
@@ -528,7 +555,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("The following service area was ambiguous: {\"US\": [\"Manhattan\"]}.", response.detail)
 
     def test_register_fails_on_401_with_no_authentication_document(self):
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
             self.http_client.queue_response(200, content=json.dumps(auth_document))
@@ -538,7 +565,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("401 response at http://circmanager.org/feed/ did not yield an Authentication For OPDS document", response.detail)
 
     def test_register_fails_on_401_if_authentication_document_ids_do_not_match(self):
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
             self.http_client.queue_response(200, content=json.dumps(auth_document))
@@ -552,7 +579,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Authentication For OPDS document guarding http://circmanager.org/feed/ does not match the one at http://circmanager.org/authentication.opds", response.detail)
 
     def test_register_succeeds_on_401_if_authentication_document_ids_match(self):
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
             self.http_client.queue_response(200, content=json.dumps(auth_document))
@@ -576,7 +603,7 @@ class TestLibraryRegistryController(ControllerTest):
         opds_url = "http://circmanager.org/feed/"
 
         # Send a registration request to the registry.
-        with self.app.test_request_context("/"):
+        with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([("url", auth_url)])
             response = self.controller.register(do_get=self.http_client.do_get)
 
