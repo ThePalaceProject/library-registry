@@ -4,7 +4,7 @@ import sys
 import urlparse
 
 from flask import Flask, url_for, redirect, Response, request
-from flask.ext.babel import Babel
+from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
 from config import Configuration

@@ -1,5 +1,5 @@
 from util.problem_detail import ProblemDetail as pd
-from flask.ext.babel import lazy_gettext as _
+from flask_babel import lazy_gettext as _
 
 NO_AUTH_URL = pd(
       "http://librarysimplified.org/terms/problem/no-opds-auth-url",

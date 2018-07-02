@@ -1,7 +1,7 @@
 from nose.tools import set_trace
 import logging
 import flask
-from flask.ext.babel import lazy_gettext as _
+from flask_babel import lazy_gettext as _
 from flask import (
     Response,
     url_for,

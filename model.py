@@ -1,6 +1,6 @@
 import base64
 from config import Configuration
-from flask.ext.babel import lazy_gettext as _
+from flask_babel import lazy_gettext as _
 import datetime
 import logging
 from nose.tools import set_trace
