@@ -271,6 +271,25 @@ class LibraryRegistryController(object):
         headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
         return Response(document, status, headers=headers)
 
+    def _required_email_address(self, uri, title):
+        """`uri` must be a mailto: URI.
+
+        :return: Either an email address or a customized ProblemDetail.
+        """
+        problem = None
+        on_error = INVALID_CONTACT_URI
+        if not uri:
+            problem = on_error.detailed("No email address was provided")
+        elif not uri.startswith("mailto:"):
+            problem = on_error.detailed(
+                _("URI must start with 'mailto:' (got: %s)", uri) 
+            )
+        return uri
+        if problem:
+            problem.title = title
+            return problem
+        return uri[7:]
+
     def register(self, do_get=HTTP.get_with_timeout):
         if flask.request.method == 'GET':
             document = self.registration_document
@@ -279,6 +298,11 @@ class LibraryRegistryController(object):
         auth_url = flask.request.form.get("url")
         if not auth_url:
             return NO_AUTH_URL
+
+        integration_contact_uri = flask.request.form.get("contact")
+        integration_contact_uri = self._required_email_address(
+            integration_contact_uri, "Invalid integration contact address"
+        )
 
         def _make_request(url, on_404, on_timeout, on_exception, allow_401=False):
             allowed_codes = ["2xx", "3xx", 404]
@@ -349,6 +373,23 @@ class LibraryRegistryController(object):
                 "Registration of %s failed: %s", auth_url, failure_detail
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
+
+        # Make sure the authentication document includes a way for
+        # patrons to get help or file a copyright complaint. Both are
+        # required for registration to succeed, but we don't care what
+        # the values are.
+        links_by_rel = defaultdict([])
+        for l in auth_document.links:
+            links_by_rel[l.get('rel')].append(l)
+        for rel, title in [
+                ('help', "Patron help URI is missing")
+                ("http://librarysimplified.org/rel/designated-agent/copyright",
+                 "Designated copyright agent email address is missing")
+        ]:
+            if rel not in links_by_rel:
+                problem = INVALID_CONTACT_URI.detailed("")
+                problem.title = title
+                return problem
 
         # Cross-check the opds_url to make sure it links back to the
         # authentication document.
