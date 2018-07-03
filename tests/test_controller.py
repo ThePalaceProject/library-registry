@@ -603,21 +603,23 @@ class TestLibraryRegistryController(ControllerTest):
                 ("url", "http://circmanager.org/authentication.opds"),
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_("No valid integration contact address", response.title)
+            eq_("Invalid or missing configuration contact email address",
+                response.title)
 
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org/authentication.opds"),
                 ("contact", "http://contact-us/")
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
-            eq_("No valid integration contact address", response.title)
+            eq_("Invalid or missing configuration contact email address",
+                response.title)
 
     def test_register_fails_on_missing_email_in_authentication_document(self):
 
         for (rel, error) in (
                 ("http://librarysimplified.org/rel/designated-agent/copyright",
-                 "No valid copyright designated agent email address"),
-                ("help", "No valid patron help email address")
+                 "Invalid or missing copyright designated agent email address"),
+                ("help", "Invalid or missing patron support email address")
         ):
             # Start with a valid document.
             auth_document = self._auth_document()

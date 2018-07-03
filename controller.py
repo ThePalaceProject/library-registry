@@ -369,7 +369,7 @@ class LibraryRegistryController(object):
         for rel, problem_title in [
             ('help', "Invalid or missing patron support email address"),
             (Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL,
-             "Invalid or missing copyright designated agent email")
+             "Invalid or missing copyright designated agent email address")
         ]:
             uris = self._locate_email_addresses(rel, links, problem_title)
             if isinstance(uris, ProblemDetail):
