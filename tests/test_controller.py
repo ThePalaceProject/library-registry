@@ -782,11 +782,18 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(Library.LIVE, library.stage)
 
             # There are still three Hyperlinks associated with the
-            # library. Two of them have changed their hrefs to reflect
-            # what's in the new authentication document
-            help_link, copyright_agent_link, integration_contact_link = sorted(
+            # library.
+            help_link_2, copyright_agent_link_2, integration_contact_link_2 = sorted(
                 library.hyperlinks, key=lambda x: x.rel
             )
+
+            # The Hyperlink objects are the same as before.
+            eq_(help_link_2, help_link)
+            eq_(copyright_agent_link_2, copyright_agent_link)
+            eq_(integration_contact_link_2, integration_contact_link)
+
+            # But two of the hrefs have been updated to reflect the new
+            # authentication document.
             eq_("help", help_link.rel)
             eq_("mailto:new-help@library.org", help_link.href)
             eq_(Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, copyright_agent_link.rel)

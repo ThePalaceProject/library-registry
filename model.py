@@ -1206,12 +1206,10 @@ class Hyperlink(Base):
     INTEGRATION_CONTACT_REL = "http://librarysimplified.org/rel/integration-contact"
     COPYRIGHT_DESIGNATED_AGENT_REL = "http://librarysimplified.org/rel/designated-agent/copyright"
 
-    __tablename__ = 'hyperlinks',
+    __tablename__ = 'hyperlinks'
 
     id = Column(Integer, primary_key=True)
-    library_id = Column(
-        Integer, ForeignKey('libraries.id'), index=True
-    )
+    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
     rel = Column(Unicode, index=True, nullable=False)
     href = Column(Unicode, nullable=False)
 
