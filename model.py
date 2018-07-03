@@ -786,8 +786,10 @@ class Library(Base):
             is True if a new Hyperlink was created _or_ an existing
             Hyperlink was modified.
         """
+        if not rel:
+            raise ValueError("No link relation was specified")
         if not hrefs:
-            raise ValueError("No Hyperlink href was specified")
+            raise ValueError("No Hyperlink hrefs were specified")
         default_href = hrefs[0]
         _db = Session.object_session(self)
         hyperlink, is_modified = get_one_or_create(
