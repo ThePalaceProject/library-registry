@@ -19,6 +19,7 @@ from Crypto.Cipher import PKCS1_OAEP
 
 from . import DatabaseTest
 from testing import DummyHTTPClient
+from util.problem_detail import ProblemDetail
 
 from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
@@ -931,3 +932,52 @@ class TestLibraryRegistryController(ControllerTest):
                 response, auth_url
             )
         )
+
+    def test__required_email_address(self):
+        """Validate the code that makes sure an input is a mailto: URI."""
+        uri = INVALID_CONTACT_URI.uri
+        m = LibraryRegistryController._required_email_address
+
+        problem = m(None, 'a title')
+        eq_(uri, problem.uri)
+        # The custom title is used.
+        eq_("a title", problem.title)
+        eq_("No email address was provided", problem.detail)
+
+        # Changing the title doesn't affect the original ProblemDetail
+        # document.
+        assert "a title" != INVALID_CONTACT_URI.title
+
+        problem = m("http://not-an-email/", "a title")
+        eq_(uri, problem.uri)
+        eq_("URI must start with 'mailto:' (got: http://not-an-email/)",
+            problem.detail)
+
+        mailto = "mailto:me@library.org"
+        success = m(mailto, "a title")
+        eq_(mailto, success)
+
+    def test__locate_email_address(self):
+        """Test the code that finds an email address in a list of links."""
+        uri = INVALID_CONTACT_URI.uri
+        m = LibraryRegistryController._locate_email_address
+
+        # No links at all.
+        result = m([], "a title")
+        assert isinstance(result, ProblemDetail)
+        eq_(uri, result.uri)
+        eq_("a title", result.title)
+        eq_("No valid mailto: links found.", result.detail)
+
+        # Links, but they're all bad.
+        links = [dict(href="http://foo/"), dict(href="http://bar/")]
+        result = m(links, "a title")
+        assert isinstance(result, ProblemDetail)
+        eq_(uri, result.uri)
+        eq_("a title", result.title)
+        eq_("No valid mailto: links found.", result.detail)
+
+        # One link that works.
+        links.append(dict(href="mailto:me@library.org"))
+        result = m(links, "a title")
+        eq_("mailto:me@library.org", result)

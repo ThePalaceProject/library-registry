@@ -272,42 +272,6 @@ class LibraryRegistryController(object):
         headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
         return Response(document, status, headers=headers)
 
-    def _required_email_address(self, uri, problem_title):
-        """`uri` must be a mailto: URI.
-
-        :return: Either an email address or a customized ProblemDetail.
-        """
-        problem = None
-        on_error = INVALID_CONTACT_URI
-        if not uri:
-            problem = on_error.detailed("No email address was provided")
-        elif not uri.startswith("mailto:"):
-            problem = on_error.detailed(
-                _("URI must start with 'mailto:' (got: %s)") % uri
-            )
-        if problem:
-            problem.title = problem_title
-            return problem
-        return uri[7:]
-
-    def _locate_email_address(self, links, problem_title):
-        """Find an email address in a list of links.
-
-        :return: Either an email address or a customized ProblemDetail.
-        """
-        value = None
-        for link in links:
-            uri = link.get('href')
-            value = self._required_email_address(uri, problem_title)
-            if isinstance(value, basestring):
-                # We found an email address.
-                break
-        if value is None:
-            # There wre no relevant links at all.
-            problem = INVALID_CONTACT_URI.detail("No candidate links found.")
-            problem.title = problem_title
-        return value
-
     def register(self, do_get=HTTP.get_with_timeout):
         if flask.request.method == 'GET':
             document = self.registration_document
@@ -527,3 +491,41 @@ class LibraryRegistryController(object):
             status_code = 200
 
         return self.catalog_response(catalog, status_code)
+
+    @classmethod
+    def _required_email_address(cls, uri, problem_title):
+        """Verify that `uri` is a mailto: URI.
+
+        :return: Either a mailto: URI or a customized ProblemDetail.
+        """
+        problem = None
+        on_error = INVALID_CONTACT_URI
+        if not uri:
+            problem = on_error.detailed("No email address was provided")
+        elif not uri.startswith("mailto:"):
+            problem = on_error.detailed(
+                _("URI must start with 'mailto:' (got: %s)") % uri
+            )
+        if problem:
+            problem.title = problem_title
+            return problem
+        return uri
+
+    @classmethod
+    def _locate_email_address(cls, links, problem_title):
+        """Find an email address in a list of links.
+
+        :return: Either an email address or a customized ProblemDetail.
+        """
+        value = None
+        for link in links:
+            uri = link.get('href')
+            value = cls._required_email_address(uri, problem_title)
+            if isinstance(value, basestring):
+                # We found an email address.
+                return value
+
+        # There were no relevant links.
+        value = INVALID_CONTACT_URI.detailed("No valid mailto: links found.")
+        value.title = problem_title
+        return value
