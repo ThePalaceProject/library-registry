@@ -28,6 +28,7 @@ from model import (
     get_one_or_create,
     ConfigurationSetting,
     ExternalIntegration,
+    Hyperlink,
     Library,
 )
 from util.http import RequestTimedOut
@@ -714,6 +715,18 @@ class TestLibraryRegistryController(ControllerTest):
         old_secret = library.shared_secret
         self.http_client.requests = []
 
+        # Hyperlink objects were created for the three email addresses
+        # associated with the library.
+        help_link, copyright_agent_link, integration_contact_link = sorted(
+            library.hyperlinks, key=lambda x: x.rel
+        )
+        eq_("help", help_link.rel)
+        eq_("mailto:help@library.org", help_link.href)
+        eq_(Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, copyright_agent_link.rel)
+        eq_("mailto:dmca@library.org", copyright_agent_link.href)
+        eq_(Hyperlink.INTEGRATION_CONTACT_REL, integration_contact_link.rel)
+        eq_("mailto:me@library.org", integration_contact_link.href)
+
         # A human inspects the library, verifies that everything
         # works, and makes it LIVE.
         library.stage = Library.LIVE
@@ -738,7 +751,6 @@ class TestLibraryRegistryController(ControllerTest):
         # We have a new logo as well.
         image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
         self.http_client.queue_response(200, content=image_data, media_type="image/png")
-
 
         # So the library re-registers itself, and gets an updated
         # registry entry.
@@ -768,6 +780,21 @@ class TestLibraryRegistryController(ControllerTest):
             # The library's stage is still LIVE, it has not gone back to
             # REGISTERED.
             eq_(Library.LIVE, library.stage)
+
+            # There are still three Hyperlinks associated with the
+            # library. Two of them have changed their hrefs to reflect
+            # what's in the new authentication document
+            help_link, copyright_agent_link, integration_contact_link = sorted(
+                library.hyperlinks, key=lambda x: x.rel
+            )
+            eq_("help", help_link.rel)
+            eq_("mailto:new-help@library.org", help_link.href)
+            eq_(Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, copyright_agent_link.rel)
+            eq_("mailto:new-dmca@library.org", copyright_agent_link.href)
+
+            # The link that hasn't changed is unaffected.
+            eq_(Hyperlink.INTEGRATION_CONTACT_REL, integration_contact_link.rel)
+            eq_("mailto:me@library.org", integration_contact_link.href)
             
             # Commit to update library.service_areas.
             self._db.commit()
@@ -1002,27 +1029,30 @@ class TestLibraryRegistryController(ControllerTest):
         success = m(mailto, "a title")
         eq_(mailto, success)
 
-    def test__locate_email_address(self):
+    def test__locate_email_addresses(self):
         """Test the code that finds an email address in a list of links."""
         uri = INVALID_CONTACT_URI.uri
-        m = LibraryRegistryController._locate_email_address
+        m = LibraryRegistryController._locate_email_addresses
 
         # No links at all.
-        result = m([], "a title")
+        result = m("rel0", [], "a title")
         assert isinstance(result, ProblemDetail)
         eq_(uri, result.uri)
         eq_("a title", result.title)
-        eq_("No valid mailto: links found.", result.detail)
+        eq_("No valid mailto: links found with rel=rel0", result.detail)
 
-        # Links, but they're all bad.
-        links = [dict(href="http://foo/"), dict(href="http://bar/")]
-        result = m(links, "a title")
+        # Links exist but none are valid and relevant.
+        links = [dict(rel="rel1", href="http://foo/"),
+                 dict(rel="rel1", href="http://bar/"),
+                 dict(rel="rel2", href="mailto:me@library.org"),
+                 dict(rel="rel2", href="mailto:me2@library.org"),
+        ]
+        result = m("rel1", links, "a title")
         assert isinstance(result, ProblemDetail)
         eq_(uri, result.uri)
         eq_("a title", result.title)
-        eq_("No valid mailto: links found.", result.detail)
+        eq_("No valid mailto: links found with rel=rel1", result.detail)
 
-        # One link that works.
-        links.append(dict(href="mailto:me@library.org"))
-        result = m(links, "a title")
-        eq_("mailto:me@library.org", result)
+        # Multiple links that work.
+        result = m("rel2", links, "a title")
+        eq_(["mailto:me@library.org", "mailto:me2@library.org"], result)
