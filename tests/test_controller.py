@@ -595,6 +595,38 @@ class TestLibraryRegistryController(ControllerTest):
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(201, response.status_code)
+
+    def test_register_fails_on_no_contact_email(self):
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org/authentication.opds"),
+            ])
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_("No valid integration contact address", response.title)
+
+    def test_register_fails_on_no_copyright_agent_email(self):
+        auth_document = self._auth_document()
+        auth_document['links'] = filter(
+            lambda x: x['rel'] != "http://librarysimplified.org/rel/designated-agent/copyright",
+            auth_document['links']
+        )
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_("No valid copyright designated agent email address", response.title)
+
+    def test_register_fails_on_no_patron_help_email(self):
+        auth_document = self._auth_document()
+        auth_document['links'] = filter(
+            lambda x: x['rel'] != "help" or not x['href'].startswith("mailto:"),
+            auth_document['links']
+        )
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_("No valid patron help email address", response.title)
         
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
