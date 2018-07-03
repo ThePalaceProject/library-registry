@@ -283,7 +283,8 @@ class LibraryRegistryController(object):
 
         integration_contact_uri = flask.request.form.get("contact")
         integration_contact_email = self._required_email_address(
-            integration_contact_uri, "No valid integration contact address"
+            integration_contact_uri,
+            "Invalid or missing configuration contact email address"
         )
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
@@ -366,9 +367,9 @@ class LibraryRegistryController(object):
         # links in the database as Hyperlink objects.
         links = auth_document.links or []
         for rel, problem_title in [
-            ('help', "No valid patron help email address"),
+            ('help', "Invalid or missing patron support email address"),
             (Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL,
-             "No valid copyright designated agent email address")
+             "Invalid or missing copyright designated agent email")
         ]:
             uris = self._locate_email_addresses(rel, links, problem_title)
             if isinstance(uris, ProblemDetail):
