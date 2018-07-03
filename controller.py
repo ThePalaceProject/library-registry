@@ -1,4 +1,3 @@
-from collections import defaultdict
 from nose.tools import set_trace
 import logging
 import flask
@@ -24,6 +23,7 @@ from authentication_document import AuthenticationDocument
 from model import (
     production_session,
     ConfigurationSetting,
+    Hyperlink,
     Library,
     ServiceArea,
     get_one_or_create,
@@ -283,10 +283,14 @@ class LibraryRegistryController(object):
 
         integration_contact_uri = flask.request.form.get("contact")
         integration_contact_email = self._required_email_address(
-            integration_contact_uri, "No valid integration contact address"
+            integration_contact_uri,
+            "Invalid or missing configuration contact email address"
         )
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
+        hyperlinks_to_create = [
+            (Hyperlink.INTEGRATION_CONTACT_REL, [integration_contact_email])
+        ]
 
         def _make_request(url, on_404, on_timeout, on_exception, allow_401=False):
             allowed_codes = ["2xx", "3xx", 404]
@@ -359,23 +363,18 @@ class LibraryRegistryController(object):
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
         # Make sure the authentication document includes a way for
-        # patrons to get help or file a copyright complaint.
-        links_by_rel = defaultdict(list)
-        for l in auth_document.links:
-            links_by_rel[l.get('rel')].append(l)
+        # patrons to get help or file a copyright complaint. Store these
+        # links in the database as Hyperlink objects.
+        links = auth_document.links or []
         for rel, problem_title in [
-                ('help', "No valid patron help email address"),
-                ("http://librarysimplified.org/rel/designated-agent/copyright",
-                 "No valid copyright designated agent email address")
+            ('help', "Invalid or missing patron support email address"),
+            (Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL,
+             "Invalid or missing copyright designated agent email address")
         ]:
-            links = links_by_rel.get(rel, [])
-            if not links:
-                problem = INVALID_CONTACT_URI.detailed("")
-                problem.title = problem_title
-                return problem
-            address = self._locate_email_address(links, problem_title)
-            if isinstance(address, ProblemDetail):
-                return address
+            uris = self._locate_email_addresses(rel, links, problem_title)
+            if isinstance(uris, ProblemDetail):
+                return uris
+            hyperlinks_to_create.append((rel, uris))
 
         # Cross-check the opds_url to make sure it links back to the
         # authentication document.
@@ -485,6 +484,10 @@ class LibraryRegistryController(object):
 
             catalog["metadata"]["short_name"] = library.short_name
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
+
+        for rel, candidates in hyperlinks_to_create:
+            library.set_hyperlink(rel, *candidates)
+
         if is_new:
             status_code = 201
         else:
@@ -512,20 +515,33 @@ class LibraryRegistryController(object):
         return uri
 
     @classmethod
-    def _locate_email_address(cls, links, problem_title):
-        """Find an email address in a list of links.
+    def _locate_email_addresses(cls, rel, links, problem_title):
+        """Find one or more email addresses in a list of links, all with
+        a given `rel`.
 
-        :return: Either an email address or a customized ProblemDetail.
+        :param library: A Library
+        :param rel: The rel for this type of link.
+        :param links: A list of dictionaries with keys 'rel' and 'href'
+        :problem_title: The title to use in a ProblemDetail if no
+            valid links are found.
+        :return: Either a list of candidate links or a customized ProblemDetail.
         """
-        value = None
+        candidates = []
         for link in links:
+            if link.get('rel') != rel:
+                # Wrong kind of link.
+                continue
             uri = link.get('href')
             value = cls._required_email_address(uri, problem_title)
             if isinstance(value, basestring):
-                # We found an email address.
-                return value
+                candidates.append(value)
 
         # There were no relevant links.
-        value = INVALID_CONTACT_URI.detailed("No valid mailto: links found.")
-        value.title = problem_title
-        return value
+        if not candidates:
+            problem = INVALID_CONTACT_URI.detailed(
+                "No valid mailto: links found with rel=%s" % rel
+            )
+            problem.title = problem_title
+            return problem
+
+        return candidates

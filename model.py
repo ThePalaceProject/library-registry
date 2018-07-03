@@ -257,7 +257,7 @@ class Library(Base):
     # Can eligible people get credentials for this library through
     # an online registration process?
     online_registration = Column(Boolean, default=False)
-    
+
     # To issue Short Client Tokens for this library, the registry must share a
     # short name and a secret with them.
 
@@ -274,6 +274,8 @@ class Library(Base):
     delegated_patron_identifiers = relationship(
         "DelegatedPatronIdentifier", backref='library'
     )
+
+    hyperlinks = relationship("Hyperlink", backref='library')
     
     __table_args__ = (
         UniqueConstraint('urn'),
@@ -771,6 +773,40 @@ class Library(Base):
         else:
             return 'urn:' + self.urn
     
+    def set_hyperlink(self, rel, *hrefs):
+        """Make sure this library has a Hyperlink with the given `rel` that
+        points to one of the given `href`s.
+
+        If there's already a matching Hyperlink, it will be returned
+        unmodified. Otherwise, the first item in `hrefs` will be used
+        as the basis for a new Hyperlink, or an existing Hyperlink
+        will be modified to use the first item in `hrefs`.
+
+        :return: A 2-tuple (Hyperlink, is_modified). `is_modified`
+            is True if a new Hyperlink was created _or_ an existing
+            Hyperlink was modified.
+        """
+        if not rel:
+            raise ValueError("No link relation was specified")
+        if not hrefs:
+            raise ValueError("No Hyperlink hrefs were specified")
+        default_href = hrefs[0]
+        _db = Session.object_session(self)
+        hyperlink, is_modified = get_one_or_create(
+            _db, Hyperlink, library=self, rel=rel,
+            create_method_kwargs=dict(href=default_href)
+        )
+        if hyperlink.href not in hrefs:
+            # This is a preexisting Hyperlink whose href doesn't
+            # match any of the given hrefs.
+            hyperlink.href = default_href
+            is_modified = True
+
+        # TODO: If a Hyperlink is modified, it loses any verification
+        # status it had.
+        return hyperlink, is_modified
+
+
 class LibraryAlias(Base):
 
     """An alternate name for a library."""
@@ -1159,6 +1195,31 @@ class CollectionSummary(Base):
         return summary
     
 Index("ix_collectionsummary_language_size", CollectionSummary.language, CollectionSummary.size)
+
+
+class Hyperlink(Base):
+    """A URI associated with a Library.
+
+    We trust that this URI is actually associated with the Library
+    because the library told us about it; either directly, during
+    registration, or by putting a link in its Authentication For OPDS
+    document.
+    """
+    INTEGRATION_CONTACT_REL = "http://librarysimplified.org/rel/integration-contact"
+    COPYRIGHT_DESIGNATED_AGENT_REL = "http://librarysimplified.org/rel/designated-agent/copyright"
+
+    __tablename__ = 'hyperlinks'
+
+    id = Column(Integer, primary_key=True)
+    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
+    rel = Column(Unicode, index=True, nullable=False)
+    href = Column(Unicode, nullable=False)
+
+    # A Library can have multiple links with the same rel, but we only
+    # need to keep track of one.
+    __table_args__ = (
+        UniqueConstraint('library_id', 'rel'),
+    )
 
 
 class DelegatedPatronIdentifier(Base):

@@ -274,7 +274,45 @@ class TestLibrary(DatabaseTest):
         except ValueError, e:
             eq_('Short name cannot contain the pipe character.',
                 e.message)
-        
+
+    def test_set_hyperlink(self):
+        library = self._library()
+
+        assert_raises_regexp(
+            ValueError, "No Hyperlink hrefs were specified",
+            library.set_hyperlink, "rel"
+        )
+
+        assert_raises_regexp(
+            ValueError, "No link relation was specified",
+            library.set_hyperlink, None, ["href"]
+        )
+
+        link, is_modified = library.set_hyperlink("rel", "href1", "href2")
+        eq_("rel", link.rel)
+        eq_("href1", link.href)
+        eq_(True, is_modified)
+
+        # Calling set_hyperlink again does not modify the link
+        # so long as the old href is still a possibility.
+        link2, is_modified = library.set_hyperlink("rel", "href2", "href1")
+        eq_(link2, link)
+        eq_("rel", link2.rel)
+        eq_("href1", link2.href)
+        eq_(False, is_modified)
+
+        # If there is no way to keep a Hyperlink's href intact,
+        # set_hyperlink will modify it.
+        link3, is_modified = library.set_hyperlink("rel", "href2", "href3")
+        eq_(link3, link)
+        eq_("rel", link3.rel)
+        eq_("href2", link3.href)
+        eq_(True, is_modified)
+
+        # Under no circumstances will two hyperlinks for the same rel be
+        # created for a given library.
+        eq_([link3], library.hyperlinks)
+
     def test_library_service_area(self):
         zip = self.zip_10018
         nypl = self._library("New York Public Library", eligibility_areas=[zip])
