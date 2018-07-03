@@ -19,6 +19,7 @@ from Crypto.Cipher import PKCS1_OAEP
 
 from . import DatabaseTest
 from testing import DummyHTTPClient
+from util.problem_detail import ProblemDetail
 
 from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
@@ -73,6 +74,7 @@ class ControllerTest(DatabaseTest):
         # in this module.
         self.registration_form = ImmutableMultiDict([
             ("url", "http://circmanager.org/authentication.opds"),
+            ("contact", "mailto:integrationproblems@library.org"),
         ])
 
 class TestLibraryRegistryController(ControllerTest):
@@ -291,6 +293,9 @@ class TestLibraryRegistryController(ControllerTest):
                 {"rel": "logo", "href": "data:image/png;imagedata" },
                 {"rel": "register", "href": "http://circmanager.org/new-account" },
                 {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"},
+                {"rel": "help", "href": "http://help.library.org/"},
+                {"rel": "help", "href": "mailto:help@library.org"},
+                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright", "href": "mailto:dmca@library.org"},
             ],
             "service_area": { "US": "Kansas" },
             "collection_size": 100,
@@ -397,6 +402,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://a-different-url/"),
+                ("contact", "mailto:me@library.org"),
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -589,6 +595,51 @@ class TestLibraryRegistryController(ControllerTest):
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(201, response.status_code)
+
+    def test_register_fails_on_no_contact_email(self):
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org/authentication.opds"),
+            ])
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_("No valid integration contact address", response.title)
+
+            flask.request.form = ImmutableMultiDict([
+                ("url", "http://circmanager.org/authentication.opds"),
+                ("contact", "http://contact-us/")
+            ])
+            response = self.controller.register(do_get=self.http_client.do_get)
+            eq_("No valid integration contact address", response.title)
+
+    def test_register_fails_on_missing_email_in_authentication_document(self):
+
+        for (rel, error) in (
+                ("http://librarysimplified.org/rel/designated-agent/copyright",
+                 "No valid copyright designated agent email address"),
+                ("help", "No valid patron help email address")
+        ):
+            # Start with a valid document.
+            auth_document = self._auth_document()
+
+            # Remove the crucial link.
+            auth_document['links'] = filter(
+            lambda x: x['rel'] != rel or not x['href'].startswith("mailto:"),
+                auth_document['links']
+            )
+
+            def _request_fails():
+                self.http_client.queue_response(200, content=json.dumps(auth_document))
+                with self.app.test_request_context("/", method="POST"):
+                    flask.request.form = self.registration_form
+                    response = self.controller.register(do_get=self.http_client.do_get)
+                    eq_(error, response.title)
+            _request_fails()
+
+            # Now add the link back but as an http: link.
+            auth_document['links'].append(
+                dict(rel=rel, href="http://not-an-email/")
+            )
+            _request_fails()
         
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
@@ -604,7 +655,10 @@ class TestLibraryRegistryController(ControllerTest):
 
         # Send a registration request to the registry.
         with self.app.test_request_context("/", method="POST"):
-            flask.request.form = ImmutableMultiDict([("url", auth_url)])
+            flask.request.form = ImmutableMultiDict([
+                ("url", auth_url),
+                ("contact", "mailto:me@library.org"),
+            ])
             response = self.controller.register(do_get=self.http_client.do_get)
 
             eq_(201, response.status_code)
@@ -671,7 +725,10 @@ class TestLibraryRegistryController(ControllerTest):
             "service_description": "New and improved",
             "links": [
                 {"rel": "logo", "href": "/logo.png", "type": "image/png" },
-                {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"}
+                {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"},
+                {"rel": "help", "href": "mailto:new-help@library.org"},
+                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright", "href": "mailto:new-dmca@library.org"},
+
             ],
             "service_area": { "US": "Connecticut" },
         }
@@ -686,7 +743,10 @@ class TestLibraryRegistryController(ControllerTest):
         # So the library re-registers itself, and gets an updated
         # registry entry.
         with self.app.test_request_context("/", method="POST"):
-            flask.request.form = ImmutableMultiDict([("url", auth_url)])
+            flask.request.form = ImmutableMultiDict([
+                ("url", auth_url),
+                ("contact", "mailto:me@library.org"),
+            ])
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(200, response.status_code)
@@ -730,6 +790,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}, method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org/authentication.opds"),
+                ("contact", "mailto:me@library.org"),
             ])
 
             key = RSA.generate(1024)
@@ -740,7 +801,6 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(200, response.status_code)
             catalog = json.loads(response.data)
-
             assert library.shared_secret != old_secret
 
             # The registry encrypted the new secret with the public key, and
@@ -755,6 +815,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", headers={"Authorization": "Bearer notthesecret"}):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://circmanager.org/authentication.opds"),
+                ("contact", "mailto:me@library.org"),
             ])
 
             key = RSA.generate(1024)
@@ -916,3 +977,52 @@ class TestLibraryRegistryController(ControllerTest):
                 response, auth_url
             )
         )
+
+    def test__required_email_address(self):
+        """Validate the code that makes sure an input is a mailto: URI."""
+        uri = INVALID_CONTACT_URI.uri
+        m = LibraryRegistryController._required_email_address
+
+        problem = m(None, 'a title')
+        eq_(uri, problem.uri)
+        # The custom title is used.
+        eq_("a title", problem.title)
+        eq_("No email address was provided", problem.detail)
+
+        # Changing the title doesn't affect the original ProblemDetail
+        # document.
+        assert "a title" != INVALID_CONTACT_URI.title
+
+        problem = m("http://not-an-email/", "a title")
+        eq_(uri, problem.uri)
+        eq_("URI must start with 'mailto:' (got: http://not-an-email/)",
+            problem.detail)
+
+        mailto = "mailto:me@library.org"
+        success = m(mailto, "a title")
+        eq_(mailto, success)
+
+    def test__locate_email_address(self):
+        """Test the code that finds an email address in a list of links."""
+        uri = INVALID_CONTACT_URI.uri
+        m = LibraryRegistryController._locate_email_address
+
+        # No links at all.
+        result = m([], "a title")
+        assert isinstance(result, ProblemDetail)
+        eq_(uri, result.uri)
+        eq_("a title", result.title)
+        eq_("No valid mailto: links found.", result.detail)
+
+        # Links, but they're all bad.
+        links = [dict(href="http://foo/"), dict(href="http://bar/")]
+        result = m(links, "a title")
+        assert isinstance(result, ProblemDetail)
+        eq_(uri, result.uri)
+        eq_("a title", result.title)
+        eq_("No valid mailto: links found.", result.detail)
+
+        # One link that works.
+        links.append(dict(href="mailto:me@library.org"))
+        result = m(links, "a title")
+        eq_("mailto:me@library.org", result)

@@ -35,3 +35,8 @@ ERROR_RETRIEVING_DOCUMENT = pd(
     detail=_("I couldn't retrieve the specified URL."),
 )
 
+INVALID_CONTACT_URI = pd(
+    "http://librarysimplified.org/terms/problem/invalid-contact-uri",
+    400,
+    title=_("URI was not specified or is of the wrong type")
+)

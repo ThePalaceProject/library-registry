@@ -1,3 +1,4 @@
+from collections import defaultdict
 from nose.tools import set_trace
 import logging
 import flask
@@ -280,6 +281,13 @@ class LibraryRegistryController(object):
         if not auth_url:
             return NO_AUTH_URL
 
+        integration_contact_uri = flask.request.form.get("contact")
+        integration_contact_email = self._required_email_address(
+            integration_contact_uri, "No valid integration contact address"
+        )
+        if isinstance(integration_contact_email, ProblemDetail):
+            return integration_contact_email
+
         def _make_request(url, on_404, on_timeout, on_exception, allow_401=False):
             allowed_codes = ["2xx", "3xx", 404]
             if allow_401:
@@ -349,6 +357,25 @@ class LibraryRegistryController(object):
                 "Registration of %s failed: %s", auth_url, failure_detail
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
+
+        # Make sure the authentication document includes a way for
+        # patrons to get help or file a copyright complaint.
+        links_by_rel = defaultdict(list)
+        for l in auth_document.links:
+            links_by_rel[l.get('rel')].append(l)
+        for rel, problem_title in [
+                ('help', "No valid patron help email address"),
+                ("http://librarysimplified.org/rel/designated-agent/copyright",
+                 "No valid copyright designated agent email address")
+        ]:
+            links = links_by_rel.get(rel, [])
+            if not links:
+                problem = INVALID_CONTACT_URI.detailed("")
+                problem.title = problem_title
+                return problem
+            address = self._locate_email_address(links, problem_title)
+            if isinstance(address, ProblemDetail):
+                return address
 
         # Cross-check the opds_url to make sure it links back to the
         # authentication document.
@@ -464,3 +491,41 @@ class LibraryRegistryController(object):
             status_code = 200
 
         return self.catalog_response(catalog, status_code)
+
+    @classmethod
+    def _required_email_address(cls, uri, problem_title):
+        """Verify that `uri` is a mailto: URI.
+
+        :return: Either a mailto: URI or a customized ProblemDetail.
+        """
+        problem = None
+        on_error = INVALID_CONTACT_URI
+        if not uri:
+            problem = on_error.detailed("No email address was provided")
+        elif not uri.startswith("mailto:"):
+            problem = on_error.detailed(
+                _("URI must start with 'mailto:' (got: %s)") % uri
+            )
+        if problem:
+            problem.title = problem_title
+            return problem
+        return uri
+
+    @classmethod
+    def _locate_email_address(cls, links, problem_title):
+        """Find an email address in a list of links.
+
+        :return: Either an email address or a customized ProblemDetail.
+        """
+        value = None
+        for link in links:
+            uri = link.get('href')
+            value = cls._required_email_address(uri, problem_title)
+            if isinstance(value, basestring):
+                # We found an email address.
+                return value
+
+        # There were no relevant links.
+        value = INVALID_CONTACT_URI.detailed("No valid mailto: links found.")
+        value.title = problem_title
+        return value
