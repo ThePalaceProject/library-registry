@@ -1281,7 +1281,7 @@ class Validation(Base):
     """
     __tablename__ = 'validations'
 
-    ATTEMPT_EXPIRES_AFTER = datetime.timedelta(days=1)
+    EXPIRES_AFTER = datetime.timedelta(days=1)
 
     id = Column(Integer, primary_key=True)
     success = Column(Boolean, index=True, default=False)
@@ -1304,10 +1304,27 @@ class Validation(Base):
         if emailer and self.resource.href.startswith('mailto'):
             emailer.send_validation_email(self)
 
+    @property
+    def active(self):
+        """Is this Validation still active?
+
+        An inactive Validation can't be marked as successful -- it
+        needs to be reset.
+        """
+        now = datetime.datetime.utcnow()
+        return not self.success and now < self.started_at + self.EXPIRES_AFTER
+
     def mark_as_successful(self):
         """Register the fact that the validation attempt has succeeded."""
+        if self.success:
+            raise Exception("This validation has already succeeded.")
+        if not self.active:
+            raise Exception("This validation has expired.")
         self.secret = None
         self.success = True
+
+        # TODO: This may cause one or more libraries to switch from
+        # "not completely validated" to "completely validated".
 
 
 class DelegatedPatronIdentifier(Base):

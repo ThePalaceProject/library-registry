@@ -1249,9 +1249,30 @@ class TestValidation(DatabaseTest):
 
     def test_mark_as_successful(self):
 
-        validation = Validation()
+        validation, ignore = create(self._db, Validation)
+        eq_(True, validation.active)
         eq_(False, validation.success)
         assert validation.secret is not None
-        validation.mark_as_sucessful()
+
+        validation.mark_as_successful()
+        eq_(False, validation.active)
         eq_(True, validation.success)
         eq_(None, validation.secret)
+
+        # A validation that has already succeeded cannot be marked
+        # as successful.
+        assert_raises_regexp(
+            Exception, "This validation has already succeeded",
+            validation.mark_as_successful
+        )
+
+        # A validation that has expired cannot be marked as successful.
+        validation.restart(None)
+        validation.started_at = (
+            datetime.datetime.utcnow() - datetime.timedelta(days=7)
+        )
+        eq_(False, validation.active)
+        assert_raises_regexp(
+            Exception, "This validation has expired",
+            validation.mark_as_successful
+        )

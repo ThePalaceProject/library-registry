@@ -2,6 +2,7 @@ from nose.tools import (
     eq_,
     set_trace,
 )
+import datetime
 import os
 import json
 import base64
@@ -9,6 +10,7 @@ import base64
 from controller import (
     LibraryRegistry,
     LibraryRegistryController,
+    ValidationController,
 )
 
 import flask
@@ -47,7 +49,24 @@ class ControllerTest(DatabaseTest):
         from app import app
         del os.environ['AUTOINITIALIZE']
         self.app = app
+        self.data_setup()
+        self.library_registry = TestLibraryRegistry(self._db, testing=True)
+        self.app.library_registry = self.library_registry
+        self.http_client = DummyHTTPClient()
 
+    def data_setup(self):
+        """Configure the site before setup() creates a LibraryRegistry
+        object.
+        """
+        pass
+
+
+class TestLibraryRegistryController(ControllerTest):
+
+    def data_setup(self):
+        """Configure the site before setup() creates a LibraryRegistry
+        object.
+        """
         # Create some places and libraries.
         nypl = self.nypl
         ct_state = self.connecticut_state_library
@@ -65,20 +84,17 @@ class ControllerTest(DatabaseTest):
             goal=ExternalIntegration.DRM_GOAL,
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
-        
-        self.library_registry = TestLibraryRegistry(self._db, testing=True)
-        self.app.library_registry = self.library_registry
+
+    def setup(self):
+        super(TestLibraryRegistryController, self).setup()
         self.controller = LibraryRegistryController(self.library_registry)
-        self.http_client = DummyHTTPClient()
 
         # A registration form that's valid for most of the tests 
-        # in this module.
+        # in this class.
         self.registration_form = ImmutableMultiDict([
             ("url", "http://circmanager.org/authentication.opds"),
             ("contact", "mailto:integrationproblems@library.org"),
         ])
-
-class TestLibraryRegistryController(ControllerTest):
 
     def test_nearby(self):
         with self.app.test_request_context("/"):
@@ -1065,3 +1081,57 @@ class TestLibraryRegistryController(ControllerTest):
         # Multiple links that work.
         result = m("rel2", links, "a title")
         eq_(["mailto:me@library.org", "mailto:me2@library.org"], result)
+
+
+class TestValidationController(ControllerTest):
+
+    def test_html_response(self):
+        """Test the generation of a simple HTML-based HTTP response."""
+        controller = ValidationController(self.library_registry)
+        response = controller.html_response(999, "a message")
+        eq_(999, response.status_code)
+        eq_("text/html", response.headers['Content-Type'])
+        eq_(controller.MESSAGE_TEMPLATE % dict(message="a message"),
+            response.data)
+
+    def test_validate(self):
+        class Mock(ValidationController):
+            def html_response(self, status_code, message):
+                return (status_code, message)
+
+        controller = Mock(self.library_registry)
+        def assert_response(secret, status_code, message):
+            """Invoke the validate() method with the given secret
+            and verify that html_response is called with the given
+            status_code and message.
+            """
+            result = controller.validate(secret)
+            eq_((status_code, message), result)
+
+        assert_response("", 404, "No validation code provided")
+        assert_response("nosuchcode", 404, "Validation code 'nosuchcode' not found")
+
+        # Expired validations can't be validated.
+        library = self._library()
+        link, ignore = library.set_hyperlink("rel", "mailto:me@library.org")
+        resource = link.resource
+        resource.restart_validation(None)
+        resource.validation.started_at = datetime.datetime.now() - datetime.timedelta(days=7)
+        secret = resource.validation.secret
+        assert_response(
+            secret, 400,
+            "Validation code %r has expired. Re-register to get another code." % secret
+        )
+
+        # Success.
+        resource.restart_validation(None)
+        secret = resource.validation.secret
+        assert_response(
+            secret, 200, "You successfully validated mailto:me@library.org."
+        )
+
+        # Once the link is validated, the secret is zeroed out, so
+        # a second validation does nothing.
+        assert_response(
+            secret, 404, "Validation code %r not found" % secret
+        )

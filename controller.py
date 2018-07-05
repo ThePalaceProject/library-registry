@@ -21,12 +21,14 @@ from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
 
 from model import (
-    production_session,
     ConfigurationSetting,
     Hyperlink,
     Library,
     ServiceArea,
+    Validation,
+    get_one,
     get_one_or_create,
+    production_session,
 )
 from config import (
     Configuration,
@@ -545,3 +547,48 @@ class LibraryRegistryController(object):
             return problem
 
         return candidates
+
+
+class ValidationController(object):
+    """Validates Resources based on validation codes.
+
+    The validation codes were sent out in emails to the addresses that
+    need to be validated, or otherwise communicated to someone who needs
+    to click on the link to this controller.
+    """
+
+    MESSAGE_TEMPLATE = "<html><head><title>%(message)s</title><body>%(message)s</body></html>"
+
+    def __init__(self, app):
+        self.app = app
+        self._db = self.app._db
+
+    def html_response(self, status_code, message):
+        """Return a human-readable message as a minimal HTML page.
+
+        This controller is used by human beings, so HTML is better
+        than Problem Detail Documents.
+        """
+        headers = {"Content-Type": "text/html"}
+        page = self.MESSAGE_TEMPLATE % dict(message=message)
+        return Response(page, status_code, headers=headers)
+
+    def validate(self, secret):
+        """Validate a secret, or don't.
+
+        :return: A Response containing a simple HTML document.
+        """
+        if not secret:
+            return self.html_response(404, _("No validation code provided"))
+        validation = get_one(self._db, Validation, secret=secret)
+        if not validation:
+            error = _("Validation code %r not found") % secret
+            return self.html_response(404, error)
+        if not validation.active:
+            error = _("Validation code %r has expired. Re-register to get another code.") % secret
+            return self.html_response(400, error)
+        validation.mark_as_successful()
+
+        resource = validation.resource
+        message = _("You successfully validated %s.") % resource.href
+        return self.html_response(200, message)

@@ -86,6 +86,11 @@ def search_qa():
         originating_ip(), live=False
     )
 
+@app.route('/validate/<secret>')
+@returns_problem_detail
+def validate_resource(secret):
+    return app.library_registry.validation_controller.validate(secret)
+
 @app.route('/heartbeat')
 @returns_problem_detail
 def hearbeat():
