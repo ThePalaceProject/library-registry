@@ -24,6 +24,7 @@ from model import (
     LibraryAlias,
     Place,
     PlaceAlias,
+    Validation,
 )
 from util import (
     GeometryUtility
@@ -312,6 +313,20 @@ class TestLibrary(DatabaseTest):
         # Under no circumstances will two hyperlinks for the same rel be
         # created for a given library.
         eq_([link3], library.hyperlinks)
+
+        # However, a library can have multiple hyperlinks to the same
+        # Resource using different rels.
+        link4, modified = library.set_hyperlink("rel2", "href2")
+        eq_(link4.resource, link3.resource)
+        eq_(True, modified)
+
+        # And two libraries can link to the same Resource using the same
+        # rel.
+        library2 = self._library()
+        link5, modified = library2.set_hyperlink("rel2", "href2")
+        eq_(True, modified)
+        eq_(library2, link5.library)
+        eq_(link4.resource, link5.resource)
 
     def test_library_service_area(self):
         zip = self.zip_10018
@@ -1179,3 +1194,64 @@ nonsecret_setting='2'"""
         assert 'a_secret' not in without_secrets
         assert 'nonsecret_setting' in without_secrets
 
+
+class TestValidation(DatabaseTest):
+    """Test the Resource validation process."""
+
+    def test_restart_validation(self):
+
+        class MockEmailer(object):
+            """Pretend to send out an email."""
+            validations = []
+            def send_validation_email(self, validation_obj):
+                self.validations.append(validation_obj)
+        emailer = MockEmailer()
+
+        # This library has two links.
+        library = self._library()
+        link1, ignore = library.set_hyperlink("rel", "mailto:me@library.org")
+        email = link1.resource
+        link2, ignore = library.set_hyperlink("rel", "http://library.org")
+        http = link2.resource
+
+        # Let's set up validation for both of them.
+        now = datetime.datetime.utcnow()
+        email_validation = email.restart_validation(emailer)
+        http_validation = http.restart_validation(emailer)
+
+        for v in (email_validation, http_validation):
+            assert (v.started_at - now).total_seconds() < 2
+            assert v.secret is not None
+
+        # A random secret was generated for each Validation.
+        assert email_validation.secret != http_validation.secret
+
+        # The mailto: URL was passed into the MockEmailer; the other
+        # one was not.
+        eq_(email_validation, emailer.validations.pop())
+        eq_([], emailer.validations)
+
+        # Let's imagine that validation succeeded and is being
+        # invalidated for some reason.
+        email_validation.success = True
+        old_started_at = email_validation.started_at
+        old_secret = email_validation.secret
+        email_validation_2 = email.restart_validation(emailer)
+
+        # Instead of a new Validation being created, the earlier
+        # Validation has been invalidated.
+        eq_(email_validation, email_validation_2)
+        eq_([email_validation_2], emailer.validations)
+        eq_(False, email_validation_2.success)
+
+        # The secret has changed.
+        assert old_secret != email_validation.secret
+
+    def test_mark_as_successful(self):
+
+        validation = Validation()
+        eq_(False, validation.success)
+        assert validation.secret is not None
+        validation.mark_as_sucessful()
+        eq_(True, validation.success)
+        eq_(None, validation.secret)
