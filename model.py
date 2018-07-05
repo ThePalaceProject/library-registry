@@ -1530,6 +1530,12 @@ class ExternalIntegration(Base):
     INTERNAL_LOGGING = u'Internal logging'
     LOGGLY = u'Loggly'
 
+    # These integrations are for sending email.
+    EMAIL_GOAL = u'email'
+
+    # Integrations with EMAIL_GOAL
+    SMTP = u'SMTP'
+
     # If there is a special URL to use for access to this API,
     # put it here.
     URL = u"url"
