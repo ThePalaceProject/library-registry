@@ -86,10 +86,12 @@ def search_qa():
         originating_ip(), live=False
     )
 
-@app.route('/validate/<secret>')
+@app.route('/validate/<int:resource_id>/<secret>')
 @returns_problem_detail
 def validate_resource(secret):
-    return app.library_registry.validation_controller.validate(secret)
+    return app.library_registry.validation_controller.validate(
+        resource_id, secret
+    )
 
 @app.route('/heartbeat')
 @returns_problem_detail
