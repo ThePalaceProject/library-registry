@@ -804,13 +804,9 @@ class Library(Base):
         )
 
         if hyperlink.href not in hrefs:
-            # This is a preexisting Hyperlink whose href doesn't
-            # match any of the given hrefs.
             hyperlink.href = default_href
             is_modified = True
 
-        # TODO: If a Hyperlink is modified, it loses any verification
-        # status it had.
         return hyperlink, is_modified
 
 
@@ -1259,9 +1255,6 @@ class Resource(Base):
     # need to validate it separately for every relationship.
     validation_id = Column(Integer, ForeignKey('validations.id'),
                            index=True)
-    validation = relationship(
-        "Validation", backref=backref("resource", uselist=False)
-    )
 
     def restart_validation(self, emailer=None):
         """Start or restart the validation process for this resource.
@@ -1290,7 +1283,12 @@ class Validation(Base):
 
     # The only way to validate a Resource is to prove you know the
     # corresponding secret.
-    secret = Column(Unicode, default=generate_secret)
+    secret = Column(Unicode, default=generate_secret, unique=True)
+
+    resource = relationship(
+        "Resource", backref=backref("validation", uselist=False), uselist=False
+    )
+
 
     def restart(self, emailer):
         """Start a new validation attempt, cancelling any previous attempt.
