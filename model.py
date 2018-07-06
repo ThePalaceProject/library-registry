@@ -1286,7 +1286,7 @@ class Hyperlink(Base):
             rel = Hyperlink.REL_DESCRIPTIONS.get(hyperlink.rel, hyperlink.rel),
             validation_link = emailer.url_for(
                 "validate", resource_id=resource.id, secret=validation.secret
-            )
+            ),
             library=library.name,
             library_web_url = library.web_url,
             email=resource.href,
