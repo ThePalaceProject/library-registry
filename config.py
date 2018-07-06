@@ -40,6 +40,8 @@ class Configuration(object):
     ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
 
     REGISTRATION_TERMS_OF_SERVICE_TEXT = "registration_terms_of_service_text"
+
+    REGISTRY_CONTACT_EMAIL = "registry_contact_email"
     
     @classmethod
     def load(cls):

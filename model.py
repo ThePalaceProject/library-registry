@@ -1211,6 +1211,13 @@ class Hyperlink(Base):
     INTEGRATION_CONTACT_REL = "http://librarysimplified.org/rel/integration-contact"
     COPYRIGHT_DESIGNATED_AGENT_REL = "http://librarysimplified.org/rel/designated-agent/copyright"
 
+    # Descriptions of the link relations, used in emails.
+    REL_DESCRIPTIONS = {
+        INTEGRATION_CONTACT_REL: "integration point of contact",
+        COPYRIGHT_DESIGNATED_AGENT_REL: "copyright designated agent",
+        "help": "patron help contact address",
+    }
+
     __tablename__ = 'hyperlinks'
 
     id = Column(Integer, primary_key=True)
@@ -1235,6 +1242,61 @@ class Hyperlink(Base):
         _db = Session.object_session(self)
         resource, is_new = get_one_or_create(_db, Resource, href=url)
         self.resource = resource
+
+    def notify(self, emailer):
+        """Notify the target of this hyperlink that it is, in fact,
+        a target of the hyperlink.
+
+        If the underlying Resource needs to be validated, a VALIDATION
+        email will be sent, asking the person on the other end to
+        confirm the address. Otherwise, a NOTIFICATION email will be
+        sent, informing the person on the other end that their already
+        validated email address was associated with another library.
+        """
+        _db = Session.object_session(self)
+
+        # These shouldn't happen, but just to be safe, do nothing if
+        # this Hyperlink is disconnected from the other data model
+        # objects it needs to do its job.
+        resource = self.resource
+        library = self.library
+        if not resource or not library:
+            return
+
+        # Default to sending an informative email with no validation
+        # link.
+        email_type = Emailer.NOTIFICATION
+        to_address = resource.href
+        deadline = None
+
+        validation, is_new = get_one_or_create(
+            _db, Validation, resource=resource
+        )
+        if is_new or not validation.active:
+            # Either this Validation was just created or it expired
+            # before being verified. Restart the validation process
+            # and send an email that includes a validation link.
+            validation.restart()
+            email_type = Emailer.VALIDATION
+            deadline = validation.deadline.strftime("%Y-%m-%d %H:%m:%s UTC")
+
+        # Create values for all the variables expected by the default
+        # templates.
+        template_args = dict(
+            rel = Hyperlink.REL_DESCRIPTIONS.get(hyperlink.rel, hyperlink.rel),
+            validation_link = emailer.url_for(
+                "validate", resource_id=resource.id, secret=validation.secret
+            )
+            library=library.name,
+            library_web_url = library.web_url,
+            email=resource.href,
+            registry_support=ConfigurationSetting.sitewide(
+                Configuration.REGISTRY_CONTACT_EMAIL
+            ).value,
+            deadline=deadline
+        )
+        body = emailer.send(email_type, to_address, **template_args)
+        return body
 
 
 class Resource(Base):
@@ -1303,6 +1365,12 @@ class Validation(Base):
             emailer.send_validation_email(self)
 
     @property
+    def deadline(self):
+        if self.success:
+            return None
+        return self.started_at + self.EXPIRES_AFTER
+
+    @property
     def active(self):
         """Is this Validation still active?
 
@@ -1310,7 +1378,7 @@ class Validation(Base):
         needs to be reset.
         """
         now = datetime.datetime.utcnow()
-        return not self.success and now < self.started_at + self.EXPIRES_AFTER
+        return not self.success and now < self.deadline
 
     def mark_as_successful(self):
         """Register the fact that the validation attempt has succeeded."""

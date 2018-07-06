@@ -1,3 +1,6 @@
+import email
+import smtplib
+
 from config import (
     CannotLoadConfiguration,
 )
@@ -5,41 +8,67 @@ from model import (
     ExternalIntegration
 )
 
-class Email(object):
-    def __init__(self, from_address, subject, template):
-        self.from_address = from_address
-        self.subject = subject
-        self.template = template
-
-    def body(self, to_address, **kwargs):
-        # Add to, from, and subject headers
-        return self.template % kwargs
-
 
 class Emailer(object):
     """A class for sending small amounts of email."""
 
     # Constants for different types of email.
     VALIDATION = 'validation'
+    NOTIFICATION = 'notification'
 
-    REQUIRED_TYPES = [VALIDATION]
+    EMAIL_TYPES = [VALIDATION, NOTIFICATION]
+
+    DEFAULT_NOTIFICATION_SUBJECT = "This address designated as %(rel)s for %(library)s"
+    DEFAULT_VALIDATION_SUBJECT = "Validate the %(rel)s for %(library)s"
+
+    DEFAULT_NOTIFICATION_TEMPLATE = """This email address, %(email)s, has been registered with the Library Simplified library registry as the %(rel)s for the library %(library)s (%(library_web_url)s).
+
+If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at %(registry_support)s -- something has gone wrong.
+
+If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at %(registry_support)s."""
+
+    NEEDS_VALIDATION_ADDITION = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link before %(deadline)s:
+
+%(validation_link)s
+
+If the link expires, just re-register your library with the library registry, and a fresh validation email like this will be sent out."""
+
+    BODIES = {
+        NOTIFICATION : DEFAULT_NOTIFICATION_TEMPLATE,
+        NEEDS_VALIDATION : DEFAULT_NOTIFICATION_TEMPLATE + "\n\n" + NEEDS_VALIDATION_ADDITION
+    ]
+
+    SUBJECTS = {
+        NOTIFICATION: DEFAULT_NOTIFICATION_SUBJECT
+        NEEDS_VALIDATION : DEFAULT_VALIDATION_SUBJECT,
+    }
 
     @classmethod
     def from_sitewide_integration(cls, _db, url_for):
-        """Create an Emailer from a site-wide email integration."""
+        """Create an Emailer from a site-wide email integration.
+
+        :param _db: A database connection
+        :param url_for: An implementation of url_for() that can generate
+           URLs for a web application as necessary.
+        """
         integration = cls.sitewide_integration(_db)
-        integration.username
-        integration.password
+        smtp_username = integration.username
+        smtp_password = integration.password
         host = integration.url
-        port = integration.setting(self.PORT).value or 25
-        validation_subject = integration.setting(self.VALIDATION_SUBJECT).value
-        validation_template = integration.setting(self.VALIDATION_TEMPLATE).value
+        port = integration.setting(self.PORT).int_value or 587
         from_address = integration.setting(self.FROM_ADDRESS).value
 
-        if not validation_subject or not validation_template or not from_address:
-            raise CannotLoadConfiguration("Email configuration is incomplete")
-
-        templates = { VALIDATION : Email(template, subject)}
+        email_templates = {}
+        for email_type in EMAIL_TYPES:
+            subject = (
+                integration.setting(email_type + "_subject").value or
+                SUBJECTS[email_type]
+            )
+            body = (
+                integration.setting(email_type + "_body").value or
+                SUBJECTS[email_type]
+            )
+            email_templates[email_type] = EmailTemplate(subject, body)
 
         return cls(user=integration.username, password=integration.password,
                    host=host, port=port, from_address=from_address,
@@ -69,34 +98,72 @@ class Emailer(object):
         [integration] = integrations
         return integration
 
-    def __init__(self, user, password, host, port, from_address, templates,
-                 url_for):
-        self.user = user
-        self.password = password
-        self.host = host
-        self.port = port
+    def __init__(self, smtp_user, smtp_password, smpt_host, smpt_port,
+                 from_address, templates, url_for):
+        """Constructor."""
+        if not smtp_user:
+            raise CannotLoadConfiguration("No SMTP username specified")
+        self.smtp_user = smtp_user
+        if not smtp_password:
+            raise CannotLoadConfiguration("No SMTP password specified")
+        self.smtp_password = smtp_password
+        if not smtp_host:
+            raise CannotLoadConfiguration("No SMTP host specified")
+        self.smtp_host = smtp_host
+        if not smtp_host:
+            raise CannotLoadConfiguration("No SMTP port specified")
+        self.smtp_port = smtp_port
+        if not from_address:
+            raise CannotLoadConfiguration("No From: address specified")
         self.from_address = from_address
         self.templates = templates
         self.url_for = url_for
 
-        for i in self.REQUIRED_TEMPLATES:
-            if not i in self.templates:
-                raise CannotLoadConfiguration(
-                    _("Missing required template type %s") % i
-                )
+    def send(self, email_type, to_address, **kwargs):
+        """Generate an email from a template and send it.
 
-    def send_validation_email(self, validation):
-        """Construct and send an email that can validate the given Validation
-        object.
+        :param email_type: The name of the template to use.
+        :param to_address: Addressee of the email.
+        :param kwargs: Arguments to use when generating the email from
+            a template.
         """
-        url = self.url_for("validate", secret=validation.secret)
-        email = self.templates[self.VALIDATION]
-        to_address = validation.resource.href
-        body = email.body(to_address, address=to_address, url=url)
-
+        if not email_type in self.templates:
+            raise ValueError("No such email template: %s" % email_type)
+        template = self.templates[email_type]
+        body = template.body(self.from_address, to_address **kwargs)
         return self._send_email(to_address, body)
 
     def _send_email(self, to_address, body):
-        smtp = smtplib.SMTP_SSL(self.host, self.port)
+        """Actually send an email.
+
+        This method may be mocked for testing purposes.
+        """
+        smtp = smtplib.SMTP()
+        smtp.connect(self.smtp_host, self.smtp_port)
+        smtp.login(self.smtp_username, self.smtp_password)
         smtp.sendmail(self.from_address, to_address, body)
         smtp.quit()
+
+
+
+class EmailTemplate(object):
+    """A template for email messages."""
+
+    def __init__(self, subject_template, body_template):
+        self.subject_template = subject_template
+        self.body_template = body_template
+
+    def body(self, from_address, to_address, **kwargs):
+        """Generate the complete body of the email message, including headers.
+
+        :param from_address: Originating address.
+        :param to_address: Destination address.
+        :param kwargs: Arguments to use when filling out the template.
+        """
+
+        message = email.Message.Message()
+        message['From'] = from_address
+        message['To'] = to_address
+        message['Subject'] = self.subject_template % kwargs
+        message.set_payload(self.body_template % kwargs)
+        return message.as_string()
