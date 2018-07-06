@@ -21,12 +21,15 @@ from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
 
 from model import (
-    production_session,
     ConfigurationSetting,
     Hyperlink,
     Library,
+    Resource,
     ServiceArea,
+    Validation,
+    get_one,
     get_one_or_create,
+    production_session,
 )
 from config import (
     Configuration,
@@ -545,3 +548,73 @@ class LibraryRegistryController(object):
             return problem
 
         return candidates
+
+
+class ValidationController(object):
+    """Validates Resources based on validation codes.
+
+    The validation codes were sent out in emails to the addresses that
+    need to be validated, or otherwise communicated to someone who needs
+    to click on the link to this controller.
+    """
+
+    MESSAGE_TEMPLATE = "<html><head><title>%(message)s</title><body>%(message)s</body></html>"
+
+    def __init__(self, app):
+        self.app = app
+        self._db = self.app._db
+
+    def html_response(self, status_code, message):
+        """Return a human-readable message as a minimal HTML page.
+
+        This controller is used by human beings, so HTML is better
+        than Problem Detail Documents.
+        """
+        headers = {"Content-Type": "text/html"}
+        page = self.MESSAGE_TEMPLATE % dict(message=message)
+        return Response(page, status_code, headers=headers)
+
+    def validate(self, resource_id, secret):
+        """Validate a secret for a URI, or don't.
+
+        :return: A Response containing a simple HTML document.
+        """
+        if not secret:
+            return self.html_response(404, _("No validation code provided"))
+        if not resource_id:
+            return self.html_response(404, _("No resource ID provided"))
+        validation = get_one(self._db, Validation, secret=secret)
+        resource = get_one(self._db, Resource, id=resource_id)
+        if not resource:
+            return self.html_response(404, _("No such resource"))
+
+        if not validation:
+            # The secret is invalid. This might be because the secret
+            # is wrong, or because the Resource has already been
+            # validated.
+            #
+            # Let's eliminate the 'Resource has already been validated'
+            # possibility and take care of the other case next.
+            if resource and resource.validation and resource.validation.success:
+                return self.html_response(200, _("This URI has already been validated."))
+
+        if (not validation
+            or not validation.resource
+            or validation.resource.id != resource_id):
+            # For whatever reason the resource ID and secret don't match.
+            # A generic error that doesn't reveal information is appropriate
+            # in all cases.
+            error = _("Validation code %r not found") % secret
+            return self.html_response(404, error)
+
+        # At this point we know that the resource has not been
+        # validated, and that the secret matches the resource. The
+        # only other problem might be that the validation has expired.
+        if not validation.active:
+            error = _("Validation code %r has expired. Re-register to get another code.") % secret
+            return self.html_response(400, error)
+        validation.mark_as_successful()
+
+        resource = validation.resource
+        message = _("You successfully validated %s.") % resource.href
+        return self.html_response(200, message)

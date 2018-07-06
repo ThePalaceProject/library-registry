@@ -4,6 +4,7 @@ from flask_babel import lazy_gettext as _
 import datetime
 import logging
 from nose.tools import set_trace
+import os
 import re
 import json
 import uuid
@@ -86,6 +87,10 @@ def production_session():
     return _db
 
 DEBUG = False
+
+def generate_secret():
+    """Generate a random secret."""
+    return os.urandom(24).encode('hex')
 
 class SessionManager(object):
 
@@ -276,7 +281,7 @@ class Library(Base):
     )
 
     hyperlinks = relationship("Hyperlink", backref='library')
-    
+
     __table_args__ = (
         UniqueConstraint('urn'),
         UniqueConstraint('short_name'),
@@ -775,16 +780,18 @@ class Library(Base):
     
     def set_hyperlink(self, rel, *hrefs):
         """Make sure this library has a Hyperlink with the given `rel` that
-        points to one of the given `href`s.
+        points to a Resource with one of the given `href`s.
 
         If there's already a matching Hyperlink, it will be returned
         unmodified. Otherwise, the first item in `hrefs` will be used
         as the basis for a new Hyperlink, or an existing Hyperlink
-        will be modified to use the first item in `hrefs`.
+        will be modified to use the first item in `hrefs` as its
+        Resource.
 
         :return: A 2-tuple (Hyperlink, is_modified). `is_modified`
             is True if a new Hyperlink was created _or_ an existing
             Hyperlink was modified.
+
         """
         if not rel:
             raise ValueError("No link relation was specified")
@@ -794,16 +801,12 @@ class Library(Base):
         _db = Session.object_session(self)
         hyperlink, is_modified = get_one_or_create(
             _db, Hyperlink, library=self, rel=rel,
-            create_method_kwargs=dict(href=default_href)
         )
+
         if hyperlink.href not in hrefs:
-            # This is a preexisting Hyperlink whose href doesn't
-            # match any of the given hrefs.
             hyperlink.href = default_href
             is_modified = True
 
-        # TODO: If a Hyperlink is modified, it loses any verification
-        # status it had.
         return hyperlink, is_modified
 
 
@@ -1198,9 +1201,9 @@ Index("ix_collectionsummary_language_size", CollectionSummary.language, Collecti
 
 
 class Hyperlink(Base):
-    """A URI associated with a Library.
+    """A link between a Library and a Resource.
 
-    We trust that this URI is actually associated with the Library
+    We trust that the Resource is actually associated with the Library
     because the library told us about it; either directly, during
     registration, or by putting a link in its Authentication For OPDS
     document.
@@ -1211,15 +1214,115 @@ class Hyperlink(Base):
     __tablename__ = 'hyperlinks'
 
     id = Column(Integer, primary_key=True)
-    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
     rel = Column(Unicode, index=True, nullable=False)
-    href = Column(Unicode, nullable=False)
+    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
+    resource_id = Column(Integer, ForeignKey('resources.id'), index=True)
 
     # A Library can have multiple links with the same rel, but we only
     # need to keep track of one.
     __table_args__ = (
         UniqueConstraint('library_id', 'rel'),
     )
+
+    @hybrid_property
+    def href(self):
+        if not self.resource:
+            return None
+        return self.resource.href
+
+    @href.setter
+    def href(self, url):
+        _db = Session.object_session(self)
+        resource, is_new = get_one_or_create(_db, Resource, href=url)
+        self.resource = resource
+
+
+class Resource(Base):
+    """A URI, potentially linked to multiple libraries, or to a single
+    library through multiple relationships.
+
+    e.g. a library consortium may use a single email address as the
+    patron help address and the integration contact address for all of
+    its libraries. That address only needs to be validated once.
+    """
+    __tablename__ = 'resources'
+
+    id = Column(Integer, primary_key=True)
+    href = Column(Unicode, nullable=False, index=True, unique=True)
+    hyperlinks = relationship("Hyperlink", backref="resource")
+
+    # Every Resource may have at most one Validation. There's no
+    # need to validate it separately for every relationship.
+    validation_id = Column(Integer, ForeignKey('validations.id'),
+                           index=True)
+
+    def restart_validation(self, emailer=None):
+        """Start or restart the validation process for this resource.
+
+        :param emailer: Something capable of sending out email.
+        """
+        if not self.validation:
+            _db = Session.object_session(self)
+            self.validation, ignore = create(_db, Validation)
+        self.validation.restart(emailer)
+        return self.validation
+
+
+class Validation(Base):
+    """An attempt (successful, in-progress, or failed) to validate a
+    Resource.
+    """
+    __tablename__ = 'validations'
+
+    EXPIRES_AFTER = datetime.timedelta(days=1)
+
+    id = Column(Integer, primary_key=True)
+    success = Column(Boolean, index=True, default=False)
+    started_at = Column(DateTime, index=True, nullable=False,
+                        default = lambda x: datetime.datetime.utcnow())
+
+    # The only way to validate a Resource is to prove you know the
+    # corresponding secret.
+    secret = Column(Unicode, default=generate_secret, unique=True)
+
+    resource = relationship(
+        "Resource", backref=backref("validation", uselist=False), uselist=False
+    )
+
+
+    def restart(self, emailer):
+        """Start a new validation attempt, cancelling any previous attempt.
+
+        :param emailer: Something capable of sending out email.
+        """
+        self.started_at = datetime.datetime.utcnow()
+        self.secret = generate_secret()
+        self.success = False
+
+        if emailer and self.resource.href.startswith('mailto'):
+            emailer.send_validation_email(self)
+
+    @property
+    def active(self):
+        """Is this Validation still active?
+
+        An inactive Validation can't be marked as successful -- it
+        needs to be reset.
+        """
+        now = datetime.datetime.utcnow()
+        return not self.success and now < self.started_at + self.EXPIRES_AFTER
+
+    def mark_as_successful(self):
+        """Register the fact that the validation attempt has succeeded."""
+        if self.success:
+            raise Exception("This validation has already succeeded.")
+        if not self.active:
+            raise Exception("This validation has expired.")
+        self.secret = None
+        self.success = True
+
+        # TODO: This may cause one or more libraries to switch from
+        # "not completely validated" to "completely validated".
 
 
 class DelegatedPatronIdentifier(Base):
@@ -1596,7 +1699,7 @@ class ConfigurationSetting(Base):
         """
         secret = ConfigurationSetting.sitewide(_db, key)
         if not secret.value:
-            secret.value = os.urandom(24).encode('hex')
+            secret.value = generate_secret()
             # Commit to get this in the database ASAP.
             _db.commit()
         return secret.value
