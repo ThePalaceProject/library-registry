@@ -24,6 +24,10 @@ class CannotLoadConfiguration(Exception):
 class Configuration(object):
 
     instance = None
+
+    # Environment variables that contain URLs to the database
+    DATABASE_TEST_ENVIRONMENT_VARIABLE = 'SIMPLIFIED_TEST_DATABASE'
+    DATABASE_PRODUCTION_ENVIRONMENT_VARIABLE = 'SIMPLIFIED_PRODUCTION_DATABASE'
     
     log = logging.getLogger("Configuration file loader")
    
@@ -43,20 +47,24 @@ class Configuration(object):
     
     @classmethod
     def load(cls):
-        cfv = 'SIMPLIFIED_CONFIGURATION_FILE'
-        if not cfv in os.environ:
-            raise CannotLoadConfiguration(
-                "No configuration file defined in %s." % cfv)
+        """Load additional site configuration from a config file.
 
-        config_path = os.environ[cfv]
-        try:
-            cls.log.info("Loading configuration from %s", config_path)
-            configuration = cls._load(open(config_path).read())
-        except Exception, e:
-            raise CannotLoadConfiguration(
-                "Error loading configuration file %s: %s" % (
-                    config_path, e)
-            )
+        This is being phased out in favor of taking all configuration from a
+        database.
+        """
+        cfv = 'SIMPLIFIED_CONFIGURATION_FILE'
+        config_path = os.environ.get(cfv)
+        if config_path:
+            try:
+                cls.log.info("Loading configuration from %s", config_path)
+                configuration = cls._load(open(config_path).read())
+            except Exception, e:
+                raise CannotLoadConfiguration(
+                    "Error loading configuration file %s: %s" % (
+                        config_path, e)
+                )
+        else:
+            configuration = cls._load('{}')
         cls.instance = configuration
         return configuration
 
@@ -111,9 +119,26 @@ class Configuration(object):
     def database_url(cls, test=False):
         if test:
             key = cls.DATABASE_TEST_URL
+            environment_variable = cls.DATABASE_TEST_ENVIRONMENT_VARIABLE
         else:
             key = cls.DATABASE_PRODUCTION_URL
-        return cls.integration(cls.DATABASE_INTEGRATION)[key]
+            environment_variable = cls.DATABASE_PRODUCTION_ENVIRONMENT_VARIABLE
+
+        # Check the legacy location (the config file) first.
+        url = None
+        database_integration = cls.integration(cls.DATABASE_INTEGRATION)
+        if database_integration:
+            url = database_integration.get(config_key)
+
+        # If that didn't work, check the new location (the environment
+        # variable).
+        if not url:
+            url = os.environ.get(environment_variable)
+        if not url:
+            raise CannotLoadConfiguration(
+                "Database URL was not defined in environment variable (%s) or configuration file." % environment_variable
+            )
+        return url
 
     @classmethod
     def vendor_id(cls, _db):
