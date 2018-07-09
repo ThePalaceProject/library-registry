@@ -64,6 +64,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from geoalchemy2 import Geography, Geometry
 
+from emailer import Emailer
 from util.language import LanguageCodes
 from util import (
     GeometryUtility,
@@ -1231,6 +1232,8 @@ class Hyperlink(Base):
         UniqueConstraint('library_id', 'rel'),
     )
 
+    TIME_FORMAT = "%Y-%m-%d %H:%M:%S UTC"
+
     @hybrid_property
     def href(self):
         if not self.resource:
@@ -1271,6 +1274,8 @@ class Hyperlink(Base):
         # link.
         email_type = Emailer.NOTIFICATION
         to_address = resource.href
+        if to_address.startswith('mailto:'):
+            to_address = to_address[7:]
         deadline = None
 
         validation, is_new = get_one_or_create(
@@ -1282,23 +1287,24 @@ class Hyperlink(Base):
             # and send an email that includes a validation link.
             validation.restart()
             email_type = Emailer.VALIDATION
-            deadline = validation.deadline.strftime("%Y-%m-%d %H:%m:%s UTC")
+            deadline = validation.deadline.strftime(self.TIME_FORMAT)
 
         # Create values for all the variables expected by the default
         # templates.
         template_args = dict(
-            rel = Hyperlink.REL_DESCRIPTIONS.get(hyperlink.rel, hyperlink.rel),
-            validation_link = url_for(
-                "validate", resource_id=resource.id, secret=validation.secret
-            ),
+            rel = Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
             library=library.name,
             library_web_url = library.web_url,
-            email=resource.href,
+            email=to_address,
             registry_support=ConfigurationSetting.sitewide(
-                Configuration.REGISTRY_CONTACT_EMAIL
+                _db, Configuration.REGISTRY_CONTACT_EMAIL
             ).value,
             deadline=deadline
         )
+        if email_type == Emailer.VALIDATION:
+            template_args['validation_link'] = url_for(
+                "validate", resource_id=resource.id, secret=validation.secret
+            )
         body = emailer.send(email_type, to_address, **template_args)
         return body
 
@@ -1322,15 +1328,12 @@ class Resource(Base):
     validation_id = Column(Integer, ForeignKey('validations.id'),
                            index=True)
 
-    def restart_validation(self, emailer=None):
-        """Start or restart the validation process for this resource.
-
-        :param emailer: Something capable of sending out email.
-        """
+    def restart_validation(self):
+        """Start or restart the validation process for this resource."""
         if not self.validation:
             _db = Session.object_session(self)
             self.validation, ignore = create(_db, Validation)
-        self.validation.restart(emailer)
+        self.validation.restart()
         return self.validation
 
 
@@ -1356,17 +1359,16 @@ class Validation(Base):
     )
 
 
-    def restart(self, emailer):
+    def restart(self):
         """Start a new validation attempt, cancelling any previous attempt.
 
-        :param emailer: Something capable of sending out email.
+        This does not send out a validation email -- that needs to be
+        handled separately by something capable of generating the URL
+        to the validation controller.
         """
         self.started_at = datetime.datetime.utcnow()
         self.secret = generate_secret()
         self.success = False
-
-        if emailer and self.resource.href.startswith('mailto'):
-            emailer.send_validation_email(self)
 
     @property
     def deadline(self):

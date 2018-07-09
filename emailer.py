@@ -4,9 +4,6 @@ import smtplib
 from config import (
     CannotLoadConfiguration,
 )
-from model import (
-    ExternalIntegration
-)
 
 
 class Emailer(object):

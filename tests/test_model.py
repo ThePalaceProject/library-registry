@@ -11,6 +11,8 @@ import base64
 import datetime
 import operator
 
+from config import Configuration
+from emailer import Emailer
 from model import (
     create,
     get_one,
@@ -1193,6 +1195,106 @@ nonsecret_setting='2'"""
         ))
         assert 'a_secret' not in without_secrets
         assert 'nonsecret_setting' in without_secrets
+
+
+class TestHyperlink(DatabaseTest):
+
+    def test_notify(self):
+        class Mock(Emailer):
+            sent = []
+            url_for_calls = []
+
+            def __init__(self):
+                """We don't need any of the arguments that are required
+                for the Emailer constructor.
+                """
+
+            def send(self, type, to_address, **kwargs):
+                self.sent.append((type, to_address, kwargs))
+
+            def url_for(self, controller, **kwargs):
+                """Just a convenient place to mock Flask's url_for()."""
+                self.url_for_calls.append((controller, kwargs))
+                return "http://url/"
+
+        emailer = Mock()
+
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.REGISTRY_CONTACT_EMAIL
+        ).value = "me@registry"
+
+        library = self._library()
+        library.web_url = "http://library/"
+        link, is_modified = library.set_hyperlink("rel", "mailto:you@library")
+        link.notify(emailer, emailer.url_for)
+
+        # A Validation object was created for the Hyperlink.
+        validation = link.resource.validation
+        secret = validation.secret
+
+        (type, sent_to, kwargs) = emailer.sent.pop()
+
+        # We 'sent' a validation email about this Hyperlink.
+        eq_(emailer.VALIDATION, type)
+        eq_("you@library", sent_to)
+
+        # These arguments were created to fill in the VALIDATION
+        # template.
+        eq_("me@registry", kwargs['registry_support'])
+        eq_("you@library", kwargs['email'])
+        eq_(library.name, kwargs['library'])
+        eq_(library.web_url, kwargs['library_web_url'])
+        eq_("http://url/", kwargs['validation_link'])
+        deadline = datetime.datetime.strptime(
+            kwargs['deadline'], link.TIME_FORMAT
+        )
+
+        # The deadline passed into the email template is the deadline
+        # for validating the Validation object associated with this
+        # Hyperlink.
+        assert (deadline-validation.deadline).total_seconds() < 1
+
+        # url_for was called to create the validation link.
+        controller, kwargs = emailer.url_for_calls.pop()
+        eq_("validate", controller)
+        eq_(secret, kwargs['secret'])
+        eq_(link.resource.id, kwargs['resource_id'])
+
+        # If a Resource we already know about is associated with
+        # a new Hyperlink, a NOTIFICATION email is sent instead.
+        link2, is_modified = library.set_hyperlink("rel2", "mailto:you@library")
+        link2.notify(emailer, emailer.url_for)
+
+        (type, href, kwargs) = emailer.sent.pop()
+        eq_(emailer.NOTIFICATION, type)
+
+        # url_for was not called again, since a NOTIFICATION email does not
+        # include a validation link.
+        eq_([], emailer.url_for_calls)
+
+        # And the Validation was not reset.
+        eq_(secret, link.resource.validation.secret)
+
+        # Same if we somehow send another notification for a Hyperlink with an
+        # active Validation.
+        link.notify(emailer, emailer.url_for)
+        (type, href, kwargs) = emailer.sent.pop()
+        eq_(emailer.NOTIFICATION, type)
+        eq_(secret, link.resource.validation.secret)
+
+        # However, if a Hyperlink's Validation has expired, it's reset and a new
+        # VALIDATION email is sent out.
+        now = datetime.datetime.utcnow()
+        link.resource.validation.started_at = (now - datetime.timedelta(days=10))
+        link.notify(emailer, emailer.url_for)
+        (type, href, kwargs) = emailer.sent.pop()
+        eq_(emailer.VALIDATION, type)
+        assert 'validation_link' in kwargs
+
+        # The Validation has been reset.
+        eq_(validation, link.resource.validation)
+        assert validation.deadline > now
+        assert secret != validation.secret
 
 
 class TestValidation(DatabaseTest):
