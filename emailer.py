@@ -12,20 +12,25 @@ from model import (
 class Emailer(object):
     """A class for sending small amounts of email."""
 
+    # Goal and setting names for the ExternalIntegration.
+    GOAL = 'email'
+    PORT = 'port'
+    FROM_ADDRESS = 'from_address'
+
     # Constants for different types of email.
     VALIDATION = 'validation'
     NOTIFICATION = 'notification'
 
     EMAIL_TYPES = [VALIDATION, NOTIFICATION]
 
-    DEFAULT_NOTIFICATION_SUBJECT = "This address designated as %(rel)s for %(library)s"
+    DEFAULT_NOTIFICATION_SUBJECT = "This address designated as the %(rel)s for %(library)s"
     DEFAULT_VALIDATION_SUBJECT = "Validate the %(rel)s for %(library)s"
 
-    DEFAULT_NOTIFICATION_TEMPLATE = """This email address, %(email)s, has been registered with the Library Simplified library registry as the %(rel)s for the library %(library)s (%(library_web_url)s).
+    DEFAULT_NOTIFICATION_TEMPLATE = """This email address, %(to_address)s, has been registered with the Library Simplified library registry as the %(rel)s for the library %(library)s (%(library_web_url)s).
 
-If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at %(registry_support)s -- something has gone wrong.
+If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at %(from_address)s -- something has gone wrong.
 
-If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at %(registry_support)s."""
+If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at %(from_address)s."""
 
     NEEDS_VALIDATION_ADDITION = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link before %(deadline)s:
 
@@ -51,35 +56,34 @@ If the link expires, just re-register your library with the library registry, an
         :param url_for: An implementation of url_for() that can generate
            URLs for a web application as necessary.
         """
-        integration = cls.sitewide_integration(_db)
-        smtp_username = integration.username
-        smtp_password = integration.password
+        integration = cls._sitewide_integration(_db)
         host = integration.url
-        port = integration.setting(self.PORT).int_value or 587
-        from_address = integration.setting(self.FROM_ADDRESS).value
+        port = integration.setting(cls.PORT).int_value or 587
+        from_address = integration.setting(cls.FROM_ADDRESS).value
 
         email_templates = {}
-        for email_type in EMAIL_TYPES:
+        for email_type in cls.EMAIL_TYPES:
             subject = (
                 integration.setting(email_type + "_subject").value or
-                SUBJECTS[email_type]
+                cls.SUBJECTS[email_type]
             )
             body = (
                 integration.setting(email_type + "_body").value or
-                SUBJECTS[email_type]
+                cls.BODIES[email_type]
             )
             email_templates[email_type] = EmailTemplate(subject, body)
 
-        return cls(user=integration.username, password=integration.password,
-                   host=host, port=port, from_address=from_address,
-                   templates=templates, url_for=url_for)
+        return cls(smtp_username=integration.username,
+                   smtp_password=integration.password,
+                   smtp_host=host, smtp_port=port, from_address=from_address,
+                   templates=email_templates, url_for=url_for)
 
     @classmethod
-    def sitewide_integration(cls, _db):
+    def _sitewide_integration(cls, _db):
         """Find the ExternalIntegration for the emailer."""
         from model import ExternalIntegration
         qu = _db.query(ExternalIntegration).filter(
-            ExternalIntegration.goal==ExternalIntegration.EMAIL_GOAL
+            ExternalIntegration.goal==cls.GOAL
         )
         integrations = qu.all()
         if not integrations:
@@ -98,12 +102,12 @@ If the link expires, just re-register your library with the library registry, an
         [integration] = integrations
         return integration
 
-    def __init__(self, smtp_user, smtp_password, smpt_host, smpt_port,
+    def __init__(self, smtp_username, smtp_password, smtp_host, smtp_port,
                  from_address, templates, url_for):
         """Constructor."""
-        if not smtp_user:
+        if not smtp_username:
             raise CannotLoadConfiguration("No SMTP username specified")
-        self.smtp_user = smtp_user
+        self.smtp_username = smtp_username
         if not smtp_password:
             raise CannotLoadConfiguration("No SMTP password specified")
         self.smtp_password = smtp_password
@@ -119,31 +123,29 @@ If the link expires, just re-register your library with the library registry, an
         self.templates = templates
         self.url_for = url_for
 
-    def send(self, email_type, to_address, **kwargs):
+    def send(self, email_type, to_address, smtp=None, **kwargs):
         """Generate an email from a template and send it.
 
         :param email_type: The name of the template to use.
         :param to_address: Addressee of the email.
+        :param smtp: Use this object as a mock instead of creating an
+            smtplib.SMTP object.
         :param kwargs: Arguments to use when generating the email from
             a template.
         """
         if not email_type in self.templates:
             raise ValueError("No such email template: %s" % email_type)
         template = self.templates[email_type]
-        body = template.body(self.from_address, to_address **kwargs)
-        return self._send_email(to_address, body)
+        body = template.body(self.from_address, to_address, **kwargs)
+        return self._send_email(to_address, body, smtp)
 
-    def _send_email(self, to_address, body):
-        """Actually send an email.
-
-        This method may be mocked for testing purposes.
-        """
-        smtp = smtplib.SMTP()
+    def _send_email(self, to_address, body, smtp=None):
+        """Actually send an email."""
+        smtp = smtp or smtplib.SMTP()
         smtp.connect(self.smtp_host, self.smtp_port)
         smtp.login(self.smtp_username, self.smtp_password)
         smtp.sendmail(self.from_address, to_address, body)
         smtp.quit()
-
 
 
 class EmailTemplate(object):
@@ -165,5 +167,7 @@ class EmailTemplate(object):
         message['From'] = from_address
         message['To'] = to_address
         message['Subject'] = self.subject_template % kwargs
+        kwargs['to_address'] = to_address
+        kwargs['from_address'] = from_address
         message.set_payload(self.body_template % kwargs)
         return message.as_string()
