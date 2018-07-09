@@ -1302,13 +1302,6 @@ class TestValidation(DatabaseTest):
 
     def test_restart_validation(self):
 
-        class MockEmailer(object):
-            """Pretend to send out an email."""
-            validations = []
-            def send_validation_email(self, validation_obj):
-                self.validations.append(validation_obj)
-        emailer = MockEmailer()
-
         # This library has two links.
         library = self._library()
         link1, ignore = library.set_hyperlink("rel", "mailto:me@library.org")
@@ -1318,8 +1311,8 @@ class TestValidation(DatabaseTest):
 
         # Let's set up validation for both of them.
         now = datetime.datetime.utcnow()
-        email_validation = email.restart_validation(emailer)
-        http_validation = http.restart_validation(emailer)
+        email_validation = email.restart_validation()
+        http_validation = http.restart_validation()
 
         for v in (email_validation, http_validation):
             assert (v.started_at - now).total_seconds() < 2
@@ -1328,22 +1321,16 @@ class TestValidation(DatabaseTest):
         # A random secret was generated for each Validation.
         assert email_validation.secret != http_validation.secret
 
-        # The mailto: URL was passed into the MockEmailer; the other
-        # one was not.
-        eq_(email_validation, emailer.validations.pop())
-        eq_([], emailer.validations)
-
         # Let's imagine that validation succeeded and is being
         # invalidated for some reason.
         email_validation.success = True
         old_started_at = email_validation.started_at
         old_secret = email_validation.secret
-        email_validation_2 = email.restart_validation(emailer)
+        email_validation_2 = email.restart_validation()
 
         # Instead of a new Validation being created, the earlier
         # Validation has been invalidated.
         eq_(email_validation, email_validation_2)
-        eq_([email_validation_2], emailer.validations)
         eq_(False, email_validation_2.success)
 
         # The secret has changed.
@@ -1369,7 +1356,7 @@ class TestValidation(DatabaseTest):
         )
 
         # A validation that has expired cannot be marked as successful.
-        validation.restart(None)
+        validation.restart()
         validation.started_at = (
             datetime.datetime.utcnow() - datetime.timedelta(days=7)
         )
