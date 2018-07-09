@@ -49,12 +49,10 @@ If the link expires, just re-register your library with the library registry, an
     }
 
     @classmethod
-    def from_sitewide_integration(cls, _db, url_for):
+    def from_sitewide_integration(cls, _db):
         """Create an Emailer from a site-wide email integration.
 
         :param _db: A database connection
-        :param url_for: An implementation of url_for() that can generate
-           URLs for a web application as necessary.
         """
         integration = cls._sitewide_integration(_db)
         host = integration.url
@@ -76,7 +74,7 @@ If the link expires, just re-register your library with the library registry, an
         return cls(smtp_username=integration.username,
                    smtp_password=integration.password,
                    smtp_host=host, smtp_port=port, from_address=from_address,
-                   templates=email_templates, url_for=url_for)
+                   templates=email_templates)
 
     @classmethod
     def _sitewide_integration(cls, _db):
@@ -103,7 +101,7 @@ If the link expires, just re-register your library with the library registry, an
         return integration
 
     def __init__(self, smtp_username, smtp_password, smtp_host, smtp_port,
-                 from_address, templates, url_for):
+                 from_address, templates):
         """Constructor."""
         if not smtp_username:
             raise CannotLoadConfiguration("No SMTP username specified")
@@ -121,7 +119,6 @@ If the link expires, just re-register your library with the library registry, an
             raise CannotLoadConfiguration("No From: address specified")
         self.from_address = from_address
         self.templates = templates
-        self.url_for = url_for
 
     def send(self, email_type, to_address, smtp=None, **kwargs):
         """Generate an email from a template and send it.

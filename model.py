@@ -1243,7 +1243,7 @@ class Hyperlink(Base):
         resource, is_new = get_one_or_create(_db, Resource, href=url)
         self.resource = resource
 
-    def notify(self, emailer):
+    def notify(self, emailer, url_for):
         """Notify the target of this hyperlink that it is, in fact,
         a target of the hyperlink.
 
@@ -1252,6 +1252,10 @@ class Hyperlink(Base):
         confirm the address. Otherwise, a NOTIFICATION email will be
         sent, informing the person on the other end that their already
         validated email address was associated with another library.
+
+        :param emailer: An Emailer, for sending out the email.
+        :param url_for: An implementation of Flask's url_for, used to
+            generate a validation link if necessary.
         """
         _db = Session.object_session(self)
 
@@ -1284,7 +1288,7 @@ class Hyperlink(Base):
         # templates.
         template_args = dict(
             rel = Hyperlink.REL_DESCRIPTIONS.get(hyperlink.rel, hyperlink.rel),
-            validation_link = emailer.url_for(
+            validation_link = url_for(
                 "validate", resource_id=resource.id, secret=validation.secret
             ),
             library=library.name,
