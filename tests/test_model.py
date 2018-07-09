@@ -22,6 +22,7 @@ from model import (
     ConfigurationSetting,
     DelegatedPatronIdentifier,
     ExternalIntegration,
+    Hyperlink,
     Library,
     LibraryAlias,
     Place,
@@ -1225,7 +1226,9 @@ class TestHyperlink(DatabaseTest):
 
         library = self._library()
         library.web_url = "http://library/"
-        link, is_modified = library.set_hyperlink("rel", "mailto:you@library")
+        link, is_modified = library.set_hyperlink(
+            Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, "mailto:you@library"
+        )
         link.notify(emailer, emailer.url_for)
 
         # A Validation object was created for the Hyperlink.
@@ -1242,6 +1245,7 @@ class TestHyperlink(DatabaseTest):
         # template.
         eq_("me@registry", kwargs['registry_support'])
         eq_("you@library", kwargs['email'])
+        eq_("copyright designated agent", kwargs['rel'])
         eq_(library.name, kwargs['library'])
         eq_(library.web_url, kwargs['library_web_url'])
         eq_("http://url/", kwargs['validation_link'])
@@ -1262,11 +1266,12 @@ class TestHyperlink(DatabaseTest):
 
         # If a Resource we already know about is associated with
         # a new Hyperlink, a NOTIFICATION email is sent instead.
-        link2, is_modified = library.set_hyperlink("rel2", "mailto:you@library")
+        link2, is_modified = library.set_hyperlink("help", "mailto:you@library")
         link2.notify(emailer, emailer.url_for)
 
         (type, href, kwargs) = emailer.sent.pop()
         eq_(emailer.NOTIFICATION, type)
+        eq_("patron help contact address", kwargs['rel'])
 
         # url_for was not called again, since a NOTIFICATION email does not
         # include a validation link.
