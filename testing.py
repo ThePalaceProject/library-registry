@@ -48,8 +48,6 @@ def package_setup():
     SessionManager.initialize_data(_db)
     _db.commit()
 
-    if not Configuration.instance:
-        Configuration.load()
     LogConfiguration.initialize(_db)
 
     connection.close()

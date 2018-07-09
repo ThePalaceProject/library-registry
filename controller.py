@@ -61,12 +61,6 @@ class LibraryRegistry(object):
 
         self.log = logging.getLogger("Library registry web app")
 
-        try:
-            self.config = Configuration.load()
-        except CannotLoadConfiguration, e:
-            self.log.error("Could not load configuration file: %s", e)
-            sys.exit()
-
         if _db is None and not testing:
             _db = production_session()
         self._db = _db
