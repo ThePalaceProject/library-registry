@@ -548,7 +548,7 @@ class LibraryRegistryController(object):
 class ValidationController(object):
     """Validates Resources based on validation codes.
 
-    The validation codes were sent out in emails to the addresses that
+    The confirmation codes were sent out in emails to the addresses that
     need to be validated, or otherwise communicated to someone who needs
     to click on the link to this controller.
     """
@@ -569,13 +569,13 @@ class ValidationController(object):
         page = self.MESSAGE_TEMPLATE % dict(message=message)
         return Response(page, status_code, headers=headers)
 
-    def validate(self, resource_id, secret):
-        """Validate a secret for a URI, or don't.
+    def confirm(self, resource_id, secret):
+        """Confirm a secret for a URI, or don't.
 
         :return: A Response containing a simple HTML document.
         """
         if not secret:
-            return self.html_response(404, _("No validation code provided"))
+            return self.html_response(404, _("No confirmation code provided"))
         if not resource_id:
             return self.html_response(404, _("No resource ID provided"))
         validation = get_one(self._db, Validation, secret=secret)
@@ -599,17 +599,17 @@ class ValidationController(object):
             # For whatever reason the resource ID and secret don't match.
             # A generic error that doesn't reveal information is appropriate
             # in all cases.
-            error = _("Validation code %r not found") % secret
+            error = _("Confirmation code %r not found") % secret
             return self.html_response(404, error)
 
         # At this point we know that the resource has not been
-        # validated, and that the secret matches the resource. The
+        # confirmed, and that the secret matches the resource. The
         # only other problem might be that the validation has expired.
         if not validation.active:
-            error = _("Validation code %r has expired. Re-register to get another code.") % secret
+            error = _("Confirmation code %r has expired. Re-register to get another code.") % secret
             return self.html_response(400, error)
         validation.mark_as_successful()
 
         resource = validation.resource
-        message = _("You successfully validated %s.") % resource.href
+        message = _("You successfully confirmed %s.") % resource.href
         return self.html_response(200, message)

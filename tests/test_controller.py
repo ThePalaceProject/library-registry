@@ -1105,7 +1105,7 @@ class TestValidationController(ControllerTest):
             and verify that html_response is called with the given
             status_code and message.
             """
-            result = controller.validate(resource_id, secret)
+            result = controller.confirm(resource_id, secret)
             eq_((status_code, message), result)
 
         # This library has three links: two that are in the middle of
@@ -1128,7 +1128,7 @@ class TestValidationController(ControllerTest):
 
         # Simple tests for missing fields or failed lookups.
         assert_response(
-            needs_validation.id, "", 404, "No validation code provided"
+            needs_validation.id, "", 404, "No confirmation code provided"
         )
         assert_response(None, "a code", 404, "No resource ID provided")
         assert_response(-20, secret, 404, "No such resource")
@@ -1136,18 +1136,18 @@ class TestValidationController(ControllerTest):
         # Secret does not exist.
         assert_response(
             needs_validation.id, "nosuchcode", 404,
-            "Validation code 'nosuchcode' not found"
+            "Confirmation code 'nosuchcode' not found"
         )
 
         # Secret exists but is associated with a different Resource.
         assert_response(needs_validation.id, secret2, 404,
-                        "Validation code %r not found" % secret2)
+                        "Confirmation code %r not found" % secret2)
 
         # Secret exists but is not associated with any Resource (this
         # shouldn't happen).
         needs_validation_2.validation.resource = None
         assert_response(needs_validation.id, secret2, 404,
-                        "Validation code %r not found" % secret2)
+                        "Confirmation code %r not found" % secret2)
 
         # Secret matches resource but validation has expired.
         needs_validation.validation.started_at = (
@@ -1155,7 +1155,7 @@ class TestValidationController(ControllerTest):
         )
         assert_response(
             needs_validation.id, secret, 400,
-            "Validation code %r has expired. Re-register to get another code." % secret
+            "Confirmation code %r has expired. Re-register to get another code." % secret
         )
 
         # Success.
@@ -1163,7 +1163,7 @@ class TestValidationController(ControllerTest):
         secret = needs_validation.validation.secret
         assert_response(
             needs_validation.id, secret, 200,
-            "You successfully validated mailto:1@library.org."
+            "You successfully confirmed mailto:1@library.org."
         )
 
         # A Resource can't be validated twice.
