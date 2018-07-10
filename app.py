@@ -86,9 +86,9 @@ def search_qa():
         originating_ip(), live=False
     )
 
-@app.route('/validate/<int:resource_id>/<secret>')
+@app.route('/confirm/<int:resource_id>/<secret>')
 @returns_problem_detail
-def validate_resource(secret):
+def confirm_resource(secret):
     return app.library_registry.validation_controller.validate(
         resource_id, secret
     )

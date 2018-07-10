@@ -24,6 +24,7 @@ from testing import DummyHTTPClient
 from util.problem_detail import ProblemDetail
 
 from authentication_document import AuthenticationDocument
+from emailer import Emailer
 from opds import OPDSCatalog
 from model import (
     get_one,
@@ -41,6 +42,18 @@ from testing import DummyHTTPResponse
 class TestLibraryRegistry(LibraryRegistry):
     pass
 
+class MockEmailer(Emailer):
+
+    @classmethod
+    def from_sitewide_integration(cls, _db):
+        return cls()
+
+    def __init__(self):
+        self.sent_out = []
+
+    def send(self, email_type, to_address, **template_args):
+        self.sent_out.append((email_type, to_address, template_args))
+
 
 class ControllerTest(DatabaseTest):
     def setup(self):
@@ -50,7 +63,9 @@ class ControllerTest(DatabaseTest):
         del os.environ['AUTOINITIALIZE']
         self.app = app
         self.data_setup()
-        self.library_registry = TestLibraryRegistry(self._db, testing=True)
+        self.library_registry = TestLibraryRegistry(
+            self._db, testing=True, emailer_class=MockEmailer,
+        )
         self.app.library_registry = self.library_registry
         self.http_client = DummyHTTPClient()
 
@@ -87,7 +102,9 @@ class TestLibraryRegistryController(ControllerTest):
 
     def setup(self):
         super(TestLibraryRegistryController, self).setup()
-        self.controller = LibraryRegistryController(self.library_registry)
+        self.controller = LibraryRegistryController(
+            self.library_registry, emailer_class=MockEmailer
+        )
 
         # A registration form that's valid for most of the tests 
         # in this class.
@@ -95,6 +112,13 @@ class TestLibraryRegistryController(ControllerTest):
             ("url", "http://circmanager.org/authentication.opds"),
             ("contact", "mailto:integrationproblems@library.org"),
         ])
+
+    def test_instantiate_without_emailer(self):
+        """If there is no emailer configured, the controller will still start
+        up.
+        """
+        controller = LibraryRegistryController(self.library_registry)
+        eq_(None, controller.emailer)
 
     def test_nearby(self):
         with self.app.test_request_context("/"):
@@ -745,6 +769,15 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(Hyperlink.INTEGRATION_CONTACT_REL, integration_contact_link.rel)
         eq_("mailto:me@library.org", integration_contact_link.href)
 
+        # A confirmation email was sent out for each of those addresses.
+        sent = sorted(self.controller.emailer.sent_out, key=lambda x: x[1])
+        for email in sent:
+            eq_(Emailer.ADDRESS_NEEDS_CONFIRMATION, email[0])
+        destinations = [x[1] for x in sent]
+        eq_(["dmca@library.org", "help@library.org", "me@library.org"],
+            destinations)
+        self.controller.emailer.sent_out = []
+
         # A human inspects the library, verifies that everything
         # works, and makes it LIVE.
         library.stage = Library.LIVE
@@ -758,7 +791,7 @@ class TestLibraryRegistryController(ControllerTest):
                 {"rel": "logo", "href": "/logo.png", "type": "image/png" },
                 {"rel": "start", "href": "http://circmanager.org/feed/", "type": "application/atom+xml;profile=opds-catalog"},
                 {"rel": "help", "href": "mailto:new-help@library.org"},
-                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright", "href": "mailto:new-dmca@library.org"},
+                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright", "href": "mailto:me@library.org"},
 
             ],
             "service_area": { "US": "Connecticut" },
@@ -815,11 +848,22 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("help", help_link.rel)
             eq_("mailto:new-help@library.org", help_link.href)
             eq_(Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, copyright_agent_link.rel)
-            eq_("mailto:new-dmca@library.org", copyright_agent_link.href)
+            eq_("mailto:me@library.org", copyright_agent_link.href)
 
             # The link that hasn't changed is unaffected.
             eq_(Hyperlink.INTEGRATION_CONTACT_REL, integration_contact_link.rel)
             eq_("mailto:me@library.org", integration_contact_link.href)
+
+            # Two emails were sent out -- one asking for confirmation
+            # of new-help@library.org, and one announcing the new role
+            # for me@library.org (which already has an outstanding
+            # confirmation request) as designated copyright agent.
+            new_dmca, new_help = sorted(
+                [(x[1], x[0]) for x in self.controller.emailer.sent_out]
+            )
+            eq_(("me@library.org", Emailer.ADDRESS_DESIGNATED), new_dmca)
+            eq_(("new-help@library.org", Emailer.ADDRESS_NEEDS_CONFIRMATION),
+                new_help)
             
             # Commit to update library.service_areas.
             self._db.commit()

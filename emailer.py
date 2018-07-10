@@ -19,7 +19,7 @@ class Emailer(object):
 
     # Constants for different types of email.
     ADDRESS_DESIGNATED = 'address_designated'
-    ADDRESS_NEEDS_CONFIRMATION = 'address_registered'
+    ADDRESS_NEEDS_CONFIRMATION = 'address_needs_confirmation'
 
     EMAIL_TYPES = [ADDRESS_DESIGNATED, ADDRESS_NEEDS_CONFIRMATION]
 
