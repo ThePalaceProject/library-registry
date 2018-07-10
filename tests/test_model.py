@@ -1253,7 +1253,7 @@ class TestHyperlink(DatabaseTest):
 
         # url_for was called to create the confirmation link.
         controller, kwargs = emailer.url_for_calls.pop()
-        eq_("validate", controller)
+        eq_("confirm_resource", controller)
         eq_(secret, kwargs['secret'])
         eq_(link.resource.id, kwargs['resource_id'])
 
