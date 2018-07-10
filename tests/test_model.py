@@ -1237,44 +1237,37 @@ class TestHyperlink(DatabaseTest):
 
         (type, sent_to, kwargs) = emailer.sent.pop()
 
-        # We 'sent' a validation email about this Hyperlink.
-        eq_(emailer.VALIDATION, type)
+        # We 'sent' an email about the fact that a new email address was
+        # registered.
+        eq_(emailer.ADDRESS_NEEDS_CONFIRMATION, type)
         eq_("you@library", sent_to)
 
-        # These arguments were created to fill in the VALIDATION
+        # These arguments were created to fill in the ADDRESS_NEEDS_CONFIRMATION
         # template.
         eq_("me@registry", kwargs['registry_support'])
         eq_("you@library", kwargs['email'])
-        eq_("copyright designated agent", kwargs['rel'])
+        eq_("copyright designated agent", kwargs['rel_desc'])
         eq_(library.name, kwargs['library'])
         eq_(library.web_url, kwargs['library_web_url'])
-        eq_("http://url/", kwargs['validation_link'])
-        deadline = datetime.datetime.strptime(
-            kwargs['deadline'], link.TIME_FORMAT
-        )
+        eq_("http://url/", kwargs['confirmation_link'])
 
-        # The deadline passed into the email template is the deadline
-        # for validating the Validation object associated with this
-        # Hyperlink.
-        assert (deadline-validation.deadline).total_seconds() < 1
-
-        # url_for was called to create the validation link.
+        # url_for was called to create the confirmation link.
         controller, kwargs = emailer.url_for_calls.pop()
         eq_("validate", controller)
         eq_(secret, kwargs['secret'])
         eq_(link.resource.id, kwargs['resource_id'])
 
         # If a Resource we already know about is associated with
-        # a new Hyperlink, a NOTIFICATION email is sent instead.
+        # a new Hyperlink, an ADDRESS_DESIGNATED email is sent instead.
         link2, is_modified = library.set_hyperlink("help", "mailto:you@library")
         link2.notify(emailer, emailer.url_for)
 
         (type, href, kwargs) = emailer.sent.pop()
-        eq_(emailer.NOTIFICATION, type)
-        eq_("patron help contact address", kwargs['rel'])
+        eq_(emailer.ADDRESS_DESIGNATED, type)
+        eq_("patron help contact address", kwargs['rel_desc'])
 
-        # url_for was not called again, since a NOTIFICATION email does not
-        # include a validation link.
+        # url_for was not called again, since an ADDRESS_DESIGNATED
+        # email does not include a validation link.
         eq_([], emailer.url_for_calls)
 
         # And the Validation was not reset.
@@ -1284,17 +1277,17 @@ class TestHyperlink(DatabaseTest):
         # active Validation.
         link.notify(emailer, emailer.url_for)
         (type, href, kwargs) = emailer.sent.pop()
-        eq_(emailer.NOTIFICATION, type)
+        eq_(emailer.ADDRESS_DESIGNATED, type)
         eq_(secret, link.resource.validation.secret)
 
         # However, if a Hyperlink's Validation has expired, it's reset and a new
-        # VALIDATION email is sent out.
+        # ADDRESS_NEEDS_CONFIRMATION email is sent out.
         now = datetime.datetime.utcnow()
         link.resource.validation.started_at = (now - datetime.timedelta(days=10))
         link.notify(emailer, emailer.url_for)
         (type, href, kwargs) = emailer.sent.pop()
-        eq_(emailer.VALIDATION, type)
-        assert 'validation_link' in kwargs
+        eq_(emailer.ADDRESS_NEEDS_CONFIRMATION, type)
+        assert 'confirmation_link' in kwargs
 
         # The Validation has been reset.
         eq_(validation, link.resource.validation)

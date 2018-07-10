@@ -157,7 +157,7 @@ class TestEmailer(DatabaseTest):
         assert_raises_regexp(
             CannotLoadConfiguration, "No SMTP port specified", **args
         )
-        args['smtp_host'] = 'host'
+        args['smtp_port'] = 'port'
 
         assert_raises_regexp(
             CannotLoadConfiguration, "No From: address specified", **args
@@ -174,14 +174,14 @@ class TestEmailer(DatabaseTest):
 
         # Start with arguments common to both email templates.
         args = dict(
-            rel="support address",
+            rel_desc="support address",
             library="My Public Library",
             library_web_url="https://library/",
         )
 
-        # Generate the notification template.
-        notification_template = emailer.templates[Emailer.NOTIFICATION]
-        body = notification_template.body(
+        # Generate the address-designation template.
+        designation_template = emailer.templates[Emailer.ADDRESS_DESIGNATED]
+        body = designation_template.body(
             "me@registry", "you@library", **args
         )
         eq_(body, """From: me@registry
@@ -194,24 +194,24 @@ If this is obviously wrong (for instance, you don't work at a public library), p
 
 If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at me@registry.""")
 
-        # The validation template has a couple extra fields that need
+        # The confirmation template has a couple extra fields that need
         # filling in.
-        validation_template = emailer.templates[Emailer.VALIDATION]
-        args['deadline'] = "January 1, 1970"
-        args['validation_link'] = "http://registry/validate"
-        body2 = validation_template.body(
+        confirmation_template = emailer.templates[Emailer.ADDRESS_NEEDS_CONFIRMATION]
+        args['confirmation_link'] = "http://registry/confirm"
+        body2 = confirmation_template.body(
             "me@registry", "you@library", **args
         )
 
-        # The validation template is the notification template with
-        # a couple extra paragraphs and a different subject line.
-        extra = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link before January 1, 1970:
+        # The address confirmation template is the address designation
+        # template with a couple extra paragraphs and a different
+        # subject line.
+        extra = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link:
 
-http://registry/validate
+http://registry/confirm
 
-If the link expires, just re-register your library with the library registry, and a fresh validation email like this will be sent out."""
+The link will expire in about a day. If the link expires, just re-register your library with the library registry, and a fresh confirmation email like this will be sent out."""
         new_body = body.replace("Subject: This address designated as the ",
-                                "Subject: Validate the ")
+                                "Subject: Confirm the ")
         eq_(body2, new_body+"\n\n"+extra)
 
     def test_send(self):

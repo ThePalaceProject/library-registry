@@ -15,34 +15,34 @@ class Emailer(object):
     FROM_ADDRESS = 'from_address'
 
     # Constants for different types of email.
-    VALIDATION = 'validation'
-    NOTIFICATION = 'notification'
+    ADDRESS_DESIGNATED = 'address_designated'
+    ADDRESS_NEEDS_CONFIRMATION = 'address_registered'
 
-    EMAIL_TYPES = [VALIDATION, NOTIFICATION]
+    EMAIL_TYPES = [ADDRESS_DESIGNATED, ADDRESS_NEEDS_CONFIRMATION]
 
-    DEFAULT_NOTIFICATION_SUBJECT = "This address designated as the %(rel)s for %(library)s"
-    DEFAULT_VALIDATION_SUBJECT = "Validate the %(rel)s for %(library)s"
+    DEFAULT_ADDRESS_DESIGNATED_SUBJECT = "This address designated as the %(rel_desc)s for %(library)s"
+    DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT = "Confirm the %(rel_desc)s for %(library)s"
 
-    DEFAULT_NOTIFICATION_TEMPLATE = """This email address, %(to_address)s, has been registered with the Library Simplified library registry as the %(rel)s for the library %(library)s (%(library_web_url)s).
+    DEFAULT_ADDRESS_DESIGNATED_TEMPLATE = """This email address, %(to_address)s, has been registered with the Library Simplified library registry as the %(rel_desc)s for the library %(library)s (%(library_web_url)s).
 
 If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at %(from_address)s -- something has gone wrong.
 
 If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at %(from_address)s."""
 
-    NEEDS_VALIDATION_ADDITION = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link before %(deadline)s:
+    NEEDS_CONFIRMATION_ADDITION = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link:
 
-%(validation_link)s
+%(confirmation_link)s
 
-If the link expires, just re-register your library with the library registry, and a fresh validation email like this will be sent out."""
+The link will expire in about a day. If the link expires, just re-register your library with the library registry, and a fresh confirmation email like this will be sent out."""
 
     BODIES = {
-        NOTIFICATION : DEFAULT_NOTIFICATION_TEMPLATE,
-        VALIDATION : DEFAULT_NOTIFICATION_TEMPLATE + "\n\n" + NEEDS_VALIDATION_ADDITION
+        ADDRESS_DESIGNATED : DEFAULT_ADDRESS_DESIGNATED_TEMPLATE,
+        ADDRESS_NEEDS_CONFIRMATION : DEFAULT_ADDRESS_DESIGNATED_TEMPLATE + "\n\n" + NEEDS_CONFIRMATION_ADDITION
     }
 
     SUBJECTS = {
-        NOTIFICATION: DEFAULT_NOTIFICATION_SUBJECT,
-        VALIDATION : DEFAULT_VALIDATION_SUBJECT,
+        ADDRESS_DESIGNATED: DEFAULT_ADDRESS_DESIGNATED_SUBJECT,
+        ADDRESS_NEEDS_CONFIRMATION : DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT,
     }
 
     @classmethod
@@ -109,7 +109,7 @@ If the link expires, just re-register your library with the library registry, an
         if not smtp_host:
             raise CannotLoadConfiguration("No SMTP host specified")
         self.smtp_host = smtp_host
-        if not smtp_host:
+        if not smtp_port:
             raise CannotLoadConfiguration("No SMTP port specified")
         self.smtp_port = smtp_port
         if not from_address:

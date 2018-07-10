@@ -1232,8 +1232,6 @@ class Hyperlink(Base):
         UniqueConstraint('library_id', 'rel'),
     )
 
-    TIME_FORMAT = "%Y-%m-%d %H:%M:%S UTC"
-
     @hybrid_property
     def href(self):
         if not self.resource:
@@ -1250,12 +1248,12 @@ class Hyperlink(Base):
         """Notify the target of this hyperlink that it is, in fact,
         a target of the hyperlink.
 
-        If the underlying resource needs a new validation, a
-        VALIDATION email will be sent, asking the person on the other
-        end to confirm the address. Otherwise, a NOTIFICATION email
-        will be sent, informing the person on the other end that their
-        (probably already validated) email address was associated with
-        another library.
+        If the underlying resource needs a new validation, an
+        ADDRESS_NEEDS_CONFIRMATION email will be sent, asking the person on
+        the other end to confirm the address. Otherwise, an
+        ADDRESS_DESIGNATED email will be sent, informing the person on
+        the other end that their (probably already validated) email
+        address was associated with another library.
 
         :param emailer: An Emailer, for sending out the email.
         :param url_for: An implementation of Flask's url_for, used to
@@ -1273,7 +1271,7 @@ class Hyperlink(Base):
 
         # Default to sending an informative email with no validation
         # link.
-        email_type = Emailer.NOTIFICATION
+        email_type = Emailer.ADDRESS_DESIGNATED
         to_address = resource.href
         if to_address.startswith('mailto:'):
             to_address = to_address[7:]
@@ -1287,23 +1285,21 @@ class Hyperlink(Base):
             # before being verified. Restart the validation process
             # and send an email that includes a validation link.
             validation.restart()
-            email_type = Emailer.VALIDATION
-            deadline = validation.deadline.strftime(self.TIME_FORMAT)
+            email_type = Emailer.ADDRESS_NEEDS_CONFIRMATION
 
         # Create values for all the variables expected by the default
         # templates.
         template_args = dict(
-            rel = Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
+            rel_desc = Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
             library=library.name,
             library_web_url = library.web_url,
             email=to_address,
             registry_support=ConfigurationSetting.sitewide(
                 _db, Configuration.REGISTRY_CONTACT_EMAIL
             ).value,
-            deadline=deadline
         )
-        if email_type == Emailer.VALIDATION:
-            template_args['validation_link'] = url_for(
+        if email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION:
+            template_args['confirmation_link'] = url_for(
                 "validate", resource_id=resource.id, secret=validation.secret
             )
         body = emailer.send(email_type, to_address, **template_args)
