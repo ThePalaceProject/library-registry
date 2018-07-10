@@ -64,6 +64,7 @@ class TestEmailer(DatabaseTest):
         integration.password = "smtp_password"
         integration.url = "smtp_host"
         integration.setting(Emailer.PORT).value = '234'
+        integration.setting(Emailer.FROM_NAME).value = 'Me'
         integration.setting(Emailer.FROM_ADDRESS).value = 'me@registry'
         return integration
 
@@ -164,6 +165,11 @@ class TestEmailer(DatabaseTest):
         )
         args['from_address'] = 'from@library.org'
 
+        assert_raises_regexp(
+            CannotLoadConfiguration, "No From: name specified", **args
+        )
+        args['from_name'] = 'Email Sender'
+
         # With all the arguments specified, it works.
         emailer = m(**args)
 
@@ -233,7 +239,7 @@ The link will expire in about a day. If the link expires, just re-register your 
         # _send_email implementation.
         (to, body, smtp) = emailer.emails.pop()
         eq_("you@library", to)
-        eq_("""From: me@registry
+        eq_("""From: Me <me@registry>
 To: you@library
 Subject: subject Value
 
