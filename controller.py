@@ -19,7 +19,7 @@ from urlparse import urljoin
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
-
+from emailer import Emailer
 from model import (
     ConfigurationSetting,
     Hyperlink,
@@ -57,7 +57,7 @@ OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://li
 
 class LibraryRegistry(object):
 
-    def __init__(self, _db=None, testing=False):
+    def __init__(self, _db=None, testing=False, emailer_class=None):
 
         self.log = logging.getLogger("Library registry web app")
 
@@ -67,11 +67,13 @@ class LibraryRegistry(object):
 
         self.testing = testing
 
-        self.setup_controllers()
+        self.setup_controllers(emailer_class)
 
-    def setup_controllers(self):
+    def setup_controllers(self, emailer_class=None):
         """Set up all the controllers that will be used by the web app."""
-        self.registry_controller = LibraryRegistryController(self)
+        self.registry_controller = LibraryRegistryController(
+            self, emailer_class
+        )
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         if vendor_id:
@@ -119,11 +121,20 @@ class LibraryRegistryController(object):
    <Url type="application/atom+xml;profile=opds-catalog" template="%(url_template)s"/>
  </OpenSearchDescription>"""
     
-    def __init__(self, app):
+    def __init__(self, app, emailer_class=Emailer):
         self.app = app
         self._db = self.app._db
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
+        emailer = None
+        try:
+            emailer = emailer_class.from_sitewide_integration(self._db)
+        except CannotLoadConfiguration, e:
+            self.log.error(
+                "Cannot load email configuration. Will not be sending any emails.",
+                exc_info=e
+            )
+        self.emailer = emailer
   
     def point_from_ip(self, ip_address):
         if not ip_address:
@@ -484,7 +495,13 @@ class LibraryRegistryController(object):
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
 
         for rel, candidates in hyperlinks_to_create:
-            library.set_hyperlink(rel, *candidates)
+            hyperlink, is_modified = library.set_hyperlink(rel, *candidates)
+            if is_modified:
+                # We need to send an email to this email address about
+                # what just happened. This is either so the receipient
+                # can confirm that the address works, or to inform
+                # them a new library is using their address.
+                hyperlink.notify(self.emailer, self.app.url_for)
 
         if is_new:
             status_code = 201
@@ -548,7 +565,7 @@ class LibraryRegistryController(object):
 class ValidationController(object):
     """Validates Resources based on validation codes.
 
-    The validation codes were sent out in emails to the addresses that
+    The confirmation codes were sent out in emails to the addresses that
     need to be validated, or otherwise communicated to someone who needs
     to click on the link to this controller.
     """
@@ -569,13 +586,13 @@ class ValidationController(object):
         page = self.MESSAGE_TEMPLATE % dict(message=message)
         return Response(page, status_code, headers=headers)
 
-    def validate(self, resource_id, secret):
-        """Validate a secret for a URI, or don't.
+    def confirm(self, resource_id, secret):
+        """Confirm a secret for a URI, or don't.
 
         :return: A Response containing a simple HTML document.
         """
         if not secret:
-            return self.html_response(404, _("No validation code provided"))
+            return self.html_response(404, _("No confirmation code provided"))
         if not resource_id:
             return self.html_response(404, _("No resource ID provided"))
         validation = get_one(self._db, Validation, secret=secret)
@@ -599,17 +616,17 @@ class ValidationController(object):
             # For whatever reason the resource ID and secret don't match.
             # A generic error that doesn't reveal information is appropriate
             # in all cases.
-            error = _("Validation code %r not found") % secret
+            error = _("Confirmation code %r not found") % secret
             return self.html_response(404, error)
 
         # At this point we know that the resource has not been
-        # validated, and that the secret matches the resource. The
+        # confirmed, and that the secret matches the resource. The
         # only other problem might be that the validation has expired.
         if not validation.active:
-            error = _("Validation code %r has expired. Re-register to get another code.") % secret
+            error = _("Confirmation code %r has expired. Re-register to get another code.") % secret
             return self.html_response(400, error)
         validation.mark_as_successful()
 
         resource = validation.resource
-        message = _("You successfully validated %s.") % resource.href
+        message = _("You successfully confirmed %s.") % resource.href
         return self.html_response(200, message)

@@ -1259,6 +1259,9 @@ class Hyperlink(Base):
         :param url_for: An implementation of Flask's url_for, used to
             generate a validation link if necessary.
         """
+        if not emailer or not url_for:
+            # We can't actually send any emails.
+            return
         _db = Session.object_session(self)
 
         # These shouldn't happen, but just to be safe, do nothing if
@@ -1300,7 +1303,7 @@ class Hyperlink(Base):
         )
         if email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION:
             template_args['confirmation_link'] = url_for(
-                "validate", resource_id=resource.id, secret=validation.secret
+                "confirm_resource", resource_id=resource.id, secret=validation.secret
             )
         body = emailer.send(email_type, to_address, **template_args)
         return body
