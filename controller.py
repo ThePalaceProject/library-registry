@@ -415,6 +415,7 @@ class LibraryRegistryController(object):
             opds_url=opds_url,
             create_method_kwargs=dict(stage=Library.REGISTERED)
         )
+        library.name = auth_document.title
         if auth_document.website:
             url = auth_document.website.get("href")
             if url:

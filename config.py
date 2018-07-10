@@ -39,7 +39,13 @@ class Configuration(object):
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
     ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
 
+    # The text to which users must agree to register a library.
     REGISTRATION_TERMS_OF_SERVICE_TEXT = "registration_terms_of_service_text"
+
+    # Email sent by the library registry will be 'from' this address,
+    # and receipients will be invited to contact this address if they
+    # have problems.
+    REGISTRY_CONTACT_EMAIL = "registry_contact_email"
     
     @classmethod
     def database_url(cls, test=False):

@@ -64,6 +64,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from geoalchemy2 import Geography, Geometry
 
+from emailer import Emailer
 from util.language import LanguageCodes
 from util import (
     GeometryUtility,
@@ -1211,6 +1212,13 @@ class Hyperlink(Base):
     INTEGRATION_CONTACT_REL = "http://librarysimplified.org/rel/integration-contact"
     COPYRIGHT_DESIGNATED_AGENT_REL = "http://librarysimplified.org/rel/designated-agent/copyright"
 
+    # Descriptions of the link relations, used in emails.
+    REL_DESCRIPTIONS = {
+        INTEGRATION_CONTACT_REL: "integration point of contact",
+        COPYRIGHT_DESIGNATED_AGENT_REL: "copyright designated agent",
+        "help": "patron help contact address",
+    }
+
     __tablename__ = 'hyperlinks'
 
     id = Column(Integer, primary_key=True)
@@ -1236,6 +1244,67 @@ class Hyperlink(Base):
         resource, is_new = get_one_or_create(_db, Resource, href=url)
         self.resource = resource
 
+    def notify(self, emailer, url_for):
+        """Notify the target of this hyperlink that it is, in fact,
+        a target of the hyperlink.
+
+        If the underlying resource needs a new validation, an
+        ADDRESS_NEEDS_CONFIRMATION email will be sent, asking the person on
+        the other end to confirm the address. Otherwise, an
+        ADDRESS_DESIGNATED email will be sent, informing the person on
+        the other end that their (probably already validated) email
+        address was associated with another library.
+
+        :param emailer: An Emailer, for sending out the email.
+        :param url_for: An implementation of Flask's url_for, used to
+            generate a validation link if necessary.
+        """
+        _db = Session.object_session(self)
+
+        # These shouldn't happen, but just to be safe, do nothing if
+        # this Hyperlink is disconnected from the other data model
+        # objects it needs to do its job.
+        resource = self.resource
+        library = self.library
+        if not resource or not library:
+            return
+
+        # Default to sending an informative email with no validation
+        # link.
+        email_type = Emailer.ADDRESS_DESIGNATED
+        to_address = resource.href
+        if to_address.startswith('mailto:'):
+            to_address = to_address[7:]
+        deadline = None
+
+        validation, is_new = get_one_or_create(
+            _db, Validation, resource=resource
+        )
+        if is_new or not validation.active:
+            # Either this Validation was just created or it expired
+            # before being verified. Restart the validation process
+            # and send an email that includes a validation link.
+            validation.restart()
+            email_type = Emailer.ADDRESS_NEEDS_CONFIRMATION
+
+        # Create values for all the variables expected by the default
+        # templates.
+        template_args = dict(
+            rel_desc = Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
+            library=library.name,
+            library_web_url = library.web_url,
+            email=to_address,
+            registry_support=ConfigurationSetting.sitewide(
+                _db, Configuration.REGISTRY_CONTACT_EMAIL
+            ).value,
+        )
+        if email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION:
+            template_args['confirmation_link'] = url_for(
+                "validate", resource_id=resource.id, secret=validation.secret
+            )
+        body = emailer.send(email_type, to_address, **template_args)
+        return body
+
 
 class Resource(Base):
     """A URI, potentially linked to multiple libraries, or to a single
@@ -1256,15 +1325,12 @@ class Resource(Base):
     validation_id = Column(Integer, ForeignKey('validations.id'),
                            index=True)
 
-    def restart_validation(self, emailer=None):
-        """Start or restart the validation process for this resource.
-
-        :param emailer: Something capable of sending out email.
-        """
+    def restart_validation(self):
+        """Start or restart the validation process for this resource."""
         if not self.validation:
             _db = Session.object_session(self)
             self.validation, ignore = create(_db, Validation)
-        self.validation.restart(emailer)
+        self.validation.restart()
         return self.validation
 
 
@@ -1290,17 +1356,22 @@ class Validation(Base):
     )
 
 
-    def restart(self, emailer):
+    def restart(self):
         """Start a new validation attempt, cancelling any previous attempt.
 
-        :param emailer: Something capable of sending out email.
+        This does not send out a validation email -- that needs to be
+        handled separately by something capable of generating the URL
+        to the validation controller.
         """
         self.started_at = datetime.datetime.utcnow()
         self.secret = generate_secret()
         self.success = False
 
-        if emailer and self.resource.href.startswith('mailto'):
-            emailer.send_validation_email(self)
+    @property
+    def deadline(self):
+        if self.success:
+            return None
+        return self.started_at + self.EXPIRES_AFTER
 
     @property
     def active(self):
@@ -1310,7 +1381,7 @@ class Validation(Base):
         needs to be reset.
         """
         now = datetime.datetime.utcnow()
-        return not self.success and now < self.started_at + self.EXPIRES_AFTER
+        return not self.success and now < self.deadline
 
     def mark_as_successful(self):
         """Register the fact that the validation attempt has succeeded."""
@@ -1527,6 +1598,12 @@ class ExternalIntegration(Base):
     # Integrations with LOGGING_GOAL
     INTERNAL_LOGGING = u'Internal logging'
     LOGGLY = u'Loggly'
+
+    # These integrations are for sending email.
+    EMAIL_GOAL = u'email'
+
+    # Integrations with EMAIL_GOAL
+    SMTP = u'SMTP'
 
     # If there is a special URL to use for access to this API,
     # put it here.

@@ -1115,12 +1115,12 @@ class TestValidationController(ControllerTest):
 
         link1, ignore = library.set_hyperlink("rel", "mailto:1@library.org")
         needs_validation = link1.resource
-        needs_validation.restart_validation(None)
+        needs_validation.restart_validation()
         secret = needs_validation.validation.secret
 
         link2, ignore = library.set_hyperlink("rel2", "mailto:2@library.org")
         needs_validation_2 = link2.resource
-        needs_validation_2.restart_validation(None)
+        needs_validation_2.restart_validation()
         secret2 = needs_validation_2.validation.secret
 
         link3, ignore = library.set_hyperlink("rel2", "mailto:3@library.org")
@@ -1159,7 +1159,7 @@ class TestValidationController(ControllerTest):
         )
 
         # Success.
-        needs_validation.restart_validation(None)
+        needs_validation.restart_validation()
         secret = needs_validation.validation.secret
         assert_response(
             needs_validation.id, secret, 200,

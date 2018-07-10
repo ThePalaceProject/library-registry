@@ -11,6 +11,8 @@ import base64
 import datetime
 import operator
 
+from config import Configuration
+from emailer import Emailer
 from model import (
     create,
     get_one,
@@ -20,6 +22,7 @@ from model import (
     ConfigurationSetting,
     DelegatedPatronIdentifier,
     ExternalIntegration,
+    Hyperlink,
     Library,
     LibraryAlias,
     Place,
@@ -1195,17 +1198,107 @@ nonsecret_setting='2'"""
         assert 'nonsecret_setting' in without_secrets
 
 
+class TestHyperlink(DatabaseTest):
+
+    def test_notify(self):
+        class Mock(Emailer):
+            sent = []
+            url_for_calls = []
+
+            def __init__(self):
+                """We don't need any of the arguments that are required
+                for the Emailer constructor.
+                """
+
+            def send(self, type, to_address, **kwargs):
+                self.sent.append((type, to_address, kwargs))
+
+            def url_for(self, controller, **kwargs):
+                """Just a convenient place to mock Flask's url_for()."""
+                self.url_for_calls.append((controller, kwargs))
+                return "http://url/"
+
+        emailer = Mock()
+
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.REGISTRY_CONTACT_EMAIL
+        ).value = "me@registry"
+
+        library = self._library()
+        library.web_url = "http://library/"
+        link, is_modified = library.set_hyperlink(
+            Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, "mailto:you@library"
+        )
+        link.notify(emailer, emailer.url_for)
+
+        # A Validation object was created for the Hyperlink.
+        validation = link.resource.validation
+        secret = validation.secret
+
+        (type, sent_to, kwargs) = emailer.sent.pop()
+
+        # We 'sent' an email about the fact that a new email address was
+        # registered.
+        eq_(emailer.ADDRESS_NEEDS_CONFIRMATION, type)
+        eq_("you@library", sent_to)
+
+        # These arguments were created to fill in the ADDRESS_NEEDS_CONFIRMATION
+        # template.
+        eq_("me@registry", kwargs['registry_support'])
+        eq_("you@library", kwargs['email'])
+        eq_("copyright designated agent", kwargs['rel_desc'])
+        eq_(library.name, kwargs['library'])
+        eq_(library.web_url, kwargs['library_web_url'])
+        eq_("http://url/", kwargs['confirmation_link'])
+
+        # url_for was called to create the confirmation link.
+        controller, kwargs = emailer.url_for_calls.pop()
+        eq_("validate", controller)
+        eq_(secret, kwargs['secret'])
+        eq_(link.resource.id, kwargs['resource_id'])
+
+        # If a Resource we already know about is associated with
+        # a new Hyperlink, an ADDRESS_DESIGNATED email is sent instead.
+        link2, is_modified = library.set_hyperlink("help", "mailto:you@library")
+        link2.notify(emailer, emailer.url_for)
+
+        (type, href, kwargs) = emailer.sent.pop()
+        eq_(emailer.ADDRESS_DESIGNATED, type)
+        eq_("patron help contact address", kwargs['rel_desc'])
+
+        # url_for was not called again, since an ADDRESS_DESIGNATED
+        # email does not include a validation link.
+        eq_([], emailer.url_for_calls)
+
+        # And the Validation was not reset.
+        eq_(secret, link.resource.validation.secret)
+
+        # Same if we somehow send another notification for a Hyperlink with an
+        # active Validation.
+        link.notify(emailer, emailer.url_for)
+        (type, href, kwargs) = emailer.sent.pop()
+        eq_(emailer.ADDRESS_DESIGNATED, type)
+        eq_(secret, link.resource.validation.secret)
+
+        # However, if a Hyperlink's Validation has expired, it's reset and a new
+        # ADDRESS_NEEDS_CONFIRMATION email is sent out.
+        now = datetime.datetime.utcnow()
+        link.resource.validation.started_at = (now - datetime.timedelta(days=10))
+        link.notify(emailer, emailer.url_for)
+        (type, href, kwargs) = emailer.sent.pop()
+        eq_(emailer.ADDRESS_NEEDS_CONFIRMATION, type)
+        assert 'confirmation_link' in kwargs
+
+        # The Validation has been reset.
+        eq_(validation, link.resource.validation)
+        assert validation.deadline > now
+        assert secret != validation.secret
+
+
 class TestValidation(DatabaseTest):
     """Test the Resource validation process."""
 
     def test_restart_validation(self):
-
-        class MockEmailer(object):
-            """Pretend to send out an email."""
-            validations = []
-            def send_validation_email(self, validation_obj):
-                self.validations.append(validation_obj)
-        emailer = MockEmailer()
 
         # This library has two links.
         library = self._library()
@@ -1216,8 +1309,8 @@ class TestValidation(DatabaseTest):
 
         # Let's set up validation for both of them.
         now = datetime.datetime.utcnow()
-        email_validation = email.restart_validation(emailer)
-        http_validation = http.restart_validation(emailer)
+        email_validation = email.restart_validation()
+        http_validation = http.restart_validation()
 
         for v in (email_validation, http_validation):
             assert (v.started_at - now).total_seconds() < 2
@@ -1226,22 +1319,16 @@ class TestValidation(DatabaseTest):
         # A random secret was generated for each Validation.
         assert email_validation.secret != http_validation.secret
 
-        # The mailto: URL was passed into the MockEmailer; the other
-        # one was not.
-        eq_(email_validation, emailer.validations.pop())
-        eq_([], emailer.validations)
-
         # Let's imagine that validation succeeded and is being
         # invalidated for some reason.
         email_validation.success = True
         old_started_at = email_validation.started_at
         old_secret = email_validation.secret
-        email_validation_2 = email.restart_validation(emailer)
+        email_validation_2 = email.restart_validation()
 
         # Instead of a new Validation being created, the earlier
         # Validation has been invalidated.
         eq_(email_validation, email_validation_2)
-        eq_([email_validation_2], emailer.validations)
         eq_(False, email_validation_2.success)
 
         # The secret has changed.
@@ -1267,7 +1354,7 @@ class TestValidation(DatabaseTest):
         )
 
         # A validation that has expired cannot be marked as successful.
-        validation.restart(None)
+        validation.restart()
         validation.started_at = (
             datetime.datetime.utcnow() - datetime.timedelta(days=7)
         )
