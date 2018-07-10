@@ -48,6 +48,16 @@ The link will expire in about a day. If the link expires, just re-register your 
         ADDRESS_NEEDS_CONFIRMATION : DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT,
     }
 
+    # We use this to catch templates that contain variables we won't
+    # be able to fill in. This doesn't include from_address and to_address,
+    # which are filled in separately.
+    KNOWN_TEMPLATE_KEYS = [
+        'rel_desc',
+        'library',
+        'library_web_url',
+        'confirmation_link'
+    ]
+
     @classmethod
     def from_sitewide_integration(cls, _db):
         """Create an Emailer from a site-wide email integration.
@@ -70,7 +80,8 @@ The link will expire in about a day. If the link expires, just re-register your 
                 integration.setting(email_type + "_body").value or
                 cls.BODIES[email_type]
             )
-            email_templates[email_type] = EmailTemplate(subject, body)
+            template = EmailTemplate(subject, body)
+            email_templates[email_type] = template
 
         return cls(smtp_username=integration.username,
                    smtp_password=integration.password,
@@ -124,6 +135,24 @@ The link will expire in about a day. If the link expires, just re-register your 
         self.from_name = from_name
         self.from_address = from_address
         self.templates = templates
+
+        # Make sure the templates don't contain any template values we
+        # can't handle.
+        test_template_values = dict(
+            (key, "value") for key in self.KNOWN_TEMPLATE_KEYS
+        )
+        for template in self.templates.values():
+            try:
+                test_body = template.body(
+                    "from address", "to address", **test_template_values
+                )
+            except Exception, e:
+                raise CannotLoadConfiguration(
+                    "Template %r/%r contains unrecognized key: %r" % (
+                        template.subject_template, template.body_template, e
+                    )
+                )
+
 
     def send(self, email_type, to_address, smtp=None, **kwargs):
         """Generate an email from a template and send it.
