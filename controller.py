@@ -502,6 +502,9 @@ class LibraryRegistryController(object):
             encryptor = PKCS1_OAEP.new(public_key)
 
             if not library.short_name:
+                # TODO: This needs to be base64 encoded or something,
+                # not hex encoded. Hex encoding limits us to 256*3
+                # libraries. Also we need to handle collisions.
                 library.short_name = os.urandom(3).encode('hex')
 
             submitted_secret = None
