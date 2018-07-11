@@ -33,6 +33,7 @@ from model import (
     ExternalIntegration,
     Hyperlink,
     Library,
+    Validation,
 )
 from util.http import RequestTimedOut
 from problem_details import *
@@ -782,7 +783,17 @@ class TestLibraryRegistryController(ControllerTest):
             destinations)
         self.controller.emailer.sent_out = []
 
-        # A human inspects the library, verifies that everything
+        # The document sent by the library registry to the library
+        # includes status information about the library's integration
+        # contact address -- information that wouldn't be made
+        # available to the public.
+        [link] = [x for x in catalog['links'] if
+                  x['rel'] == Hyperlink.INTEGRATION_CONTACT_REL]
+        eq_("mailto:me@library.org", link['href'])
+        eq_(Validation.IN_PROGRESS,
+            link['properties'][Validation.STATUS_PROPERTY])
+
+        # Now, a human inspects the library, verifies that everything
         # works, and makes it LIVE.
         library.stage = Library.LIVE
 

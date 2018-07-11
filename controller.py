@@ -488,12 +488,14 @@ class LibraryRegistryController(object):
                 # them a new library is using their address.
                 hyperlink.notify(self.emailer, self.app.url_for)
                     
-        # Create an OPDS 2 catalog containing all publicly available
+        # Create an OPDS 2 catalog containing all available
         # information about the library.
-        catalog = OPDSCatalog.library_catalog(library)
+        catalog = OPDSCatalog.library_catalog(
+            library, include_private_information=True
+        )
 
-        # Annotate the catalog with information that is _not_ publicly
-        # available.
+        # Annotate the catalog with some information specific to
+        # the transaction that's happening right now.
         public_key = auth_document.public_key
         if public_key and public_key.get("type") == "RSA":
             public_key = RSA.importKey(public_key.get("value"))
