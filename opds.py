@@ -123,6 +123,8 @@ class OPDSCatalog(object):
         """Turn a Hyperlink into a dictionary of arguments that can
         be turned into an OPDS 2 link.
         """
+        if not hyperlink:
+            return None
         resource = hyperlink.resource
         if not resource:
             return None
@@ -141,8 +143,8 @@ class OPDSCatalog(object):
             elif validation.active:
                 status = Validation.IN_PROGRESS
             else:
-                status = Validation.UNCONFIRMED
-            properties["https://schema.org/reservationStatus"] = status
+                status = Validation.INACTIVE
+            properties[Validation.STATUS_PROPERTY] = status
         if properties:
             args['properties'] = properties
         return args

@@ -1211,12 +1211,13 @@ class Hyperlink(Base):
     """
     INTEGRATION_CONTACT_REL = "http://librarysimplified.org/rel/integration-contact"
     COPYRIGHT_DESIGNATED_AGENT_REL = "http://librarysimplified.org/rel/designated-agent/copyright"
+    HELP_REL = "help"
 
     # Descriptions of the link relations, used in emails.
     REL_DESCRIPTIONS = {
         INTEGRATION_CONTACT_REL: "integration point of contact",
         COPYRIGHT_DESIGNATED_AGENT_REL: "copyright designated agent",
-        "help": "patron help contact address",
+        HELP_REL: "patron help contact address",
     }
 
     # Hyperlinks with these relations are not for public consumption.
@@ -1353,11 +1354,14 @@ class Validation(Base):
     started_at = Column(DateTime, index=True, nullable=False,
                         default = lambda x: datetime.datetime.utcnow())
 
+    # Used in OPDS catalogs to convey the status of a validation attempt.
+    STATUS_PROPERTY = "https://schema.org/reservationStatus"
+
     # These constants are used in OPDS catalogs as values of
     # schema:reservationStatus.
     CONFIRMED = "https://schema.org/ReservationConfirmed"
     IN_PROGRESS = "https://schema.org/ReservationPending"
-    UNCONFIRMED = "https://schema.org/ReservationCancelled"
+    INACTIVE = "https://schema.org/ReservationCancelled"
 
     # The only way to validate a Resource is to prove you know the
     # corresponding secret.
