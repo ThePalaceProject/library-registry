@@ -33,6 +33,7 @@ from model import (
     ExternalIntegration,
     Hyperlink,
     Library,
+    Validation,
 )
 from util.http import RequestTimedOut
 from problem_details import *
@@ -637,22 +638,26 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(201, response.status_code)
 
-    def test_register_fails_on_no_contact_email(self):
-        with self.app.test_request_context("/", method="POST"):
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org/authentication.opds"),
-            ])
-            response = self.controller.register(do_get=self.http_client.do_get)
-            eq_("Invalid or missing configuration contact email address",
-                response.title)
+    # NOTE: This is commented out until we can say that registration
+    # requires providing a contact email and expect every new library
+    # to be on a circulation manager that can meet this requirement.
+    #
+    # def test_register_fails_on_no_contact_email(self):
+    #     with self.app.test_request_context("/", method="POST"):
+    #         flask.request.form = ImmutableMultiDict([
+    #             ("url", "http://circmanager.org/authentication.opds"),
+    #         ])
+    #         response = self.controller.register(do_get=self.http_client.do_get)
+    #         eq_("Invalid or missing configuration contact email address",
+    #             response.title)
 
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org/authentication.opds"),
-                ("contact", "http://contact-us/")
-            ])
-            response = self.controller.register(do_get=self.http_client.do_get)
-            eq_("Invalid or missing configuration contact email address",
-                response.title)
+    #         flask.request.form = ImmutableMultiDict([
+    #             ("url", "http://circmanager.org/authentication.opds"),
+    #             ("contact", "http://contact-us/")
+    #         ])
+    #         response = self.controller.register(do_get=self.http_client.do_get)
+    #         eq_("Invalid or missing configuration contact email address",
+    #             response.title)
 
     def test_register_fails_on_missing_email_in_authentication_document(self):
 
@@ -778,7 +783,17 @@ class TestLibraryRegistryController(ControllerTest):
             destinations)
         self.controller.emailer.sent_out = []
 
-        # A human inspects the library, verifies that everything
+        # The document sent by the library registry to the library
+        # includes status information about the library's integration
+        # contact address -- information that wouldn't be made
+        # available to the public.
+        [link] = [x for x in catalog['links'] if
+                  x['rel'] == Hyperlink.INTEGRATION_CONTACT_REL]
+        eq_("mailto:me@library.org", link['href'])
+        eq_(Validation.IN_PROGRESS,
+            link['properties'][Validation.STATUS_PROPERTY])
+
+        # Now, a human inspects the library, verifies that everything
         # works, and makes it LIVE.
         library.stage = Library.LIVE
 

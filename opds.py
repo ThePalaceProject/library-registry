@@ -1,6 +1,11 @@
 from nose.tools import set_trace
 import json
 
+from model import (
+    Hyperlink,
+    Validation,
+)
+
 class Annotator(object):
 
     def annotate_feed(self, feed):
@@ -61,7 +66,17 @@ class OPDSCatalog(object):
         annotator.annotate_catalog(self, live=live)
 
     @classmethod
-    def library_catalog(cls, library, distance=None):
+    def library_catalog(cls, library, distance=None,
+                        include_private_information=False):
+
+        """Create an OPDS catalog for a library.
+
+        :param include_private_information: If this is True, the
+        consumer of this OPDS catalog is expected to be the library
+        whose catalog it is. Private information such as the point of
+        contact for integration problems will be included, where it
+        normally wouldn't be.
+        """
         metadata = dict(
             id=library.urn_uri,
             title=library.name,
@@ -90,7 +105,49 @@ class OPDSCatalog(object):
                                      href=library.logo,
                                      type="image/png")
 
+        for hyperlink in library.hyperlinks:
+            if (not include_private_information and hyperlink.rel in
+                Hyperlink.PRIVATE_RELS):
+                continue
+            args = cls._hyperlink_args(hyperlink)
+            if not args:
+                # Not enough information to create a link.
+                continue
+            cls.add_link_to_catalog(
+                catalog, **args
+            )
         return catalog
+
+    @classmethod
+    def _hyperlink_args(cls, hyperlink):
+        """Turn a Hyperlink into a dictionary of arguments that can
+        be turned into an OPDS 2 link.
+        """
+        if not hyperlink:
+            return None
+        resource = hyperlink.resource
+        if not resource:
+            return None
+        href = resource.href
+        if not href:
+            return None
+        args = dict(rel=hyperlink.rel, href=href)
+
+        # If there was ever an attempt to validate this Hyperlink,
+        # explain the status of that attempt.
+        properties = {}
+        validation = resource.validation
+        if validation:
+            if validation.success:
+                status = Validation.CONFIRMED
+            elif validation.active:
+                status = Validation.IN_PROGRESS
+            else:
+                status = Validation.INACTIVE
+            properties[Validation.STATUS_PROPERTY] = status
+        if properties:
+            args['properties'] = properties
+        return args
 
     def __unicode__(self):
         if self.catalog is None:

@@ -57,7 +57,7 @@ OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://li
 
 class LibraryRegistry(object):
 
-    def __init__(self, _db=None, testing=False, emailer_class=None):
+    def __init__(self, _db=None, testing=False, emailer_class=Emailer):
 
         self.log = logging.getLogger("Library registry web app")
 
@@ -69,7 +69,7 @@ class LibraryRegistry(object):
 
         self.setup_controllers(emailer_class)
 
-    def setup_controllers(self, emailer_class=None):
+    def setup_controllers(self, emailer_class=Emailer):
         """Set up all the controllers that will be used by the web app."""
         self.registry_controller = LibraryRegistryController(
             self, emailer_class
@@ -290,15 +290,24 @@ class LibraryRegistryController(object):
             return NO_AUTH_URL
 
         integration_contact_uri = flask.request.form.get("contact")
-        integration_contact_email = self._required_email_address(
-            integration_contact_uri,
-            "Invalid or missing configuration contact email address"
-        )
+        integration_contact_email = integration_contact_uri
+
+        # NOTE: This is commented out until we can say that
+        # registration requires providing a contact email and expect
+        # every new library to be on a circulation manager that can meet
+        # this requirement.
+        #
+        #integration_contact_email = self._required_email_address(
+        #    integration_contact_uri,
+        #    "Invalid or missing configuration contact email address"
+        #)
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
-        hyperlinks_to_create = [
-            (Hyperlink.INTEGRATION_CONTACT_REL, [integration_contact_email])
-        ]
+        hyperlinks_to_create = []
+        if integration_contact_email:
+            hyperlinks_to_create.append(
+                (Hyperlink.INTEGRATION_CONTACT_REL, [integration_contact_email])
+            )
 
         def _make_request(url, on_404, on_timeout, on_exception, allow_401=False):
             allowed_codes = ["2xx", "3xx", 404]
@@ -469,16 +478,33 @@ class LibraryRegistryController(object):
                 auth_url, problem
             )
             return problem
-                    
-        catalog = OPDSCatalog.library_catalog(library)
 
+        for rel, candidates in hyperlinks_to_create:
+            hyperlink, is_modified = library.set_hyperlink(rel, *candidates)
+            if is_modified:
+                # We need to send an email to this email address about
+                # what just happened. This is either so the receipient
+                # can confirm that the address works, or to inform
+                # them a new library is using their address.
+                hyperlink.notify(self.emailer, self.app.url_for)
+                    
+        # Create an OPDS 2 catalog containing all available
+        # information about the library.
+        catalog = OPDSCatalog.library_catalog(
+            library, include_private_information=True
+        )
+
+        # Annotate the catalog with some information specific to
+        # the transaction that's happening right now.
         public_key = auth_document.public_key
         if public_key and public_key.get("type") == "RSA":
             public_key = RSA.importKey(public_key.get("value"))
             encryptor = PKCS1_OAEP.new(public_key)
 
             if not library.short_name:
-                # TODO: Generate a short name based on the library's service area.
+                # TODO: This needs to be base64 encoded or something,
+                # not hex encoded. Hex encoding limits us to 256*3
+                # libraries. Also we need to handle collisions.
                 library.short_name = os.urandom(3).encode('hex')
 
             submitted_secret = None
@@ -493,15 +519,6 @@ class LibraryRegistryController(object):
 
             catalog["metadata"]["short_name"] = library.short_name
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
-
-        for rel, candidates in hyperlinks_to_create:
-            hyperlink, is_modified = library.set_hyperlink(rel, *candidates)
-            if is_modified:
-                # We need to send an email to this email address about
-                # what just happened. This is either so the receipient
-                # can confirm that the address works, or to inform
-                # them a new library is using their address.
-                hyperlink.notify(self.emailer, self.app.url_for)
 
         if is_new:
             status_code = 201
