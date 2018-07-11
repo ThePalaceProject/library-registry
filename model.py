@@ -1219,6 +1219,9 @@ class Hyperlink(Base):
         "help": "patron help contact address",
     }
 
+    # Hyperlinks with these relations are not for public consumption.
+    PRIVATE_RELS = [INTEGRATION_CONTACT_REL]
+
     __tablename__ = 'hyperlinks'
 
     id = Column(Integer, primary_key=True)
@@ -1349,6 +1352,12 @@ class Validation(Base):
     success = Column(Boolean, index=True, default=False)
     started_at = Column(DateTime, index=True, nullable=False,
                         default = lambda x: datetime.datetime.utcnow())
+
+    # These constants are used in OPDS catalogs as values of
+    # schema:reservationStatus.
+    CONFIRMED = "https://schema.org/ReservationConfirmed"
+    IN_PROGRESS = "https://schema.org/ReservationPending"
+    UNCONFIRMED = "https://schema.org/ReservationCancelled"
 
     # The only way to validate a Resource is to prove you know the
     # corresponding secret.
