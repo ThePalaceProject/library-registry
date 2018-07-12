@@ -86,6 +86,6 @@ class Configuration(object):
 
         return (
             integration.setting(cls.ADOBE_VENDOR_ID).value,
-            integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).value,
+            int(integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).value, 16),
             delegates,
         )
