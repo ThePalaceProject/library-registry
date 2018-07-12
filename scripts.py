@@ -530,6 +530,52 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
         output.write("\n")
 
 
+class ConfigureVendorIDScript(Script):
+    """Configure the site-wide Adobe Vendor ID configuration."""
+    @classmethod
+    def arg_parser(cls):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--vendor-id", help="Vendor ID issued by Adobe", required=True
+        )
+        parser.add_argument(
+            "--node-value", help="Node value issued by Adobe", required=True
+        )
+        parser.add_argument(
+            "--delegate",
+            help="Delegate Adobe IDs to this URL if no local answer found",
+            action="append"
+        )
+        return parser
+
+    def do_run(self, _db=None, cmd_args=None, output=sys.stdout):
+        _db = _db or self._db
+        parsed = self.parse_command_line(_db, cmd_args=cmd_args)
+
+        integration, is_new = get_one_or_create(
+            _db, ExternalIntegration, goal=ExternalIntegration.DRM_GOAL,
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID
+        )
+        c = Configuration
+
+        # All node values are string representations of hexidecimal
+        # numbers.
+        hex_node = int(parsed.node_value, 16)
+
+        integration.setting(c.ADOBE_VENDOR_ID).value = parsed.vendor_id
+        integration.setting(c.ADOBE_VENDOR_ID_NODE_VALUE).value = parsed.node_value
+        delegates = parsed.delegate
+        for delegate in delegates:
+            if not delegate.endswith("/AdobeAuth/"):
+                raise ValueError(
+                    'Invalid delegate: %s. Expected something ending with "/AdobeAuth/"' % delegate
+                )
+        integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = (
+            json.dumps(delegates)
+        )
+        _db.commit()
+
+
 class ConfigureEmailerScript(Script):
     """Configure the site-wide email configuration and send a test
     email to verify it.
