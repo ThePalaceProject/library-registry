@@ -6,6 +6,7 @@ from nose.tools import (
 )
 from StringIO import StringIO
 
+from emailer import Emailer
 from model import (
     ConfigurationSetting,
     ExternalIntegration,
@@ -16,6 +17,7 @@ from model import (
 )
 from scripts import (
     AddLibraryScript,
+    ConfigureEmailerScript,
     ConfigureIntegrationScript,
     ConfigureSiteScript,
     LoadPlacesScript,
@@ -364,3 +366,42 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         # The library's former ServiceAreas have been removed.
         assert us not in places
+
+
+class TestConfigureEmailerScript(DatabaseTest):
+
+    def test_run(self):
+        class Mock(Emailer):
+            sent = None
+            def send(self, template_name, to_address):
+                Mock.sent = (template_name, to_address)
+
+        cmd_args = [
+            "--host=a_host",
+            "--port=25",
+            "--username=a_user",
+            "--password=a_password",
+            "--from-address=from@example.com",
+            "--from-name=Administrator",
+            "--test-address=you@example.com"
+        ]
+        script = ConfigureEmailerScript(self._db)
+        script.do_run(
+            self._db,
+            cmd_args=cmd_args,
+            emailer_class=Mock
+        )
+
+        # The ExternalIntegration is properly configured.
+        emailer = Emailer._sitewide_integration(self._db)
+        eq_("a_user", emailer.username)
+        eq_("a_password", emailer.password)
+        eq_("a_host", emailer.url)
+        eq_(25, emailer.setting(Emailer.PORT).int_value)
+        eq_("from@example.com", emailer.setting(Emailer.FROM_ADDRESS).value)
+        eq_("Administrator", emailer.setting(Emailer.FROM_NAME).value)
+
+        # An email was sent out to the test address.
+        template, to = Mock.sent
+        eq_("test", template)
+        eq_("you@example.com", to)
