@@ -6,6 +6,8 @@ from nose.tools import (
 )
 from StringIO import StringIO
 
+from config import Configuration
+from emailer import Emailer
 from model import (
     ConfigurationSetting,
     ExternalIntegration,
@@ -16,8 +18,10 @@ from model import (
 )
 from scripts import (
     AddLibraryScript,
+    ConfigureEmailerScript,
     ConfigureIntegrationScript,
     ConfigureSiteScript,
+    ConfigureVendorIDScript,
     LoadPlacesScript,
     SearchLibraryScript,
     SearchPlacesScript,
@@ -364,3 +368,92 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         # The library's former ServiceAreas have been removed.
         assert us not in places
+
+
+class TestConfigureEmailerScript(DatabaseTest):
+
+    def test_run(self):
+        class Mock(Emailer):
+            sent = None
+            def send(self, template_name, to_address):
+                Mock.sent = (template_name, to_address)
+
+        cmd_args = [
+            "--host=a_host",
+            "--port=25",
+            "--username=a_user",
+            "--password=a_password",
+            "--from-address=from@example.com",
+            "--from-name=Administrator",
+            "--test-address=you@example.com"
+        ]
+        script = ConfigureEmailerScript(self._db)
+        script.do_run(
+            self._db,
+            cmd_args=cmd_args,
+            emailer_class=Mock
+        )
+
+        # The ExternalIntegration is properly configured.
+        emailer = Emailer._sitewide_integration(self._db)
+        eq_("a_user", emailer.username)
+        eq_("a_password", emailer.password)
+        eq_("a_host", emailer.url)
+        eq_(25, emailer.setting(Emailer.PORT).int_value)
+        eq_("from@example.com", emailer.setting(Emailer.FROM_ADDRESS).value)
+        eq_("Administrator", emailer.setting(Emailer.FROM_NAME).value)
+
+        # An email was sent out to the test address.
+        template, to = Mock.sent
+        eq_("test", template)
+        eq_("you@example.com", to)
+
+
+class TestConfigureVendorIDScript(DatabaseTest):
+
+    def test_run(self):
+        cmd_args = [
+            "--vendor-id=LIBR",
+            "--node-value=abc12",
+            "--delegate=http://server1/AdobeAuth/",
+            "--delegate=http://server2/AdobeAuth/",
+        ]
+        script = ConfigureVendorIDScript(self._db)
+        script.do_run(self._db, cmd_args=cmd_args)
+
+        # The ExternalIntegration is properly configured.
+        integration = ExternalIntegration.lookup(
+            self._db, ExternalIntegration.ADOBE_VENDOR_ID,
+            ExternalIntegration.DRM_GOAL
+        )
+        eq_("LIBR", integration.setting(Configuration.ADOBE_VENDOR_ID).value)
+        eq_("abc12", integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value)
+        eq_(
+            ["http://server1/AdobeAuth/", "http://server2/AdobeAuth/"],
+            integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).json_value
+        )
+
+        # The script won't run if --node-value or --delegate have obviously
+        # wrong values.
+        cmd_args = [
+            "--vendor-id=LIBR",
+            "--node-value=not a hex number",
+        ]
+        assert_raises_regexp(
+            ValueError,
+            "invalid literal for int",
+            script.do_run, self._db,
+            cmd_args=cmd_args
+        )
+
+        cmd_args = [
+            "--vendor-id=LIBR",
+            "--node-value=abce",
+            "--delegate=http://random-site/",
+        ]
+        assert_raises_regexp(
+            ValueError,
+            "Invalid delegate: http://random-site/",
+            script.do_run, self._db,
+            cmd_args=cmd_args
+        )

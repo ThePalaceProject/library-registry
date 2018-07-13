@@ -260,11 +260,16 @@ body Value""", body)
         mock = MockSMTP()
         emailer._send_email("you@library", "email body", mock)
 
-        # Four smtplib.SMTP methods were called.
-        connect, login, sendmail, quit = mock.calls
+        # Five smtplib.SMTP methods were called.
+        connect, starttls, login, sendmail, quit = mock.calls
         eq_(
             ('connect', (emailer.smtp_host, emailer.smtp_port), {}),
             connect
+        )
+
+        eq_(
+            ('starttls', (), {}),
+            starttls
         )
 
         eq_(

@@ -83,8 +83,11 @@ class Configuration(object):
             delegates = setting.json_value or []
         except ValueError, e:
             cls.log.warn("Invalid Adobe Vendor ID delegates configured.")
+
+        node = integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).value
+        if node:
+            node = int(node, 16)
         return (
             integration.setting(cls.ADOBE_VENDOR_ID).value,
-            integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).int_value,
-            delegates
+            node, delegates,
         )

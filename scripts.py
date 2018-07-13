@@ -23,6 +23,10 @@ from model import (
 from config import Configuration
 from adobe_vendor_id import AdobeVendorIDClient
 from authentication_document import AuthenticationDocument
+from emailer import (
+    Emailer,
+    EmailTemplate,
+)
 
 class Script(object):
 
@@ -69,7 +73,6 @@ class Script(object):
             self._session = _db
 
     def run(self):
-        self.load_configuration()
         try:
             self.do_run()
         except Exception, e:
@@ -78,10 +81,6 @@ class Script(object):
                 exc_info=e
             )
             raise e
-
-    def load_configuration(self):
-        if not Configuration.instance:
-            Configuration.load()
 
 
 class LibraryScript(Script):
@@ -530,3 +529,90 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
         output.write("\n".join(integration.explain()))
         output.write("\n")
 
+
+class ConfigureVendorIDScript(Script):
+    """Configure the site-wide Adobe Vendor ID configuration."""
+    @classmethod
+    def arg_parser(cls):
+        parser = argparse.ArgumentParser()
+        parser.add_argument(
+            "--vendor-id", help="Vendor ID issued by Adobe", required=True
+        )
+        parser.add_argument(
+            "--node-value", help="Node value issued by Adobe", required=True
+        )
+        parser.add_argument(
+            "--delegate",
+            help="Delegate Adobe IDs to this URL if no local answer found",
+            action="append"
+        )
+        return parser
+
+    def do_run(self, _db=None, cmd_args=None, output=sys.stdout):
+        _db = _db or self._db
+        parsed = self.parse_command_line(_db, cmd_args=cmd_args)
+
+        integration, is_new = get_one_or_create(
+            _db, ExternalIntegration, goal=ExternalIntegration.DRM_GOAL,
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID
+        )
+        c = Configuration
+
+        # All node values are string representations of hexidecimal
+        # numbers.
+        hex_node = int(parsed.node_value, 16)
+
+        integration.setting(c.ADOBE_VENDOR_ID).value = parsed.vendor_id
+        integration.setting(c.ADOBE_VENDOR_ID_NODE_VALUE).value = parsed.node_value
+        delegates = parsed.delegate
+        for delegate in delegates:
+            if not delegate.endswith("/AdobeAuth/"):
+                raise ValueError(
+                    'Invalid delegate: %s. Expected something ending with "/AdobeAuth/"' % delegate
+                )
+        integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = (
+            json.dumps(delegates)
+        )
+        _db.commit()
+
+
+class ConfigureEmailerScript(Script):
+    """Configure the site-wide email configuration and send a test
+    email to verify it.
+    """
+
+    @classmethod
+    def arg_parser(cls):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--host", help="SMTP host", required=True)
+        parser.add_argument("--port", help="SMTP port", default=587, type=int)
+        parser.add_argument("--username", help="SMTP username", required=True)
+        parser.add_argument("--password", help="SMTP password", required=True)
+        parser.add_argument("--from-address", help="Email sent will come from this address", required=True)
+        parser.add_argument("--from-name", help="Name associated with the from-address", required=True)
+        parser.add_argument("--test-address", help="Send a test email to this address", required=True)
+        return parser
+
+    def do_run(self, _db=None, cmd_args=None, output=sys.stdout, emailer_class=Emailer):
+        _db = _db or self._db
+        parsed = self.parse_command_line(_db, cmd_args=cmd_args)
+
+        integration, is_new = get_one_or_create(
+            _db, ExternalIntegration, goal=ExternalIntegration.EMAIL_GOAL,
+            protocol=ExternalIntegration.SMTP
+        )
+        integration.setting(Emailer.PORT).value = parsed.port
+        integration.username = parsed.username
+        integration.password = parsed.password
+        integration.url = parsed.host
+        integration.setting(Emailer.FROM_ADDRESS).value = parsed.from_address
+        integration.setting(Emailer.FROM_NAME).value = parsed.from_name
+
+        emailer = emailer_class.from_sitewide_integration(_db)
+        template = EmailTemplate("Test email", "This is a test email.")
+        emailer.templates["test"] = template
+        emailer.send("test", parsed.test_address)
+
+        # Since the emailer didn't raise an exception we can assume we sent
+        # the email successfully.
+        _db.commit()
