@@ -45,7 +45,7 @@ class VendorIDTest(DatabaseTest):
             goal=ExternalIntegration.DRM_GOAL,
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
-        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = 114740953091845
+        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = "685b35c00f05"
         return integration
 
 class TestConfiguration(VendorIDTest):

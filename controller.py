@@ -57,7 +57,7 @@ OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://li
 
 class LibraryRegistry(object):
 
-    def __init__(self, _db=None, testing=False, emailer_class=None):
+    def __init__(self, _db=None, testing=False, emailer_class=Emailer):
 
         self.log = logging.getLogger("Library registry web app")
 
@@ -69,7 +69,7 @@ class LibraryRegistry(object):
 
         self.setup_controllers(emailer_class)
 
-    def setup_controllers(self, emailer_class=None):
+    def setup_controllers(self, emailer_class=Emailer):
         """Set up all the controllers that will be used by the web app."""
         self.registry_controller = LibraryRegistryController(
             self, emailer_class

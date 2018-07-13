@@ -6,6 +6,7 @@ from nose.tools import (
 )
 from StringIO import StringIO
 
+from config import Configuration
 from emailer import Emailer
 from model import (
     ConfigurationSetting,
@@ -20,6 +21,7 @@ from scripts import (
     ConfigureEmailerScript,
     ConfigureIntegrationScript,
     ConfigureSiteScript,
+    ConfigureVendorIDScript,
     LoadPlacesScript,
     SearchLibraryScript,
     SearchPlacesScript,
@@ -405,3 +407,53 @@ class TestConfigureEmailerScript(DatabaseTest):
         template, to = Mock.sent
         eq_("test", template)
         eq_("you@example.com", to)
+
+
+class TestConfigureVendorIDScript(DatabaseTest):
+
+    def test_run(self):
+        cmd_args = [
+            "--vendor-id=LIBR",
+            "--node-value=abc12",
+            "--delegate=http://server1/AdobeAuth/",
+            "--delegate=http://server2/AdobeAuth/",
+        ]
+        script = ConfigureVendorIDScript(self._db)
+        script.do_run(self._db, cmd_args=cmd_args)
+
+        # The ExternalIntegration is properly configured.
+        integration = ExternalIntegration.lookup(
+            self._db, ExternalIntegration.ADOBE_VENDOR_ID,
+            ExternalIntegration.DRM_GOAL
+        )
+        eq_("LIBR", integration.setting(Configuration.ADOBE_VENDOR_ID).value)
+        eq_("abc12", integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value)
+        eq_(
+            ["http://server1/AdobeAuth/", "http://server2/AdobeAuth/"],
+            integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).json_value
+        )
+
+        # The script won't run if --node-value or --delegate have obviously
+        # wrong values.
+        cmd_args = [
+            "--vendor-id=LIBR",
+            "--node-value=not a hex number",
+        ]
+        assert_raises_regexp(
+            ValueError,
+            "invalid literal for int",
+            script.do_run, self._db,
+            cmd_args=cmd_args
+        )
+
+        cmd_args = [
+            "--vendor-id=LIBR",
+            "--node-value=abce",
+            "--delegate=http://random-site/",
+        ]
+        assert_raises_regexp(
+            ValueError,
+            "Invalid delegate: http://random-site/",
+            script.do_run, self._db,
+            cmd_args=cmd_args
+        )
