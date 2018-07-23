@@ -250,7 +250,7 @@ The link will expire in about a day. If the link expires, just re-register your 
 To: you@library
 Subject: subject Value
 
-Hello, you@library, this is me@registry""", body)
+Hello, you@library, this is me@registry.""", body)
         eq_(mock_smtp, smtp)
 
     def test__send_email(self):
