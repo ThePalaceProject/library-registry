@@ -164,21 +164,24 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
     def test_nearby_qa(self):
-        # The library we used in the previous test has stage=LIVE.
-        # If we switch to looking for libraries with stage=APPROVED,
-        # we won't find anything.
+        # The libraries we used in the previous test are in production.
+        # If we move them from production to TESTING, we won't find anything.
+        for library in self._db.query(Library):
+            library.registry_stage = Library.TESTING_STAGE
         with self.app.test_request_context("/"):
-            response = self.controller.nearby("65.88.88.124", live=False)
+            response = self.controller.nearby("65.88.88.124", live=True)
             catalogs = json.loads(response.data)
             eq_([], catalogs['catalogs'])
 
-        # If we move the LIVE library to APPROVED, it shows up in
-        # the feed.
-        self.connecticut_state_library.stage = Library.APPROVED
+        # However, they will show up in the QA feed.
         with self.app.test_request_context("/"):
             response = self.controller.nearby("65.88.88.124", live=False)
             catalogs = json.loads(response.data)
-            [catalog] = catalogs['catalogs']
+            eq_(2, len(catalogs['catalogs']))
+            [catalog] = [
+                x for x in catalogs['catalogs']
+                if x['metadata']['id'] == self.nypl.internal_urn
+            ]
             assert("", catalog['metadata']['title'])
 
             # Some of the links are the same as in the production feed;
@@ -252,6 +255,7 @@ class TestLibraryRegistryController(ControllerTest):
             
     def test_search(self):
         with self.app.test_request_context("/?q=manhattan"):
+            set_trace()
             response = self.controller.search("65.88.88.124")
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])

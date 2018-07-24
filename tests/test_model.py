@@ -647,13 +647,19 @@ class TestLibrary(DatabaseTest):
         # libraries near that point in Pennsylvania.
         eq_([], Library.nearby(self._db, (40, -75.8), 100).all())
 
-        # By default, nearby() only finds libraries with the LIVE
-        # status. If we look for libraries with the APPROVED status,
-        # we find nothing.
-        eq_([],
-            Library.nearby(self._db, (41.3, -73.3),
-                           production=False).all()
-        )
+        # By default, nearby() only finds libraries that are in production.
+        def m(production):
+            return Library.nearby(
+                self._db, (41.3, -73.3), production=production
+            ).count()
+        # Take all the libraries we found earlier out of production.
+        for l in ct_state, nypl:
+            l.registry_stage = Library.TESTING_STAGE
+        # Now there are no results.
+        eq_(0, m(True))
+
+        # But we can run a search that includes libraries in the TESTING stage.
+        eq_(2, m(False))
         
     def test_query_cleanup(self):
         m = Library.query_cleanup
@@ -740,13 +746,13 @@ class TestLibrary(DatabaseTest):
         )
 
         # By default, search_by_library_name() only finds libraries
-        # with the LIVE status. If we look for libraries with the
-        # APPROVED status, we find nothing.
-        #
-        # TODO: We should start finding more stuff by setting production=False
-        eq_([],
-            search("bpl", production=False)
-        )
+        # in production. Put them in the TESTING stage and they disappear.
+        for l in (brooklyn, boston):
+            l.registry_stage = Library.TESTING_STAGE
+        eq_([], search("bpl", production=True))
+
+        # But you can find them by passing in production=False.
+        eq_(2, len(search("bpl", production=False)))
         
 
     def test_search_by_location(self):
@@ -803,14 +809,22 @@ class TestLibrary(DatabaseTest):
         )
         eq_(nypl, brooklyn_results[0])
 
-        # TODO: We should find more stuff by searching for production=False
+        nypl.registry_stage = Library.TESTING_STAGE
         eq_([],
             Library.search_by_location_name(
                 self._db, "brooklyn", here=GeometryUtility.point(43, -70),
-                production=False
+                production=True
             ).all()
         )
         
+        eq_(1,
+            Library.search_by_location_name(
+                self._db, "brooklyn", here=GeometryUtility.point(43, -70),
+                production=False
+            ).count()
+        )
+
+
     def test_search(self):
         """Test the overall search method."""
         
@@ -844,16 +858,20 @@ class TestLibrary(DatabaseTest):
         libraries = Library.search(self._db, (40.7, -73.9), "Kansas")
         eq_(['Now Work'], [x[0].name for x in libraries])
 
-        # By default, search() only finds libraries with the LIVE
-        # status. If we look for libraries with the APPROVED status,
-        # we find nothing.
-        eq_([],
-            Library.search(
-                self._db, (40.7, -73.9), "New York",
-                production=False
+        # By default, search() only finds libraries in production.
+        self.nypl.registry_stage = Library.TESTING_STAGE
+        new_work.registry_stage = Library.TESTING_STAGE
+        def m(production):
+            return len(
+                Library.search(
+                    self._db, (40.7, -73.9), "New York", production
+                )
             )
-        )
-        
+        eq_(0, m(True))
+
+        # But you can find libraries that are in the TESTING stage.
+        eq_(2, m(False))
+
     def test_search_excludes_duplicates(self):
         # Here's a library that serves a place called Kansas
         # whose name is also "Kansas"

@@ -631,10 +631,11 @@ class Library(Base):
         min_distance = func.min(func.ST_Distance_Sphere(target, Place.geometry))
         
         qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place).filter(nearby).add_column(
+            ServiceArea.place).filter(nearby)
+        qu = qu.filter(cls._feed_restriction(production))
+        qu = qu.add_column(
                 min_distance).group_by(Library.id).order_by(
                 min_distance.asc())
-        qu = qu.filter(cls._feed_restriction(production))
         return qu
 
     @classmethod
