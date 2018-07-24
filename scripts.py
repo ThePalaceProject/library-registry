@@ -41,7 +41,7 @@ class Script(object):
         if not hasattr(self, '_log'):
             logger_name = getattr(self, 'name', None)
             self._log = logging.getLogger(logger_name)
-        return self._log        
+        return self._log
 
     @classmethod
     def parse_command_line(cls, _db=None, cmd_args=None):
@@ -62,7 +62,7 @@ class Script(object):
         else:
             lines = []
         return lines
-    
+
     def __init__(self, _db=None):
         """Basic constructor.
 
@@ -94,16 +94,16 @@ class LibraryScript(Script):
         )
         return parser
 
-            
+
 class LoadPlacesScript(Script):
-    
+
     @classmethod
     def parse_command_line(cls, _db=None, cmd_args=None, stdin=sys.stdin):
         parser = cls.arg_parser()
         parsed = parser.parse_args(cmd_args)
         stdin = cls.read_stdin_lines(stdin)
         return parsed, stdin
-        
+
     def run(self, cmd_args=None, stdin=sys.stdin):
         parsed, stdin = self.parse_command_line(
             self._db, cmd_args, stdin
@@ -203,7 +203,7 @@ class AddLibraryScript(Script):
         places = parsed.place
         short_name = parsed.short_name
         shared_secret = parsed.shared_secret
-        
+
         library, is_new = get_one_or_create(self._db, Library, urn=urn)
         if name:
             library.name = name
@@ -272,7 +272,7 @@ class SetCoverageAreaScript(LibraryScript):
 
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
             self._db, service_area, focus_area, place_class
-        )         
+        )
         for (valid, unknown, ambiguous) in [service_area, focus_area]:
             if unknown:
                 raise ValueError("Unknown places: %r" % unknown.items())
@@ -288,7 +288,7 @@ class AdobeVendorIDAcceptanceTestScript(Script):
     """Verify basic Adobe Vendor ID functionality, the way Adobe does
     when testing compliance.
     """
-    
+
     @classmethod
     def arg_parser(cls):
         parser = super(AdobeVendorIDAcceptanceTestScript, cls).arg_parser()
@@ -300,7 +300,7 @@ class AdobeVendorIDAcceptanceTestScript(Script):
             required=True
         )
         return parser
-        
+
     def run(self, cmd_args=None):
         parsed = self.parse_command_line(self._db, cmd_args)
 
@@ -311,12 +311,12 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         token = parsed.token
 
         client = AdobeVendorIDClient(base_url)
-        
+
         print "1. Checking status: %s" % client.status_url
         response = client.status()
         # status() will raise an exception if anything is wrong.
         print 'OK Service is up and running.'
-            
+
         print "2. Passing token into SignIn as authdata: %s" % client.signin_url
         identifier, label, content = client.sign_in_authdata(token)
         print "OK Found user identifier and label."
@@ -332,7 +332,7 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         print "   User identifier: %s" % identifier
         print "   Label: %s" % label
         print "   Full content: %s" % content
-            
+
         print
         print "4. Passing identifier into UserInfo to get user info: %s" % client.accountinfo_url
         user_info, content = client.user_info(identifier)
@@ -353,11 +353,11 @@ class ConfigurationSettingScript(Script):
 
     @classmethod
     def add_setting_argument(self, parser, help):
-        """Modify an ArgumentParser to indicate that the script takes 
+        """Modify an ArgumentParser to indicate that the script takes
         command-line settings.
         """
         parser.add_argument('--setting', help=help, action="append")
-    
+
     def apply_settings(self, settings, obj):
         """Treat `settings` as a list of command-line argument settings,
         and apply each one to `obj`.
@@ -367,22 +367,22 @@ class ConfigurationSettingScript(Script):
         for setting in settings:
             key, value = self._parse_setting(setting)
             obj.setting(key).value = value
-            
-            
+
+
 class ConfigureSiteScript(ConfigurationSettingScript):
     """View or update site-wide configuration."""
 
     @classmethod
     def arg_parser(cls):
         parser = argparse.ArgumentParser()
-    
+
         parser.add_argument(
             '--show-secrets',
             help="Include secrets when displaying site settings.",
             action="store_true",
             default=False
         )
-    
+
         cls.add_setting_argument(
             parser,
             'Set a site-wide setting, such as base_url. Format: --setting="base_url=http://localhost:7000"'
@@ -408,7 +408,7 @@ class ConfigureSiteScript(ConfigurationSettingScript):
 
 class ShowIntegrationsScript(Script):
     """Show information about the external integrations on a server."""
-    
+
     name = "List the external integrations on this server."
     @classmethod
     def arg_parser(cls):
@@ -423,7 +423,7 @@ class ShowIntegrationsScript(Script):
             action='store_true'
         )
         return parser
-    
+
     def do_run(self, _db=None, cmd_args=None, output=sys.stdout):
         _db = _db or self._db
         args = self.parse_command_line(_db, cmd_args=cmd_args)
@@ -460,7 +460,7 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
     def parse_command_line(cls, _db=None, cmd_args=None):
         parser = cls.arg_parser(_db)
         return parser.parse_known_args(cmd_args)[0]
-    
+
     @classmethod
     def arg_parser(cls, _db):
         parser = argparse.ArgumentParser()
@@ -481,7 +481,7 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
         cls.add_setting_argument(
             parser,
             'Set a configuration value on the integration. Format: --setting="key=value"'
-        )        
+        )
         return parser
 
     @classmethod
@@ -511,7 +511,7 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
         if name:
             integration.name = name
         return integration
-        
+
     def do_run(self, _db=None, cmd_args=None, output=sys.stdout):
         _db = _db or self._db
         args = self.parse_command_line(_db, cmd_args=cmd_args)

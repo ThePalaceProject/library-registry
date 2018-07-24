@@ -30,17 +30,17 @@ class AuthenticationDocument(object):
     MEDIA_TYPE = "application/vnd.opds.authentication.v1.0+json"
 
     COVERAGE_EVERYWHERE = "everywhere"
-    
+
     # The list of color schemes supported by SimplyE.
     SIMPLYE_COLOR_SCHEMES = [
         "red", "blue", "gray", "gold", "green", "teal", "purple",
-    ]   
-    
+    ]
+
     PUBLIC_AUDIENCE = 'public'
     AUDIENCES = [PUBLIC_AUDIENCE, 'educational-primary',
                  'educational-secondary', 'research', 'print-disability',
                  'other']
-    
+
     def __init__(self, _db, id, title, authentication, service_description,
                  color_scheme, collection_size, public_key, audiences,
                  service_area, focus_area, links, place_class=Place):
@@ -87,7 +87,7 @@ class AuthenticationDocument(object):
                 # Not a valid authentication flow.
                 continue
             yield i
-        
+
     def extract_link(self, rel, require_type=None, prefer_type=None):
         """Find a link with the given link relation in the main authentication
         document.
@@ -105,7 +105,7 @@ class AuthenticationDocument(object):
 
     def has_link(self, rel):
         """Is there a link with this link relation anywhere in the document?
-        
+
         This checks both the main document and the authentication flows.
 
         :rel: The link must have this link relation.
@@ -121,7 +121,7 @@ class AuthenticationDocument(object):
         for flow in self.authentication_flows:
             if self._extract_link(flow.get('links', []), rel):
                 return True
-        return False        
+        return False
 
     @classmethod
     def parse_service_and_focus_area(cls, _db, service_area, focus_area,
@@ -139,7 +139,7 @@ class AuthenticationDocument(object):
         else:
             focus_area = service_area
         return service_area, focus_area
-                
+
     @classmethod
     def parse_coverage(cls, _db, coverage, place_class=Place):
         """Derive Place objects from an Authentication For OPDS coverage
@@ -205,7 +205,7 @@ class AuthenticationDocument(object):
                 # or we don't have a geography for it.
                 unknown[country] = places
         return place_objs, unknown, ambiguous
-    
+
     @classmethod
     def _extract_link(cls, links, rel, require_type=None, prefer_type=None):
         if require_type and prefer_type:
@@ -230,7 +230,7 @@ class AuthenticationDocument(object):
             # Beyond this point, either require_type or prefer_type is
             # set, so the type of the link becomes relevant.
             type = link.get('type', '')
-            
+
             if type:
                 if (require_type and type.startswith(require_type)
                     or prefer_type and type.startswith(prefer_type)):
@@ -245,7 +245,7 @@ class AuthenticationDocument(object):
                 # first link of the given type.
                 good_enough = link
         return good_enough
-            
+
     @classmethod
     def from_string(cls, _db, s, place_class=Place):
         data = json.loads(s)
@@ -272,7 +272,7 @@ class AuthenticationDocument(object):
     def update_library(self, library):
         """Modify a library to reflect the current state of this
         AuthenticationDocument.
-        
+
         :param library: A Library.
         :return: A ProblemDetail if there's a problem, otherwise None.
         """
@@ -288,7 +288,7 @@ class AuthenticationDocument(object):
             problem = self.update_collection_size(library)
 
         return problem
-        
+
     def update_audiences(self, library):
         return self._update_audiences(library, self.audiences)
 
@@ -337,11 +337,11 @@ class AuthenticationDocument(object):
         service_areas = []
 
         old_service_areas = list(library.service_areas)
-        
+
         # What service_area or focus_area looks like when
         # no input was specified.
         empty = [[],{},{}]
-        
+
         if (focus_area == empty and service_area != empty
             or service_area == focus_area):
             # Service area and focus area are the same, either because
@@ -379,7 +379,7 @@ class AuthenticationDocument(object):
     def _update_service_areas(cls, library, areas, type, service_areas):
         """Update a Library's ServiceAreas with a new set based on
         `areas`.
-        
+
         :param library: A Library.
         :param areas: A list [place_objs, unknown, ambiguous]
             of the sort returned by `parse_coverage()`.

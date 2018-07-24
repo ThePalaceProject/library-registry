@@ -82,7 +82,7 @@ class LibraryRegistry(object):
             )
         else:
             self.adobe_vendor_id = None
-        
+
     def url_for(self, view, *args, **kwargs):
         kwargs['_external'] = True
         return url_for(view, *args, **kwargs)
@@ -92,7 +92,7 @@ class LibraryRegistryAnnotator(Annotator):
 
     def __init__(self, app):
         self.app = app
-    
+
     def annotate_catalog(self, catalog, live=True):
         """Add links and metadata to every catalog."""
         if live:
@@ -110,7 +110,7 @@ class LibraryRegistryAnnotator(Annotator):
 
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
-    
+
 class LibraryRegistryController(object):
 
     OPENSEARCH_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
@@ -120,7 +120,7 @@ class LibraryRegistryController(object):
    <Tags>%(tags)s</Tags>
    <Url type="application/atom+xml;profile=opds-catalog" template="%(url_template)s"/>
  </OpenSearchDescription>"""
-    
+
     def __init__(self, app, emailer_class=Emailer):
         self.app = app
         self._db = self.app._db
@@ -135,7 +135,7 @@ class LibraryRegistryController(object):
                 exc_info=e
             )
         self.emailer = emailer
-  
+
     def point_from_ip(self, ip_address):
         if not ip_address:
             return None
@@ -150,7 +150,7 @@ class LibraryRegistryController(object):
             return [Library.LIVE]
         else:
             return [Library.APPROVED]
-        
+
     def nearby(self, ip_address, live=True):
         point = self.point_from_ip(ip_address)
         qu = Library.nearby(self._db, point,
@@ -166,7 +166,7 @@ class LibraryRegistryController(object):
             annotator=self.annotator, live=live
         )
         return catalog_response(catalog)
-        
+
     def search(self, ip_address=None, live=True):
         point = self.point_from_ip(ip_address)
         query = flask.request.args.get('q')
@@ -179,7 +179,7 @@ class LibraryRegistryController(object):
             results = Library.search(
                 self._db, point, query, allowed_stages=self.stages(live)
             )
-                
+
             this_url = this_url = self.app.url_for(
                 search_controller, q=query
             )
@@ -206,7 +206,7 @@ class LibraryRegistryController(object):
 
     @classmethod
     def opds_response_links(cls, response, rel):
-        """Find all the links in the given response for the given 
+        """Find all the links in the given response for the given
         link relation.
         """
         # Look in the response itself for a Link header.
@@ -238,7 +238,7 @@ class LibraryRegistryController(object):
     def opds_response_links_to_auth_document(cls, opds_response, auth_url):
         """Verify that the given response links to the given URL as its
         Authentication For OPDS document.
-        
+
         The link might happen in the `Link` header or in the body of
         an OPDS feed.
         """
@@ -333,7 +333,7 @@ class LibraryRegistryController(object):
                     )
             except RequestTimedOut, e:
                 self.log.error(
-                    "Registration of %s failed: timeout retrieving %s", 
+                    "Registration of %s failed: timeout retrieving %s",
                     auth_url, url, exc_info=e
                 )
                 return TIMEOUT.detailed(on_timeout)
@@ -346,8 +346,8 @@ class LibraryRegistryController(object):
             return response
 
         auth_response = _make_request(
-            auth_url, 
-            _("No Authentication For OPDS document present at %(url)s", 
+            auth_url,
+            _("No Authentication For OPDS document present at %(url)s",
               url=auth_url),
             _("Timeout retrieving auth document %(url)s", url=auth_url),
             _("Error retrieving auth document %(url)s", url=auth_url),
@@ -396,7 +396,7 @@ class LibraryRegistryController(object):
         # Cross-check the opds_url to make sure it links back to the
         # authentication document.
         opds_response = _make_request(
-            opds_url, 
+            opds_url,
             _("No OPDS root document present at %(url)s", url=opds_url),
             _("Timeout retrieving OPDS root document at %(url)s", url=opds_url),
             _("Error retrieving OPDS root document at %(url)s", url=opds_url),
@@ -487,7 +487,7 @@ class LibraryRegistryController(object):
                 # can confirm that the address works, or to inform
                 # them a new library is using their address.
                 hyperlink.notify(self.emailer, self.app.url_for)
-                    
+
         # Create an OPDS 2 catalog containing all available
         # information about the library.
         catalog = OPDSCatalog.library_catalog(
