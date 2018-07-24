@@ -235,7 +235,7 @@ The link will expire in about a day. If the link expires, just re-register your 
 
         emailer = MockEmailer.from_sitewide_integration(self._db)
         emailer.templates['email1'] = EmailTemplate(
-            "subject %(arg)s", "body %(arg)s"
+            "subject %(arg)s", "Hello, %(to_address)s, this is %(from_address)s."
         )
         mock_smtp = object()
 
@@ -250,7 +250,7 @@ The link will expire in about a day. If the link expires, just re-register your 
 To: you@library
 Subject: subject Value
 
-body Value""", body)
+Hello, you@library, this is me@registry.""", body)
         eq_(mock_smtp, smtp)
 
     def test__send_email(self):
