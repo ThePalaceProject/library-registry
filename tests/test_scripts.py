@@ -101,7 +101,7 @@ class TestAddLibraryScript(DatabaseTest):
         eq_(u"Serving the five boroughs of New York, NY.", library.description)
         eq_(u"NYNYPL", library.short_name)
         eq_(u"12345", library.shared_secret)
-        
+
         [alias] = library.aliases
         eq_("NYPL", alias.name)
         eq_("eng", alias.language)
@@ -119,7 +119,7 @@ class TestSearchLibraryScript(DatabaseTest):
         ct = self.connecticut_state
         nyc = self.new_york_city
         nypl.opds_url = "http://opds/"
-        
+
         # Run the script...
         output = StringIO()
         script = SearchLibraryScript(self._db)
@@ -192,7 +192,7 @@ class TestShowIntegrationsScript(DatabaseTest):
         ShowIntegrationsScript().do_run(self._db, output=output)
         expect_1 = "\n".join(i1.explain(include_secrets=False))
         expect_2 = "\n".join(i2.explain(include_secrets=False))
-        
+
         eq_(expect_1 + "\n" + expect_2 + "\n", output.getvalue())
 
 
@@ -204,7 +204,7 @@ class TestShowIntegrationsScript(DatabaseTest):
             output=output
         )
         eq_(expect_2 + "\n", output.getvalue())
-        
+
         # We can tell the script to include the integration secrets
         output = StringIO()
         ShowIntegrationsScript().do_run(
@@ -215,10 +215,10 @@ class TestShowIntegrationsScript(DatabaseTest):
         expect_1 = "\n".join(i1.explain(include_secrets=True))
         expect_2 = "\n".join(i2.explain(include_secrets=True))
         eq_(expect_1 + "\n" + expect_2 + "\n", output.getvalue())
-        
+
 
 class TestConfigureIntegrationScript(DatabaseTest):
-    
+
     def test_load_integration(self):
         m = ConfigureIntegrationScript._integration
 
@@ -239,7 +239,7 @@ class TestConfigureIntegrationScript(DatabaseTest):
             'No integration with name "Unknown integration". To create it, you must also provide protocol and goal.',
             m, self._db, None, "Unknown integration", None, None
         )
-        
+
         integration, ignore = create(
             self._db, ExternalIntegration,
             protocol="Protocol", goal="Goal"
@@ -263,7 +263,7 @@ class TestConfigureIntegrationScript(DatabaseTest):
         eq_("Protocol", integration2.protocol)
         eq_("Goal2", integration2.goal)
         eq_("I exist now", integration2.name)
-        
+
     def test_add_settings(self):
         script = ConfigureIntegrationScript()
         output = StringIO()
@@ -283,7 +283,7 @@ class TestConfigureIntegrationScript(DatabaseTest):
 
         expect_output = "Configuration settings stored.\n" + "\n".join(integration.explain()) + "\n"
         eq_(expect_output, output.getvalue())
-       
+
 
 class TestSetCoverageAreaScript(DatabaseTest):
 
@@ -314,11 +314,11 @@ class TestSetCoverageAreaScript(DatabaseTest):
                 s.run, args, place_class=MockPlace
             )
 
-    def test_unrecognized_place(self):      
+    def test_unrecognized_place(self):
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
-        for arg in ['service-area', 'focus-area']:        
-            args = ["--library=%s" % library.name, 
+        for arg in ['service-area', 'focus-area']:
+            args = ["--library=%s" % library.name,
                     '--%s={"US": "San Francisco"}' % arg]
             assert_raises_regexp(
                 ValueError,
@@ -332,8 +332,8 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
-        for arg in ['service-area', 'focus-area']:        
-            args = ["--library=%s" % library.name, 
+        for arg in ['service-area', 'focus-area']:
+            args = ["--library=%s" % library.name,
                     '--%s={"OO": "everywhere"}' % arg]
             assert_raises_regexp(
                 ValueError,
@@ -349,7 +349,7 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         # Setting a service area with no focus area assigns that
         # service area to the library.
-        args = ["--library=%s" % library.name, 
+        args = ["--library=%s" % library.name,
                 '--service-area={"US": "everywhere"}']
         s.run(args)
         [area] = library.service_areas

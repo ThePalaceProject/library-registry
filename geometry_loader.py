@@ -19,7 +19,7 @@ class GeometryLoader(object):
     def __init__(self, _db):
         self._db = _db
         self.places_by_external_id=dict()
-        
+
     def load_ndjson(self, fh):
         while True:
             metadata = fh.readline().strip()

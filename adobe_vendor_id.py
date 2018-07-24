@@ -20,7 +20,7 @@ class AdobeVendorIDController(object):
     def __init__(self, _db, vendor_id, node_value,
                  delegates=[]):
         """Constructor.
-        
+
         :param delegates: A list of URLs or AdobeVendorIDClient
         objects. If this Vendor ID server cannot validate an incoming
         login, it will delegate to each of these other servers in
@@ -123,7 +123,7 @@ class AdobeVendorIDRequestHandler(object):
 </accountInfoResponse>"""
 
     AUTH_ERROR_TYPE = "AUTH"
-    ACCOUNT_INFO_ERROR_TYPE = "ACCOUNT_INFO"   
+    ACCOUNT_INFO_ERROR_TYPE = "ACCOUNT_INFO"
 
     ERROR_RESPONSE_TEMPLATE = '<error xmlns="http://ns.adobe.com/adept" data="E_%(vendor_id)s_%(type)s %(message)s"/>'
 
@@ -207,14 +207,14 @@ class AdobeVendorIDModel(object):
                 self.delegates.append(AdobeVendorIDClient(i))
             else:
                 self.delegates.append(i)
-        
+
     def standard_lookup(self, authorization_data):
         """Treat an incoming username and password as the two parts of a short
         client token. Return an Adobe Account ID and a human-readable
         label. Create a DelegatedPatronIdentifier to hold the Adobe
         Account ID if necessary.
         """
-        username = authorization_data.get('username') 
+        username = authorization_data.get('username')
         password = authorization_data.get('password')
         try:
             delegated_patron_identifier = self.short_client_token_decoder.decode_two_part(
@@ -237,7 +237,7 @@ class AdobeVendorIDModel(object):
 
         # Neither this server nor the delegates were able to do anything.
         return None, None
-            
+
     def authdata_lookup(self, authdata):
         """Treat an authdata string as a short client token. Return an Adobe
         Account ID and a human-readable label. Create a
@@ -273,7 +273,7 @@ class AdobeVendorIDModel(object):
             return (None, None)
         urn = delegated_patron_identifier.delegated_identifier
         return (urn, self.urn_to_label(urn))
-        
+
     def urn_to_label(self, urn):
         """We have no information about patrons, so labels are sparse."""
         return "Delegated account ID %s" % urn
@@ -282,10 +282,10 @@ class AdobeVendorIDModel(object):
 class VendorIDAuthenticationError(Exception):
     """The Vendor ID service is working properly but returned an error."""
 
-    
+
 class VendorIDServerException(Exception):
     """The Vendor ID service is not working properly."""
-    
+
 
 class AdobeVendorIDClient(object):
     """A client library for the Adobe Vendor ID protocol.
@@ -302,12 +302,12 @@ class AdobeVendorIDClient(object):
 
     SIGNIN_AUTHDATA_BODY = """<signInRequest method="authData" xmlns="http://ns.adobe.com/adept">
 <authData>%s</authData>
-</signInRequest>""" 
+</signInRequest>"""
 
     SIGNIN_STANDARD_BODY = """<signInRequest method="standard" xmlns="http://ns.adobe.com/adept">
 <username>%s</username>
 <password>%s</password>
-</signInRequest>""" 
+</signInRequest>"""
 
     USER_INFO_BODY = """<accountInfoRequest method="standard" xmlns="http://ns.adobe.com/adept">
 <user>%s</user>
@@ -316,7 +316,7 @@ class AdobeVendorIDClient(object):
     USER_IDENTIFIER_RE = re.compile("<user>([^<]+)</user>")
     LABEL_RE = re.compile("<label>([^<]+)</label>")
     ERROR_RE = re.compile('<error [^<]+ data="([^<]+)"')
-    
+
     def __init__(self, base_url):
         self.base_url = base_url
         self.signin_url = base_url + "SignIn"
@@ -331,7 +331,7 @@ class AdobeVendorIDClient(object):
         if content == 'UP':
             return True
         raise VendorIDServerException("Unexpected response: %s" % content)
-        
+
     def sign_in_authdata(self, authdata):
         """Attempt to sign in using authdata.
 
@@ -346,7 +346,7 @@ class AdobeVendorIDClient(object):
         body = self.SIGNIN_STANDARD_BODY % (username, password)
         response = requests.post(self.signin_url, data=body)
         return self._process_sign_in_result(response)
-           
+
     def user_info(self, urn):
         """Turn a user identifier into a label."""
         body = self.USER_INFO_BODY % urn
@@ -357,13 +357,13 @@ class AdobeVendorIDClient(object):
         if not label:
             raise VendorIDServerException("Unexpected response: %s" % content)
         return label, content
-        
+
     def extract_user_identifier(self, content):
         return self._extract_by_re(content, self.USER_IDENTIFIER_RE)
 
     def extract_label(self, content):
         return self._extract_by_re(content, self.LABEL_RE)
-   
+
     def handle_error(self, status_code, content):
         if status_code != 200:
             raise VendorIDServerException(
@@ -372,13 +372,13 @@ class AdobeVendorIDClient(object):
         error = self._extract_by_re(content, self.ERROR_RE)
         if error:
             raise VendorIDAuthenticationError(error)
-    
+
     def _extract_by_re(self, content, re):
         match = re.search(content)
         if not match:
             return None
         return match.groups()[0]
-    
+
     def _process_sign_in_result(self, response):
         content = response.content
         self.handle_error(response.status_code, content)
@@ -391,14 +391,14 @@ class AdobeVendorIDClient(object):
 
 class MockAdobeVendorIDClient(AdobeVendorIDClient):
     """Mock AdobeVendorIDClient for use in tests."""
-    
+
     def __init__(self):
         self.queue = []
 
     def enqueue(self, response):
         """Queue a response."""
         self.queue.insert(0, response)
-        
+
     def dequeue(self, *args, **kwargs):
         """Dequeue a response.
 

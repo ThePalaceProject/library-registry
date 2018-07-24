@@ -28,9 +28,9 @@ class Configuration(object):
     # Environment variables that contain URLs to the database
     DATABASE_TEST_ENVIRONMENT_VARIABLE = 'SIMPLIFIED_TEST_DATABASE'
     DATABASE_PRODUCTION_ENVIRONMENT_VARIABLE = 'SIMPLIFIED_PRODUCTION_DATABASE'
-    
+
     log = logging.getLogger("Configuration file loader")
-   
+
     INTEGRATIONS = 'integrations'
 
     BASE_URL = 'base_url'
@@ -46,7 +46,7 @@ class Configuration(object):
     # and receipients will be invited to contact this address if they
     # have problems.
     REGISTRY_CONTACT_EMAIL = "registry_contact_email"
-    
+
     @classmethod
     def database_url(cls, test=False):
         """Find the URL to the database so that other configuration

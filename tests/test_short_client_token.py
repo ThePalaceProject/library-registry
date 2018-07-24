@@ -17,13 +17,13 @@ class TestShortClientTokenEncoder(object):
 
     def setup(self):
         self.encoder = ShortClientTokenEncoder()
-    
+
     def test_adobe_base64_encode_decode(self):
         """Test our special variant of base64 encoding designed to avoid
         triggering an Adobe bug.
         """
         value = "!\tFN6~'Es52?X!#)Z*_S"
-        
+
         encoded = self.encoder.adobe_base64_encode(value)
         eq_('IQlGTjZ:J0VzNTI;WCEjKVoqX1M@', encoded)
 
@@ -44,7 +44,7 @@ class TestShortClientTokenEncoder(object):
             def prepare_key(self, key):
                 return key
             def sign(self, value, key):
-                """Always return the same signature, crafted to contain a 
+                """Always return the same signature, crafted to contain a
                 plus sign, a slash and an equal sign when base64-encoded.
                 """
                 return "!\tFN6~'Es52?X!#)Z*_S"
@@ -67,13 +67,13 @@ class TestShortClientTokenEncoder(object):
         assert_raises_regexp(
             ValueError, error, self.encoder.encode, None, "A", None
         )
-        
+
     def test_cannot_encode_null_patron_identifier(self):
         assert_raises_regexp(
             ValueError, "No patron identifier specified",
             self.encoder.encode, "lib", "My library secret", None
         )
-       
+
     def test_short_client_token_encode_known_value(self):
         """Verify that the encoding algorithm gives a known value on known
         input.
@@ -108,7 +108,7 @@ class TestShortClientTokenEncoder(object):
             token, self.encoder.signer.prepare_key(secret)
         )
         eq_(expect_signature, signature)
-        
+
 
 class TestShortClientTokenDecoder(DatabaseTest):
 
@@ -128,7 +128,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
         # value.
         assert u.startswith('urn:uuid:0')
         assert u.endswith('685b35c00f05')
-        
+
     def test_short_client_token_lookup_delegated_patron_identifier_success(self):
         """Test that the library registry can create a
         DelegatedPatronIdentifier from a short client token generated
@@ -145,14 +145,14 @@ class TestShortClientTokenDecoder(DatabaseTest):
         eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, identifier.type)
         eq_("Foreign Patron", identifier.patron_identifier)
         assert identifier.delegated_identifier.startswith('urn:uuid:')
-        
+
         # Do the lookup again and verify we get the same
         # DelegatedPatronIdentifier.
         identifier2 = self.decoder.decode(self._db, short_client_token)
         eq_(identifier, identifier2)
-        
+
     def test_short_client_token_lookup_delegated_patron_identifier_failure(self):
-        """Test various token decoding errors"""        
+        """Test various token decoding errors"""
         m = self.decoder._decode
 
         assert_raises_regexp(
@@ -161,13 +161,13 @@ class TestShortClientTokenDecoder(DatabaseTest):
             self.decoder.decode,
             self._db, "no pipes"
         )
-        
+
         # A token has to contain at least two pipe characters.
         assert_raises_regexp(
             ValueError, "Invalid client token",
             m, self._db, "foo|", "signature"
         )
-        
+
         # The expiration time must be numeric.
         assert_raises_regexp(
             ValueError, 'Expiration time "a time" is not numeric',
@@ -179,7 +179,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
             ValueError, 'Token library\|1234\| has empty patron identifier',
             m, self._db, "library|1234|", "signature"
         )
-        
+
         # The library must be a known one.
         assert_raises_regexp(
             ValueError,
@@ -204,7 +204,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
             'Token library\|1500000000\|patron expired at 2017-07-14 02:40:00',
             m, self._db, "library|1500000000|patron", "signature"
         )
-        
+
         # Finally, the signature must be valid.
         assert_raises_regexp(
             ValueError, 'Invalid signature for',
@@ -214,7 +214,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
     def test_decode_uses_adobe_base64_encoding(self):
 
         library = self._library()
-        
+
         # The base64 encoding of this signature has a plus sign in it.
         signature = 'LbU}66%\\-4zt>R>_)\n2Q'
         encoded_signature = self.encoder.adobe_base64_encode(signature)
@@ -222,14 +222,14 @@ class TestShortClientTokenDecoder(DatabaseTest):
         # We replace the plus sign with a colon.
         assert ':' in encoded_signature
         assert '+' not in encoded_signature
-        
+
         # Make sure that decode properly reverses that change when
         # decoding the 'password'.
         def _decode(_db, token, supposed_signature):
             eq_(supposed_signature, signature)
             self.decoder.test_code_ran = True
         self.decoder._decode = _decode
-            
+
         self.decoder.test_code_ran = False
         self.decoder.decode_two_part(
             self._db, "username", encoded_signature
@@ -237,7 +237,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
 
         # The code in _decode_short_client_token ran. Since there was no
         # test failure, it ran successfully.
-        eq_(True, self.decoder.test_code_ran)        
+        eq_(True, self.decoder.test_code_ran)
 
         assert_raises_regexp(
             ValueError, "Invalid password",

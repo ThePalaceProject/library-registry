@@ -107,7 +107,7 @@ class TestLibraryRegistryController(ControllerTest):
             self.library_registry, emailer_class=MockEmailer
         )
 
-        # A registration form that's valid for most of the tests 
+        # A registration form that's valid for most of the tests
         # in this class.
         self.registration_form = ImmutableMultiDict([
             ("url", "http://circmanager.org/authentication.opds"),
@@ -223,7 +223,7 @@ class TestLibraryRegistryController(ControllerTest):
             # We found no nearby libraries, because we were too far away
             # from them.
             eq_([], catalog['catalogs'])
-            
+
     def test_search_form(self):
         with self.app.test_request_context("/"):
             response = self.controller.search()
@@ -249,7 +249,7 @@ class TestLibraryRegistryController(ControllerTest):
             expect_url = self.library_registry.url_for("search_qa")
             expect_url_tag = '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
             assert expect_url_tag in response.data
-            
+
     def test_search(self):
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124")
@@ -422,7 +422,7 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INTEGRATION_DOCUMENT_NOT_FOUND.uri, response.uri)
             eq_('No Authentication For OPDS document present at http://circmanager.org/authentication.opds', response.detail)
-        
+
     def test_register_fails_on_non_authentication_document(self):
         """The request succeeds but returns something other than
         an authentication document.
@@ -506,7 +506,7 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(TIMEOUT.uri, response.uri)
-            eq_("Timeout retrieving OPDS root document at http://circmanager.org/feed/", 
+            eq_("Timeout retrieving OPDS root document at http://circmanager.org/feed/",
                 response.detail)
 
     def test_register_fails_on_start_link_error(self):
@@ -688,7 +688,7 @@ class TestLibraryRegistryController(ControllerTest):
                 dict(rel=rel, href="http://not-an-email/")
             )
             _request_fails()
-        
+
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
 
@@ -724,7 +724,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_(True, library.anonymous_access)
             eq_(True, library.online_registration)
-            
+
             [collection_summary] = library.collections
             eq_(None, collection_summary.language)
             eq_(100, collection_summary.size)
@@ -738,7 +738,7 @@ class TestLibraryRegistryController(ControllerTest):
             #
             eq_(["http://circmanager.org/authentication.opds",
                  "http://circmanager.org/feed/"
-            ], 
+            ],
                 self.http_client.requests)
 
             # And the document we queued up was fed into the library
@@ -879,7 +879,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(("me@library.org", Emailer.ADDRESS_DESIGNATED), new_dmca)
             eq_(("new-help@library.org", Emailer.ADDRESS_NEEDS_CONFIRMATION),
                 new_help)
-            
+
             # Commit to update library.service_areas.
             self._db.commit()
 
@@ -888,10 +888,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(self.connecticut_state.id, service_area.place_id)
 
             # In addition to making the request to get the
-            # Authentication For OPDS document, and the request to 
+            # Authentication For OPDS document, and the request to
             # get the root OPDS feed, the registry made a
             # follow-up request to download the library's logo.
-            eq_(["http://circmanager.org/authentication.opds", 
+            eq_(["http://circmanager.org/authentication.opds",
                  "http://circmanager.org/feed/",
                  "http://circmanager.org/logo.png"], self.http_client.requests)
 
@@ -965,12 +965,12 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([auth_url], LibraryRegistryController.opds_response_links(
             response, rel
         ))
-        eq_(True, 
+        eq_(True,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )
         )
-        eq_(False, 
+        eq_(False,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, "Some other URL"
             )
@@ -986,7 +986,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(set([auth_url, "http://another-auth-document"]),
             set(LibraryRegistryController.opds_response_links(response, rel))
         )
-        eq_(True, 
+        eq_(True,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )
@@ -1004,7 +1004,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(["http://opds-server/auth-document"],
             LibraryRegistryController.opds_response_links(response, rel)
         )
-        eq_(True, 
+        eq_(True,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, "http://opds-server/auth-document"
             )
@@ -1017,7 +1017,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([], LibraryRegistryController.opds_response_links(
             response, rel
         ))
-        eq_(False, 
+        eq_(False,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )
@@ -1031,7 +1031,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([auth_url], LibraryRegistryController.opds_response_links(
             response, rel
         ))
-        eq_(True, 
+        eq_(True,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )
@@ -1045,7 +1045,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_([], LibraryRegistryController.opds_response_links(
             response, rel
         ))
-        eq_(False, 
+        eq_(False,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )
@@ -1055,7 +1055,7 @@ class TestLibraryRegistryController(ControllerTest):
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, "Not a real feed"
         )
-        eq_(False, 
+        eq_(False,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )
@@ -1063,13 +1063,13 @@ class TestLibraryRegistryController(ControllerTest):
 
         # An Authentication For OPDS document.
         response = DummyHTTPResponse(
-            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE}, 
+            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE},
             json.dumps({ "id": auth_url })
         )
         eq_([auth_url], LibraryRegistryController.opds_response_links(
             response, rel
         ))
-        eq_(True, 
+        eq_(True,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )
@@ -1077,13 +1077,13 @@ class TestLibraryRegistryController(ControllerTest):
 
         # A malformed Authentication For OPDS document.
         response = DummyHTTPResponse(
-            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE}, 
+            200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE},
             json.dumps("Not a document.")
         )
         eq_([], LibraryRegistryController.opds_response_links(
             response, rel
         ))
-        eq_(False, 
+        eq_(False,
             LibraryRegistryController.opds_response_links_to_auth_document(
                 response, auth_url
             )

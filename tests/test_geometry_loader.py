@@ -24,8 +24,8 @@ class TestGeometryLoader(DatabaseTest):
     def setup(self):
         super(TestGeometryLoader, self).setup()
         self.loader = GeometryLoader(self._db)
-    
-    def test_load(self):       
+
+    def test_load(self):
         # Load a place identified by a GeoJSON Polygon.
         metadata = '{"parent_id": null, "name": "77977", "id": "77977", "type": "postal_code", "aliases": [{"name": "The 977", "language": "eng"}]}'
         geography = '{"type": "Polygon", "coordinates": [[[-96.840066, 28.683039], [-96.830637, 28.690131], [-96.835048, 28.693599], [-96.833515, 28.694926], [-96.82657, 28.699584], [-96.822495, 28.695826], [-96.821248, 28.696391], [-96.814249, 28.700983], [-96.772337, 28.722765], [-96.768804, 28.725363], [-96.768564, 28.725046], [-96.767246, 28.723276], [-96.765295, 28.722084], [-96.764568, 28.720456], [-96.76254, 28.718483], [-96.763087, 28.717521], [-96.761814, 28.716488], [-96.761088, 28.713623], [-96.762231, 28.712798], [-96.75967, 28.709812], [-96.781093, 28.677548], [-96.784803, 28.675363], [-96.793788, 28.669546], [-96.791527, 28.667603], [-96.808567, 28.678507], [-96.81505, 28.682946], [-96.820191, 28.684517], [-96.827178, 28.679867], [-96.828626, 28.681719], [-96.831309, 28.680451], [-96.83565, 28.677724], [-96.840066, 28.683039]]]}'
@@ -39,7 +39,7 @@ class TestGeometryLoader(DatabaseTest):
         [alias] = texas_zip.aliases
         eq_("The 977", alias.name)
         eq_("eng", alias.language)
-        
+
         # Load another place identified by a GeoJSON Point.
         metadata = '{"parent_id": null, "name": "New York", "type": "state", "abbreviated_name": "NY", "id": "NY", "full_name": "New York", "aliases": [{"name": "New York State", "language": "eng"}]}'
         geography = '{"type": "Point", "coordinates": [-75, 43]}'
@@ -47,14 +47,14 @@ class TestGeometryLoader(DatabaseTest):
         eq_("NY", new_york.abbreviated_name)
         eq_("New York", new_york.external_name)
         eq_(True, is_new)
-        
+
         # We can measure the distance in kilometers between New York
         # and Texas.
         distance_func = func.ST_Distance_Sphere(new_york.geometry, texas_zip.geometry)
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
         eq_(2510, int(distance/1000))
-        
+
         [alias] = new_york.aliases
         eq_("New York State", alias.name)
         eq_("eng", alias.language)
@@ -71,7 +71,7 @@ class TestGeometryLoader(DatabaseTest):
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
         eq_(2637, int(distance/1000))
-        
+
     def test_load_ndjson(self):
         # Create a preexisting Place with an alias.
         old_us, is_new = get_one_or_create(
@@ -83,7 +83,7 @@ class TestGeometryLoader(DatabaseTest):
             self._db, PlaceAlias, name="USA", language="eng", place=old_us
         )
         old_us_geography = old_us.geometry
-        
+
         # Load a small NDJSON "file" containing information about
         # three places.
         test_ndjson = """{"parent_id": null, "name": "United States", "aliases": [{"name" : "The Good Old U. S. of A.", "language": "eng"}], "type": "nation", "abbreviated_name": "US", "id": "US"}
@@ -118,10 +118,10 @@ class TestGeometryLoader(DatabaseTest):
         # Its preexisting alias has been preserved, and a new alias added.
         [new_alias, old_alias] = sorted(us.aliases, key=lambda x: x.name)
         eq_("USA", old_alias.name)
-        
+
         eq_("The Good Old U. S. of A.", new_alias.name)
         eq_("eng", new_alias.language)
-        
+
         # We can measure the distance in kilometers between the point
         # chosen to represent 'Montgomery' and the point chosen to
         # represent 'Alabama'.

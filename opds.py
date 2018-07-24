@@ -156,5 +156,5 @@ class OPDSCatalog(object):
         return json.dumps(self.catalog)
 
 
-                                   
-        
+
+

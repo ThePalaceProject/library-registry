@@ -40,7 +40,7 @@ from . import (
 
 class TestPlace(DatabaseTest):
 
-    def test_creation(self):       
+    def test_creation(self):
         # Create some US states represented by points.
         # (Rather than by multi-polygons, as they will be represented in
         # the actual application.)
@@ -50,13 +50,13 @@ class TestPlace(DatabaseTest):
             create_method_kwargs=dict(geometry='SRID=4326;POINT(-75 43)')
         )
         eq_(True, is_new)
-        
+
         new_mexico, is_new = get_one_or_create(
             self._db, Place, type=Place.STATE, external_id='21',
             external_name='New Mexico',
             create_method_kwargs=dict(geometry='SRID=4326;POINT(-106 34)')
         )
-        
+
         connecticut, is_new = get_one_or_create(
             self._db, Place, type=Place.STATE, external_id='14',
             external_name='Connecticut',
@@ -72,11 +72,11 @@ class TestPlace(DatabaseTest):
             create_method_kwargs=dict(
                 geometry='SRID=4326;POINT(-73.59 44.17)'
             )
-        )        
+        )
         eq_(new_york, lake_placid.parent)
         eq_([lake_placid], new_york.children)
         eq_([], new_mexico.children)
-        
+
         # Query the database to find states ordered by distance from
         # Lake Placid.
         distance = func.ST_Distance_Sphere(
@@ -84,7 +84,7 @@ class TestPlace(DatabaseTest):
         )
         places = self._db.query(Place).filter(
             Place.type==Place.STATE).order_by(distance).add_columns(distance)
-        
+
         # We can find the distance in kilometers between the 'Lake
         # Placid' point and the points representing the other states.
         eq_(
@@ -132,7 +132,7 @@ class TestPlace(DatabaseTest):
         # Places that don't share a border don't intersect.
         eq_(False, s_i(nyc, connecticut))
         eq_(False, s_i(connecticut, nyc))
-        
+
         # Connecticut and New York share a border, so PostGIS says they
         # intersect, but they don't "intersect" in the everyday sense,
         # so overlaps_not_counting_border excludes them.
@@ -144,14 +144,14 @@ class TestPlace(DatabaseTest):
         eq_(("Kern", Place.COUNTY), m("Kern County"))
         eq_(("New York", Place.STATE), m("New York State"))
         eq_(("Chicago, IL", None), m("Chicago, IL"))
-        
+
     def test_name_parts(self):
         m = Place.name_parts
         eq_(["MA", "Boston"], m("Boston, MA"))
         eq_(["MA", "Boston"], m("Boston, MA,"))
         eq_(["USA", "Anytown"], m("Anytown, USA"))
         eq_(["US", "Ohio", "Lake County"], m("Lake County, Ohio, US"))
-        
+
     def test_lookup_inside(self):
         us = self.crude_us
         zip_10018 = self.zip_10018
@@ -161,7 +161,7 @@ class TestPlace(DatabaseTest):
         manhattan_ks = self.manhattan_ks
         kansas = manhattan_ks.parent
         kings_county = self.crude_kings_county
-        
+
         everywhere = Place.everywhere(self._db)
         eq_(us, everywhere.lookup_inside("US"))
         eq_(new_york, everywhere.lookup_inside("NY"))
@@ -171,7 +171,7 @@ class TestPlace(DatabaseTest):
         eq_(zip_10018, us.lookup_inside("10018, NY"))
         eq_(nyc, us.lookup_inside("New York, NY"))
         eq_(nyc, new_york.lookup_inside("New York"))
-        
+
         # Test that the disambiguators "State" and "County" are handled
         # properly.
         eq_(new_york, us.lookup_inside("New York State"))
@@ -198,7 +198,7 @@ class TestPlace(DatabaseTest):
         eq_(None, kings_county.lookup_inside("NY"))
         eq_(None, us.lookup_inside("NY, 10018"))
         eq_(None, zip_10018.lookup_inside("NY"))
-        
+
         # This is annoying, but I think it's the best overall
         # solution. "New York, USA" really is ambiguous.
         assert_raises_regexp(
@@ -213,14 +213,14 @@ class TestPlace(DatabaseTest):
             "More than one place called New York inside United States.",
             us.lookup_inside, "New York, New York"
         )
-        
+
         # This maybe shouldn't work -- it exposes that we're saying
         # "inside", but our algorithm uses intersection. We handle
         # most such cases by only looking at certain types of places,
         # but ZIP codes don't nest within cities, so that trick
         # doesn't work here.
         eq_(nyc, zip_10018.lookup_inside("New York"))
-        
+
     def test_served_by(self):
         zip = self.zip_10018
         nyc = self.new_york_city
@@ -337,7 +337,7 @@ class TestLibrary(DatabaseTest):
         [service_area] = nypl.service_areas
         eq_(zip, service_area.place)
         eq_(nypl, service_area.library)
-        
+
     def test_relevant_audience(self):
         research = self._library(
             "NYU Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city],
@@ -409,7 +409,7 @@ class TestLibrary(DatabaseTest):
         [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng').most_common()
         eq_(ct_state, lib1)
         eq_(nypl, lib2)
-                
+
         # From this point in New Jersey, NYPL is closest.
         [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng').most_common()
         eq_(nypl, lib1)
@@ -440,7 +440,7 @@ class TestLibrary(DatabaseTest):
         [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng').most_common()
         eq_(ct_state, lib1)
         eq_(nypl, lib2)
-                
+
         # From this point in New Jersey, NYPL is closest.
         [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng').most_common()
         eq_(nypl, lib1)
@@ -640,10 +640,10 @@ class TestLibrary(DatabaseTest):
         [(lib1, d1), (lib2, d2)] = Library.nearby(self._db, (41.3, -73.3))
         eq_(ct_state, lib1)
         eq_(0, d1)
-        
+
         eq_(nypl, lib2)
         eq_(61, int(d2/1000))
-                
+
         # From this point in Pennsylvania, NYPL shows up (142km away) but
         # CT State does not.
         [(lib1, d1)] = Library.nearby(self._db, (40, -75.8))
@@ -661,7 +661,7 @@ class TestLibrary(DatabaseTest):
             Library.nearby(self._db, (41.3, -73.3),
                            allowed_stages=[Library.APPROVED]).all()
         )
-        
+
     def test_query_cleanup(self):
         m = Library.query_cleanup
 
@@ -683,7 +683,7 @@ class TestLibrary(DatabaseTest):
         m = Library.query_parts
         eq_((None, "93203", Place.POSTAL_CODE), m("93203"))
         eq_(("new york public library", "new york", None),
-            m("new york public library"))        
+            m("new york public library"))
         eq_(("queens library", "queens", None), m("queens library"))
         eq_(("kern county library", "kern", Place.COUNTY),
             m("kern county library"))
@@ -711,7 +711,7 @@ class TestLibrary(DatabaseTest):
         get_one_or_create(
             self._db, LibraryAlias, name="Bklynlib", language=None,
             library=brooklyn
-        )        
+        )
         eq_([brooklyn], search("zklynlib"))
 
         # The Boston Public Library serves Boston, MA.
@@ -752,7 +752,7 @@ class TestLibrary(DatabaseTest):
         eq_([],
             search("bpl", allowed_stages=[Library.APPROVED])
         )
-        
+
 
     def test_search_by_location(self):
         # We know about three libraries.
@@ -764,14 +764,14 @@ class TestLibrary(DatabaseTest):
         # 'Manhattan' as an alias.
         [nyc, zip_11212] = [x.place for x in nypl.service_areas]
         assert "Manhattan" in [x.name for x in nyc.aliases]
-        
+
         # The Kansas state library covers the entire state,
         # which happens to contain a city called Manhattan.
         [kansas] = [x.place for x in kansas_state.service_areas]
         eq_("Kansas", kansas.external_name)
         eq_(Place.STATE, kansas.type)
         manhattan_ks = self.manhattan_ks
-        
+
         # A search for 'manhattan' finds both libraries.
         libraries = list(Library.search_by_location_name(self._db, "manhattan"))
         eq_(set(["NYPL", "Kansas State Library"]),
@@ -784,7 +784,7 @@ class TestLibrary(DatabaseTest):
             self._db, "manhattan", here=GeometryUtility.point(35, -118)
         )
         eq_(["Kansas State Library", "NYPL"], [x[0].name for x in ca_results])
-        
+
         # If you're searching from Maine, the New York library shows
         # up first.
         me_results = Library.search_by_location_name(
@@ -817,10 +817,10 @@ class TestLibrary(DatabaseTest):
                 allowed_stages=[Library.APPROVED]
             ).all()
         )
-        
+
     def test_search(self):
         """Test the overall search method."""
-        
+
         # Here's a Kansas library with a confusing name whose
         # Levenshtein distance from "New York" is 2.
         new_work = self._library("Now Work", [self.kansas_state])
@@ -835,7 +835,7 @@ class TestLibrary(DatabaseTest):
         # as opposed to a service location match.
         eq_(['Now Work', 'NYPL'], [x[0].name for x in libraries])
         eq_([1768, 0], [int(x[1]/1000) for x in libraries])
-        
+
         # This search query has a Levenshtein distance of 1 from "New
         # York", but a distance of 3 from "Now Work", so only NYPL
         # shows up.
@@ -860,7 +860,7 @@ class TestLibrary(DatabaseTest):
                 allowed_stages=[Library.APPROVED]
             )
         )
-        
+
     def test_search_excludes_duplicates(self):
         # Here's a library that serves a place called Kansas
         # whose name is also "Kansas"
@@ -871,7 +871,7 @@ class TestLibrary(DatabaseTest):
             Library.search_by_location_name(self._db, "kansas").all())
         eq_([library],
             Library.search_by_library_name(self._db, "kansas").all())
-        
+
         # But when we do the general search, the library only shows up once.
         [(result, distance)] = Library.search(self._db, (0, 0), "Kansas")
         eq_(library, result)
@@ -905,7 +905,7 @@ class TestCollectionSummary(DatabaseTest):
             CollectionSummary.set, library, "eng",
             "fruit"
         )
-        
+
     def test_negative_size_is_not_allowed(self):
         library  = self._library()
         assert_raises_regexp(
@@ -996,7 +996,7 @@ Protocol/Goal: protocol/goal
 somesetting='somevalue'""" % integration.id
         actual = integration.explain()
         eq_(expect, "\n".join(actual))
-        
+
         # If we pass in True for include_secrets, we see the passwords.
         with_secrets = integration.explain(include_secrets=True)
         assert "password='somepass'" in with_secrets
@@ -1004,7 +1004,7 @@ somesetting='somevalue'""" % integration.id
 class TestConfigurationSetting(DatabaseTest):
 
     def test_is_secret(self):
-        """Some configuration settings are considered secrets, 
+        """Some configuration settings are considered secrets,
         and some are not.
         """
         m = ConfigurationSetting._is_secret
@@ -1026,7 +1026,7 @@ class TestConfigurationSetting(DatabaseTest):
         )
         setting = integration.setting("key")
         eq_(None, setting.value)
-        
+
         # If the setting has no value, value_or_default sets the value to
         # the default, and returns the default.
         eq_("default value", setting.value_or_default("default value"))
@@ -1034,7 +1034,7 @@ class TestConfigurationSetting(DatabaseTest):
 
         # Once the value is set, value_or_default returns the value.
         eq_("default value", setting.value_or_default("new default"))
-        
+
         # If the setting has any value at all, even the empty string,
         # it's returned instead of the default.
         setting.value = ""
@@ -1053,7 +1053,7 @@ class TestConfigurationSetting(DatabaseTest):
         # Set it.
         sitewide_conf.value = "Sitewide value"
         eq_("Sitewide value", sitewide_conf.value)
-        
+
         # Here's an integration, let's say the Adobe Vendor ID setup.
         adobe, ignore = create(
             self._db, ExternalIntegration,
@@ -1069,12 +1069,12 @@ class TestConfigurationSetting(DatabaseTest):
         # inherit the sitewide value for the key.
         eq_(None, adobe_conf.value)
         adobe_conf.value = "Adobe value"
-        
+
         # Here's a library which has a ConfigurationSetting for the same
         # key used in the sitewide configuration.
         library = self._library()
         library_conf = ConfigurationSetting.for_library(key, library)
-        
+
         # Since all libraries use a given ConfigurationSetting to mean
         # the same thing, a library _does_ inherit the sitewide value
         # for a configuration setting.
@@ -1088,7 +1088,7 @@ class TestConfigurationSetting(DatabaseTest):
         # value.
         library_conf.value = "Per-library value"
         eq_("Per-library value", library_conf.value)
-        
+
         # Now let's consider a setting like on the combination of a library and an
         # integration integration.
         key = "patron_identifier_prefix"
@@ -1116,7 +1116,7 @@ class TestConfigurationSetting(DatabaseTest):
         # integration setting.
         library_patron_prefix_conf.value = "Library-specific value"
         eq_("Library-specific value", library_patron_prefix_conf.value)
-        
+
     def test_duplicate(self):
         """You can't have two ConfigurationSettings for the same key,
         library, and external integration.
@@ -1142,11 +1142,11 @@ class TestConfigurationSetting(DatabaseTest):
             key=key,
             library_id=library.id, external_integration=integration
         )
-    
+
     def test_int_value(self):
         number = ConfigurationSetting.sitewide(self._db, "number")
         eq_(None, number.int_value)
-        
+
         number.value = "1234"
         eq_(1234, number.int_value)
 
@@ -1156,13 +1156,13 @@ class TestConfigurationSetting(DatabaseTest):
     def test_float_value(self):
         number = ConfigurationSetting.sitewide(self._db, "number")
         eq_(None, number.int_value)
-        
+
         number.value = "1234.5"
         eq_(1234.5, number.float_value)
 
         number.value = "tra la la"
         assert_raises(ValueError, lambda: number.float_value)
-        
+
     def test_json_value(self):
         jsondata = ConfigurationSetting.sitewide(self._db, "json")
         eq_(None, jsondata.int_value)
@@ -1172,7 +1172,7 @@ class TestConfigurationSetting(DatabaseTest):
 
         jsondata.value = "tra la la"
         assert_raises(ValueError, lambda: jsondata.json_value)
-        
+
     def test_explain(self):
         """Test that ConfigurationSetting.explain gives information
         about all site-wide configuration settings.
@@ -1183,14 +1183,14 @@ class TestConfigurationSetting(DatabaseTest):
         integration, ignore = create(
             self._db, ExternalIntegration,
             protocol="a protocol", goal="a goal")
-        
+
         actual = ConfigurationSetting.explain(self._db, include_secrets=True)
         expect = """Site-wide configuration settings:
 ---------------------------------
 a_secret='1'
 nonsecret_setting='2'"""
         eq_(expect, "\n".join(actual))
-        
+
         without_secrets = "\n".join(ConfigurationSetting.explain(
             self._db, include_secrets=False
         ))
