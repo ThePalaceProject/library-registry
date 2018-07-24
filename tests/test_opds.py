@@ -78,7 +78,7 @@ class TestOPDSCatalog(DatabaseTest):
         catalog = Mock.library_catalog(library)
         metadata = catalog['metadata']
         eq_(library.name, metadata['title'])
-        eq_(library.urn_uri, metadata['id'])
+        eq_(library.internal_urn, metadata['id'])
         eq_(library.description, metadata['description'])
 
         eq_(metadata['updated'], OPDSCatalog._strftime(library.timestamp))

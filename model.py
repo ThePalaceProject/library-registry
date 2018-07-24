@@ -212,81 +212,124 @@ class Library(Base):
 
     id = Column(Integer, primary_key=True)
     
-    # The official name of the library.
+    # The official name of the library.  This is not unique because
+    # there are many "Springfield Public Library"s.  This is nullable
+    # because there's a period during initial registration where a
+    # library has no name. (TODO: we might be able to change this.)
     name = Column(Unicode, index=True)
 
-    # A URN that uniquely identifies the library. This is the URN
-    # served by the library's Authentication for OPDS document.
-    urn = Column(Unicode, index=True)
-    
     # Human-readable explanation of who the library serves.
     description = Column(Unicode)
 
-    # The URL to the library's OPDS server.
+    # An internally generated unique URN. This is used in controller
+    # URLs to identify a library. A registry will always use the same
+    # URN to identify a given library, even if the library's OPDS
+    # server changes.
+    internal_urn = Column(
+        Unicode, nullable=False, index=True, unique=True,
+        default=lambda: "urn:uuid:" + str(uuid.uuid4())
+    )
+
+    # The URL to the library's Authentication for OPDS document. At
+    # any given time, this URL is unique, but it may change over time
+    # as libraries move to different servers.
+    authentication_url = Column(Unicode, index=True, unique=True)
+    
+    # The URL to the library's OPDS server root.
     opds_url = Column(Unicode)
 
-    # The URL to the library's web page.
+    # The URL to the library's patron-facing web page.
     web_url = Column(Unicode)
     
-    # When the library's record was last updated.
+    # When our record of this library was last updated.
     timestamp = Column(DateTime, index=True,
                        default=lambda: datetime.datetime.utcnow(),
                        onupdate=lambda: datetime.datetime.utcnow())
 
-    # The library's logo.
+    # The library's logo, as a data: URI.
     logo = Column(Unicode)
 
-    # A Library may inhabit one of four stages:
+    # Constants for determining which stage a library is in.
     #
-    # 'registered' - An OPDS server successfully completed the registration
-    #                process.
+    # Which stage the library is actually in depends on the
+    # combination of Library.library_stage (the library's opinion) and
+    # Library.registry_stage (the registry's opinion).
     #
-    # 'approved' - Someone looked at the server and approved it for
-    #              inclusion in the registry.
+    # If either value is CANCELLED_STAGE, the library is in
+    # CANCELLED_STAGE.    
     #
-    # 'rejected' - Someone looked at the server and does not want it
-    #              included in the registry at all.
+    # Otherwise, if either value is TESTING_STAGE, the library is in
+    # TESTING_STAGE.
     #
-    # 'live' - The server appears in feeds for real users to see.
-    REGISTERED = 'registered'
-    APPROVED = 'approved'
-    REJECTED = 'rejected'
-    LIVE = 'live'
+    # Otherwise, the library is in PRODUCTION_STAGE.
+    TESTING_STAGE = 'testing'       # Library should show up in test feed
+    PRODUCTION_STAGE = 'production' # Library should show up in production feed
+    CANCELLED_STAGE = 'cancelled'   # Library should not show up in any feed
     stage_enum = Enum(
-        REGISTERED, APPROVED, REJECTED, LIVE, name='library_stage'
+        TESTING_STAGE, PRODUCTION_STAGE, CANCELLED_STAGE, name='library_stage'
     )
-    stage = Column(stage_enum, index=True, nullable=False, default=REGISTERED)
+
+    # The library's opinion about which stage a library should be in.
+    library_stage = Column(
+        stage_enum, index=True, nullable=False, default=TESTING_STAGE
+    )
+
+    # The registry's opinion about which stage a library should be in.
+    registry_stage = Column(
+        stage_enum, index=True, nullable=False, default=TESTING_STAGE
+    )
 
     # Can people get books from this library without authenticating?
+    #
+    # We store this specially because it might be useful to filter
+    # for libraries of this type.
     anonymous_access = Column(Boolean, default=False)
 
     # Can eligible people get credentials for this library through
     # an online registration process?
+    #
+    # We store this specially because it might be useful to filter
+    # for libraries of this type.
     online_registration = Column(Boolean, default=False)
 
-    # To issue Short Client Tokens for this library, the registry must share a
-    # short name and a secret with them.
+    # To issue Short Client Tokens for this library, the registry must
+    # share a short name and a secret with them.
+    short_name = Column(Unicode, index=True, unique=True)
 
-    short_name = Column(Unicode, index=True)
+    # The shared secret is also used to authenticate requests in the
+    # case where a library's URL has changed.
     shared_secret = Column(Unicode)
 
+    # A library may have alternate names, e.g. "BPL" for the Brooklyn
+    # Public Library.
     aliases = relationship("LibraryAlias", backref='library')
+
+    # A library may serve one or more geographic areas.
     service_areas = relationship('ServiceArea', backref='library')
 
+    # A library may serve one or more specific audiences.
     audiences = relationship('Audience', secondary='libraries_audiences',
                             back_populates="libraries")
+
+    # The registry may have information about the library's
+    # collections of materials. The registry doesn't need to know
+    # details, but it's useful to know approximate counts when finding
+    # libraries that serve specific language communities.
     collections = relationship("CollectionSummary", backref='library')
     
+    # The registry may keep delegated patron identifiers (basically,
+    # Adobe IDs) for a library's patrons. This allows the library's
+    # patrons to decrypt Adobe ACS-encrypted books without having to
+    # license separate Adobe Vendor ID and without the registry
+    # knowing anything about the patrons.
     delegated_patron_identifiers = relationship(
         "DelegatedPatronIdentifier", backref='library'
     )
 
+    # A library may have miscellaneous URIs associated with it. Generally
+    # speaking, the registry is only concerned about these URIs insofar as
+    # it needs to verify that they work.
     hyperlinks = relationship("Hyperlink", backref='library')
-
-    __table_args__ = (
-        UniqueConstraint('urn'),
-        UniqueConstraint('short_name'),
-    )
 
     @validates('short_name')
     def validate_short_name(self, key, value):
@@ -299,19 +342,36 @@ class Library(Base):
         return value.upper()
 
     @classmethod
-    def _restrict_to_stages(cls, qu, allowed_stages=None):
-        """Restrict the given query to libraries that are in one of
-        the given stages.
+    def _feed_restriction(cls, production):
+        """Create a SQLAlchemy restriction that only finds libraries that
+        ought to be in the given feed.
 
-        :param allowed_stages: A list of allowable values for
-        `Library.stage`. By default, only libraries in the LIVE stage
-        are shown.
+        :param production: A boolean. If True, then only libraries in
+        the production stage should be included. If False, then
+        libraries in the production or testing stages should be
+        included.
+
+        :return: A SQLAlchemy expression.
         """
-        allowed_stages = allowed_stages or [Library.LIVE]
-        return qu.filter(Library.stage.in_(allowed_stages))
+        # The library's opinion
+        lib = Library.library_stage
+        # The registry's opinion
+        reg = Library.registry_stage
+
+        prod = cls.PRODUCTION_STAGE
+        test = cls.TESTING_STAGE
+
+        if production:
+            # Both parties must agree that this library is
+            # production-ready.
+            return and_(lib==prod, reg==prod)
+        else:
+            # Both parties must agree that this library is _either_
+            # in the production stage or the testing stage.
+            return and_(lib.in_((prod, test)), reg.in_((prod, test)))
 
     @classmethod
-    def relevant(cls, _db, target, language, audiences=None, allowed_stages=None):
+    def relevant(cls, _db, target, language, audiences=None, production=True):
         """Find libraries that are most relevant for a user.
         
         :param target: The user's current location. May be a Geometry object or
@@ -319,9 +379,8 @@ class Library(Base):
         :param language: The ISO 639-1 code for the user's language.
         :param audiences: List of audiences the user is a member of.
         By default, only libraries with the PUBLIC audience are shown.
-        :param allowed_stages: A list of allowable values for
-        `Library.stage`. By default, only libraries in the LIVE stage
-        are shown.
+        :param production: If True, only libraries that are ready for
+            production are shown.
 
         :return A Counter mapping Library objects to scores.
         """
@@ -336,9 +395,6 @@ class Library(Base):
         eligibility_area_distance_factor = 0.1
         focus_area_size_factor = 0.00000001
         score_threshold = 0.00001
-
-        # By default, only show libraries that have been approved.
-        allowed_stages = allowed_stages or [cls.LIVE]
 
         # By default, only show libraries that are for the general public.
         audiences = audiences or [Audience.PUBLIC]
@@ -498,11 +554,17 @@ class Library(Base):
         ).having(
             score > literal_column(str(score_threshold))
         ).where(
-            # Limit to the collection summaries for the user's language. If a library
-            # has no collection for the language, it's still included.
-            or_(
-                libraries_collections.c.collectionsummaries_language==language_code,
-                libraries_collections.c.collectionsummaries_language==None
+            and_(
+                # Query for either the production feed or the testing feed.
+                cls._feed_restriction(production),
+
+                # Limit to the collection summaries for the user's
+                # language. If a library has no collection for the
+                # language, it's still included.
+                or_(
+                    libraries_collections.c.collectionsummaries_language==language_code,
+                    libraries_collections.c.collectionsummaries_language==None
+                )
             )
         ).select_from(
             libraries_collections
@@ -524,7 +586,7 @@ class Library(Base):
         return c
 
     @classmethod
-    def nearby(cls, _db, target, max_radius=150, allowed_stages=None):
+    def nearby(cls, _db, target, max_radius=150, production=True):
         """Find libraries whose service areas include or are close to the
         given point.
 
@@ -532,15 +594,13 @@ class Library(Base):
          a 2-tuple (latitude, longitude).
         :param max_radius: How far out from the starting point to search
             for a library's service area, in kilometers.
+        :param production: If True, only libraries that are ready for
+            production are shown.
 
         :return: A database query that returns lists of 2-tuples
         (library, distance from starting point). Distances are
         measured in meters.
-        """
-
-        # By default, only show libraries that have been approved.
-        allowed_stages = allowed_stages or [cls.LIVE]
-        
+        """        
         # We start with a single point on the globe. Call this Point
         # A.
         if isinstance(target, tuple):
@@ -574,17 +634,22 @@ class Library(Base):
             ServiceArea.place).filter(nearby).add_column(
                 min_distance).group_by(Library.id).order_by(
                 min_distance.asc())
-        qu = cls._restrict_to_stages(qu, allowed_stages)
+        qu = qu.filter(cls._feed_restriction(production))
         return qu
 
     @classmethod
-    def search(cls, _db, target, query, allowed_stages=None):
+    def search(cls, _db, target, query, production=True):
         """Try as hard as possible to find a small number of libraries
         that match the given query.
 
         :param target: Order libraries by their distance from this
          point. May be a Geometry object or a 2-tuple (latitude,
          longitude).
+
+        :param query: String to search for.
+
+        :param production: If True, only libraries that are ready for
+            production are shown.
         """
         # We don't anticipate a lot of libraries or a lot of
         # localities with the same name, but we need to have _some_
@@ -608,7 +673,7 @@ class Library(Base):
         # We start with libraries that match the name query.
         if library_query:
             libraries_for_name = cls.search_by_library_name(
-                _db, library_query, here, allowed_stages).limit(
+                _db, library_query, here, production).limit(
                     max_libraries).all()
         else:
             libraries_for_name = []
@@ -616,7 +681,7 @@ class Library(Base):
         # We tack on any additional libraries that match a place query.
         if place_query:
             libraries_for_location = cls.search_by_location_name(
-                _db, place_query, place_type, here, allowed_stages
+                _db, place_query, place_type, here, production
             ).limit(max_libraries).all()
         else:
             libraries_for_location = []
@@ -630,13 +695,13 @@ class Library(Base):
         return libraries_for_name + libraries_for_location
 
     @classmethod
-    def search_by_library_name(cls, _db, name, here=None, allowed_stages=None):
+    def search_by_library_name(cls, _db, name, here=None, production=True):
         """Find libraries whose name or alias matches the given name.
 
         :param name: Name of the library to search for.
         :param here: Order results by proximity to this location.
-        :param allowed_stages: Only find libraries whose .stage is one
-            of these values.
+        :param production: If True, only libraries that are ready for
+            production are shown.
         """
        
         qu = _db.query(Library).outerjoin(Library.aliases)
@@ -656,20 +721,20 @@ class Library(Base):
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
-        qu = cls._restrict_to_stages(qu, allowed_stages)
+        qu = qu.filter(cls._feed_restriction(production))
         return qu
 
     @classmethod
     def search_by_location_name(cls, _db, query, type=None, here=None,
-                                allowed_stages=None):
+                                production=True):
         """Find libraries whose service area overlaps a place with
         the given name.
 
         :param query: Name of the place to search for.
         :param type: Restrict results to places of this type.
         :param here: Order results by proximity to this location.
-        :param allowed_stages: Only find libraries whose .stage is one
-            of these values.
+        :param production: If True, only libraries that are ready for
+            production are shown.
         """
         # For a library to match, the Place named by the query must
         # intersect a Place served by that library.
@@ -691,7 +756,7 @@ class Library(Base):
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
-        qu = cls._restrict_to_stages(qu, allowed_stages)
+        qu = qu.filter(cls._feed_restriction(production))
         return qu
     
     us_zip = re.compile("^[0-9]{5}$")
@@ -768,16 +833,6 @@ class Library(Base):
         long_value_is_approximate_match = (is_long & close_enough)
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)
-
-    @property
-    def urn_uri(self):
-        "Return the URN as a urn: URI."
-        if not self.urn:
-            return None
-        if self.urn.startswith('urn:'):
-            return self.urn
-        else:
-            return 'urn:' + self.urn
     
     def set_hyperlink(self, rel, *hrefs):
         """Make sure this library has a Hyperlink with the given `rel` that

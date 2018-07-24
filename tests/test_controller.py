@@ -720,7 +720,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Description", library.description)
             eq_("http://circmanager.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
-            eq_(Library.REGISTERED, library.stage)
+            eq_(Library.TESTING_STAGE, library.library_stage)
 
             eq_(True, library.anonymous_access)
             eq_(True, library.online_registration)
@@ -794,8 +794,8 @@ class TestLibraryRegistryController(ControllerTest):
             link['properties'][Validation.STATUS_PROPERTY])
 
         # Now, a human inspects the library, verifies that everything
-        # works, and makes it LIVE.
-        library.stage = Library.LIVE
+        # works, and says it's ready for production.
+        library.registry_stage = Library.PRODUCTION_STAGE
 
         # Later, the library's information changes.
         auth_document = {
@@ -824,6 +824,7 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = ImmutableMultiDict([
                 ("url", auth_url),
                 ("contact", "mailto:me@library.org"),
+                ("stage", Library.PRODUCTION_STAGE)
             ])
 
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -843,9 +844,9 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("New and improved", library.description)
             eq_(None, library.web_url)
             eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
-            # The library's stage is still LIVE, it has not gone back to
-            # REGISTERED.
-            eq_(Library.LIVE, library.stage)
+            # The library's library_stage has been updated to reflect
+            # the fact that the library thinks it should be live.
+            eq_(Library.PRODUCTION_STAGE, library.library_stage)
 
             # There are still three Hyperlinks associated with the
             # library.

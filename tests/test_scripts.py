@@ -95,7 +95,7 @@ class TestAddLibraryScript(DatabaseTest):
         [library] = self._db.query(Library).all()
 
         eq_(u"The New York Public Library", library.name)
-        eq_(u"1236662b-66cf-3068-af58-95385f299b4f", library.urn)
+        eq_(u"1236662b-66cf-3068-af58-95385f299b4f", library.internal_urn)
         eq_(u"https://nypl.org/", library.web_url)
         eq_(u"https://circulation.librarysimplified.org/", library.opds_url)
         eq_(u"Serving the five boroughs of New York, NY.", library.description)

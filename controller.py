@@ -140,21 +140,10 @@ class LibraryRegistryController(object):
         if not ip_address:
             return None
         return GeometryUtility.point_from_ip(ip_address)
-
-    def stages(self, show_live):
-        """Turn a boolean flag into an appropriate list of library stages.
-
-        The list can be passed into one of the Library query methods.
-        """
-        if show_live:
-            return [Library.LIVE]
-        else:
-            return [Library.APPROVED]
         
     def nearby(self, ip_address, live=True):
         point = self.point_from_ip(ip_address)
-        qu = Library.nearby(self._db, point,
-                            allowed_stages=self.stages(live))
+        qu = Library.nearby(self._db, point, production=live)
         qu = qu.limit(5)
         if live:
             nearby_controller = 'nearby'
@@ -177,7 +166,7 @@ class LibraryRegistryController(object):
         if query:
             # Run the query and send the results.
             results = Library.search(
-                self._db, point, query, allowed_stages=self.stages(live)
+                self._db, point, query, production=live
             )
                 
             this_url = this_url = self.app.url_for(
@@ -430,10 +419,11 @@ class LibraryRegistryController(object):
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
+        # TODO: take library_stage from input.
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url,
-            create_method_kwargs=dict(stage=Library.REGISTERED)
+            create_method_kwargs=dict(library_stage=Library.TESTING_STAGE)
         )
         library.name = auth_document.title
         if auth_document.website:

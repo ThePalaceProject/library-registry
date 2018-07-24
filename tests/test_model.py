@@ -261,13 +261,6 @@ class TestLibrary(DatabaseTest):
         self._db.commit()
         assert nypl.timestamp > first_modified
 
-    def test_urn_uri(self):
-        nypl = self._library("New York Public Library")
-        nypl.urn = 'foo'
-        eq_("urn:foo", nypl.urn_uri)
-        nypl.urn = 'urn:bar'
-        eq_('urn:bar', nypl.urn_uri)
-
     def test_short_name(self):
         lib = self._library("A Library")
         lib.short_name = 'abcd'
@@ -659,7 +652,7 @@ class TestLibrary(DatabaseTest):
         # we find nothing.
         eq_([],
             Library.nearby(self._db, (41.3, -73.3),
-                           allowed_stages=[Library.APPROVED]).all()
+                           production=False).all()
         )
         
     def test_query_cleanup(self):
@@ -749,8 +742,10 @@ class TestLibrary(DatabaseTest):
         # By default, search_by_library_name() only finds libraries
         # with the LIVE status. If we look for libraries with the
         # APPROVED status, we find nothing.
+        #
+        # TODO: We should start finding more stuff by setting production=False
         eq_([],
-            search("bpl", allowed_stages=[Library.APPROVED])
+            search("bpl", production=False)
         )
         
 
@@ -808,13 +803,11 @@ class TestLibrary(DatabaseTest):
         )
         eq_(nypl, brooklyn_results[0])
 
-        # By default, search_by_location_name() only finds libraries
-        # with the LIVE status. If we look for libraries with the
-        # APPROVED status, we find nothing.
+        # TODO: We should find more stuff by searching for production=False
         eq_([],
             Library.search_by_location_name(
                 self._db, "brooklyn", here=GeometryUtility.point(43, -70),
-                allowed_stages=[Library.APPROVED]
+                production=False
             ).all()
         )
         
@@ -857,7 +850,7 @@ class TestLibrary(DatabaseTest):
         eq_([],
             Library.search(
                 self._db, (40.7, -73.9), "New York",
-                allowed_stages=[Library.APPROVED]
+                production=False
             )
         )
         

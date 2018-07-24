@@ -204,7 +204,7 @@ class AddLibraryScript(Script):
         short_name = parsed.short_name
         shared_secret = parsed.shared_secret
         
-        library, is_new = get_one_or_create(self._db, Library, urn=urn)
+        library, is_new = get_one_or_create(self._db, Library, internal_urn=urn)
         if name:
             library.name = name
         if opds:
