@@ -342,7 +342,7 @@ class Library(Base):
         return value.upper()
 
     @classmethod
-    def _feed_restriction(cls, production):
+    def _feed_restriction(cls, production, library_field=None, registry_field=None):
         """Create a SQLAlchemy restriction that only finds libraries that
         ought to be in the given feed.
 
@@ -354,9 +354,11 @@ class Library(Base):
         :return: A SQLAlchemy expression.
         """
         # The library's opinion
-        lib = Library.library_stage
+        if library_field is None:
+            library_field = Library.library_stage
         # The registry's opinion
-        reg = Library.registry_stage
+        if registry_field is None:
+            registry_field = Library.registry_stage
 
         prod = cls.PRODUCTION_STAGE
         test = cls.TESTING_STAGE
@@ -364,11 +366,14 @@ class Library(Base):
         if production:
             # Both parties must agree that this library is
             # production-ready.
-            return and_(lib==prod, reg==prod)
+            return and_(library_field==prod, registry_field==prod)
         else:
             # Both parties must agree that this library is _either_
             # in the production stage or the testing stage.
-            return and_(lib.in_((prod, test)), reg.in_((prod, test)))
+            return and_(
+                library_field.in_((prod, test)),
+                registry_field.in_((prod, test))
+            )
 
     @classmethod
     def relevant(cls, _db, target, language, audiences=None, production=True):
@@ -556,7 +561,11 @@ class Library(Base):
         ).where(
             and_(
                 # Query for either the production feed or the testing feed.
-                cls._feed_restriction(production),
+                cls._feed_restriction(
+                    production,
+                    libraries_collections.c.libraries_library_stage,
+                    libraries_collections.c.libraries_registry_stage
+                ),
 
                 # Limit to the collection summaries for the user's
                 # language. If a library has no collection for the
