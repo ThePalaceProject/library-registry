@@ -640,8 +640,9 @@ class Library(Base):
         min_distance = func.min(func.ST_Distance_Sphere(target, Place.geometry))
         
         qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place).filter(nearby)
+            ServiceArea.place)
         qu = qu.filter(cls._feed_restriction(production))
+        qu = qu.filter(nearby)
         qu = qu.add_column(
                 min_distance).group_by(Library.id).order_by(
                 min_distance.asc())
@@ -721,7 +722,7 @@ class Library(Base):
         name_matches = cls.fuzzy_match(Library.name, name)
         alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
         qu = qu.filter(or_(name_matches, alias_matches))
-
+        qu = qu.filter(cls._feed_restriction(production))
         if here:
             # Order by the minimum distance between one of the
             # library's service areas and the current location.
@@ -731,7 +732,6 @@ class Library(Base):
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
-        qu = qu.filter(cls._feed_restriction(production))
         return qu
 
     @classmethod
@@ -755,7 +755,7 @@ class Library(Base):
                     named_place,
                     func.ST_Intersects(Place.geometry, named_place.geometry)
                 ).outerjoin(named_place.aliases)
-
+        qu = qu.filter(cls._feed_restriction(production))
         name_match = cls.fuzzy_match(named_place.external_name, query)
         alias_match = cls.fuzzy_match(PlaceAlias.name, query)
         qu = qu.filter(or_(name_match, alias_match))
@@ -766,7 +766,6 @@ class Library(Base):
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
-        qu = qu.filter(cls._feed_restriction(production))
         return qu
     
     us_zip = re.compile("^[0-9]{5}$")

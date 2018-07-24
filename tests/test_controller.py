@@ -255,7 +255,6 @@ class TestLibraryRegistryController(ControllerTest):
             
     def test_search(self):
         with self.app.test_request_context("/?q=manhattan"):
-            set_trace()
             response = self.controller.search("65.88.88.124")
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
@@ -291,19 +290,20 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_search_qa(self):
         # As we saw in the previous test, this search picks up two
-        # libraries when we run it looking for LIVE libraries. But
-        # since we're only searching for libraries in the APPROVED
-        # stage, we don't find anything.
+        # libraries when we run it looking for production libraries. If
+        # all of the libraries are cancelled, we don't find anything.
+        for l in self._db.query(Library):
+            l.registry_stage = Library.CANCELLED_STAGE
         with self.app.test_request_context("/?q=manhattan"):
-            response = self.controller.search("65.88.88.124", live=False)
+            response = self.controller.search("65.88.88.124", live=True)
             catalog = json.loads(response.data)
             eq_([], catalog['catalogs'])
 
         # If we move one of the libraries back into the APPROVED
         # stage, we find it.
-        self.kansas_state_library.stage = Library.APPROVED
+        self.kansas_state_library.registry_stage = Library.TESTING_STAGE
         with self.app.test_request_context("/?q=manhattan"):
-            response = self.controller.search("65.88.88.124", live=False)
+            response = self.controller.search("65.88.88.124", live=True)
             catalog = json.loads(response.data)
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])
