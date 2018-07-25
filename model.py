@@ -233,10 +233,12 @@ class Library(Base):
         default=lambda: "urn:uuid:" + str(uuid.uuid4())
     )
 
-    # The URL to the library's Authentication for OPDS document. At
-    # any given time, this URL is unique, but it may change over time
-    # as libraries move to different servers.
-    authentication_url = Column(Unicode, index=True, unique=True)
+    # The URL to the library's Authentication for OPDS document. This
+    # URL may change over time as libraries move to different servers.
+    # This URL is generally unique, but that's not a database
+    # requirement, since a single library could potentially have two
+    # registry entries.
+    authentication_url = Column(Unicode, index=True)
 
     # The URL to the library's OPDS server root.
     opds_url = Column(Unicode)
