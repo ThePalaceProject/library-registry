@@ -54,7 +54,7 @@ from sqlalchemy.orm.exc import (
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql.expression import (
-    cast, 
+    cast,
     literal_column,
     or_,
     and_,
@@ -120,7 +120,7 @@ class SessionManager(object):
 
         Base.metadata.create_all(engine)
 
-        
+
         cls.engine_for_url[url] = engine
         return engine, engine.connect()
 
@@ -169,7 +169,7 @@ def dump_query(query):
             v = v.encode(enc)
         params[k] = sqlescape(v)
     return (comp.string.encode(enc) % params).decode(enc)
-    
+
 def get_one_or_create(db, model, create_method='',
                       create_method_kwargs=None,
                       **kwargs):
@@ -187,7 +187,7 @@ def get_one_or_create(db, model, create_method='',
             return obj
         except IntegrityError, e:
             logging.info(
-                "INTEGRITY ERROR on %r %r, %r: %r", model, create_method_kwargs, 
+                "INTEGRITY ERROR on %r %r, %r: %r", model, create_method_kwargs,
                 kwargs, e)
             __transaction.rollback()
             return db.query(model).filter_by(**kwargs).one(), False
@@ -201,7 +201,7 @@ def create(db, model, create_method='',
     db.flush()
     return created, True
 
-    
+
 Base = declarative_base()
 
 class Library(Base):
@@ -406,7 +406,7 @@ class Library(Base):
     @classmethod
     def relevant(cls, _db, target, language, audiences=None, production=True):
         """Find libraries that are most relevant for a user.
-        
+
         :param target: The user's current location. May be a Geometry object or
         a 2-tuple (latitude, longitude).
         :param language: The ISO 639-1 code for the user's language.
@@ -563,7 +563,7 @@ class Library(Base):
 
         # Decrease the score based on how far away the library's eligibility area is.
         score = score * exponential_decrease(1.0 * eligibility_area_distance_factor * eligibility_min_distance)
- 
+
         # Decrease the score based on how far away the library's focus area is.
         score = score * exponential_decrease(1.0 * focus_area_distance_factor * focus_min_distance)
 
@@ -666,7 +666,7 @@ class Library(Base):
         # minimum distance between the library's service area and
         # Point A in meters.
         min_distance = func.min(func.ST_Distance_Sphere(target, Place.geometry))
-        
+
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place)
         qu = qu.filter(cls._feed_restriction(production))
@@ -696,7 +696,7 @@ class Library(Base):
         # can get. This will guarantee we never return more than 20
         # results.
         max_libraries = 10
-        
+
         if not query:
             # No query, no results.
             return []
@@ -707,7 +707,7 @@ class Library(Base):
                 here = target
         else:
             here = None
-            
+
         library_query, place_query, place_type = cls.query_parts(query)
         # We start with libraries that match the name query.
         if library_query:
@@ -716,7 +716,7 @@ class Library(Base):
                     max_libraries).all()
         else:
             libraries_for_name = []
-            
+
         # We tack on any additional libraries that match a place query.
         if place_query:
             libraries_for_location = cls.search_by_location_name(
@@ -742,7 +742,7 @@ class Library(Base):
         :param production: If True, only libraries that are ready for
             production are shown.
         """
-       
+
         qu = _db.query(Library).outerjoin(Library.aliases)
         if here:
             qu = qu.outerjoin(Library.service_areas).outerjoin(ServiceArea.place)
@@ -795,7 +795,7 @@ class Library(Base):
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
         return qu
-    
+
     us_zip = re.compile("^[0-9]{5}$")
     us_zip_plus_4 = re.compile("^[0-9]{5}-[0-9]{4}$")
     running_whitespace = re.compile("\s+")
@@ -818,7 +818,7 @@ class Library(Base):
         match = cls.us_zip_plus_4.match(query)
         if match:
             return query[:5]
-    
+
     @classmethod
     def query_parts(cls, query):
         """Turn a query received by a user into a set of things to
@@ -854,7 +854,7 @@ class Library(Base):
         place_query, place_type = Place.parse_name(place_query)
 
         return library_query, place_query, place_type
-    
+
     @classmethod
     def fuzzy_match(cls, field, value):
         """Create a SQL clause that attempts a fuzzy match of the given
@@ -870,7 +870,7 @@ class Library(Base):
         long_value_is_approximate_match = (is_long & close_enough)
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)
-    
+
     def set_hyperlink(self, rel, *hrefs):
         """Make sure this library has a Hyperlink with the given `rel` that
         points to a Resource with one of the given `href`s.
@@ -917,7 +917,7 @@ class LibraryAlias(Base):
         UniqueConstraint('library_id', 'name', 'language'),
     )
 
-    
+
 class ServiceArea(Base):
     """Designates a geographic area served by a Library.
 
@@ -925,7 +925,7 @@ class ServiceArea(Base):
     Place have service from the Library.
     """
     __tablename__ = 'serviceareas'
-   
+
     id = Column(Integer, primary_key=True)
     library_id = Column(
         Integer, ForeignKey('libraries.id'), index=True
@@ -945,11 +945,11 @@ class ServiceArea(Base):
     )
     type = Column(servicearea_type_enum,
                   index=True, nullable=False, default=ELIGIBILITY)
-    
+
     __table_args__ = (
         UniqueConstraint('library_id', 'place_id', 'type'),
     )
-    
+
 
 class Place(Base):
     __tablename__ = 'places'
@@ -966,7 +966,7 @@ class Place(Base):
     POSTAL_CODE = 'postal_code'
     LIBRARY_SERVICE_AREA = 'library_service_area'
     EVERYWHERE = 'everywhere'
-    
+
     id = Column(Integer, primary_key=True)
 
     # The type of place.
@@ -983,7 +983,7 @@ class Place(Base):
     # A canonical abbreviated name for this place. Generally used only
     # for nations and states.
     abbreviated_name = Column(Unicode, index=True)
-    
+
     # The most convenient place that 'contains' this place. For most
     # places the most convenient parent will be a state. For states,
     # the best parent will be a nation. A nation has no parent; neither
@@ -997,7 +997,7 @@ class Place(Base):
         backref=backref("parent", remote_side = [id]),
         lazy="joined"
     )
-    
+
     # The geography of the place itself. It is stored internally as a
     # geometry, which means we have to cast to Geography when doing
     # calculations.
@@ -1040,7 +1040,7 @@ class Place(Base):
         if type == Place.CITY:
             larger.append(Place.COUNTY)
         return larger
-    
+
     @classmethod
     def parse_name(cls, place_name):
         """Try to extract a place type from a name.
@@ -1096,7 +1096,7 @@ class Place(Base):
            of the list.
         """
         return [x.strip() for x in reversed(name.split(",")) if x.strip()]
-    
+
     def overlaps_not_counting_border(self, qu):
         """Modifies a filter to find places that have points inside this
         Place, not counting the border.
@@ -1108,7 +1108,7 @@ class Place(Base):
         intersects = Place.geometry.intersects(self.geometry)
         touches = func.ST_Touches(Place.geometry, self.geometry)
         return qu.filter(intersects).filter(touches==False)
-    
+
     def lookup_inside(self, name):
         """Look up a named Place that geographically intersects this Place.
 
@@ -1152,7 +1152,7 @@ class Place(Base):
         # place.
         exclude_types = Place.larger_place_types(self.type)
         qu = qu.filter(~Place.type.in_(exclude_types))
-        
+
         if self.geometry is not None:
             qu = self.overlaps_not_counting_border(qu)
         places = qu.all()
@@ -1165,7 +1165,7 @@ class Place(Base):
                 )
             )
         return places[0]
-    
+
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place overlaps
         this Place, not counting the border.
@@ -1180,7 +1180,7 @@ class Place(Base):
             ServiceArea.place)
         qu = self.overlaps_not_counting_border(qu)
         return qu
-    
+
     def __repr__(self):
         if self.parent:
             parent = self.parent.external_name
@@ -1237,13 +1237,13 @@ class Audience(Base):
         PUBLIC, EDUCATIONAL_PRIMARY, EDUCATIONAL_SECONDARY, RESEARCH,
         PRINT_DISABILITY, OTHER
     ]
-    
+
     id = Column(Integer, primary_key=True)
     name = Column(Unicode, index=True, unique=True)
 
     libraries = relationship("Library", secondary='libraries_audiences',
                              back_populates="audiences")
-    
+
     @classmethod
     def lookup(cls, _db, name):
         if name not in cls.KNOWN_AUDIENCES:
@@ -1253,12 +1253,12 @@ class Audience(Base):
 
 class CollectionSummary(Base):
     """A summary of a collection held by a library.
-    
+
     We only need to know the language of the collection and
     approximately how big it is.
     """
     __tablename__ = 'collectionsummaries'
-    
+
     id = Column(Integer, primary_key=True)
     library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
     language = Column(Unicode)
@@ -1282,14 +1282,14 @@ class CollectionSummary(Base):
         # case where the library specifies its collection size but
         # doesn't mention any languages.
         language_code = LanguageCodes.string_to_alpha_3(language)
-        
+
         summary, is_new = get_one_or_create(
             _db, CollectionSummary, library=library,
             language=language_code
         )
         summary.size = size
         return summary
-    
+
 Index("ix_collectionsummary_language_size", CollectionSummary.language, CollectionSummary.size)
 
 
@@ -1511,7 +1511,7 @@ class DelegatedPatronIdentifier(Base):
     This is probably an Adobe Account ID.
     """
     ADOBE_ACCOUNT_ID = u'Adobe Account ID'
-    
+
     __tablename__ = 'delegatedpatronidentifiers'
     id = Column(Integer, primary_key=True)
     type = Column(String(255), index=True)
@@ -1524,7 +1524,7 @@ class DelegatedPatronIdentifier(Base):
     # This is the identifier we made up for the patron. This is what the
     # foreign library is trying to look up.
     delegated_identifier = Column(String)
-    
+
     __table_args__ = (
         UniqueConstraint('type', 'library_id', 'patron_identifier'),
     )
@@ -1568,7 +1568,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
     """Turn a short client token into a DelegatedPatronIdentifier.
 
     Used by the library registry. Not used by the circulation manager.
-    
+
     See util/short_client_token.py for the corresponding encoder.
     """
 
@@ -1580,11 +1580,11 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # it doesn't do much damage.
         value = "urn:uuid:0" + u[1:]
         return value
-    
+
     def __init__(self, node_value):
         super(ShortClientTokenDecoder, self).__init__()
         self.node_value = node_value
-    
+
     def decode(self, _db, token):
         """Decode a short client token.
 
@@ -1599,7 +1599,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
         username, password = token.rsplit('|', 1)
         return self.decode_two_part(_db, username, password)
-        
+
     def decode_two_part(self, _db, username, password):
         """Decode a short client token that has already been split into
         two parts.
@@ -1627,7 +1627,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 "I don't know how to handle tokens from library \"%s\"" % library_short_name
             )
         secret = library.shared_secret
-        
+
         try:
             expiration = float(expiration)
         except ValueError:
@@ -1668,7 +1668,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # Sign the token and check against the provided signature.
         key = self.signer.prepare_key(secret)
         actual_signature = self.signer.sign(token, key)
-        
+
         if actual_signature != supposed_signature:
             raise ValueError(
                 "Invalid signature for %s." % token
@@ -1681,7 +1681,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 _db, library, patron_identifier,
                 DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, self.uuid
             )
-        )        
+        )
         return delegated_patron_identifier
 
 class ExternalIntegration(Base):
@@ -1738,7 +1738,7 @@ class ExternalIntegration(Base):
     # A unique name for this ExternalIntegration. This is primarily
     # used to identify ExternalIntegrations from command-line scripts.
     name = Column(Unicode, nullable=True, unique=True)
-    
+
     # Any additional configuration information goes into
     # ConfigurationSettings.
     settings = relationship(
@@ -1793,7 +1793,7 @@ class ExternalIntegration(Base):
         setting = self.setting(key)
         setting.value = value
         return setting
-    
+
     def setting(self, key):
         """Find or create a ConfigurationSetting on this ExternalIntegration.
 
@@ -1894,7 +1894,7 @@ class ConfigurationSetting(Base):
         """Explain all site-wide ConfigurationSettings."""
         lines = []
         site_wide_settings = []
-        
+
         for setting in _db.query(ConfigurationSetting).filter(
                 ConfigurationSetting.library_id==None).filter(
                     ConfigurationSetting.external_integration==None):
@@ -1928,7 +1928,7 @@ class ConfigurationSetting(Base):
         return cls.for_library_and_externalintegration(
             _db, key, None, externalintegration
         )
-    
+
     @classmethod
     def for_library_and_externalintegration(
             cls, _db, key, library, external_integration
@@ -1956,7 +1956,7 @@ class ConfigurationSetting(Base):
     @hybrid_property
     def value(self):
         """What's the current value of this configuration setting?
-        
+
         If not present, the value may be inherited from some other
         ConfigurationSetting.
         """
@@ -1975,13 +1975,13 @@ class ConfigurationSetting(Base):
             _db = Session.object_session(self)
             return self.sitewide(_db, self.key).value
         return self._value
-    
+
     @value.setter
     def value(self, new_value):
         self._value = new_value
 
     def setdefault(self, default=None):
-        """If no value is set, set it to `default`. 
+        """If no value is set, set it to `default`.
         Then return the current value.
         """
         if self.value is None:
@@ -2015,7 +2015,7 @@ class ConfigurationSetting(Base):
         if self.value is None:
             self.value = default
         return self.value
-    
+
     MEANS_YES = set(['true', 't', 'yes', 'y'])
     @property
     def bool_value(self):
@@ -2028,7 +2028,7 @@ class ConfigurationSetting(Base):
                 return True
             return False
         return None
-        
+
     @property
     def int_value(self):
         """Turn the value into an int if possible.
@@ -2052,7 +2052,7 @@ class ConfigurationSetting(Base):
         if self.value:
             return float(self.value)
         return None
-    
+
     @property
     def json_value(self):
         """Interpret the value as JSON if possible.

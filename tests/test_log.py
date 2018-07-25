@@ -70,7 +70,7 @@ class TestLogConfiguration(DatabaseTest):
         [loggly_handler] = [x for x in handlers if isinstance(x, LogglyHandler)]
         eq_("http://example.com/a_token/", loggly_handler.url)
 
-        [stream_handler] = [x for x in handlers 
+        [stream_handler] = [x for x in handlers
                             if isinstance(x, logging.StreamHandler)]
         assert isinstance(stream_handler.formatter, UTF8Formatter)
         eq_(template, stream_handler.formatter._fmt)
@@ -92,8 +92,8 @@ class TestLogConfiguration(DatabaseTest):
         # Normally the default log level is INFO and log messages are
         # emitted in JSON format.
         eq_(
-            (cls.INFO, cls.JSON_LOG_FORMAT, cls.WARN, 
-             cls.DEFAULT_MESSAGE_TEMPLATE), 
+            (cls.INFO, cls.JSON_LOG_FORMAT, cls.WARN,
+             cls.DEFAULT_MESSAGE_TEMPLATE),
             cls._defaults(testing=False)
         )
 
@@ -101,7 +101,7 @@ class TestLogConfiguration(DatabaseTest):
         # and log messages are emitted in text format.
         eq_(
             (cls.DEBUG, cls.TEXT_LOG_FORMAT, cls.WARN,
-             cls.DEFAULT_MESSAGE_TEMPLATE), 
+             cls.DEFAULT_MESSAGE_TEMPLATE),
             cls._defaults(testing=True)
         )
 
@@ -162,7 +162,7 @@ class TestLogConfiguration(DatabaseTest):
 
         # If the URL contains no string interpolation, we assume the token's
         # already in there.
-        eq_("http://foo/othertoken/bar/", 
+        eq_("http://foo/othertoken/bar/",
             m("http://foo/othertoken/bar/", "token"))
 
         # Anything that doesn't fall under one of these cases will raise an

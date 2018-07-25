@@ -55,7 +55,9 @@ The link will expire in about a day. If the link expires, just re-register your 
         'rel_desc',
         'library',
         'library_web_url',
-        'confirmation_link'
+        'confirmation_link',
+        'to_address',
+        'from_address',
     ]
 
     @classmethod
@@ -168,6 +170,8 @@ The link will expire in about a day. If the link expires, just re-register your 
             raise ValueError("No such email template: %s" % email_type)
         template = self.templates[email_type]
         from_header = '%s <%s>' % (self.from_name, self.from_address)
+        kwargs['from_address'] = self.from_address
+        kwargs['to_address'] = to_address
         body = template.body(from_header, to_address, **kwargs)
         return self._send_email(to_address, body, smtp)
 
@@ -188,19 +192,25 @@ class EmailTemplate(object):
         self.subject_template = subject_template
         self.body_template = body_template
 
-    def body(self, from_address, to_address, **kwargs):
+    def body(self, from_header, to_header, **kwargs):
         """Generate the complete body of the email message, including headers.
 
-        :param from_address: Originating address.
-        :param to_address: Destination address.
+        :param from_header: Originating address to use in From: header.
+        :param to_header: Destination address to use in To: header.
         :param kwargs: Arguments to use when filling out the template.
         """
 
         message = email.Message.Message()
-        message['From'] = from_address
-        message['To'] = to_address
+        message['From'] = from_header
+        message['To'] = to_header
         message['Subject'] = self.subject_template % kwargs
-        kwargs['to_address'] = to_address
-        kwargs['from_address'] = from_address
+
+        # This might look ugly, because %(from_address)s in a template
+        # is expected to be an unadorned email address, whereas this
+        # might look like '"Name" <email>', but it's better than
+        # nothing.
+        for k, v in (('to_address', to_header), ('from_address', from_header)):
+            if not k in kwargs:
+                kwargs[k] = v
         message.set_payload(self.body_template % kwargs)
         return message.as_string()

@@ -45,7 +45,7 @@ class UTF8Formatter(logging.Formatter):
             data = data.encode("utf8")
         return data
 
-       
+
 class LogConfiguration(object):
     """Configures the active Python logging handlers based on logging
     configuration from the database.
@@ -82,7 +82,7 @@ class LogConfiguration(object):
         log_level, database_log_level, new_handlers = (
             cls.from_configuration(_db, testing)
         )
-    
+
         # Replace the set of handlers associated with the root logger.
         logger = logging.getLogger()
         logger.setLevel(log_level)
@@ -95,7 +95,7 @@ class LogConfiguration(object):
         # Set the loggers for various verbose libraries to the database
         # log level, which is probably higher than the normal log level.
         for logger in (
-                'sqlalchemy.engine', 'elasticsearch', 
+                'sqlalchemy.engine', 'elasticsearch',
                 'requests.packages.urllib3.connectionpool',
         ):
             logging.getLogger(logger).setLevel(database_log_level)
@@ -135,7 +135,7 @@ class LogConfiguration(object):
 
         # Establish defaults, in case the database is not initialized or
         # it is initialized but logging is not configured.
-        (internal_log_level, internal_log_format, database_log_level, 
+        (internal_log_level, internal_log_format, database_log_level,
          message_template) = cls._defaults(testing)
 
         handlers = []

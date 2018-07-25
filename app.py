@@ -52,7 +52,7 @@ def shutdown_session(exception):
         else:
             app.library_registry._db.commit()
 
-       
+
 @app.route('/')
 @returns_problem_detail
 def nearby():
@@ -106,7 +106,7 @@ def adobe_vendor_id_signin():
         return app.library_registry.adobe_vendor_id.signin_handler()
     else:
         return Response("", 404)
-    
+
 @app.route('/AdobeAuth/AccountInfo', methods=['POST'])
 @returns_problem_detail
 def adobe_vendor_id_accountinfo():

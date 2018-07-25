@@ -24,7 +24,7 @@ class TestOPDSCatalog(DatabaseTest):
         class TestAnnotator(object):
             def annotate_catalog(self, catalog_obj, live=True):
                 catalog_obj.catalog['metadata']['random'] = "Random text inserted by annotator."
-                
+
         catalog = OPDSCatalog(
             self._db, "A Catalog!", "http://url/", [l1, l2],
             TestAnnotator()
@@ -37,13 +37,13 @@ class TestOPDSCatalog(DatabaseTest):
         [self_link] = parsed['links']
         eq_("http://url/", self_link['href'])
         eq_("self", self_link['rel'])
-        
+
         # The annotator modified the catalog in passing.
         eq_("Random text inserted by annotator.", parsed['metadata']['random'])
-        
+
         # Each library became a catalog in the catalogs collection.
         eq_([l1.name, l2.name], [x['metadata']['title'] for x in parsed['catalogs']])
-        
+
     def test_library_catalog(self):
 
         class Mock(OPDSCatalog):
@@ -74,7 +74,7 @@ class TestOPDSCatalog(DatabaseTest):
             Hyperlink.HELP_REL,
             "mailto:help@library.org"
         )
-        
+
         catalog = Mock.library_catalog(library)
         metadata = catalog['metadata']
         eq_(library.name, metadata['title'])
