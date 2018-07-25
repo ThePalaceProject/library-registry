@@ -78,7 +78,7 @@ class OPDSCatalog(object):
         normally wouldn't be.
         """
         metadata = dict(
-            id=library.urn_uri,
+            id=library.internal_urn,
             title=library.name,
             updated=cls._strftime(library.timestamp),
         )

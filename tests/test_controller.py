@@ -164,21 +164,24 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
     def test_nearby_qa(self):
-        # The library we used in the previous test has stage=LIVE.
-        # If we switch to looking for libraries with stage=APPROVED,
-        # we won't find anything.
+        # The libraries we used in the previous test are in production.
+        # If we move them from production to TESTING, we won't find anything.
+        for library in self._db.query(Library):
+            library.registry_stage = Library.TESTING_STAGE
         with self.app.test_request_context("/"):
-            response = self.controller.nearby("65.88.88.124", live=False)
+            response = self.controller.nearby("65.88.88.124", live=True)
             catalogs = json.loads(response.data)
             eq_([], catalogs['catalogs'])
 
-        # If we move the LIVE library to APPROVED, it shows up in
-        # the feed.
-        self.connecticut_state_library.stage = Library.APPROVED
+        # However, they will show up in the QA feed.
         with self.app.test_request_context("/"):
             response = self.controller.nearby("65.88.88.124", live=False)
             catalogs = json.loads(response.data)
-            [catalog] = catalogs['catalogs']
+            eq_(2, len(catalogs['catalogs']))
+            [catalog] = [
+                x for x in catalogs['catalogs']
+                if x['metadata']['id'] == self.nypl.internal_urn
+            ]
             assert("", catalog['metadata']['title'])
 
             # Some of the links are the same as in the production feed;
@@ -287,19 +290,23 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_search_qa(self):
         # As we saw in the previous test, this search picks up two
-        # libraries when we run it looking for LIVE libraries. But
-        # since we're only searching for libraries in the APPROVED
-        # stage, we don't find anything.
+        # libraries when we run it looking for production libraries. If
+        # all of the libraries are cancelled, we don't find anything.
+        for l in self._db.query(Library):
+            eq_(l.registry_stage, Library.PRODUCTION_STAGE)
+
+        for l in self._db.query(Library):
+            l.registry_stage = Library.CANCELLED_STAGE
         with self.app.test_request_context("/?q=manhattan"):
-            response = self.controller.search("65.88.88.124", live=False)
+            response = self.controller.search("65.88.88.124", live=True)
             catalog = json.loads(response.data)
             eq_([], catalog['catalogs'])
 
-        # If we move one of the libraries back into the APPROVED
+        # If we move one of the libraries back into the PRODUCTION
         # stage, we find it.
-        self.kansas_state_library.stage = Library.APPROVED
+        self.kansas_state_library.registry_stage = Library.PRODUCTION_STAGE
         with self.app.test_request_context("/?q=manhattan"):
-            response = self.controller.search("65.88.88.124", live=False)
+            response = self.controller.search("65.88.88.124", live=True)
             catalog = json.loads(response.data)
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])
@@ -720,7 +727,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Description", library.description)
             eq_("http://circmanager.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
-            eq_(Library.REGISTERED, library.stage)
+
+            # The client didn't specify a stage, so the server acted
+            # like the client asked to be put into production.
+            eq_(Library.PRODUCTION_STAGE, library.library_stage)
 
             eq_(True, library.anonymous_access)
             eq_(True, library.online_registration)
@@ -793,10 +803,6 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(Validation.IN_PROGRESS,
             link['properties'][Validation.STATUS_PROPERTY])
 
-        # Now, a human inspects the library, verifies that everything
-        # works, and makes it LIVE.
-        library.stage = Library.LIVE
-
         # Later, the library's information changes.
         auth_document = {
             "id": auth_url,
@@ -820,10 +826,14 @@ class TestLibraryRegistryController(ControllerTest):
 
         # So the library re-registers itself, and gets an updated
         # registry entry.
+        #
+        # This time, the library explicitly specifies which stage it
+        # wants to be in.
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", auth_url),
                 ("contact", "mailto:me@library.org"),
+                ("stage", Library.TESTING_STAGE)
             ])
 
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -843,9 +853,9 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("New and improved", library.description)
             eq_(None, library.web_url)
             eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
-            # The library's stage is still LIVE, it has not gone back to
-            # REGISTERED.
-            eq_(Library.LIVE, library.stage)
+            # The library's library_stage has been updated to reflect
+            # the 'stage' method passed in from the client.
+            eq_(Library.TESTING_STAGE, library.library_stage)
 
             # There are still three Hyperlinks associated with the
             # library.

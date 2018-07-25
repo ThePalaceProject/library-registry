@@ -79,7 +79,7 @@ class TestAddLibraryScript(DatabaseTest):
     def test_run(self):
         nyc = self.new_york_city
         args = ['--name=The New York Public Library',
-                '--urn=1236662b-66cf-3068-af58-95385f299b4f',
+                '--authentication-url=https://circulation.librarysimplified.org/NYNYPL/authentication_document',
                 '--place=' + nyc.external_id,
                 '--alias=NYPL',
                 '--web=https://nypl.org/',
@@ -95,7 +95,8 @@ class TestAddLibraryScript(DatabaseTest):
         [library] = self._db.query(Library).all()
 
         eq_(u"The New York Public Library", library.name)
-        eq_(u"1236662b-66cf-3068-af58-95385f299b4f", library.urn)
+        assert library.internal_urn.startswith("urn:uuid")
+        eq_(u"https://circulation.librarysimplified.org/NYNYPL/authentication_document", library.authentication_url)
         eq_(u"https://nypl.org/", library.web_url)
         eq_(u"https://circulation.librarysimplified.org/", library.opds_url)
         eq_(u"Serving the five boroughs of New York, NY.", library.description)

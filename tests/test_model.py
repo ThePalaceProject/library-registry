@@ -261,13 +261,6 @@ class TestLibrary(DatabaseTest):
         self._db.commit()
         assert nypl.timestamp > first_modified
 
-    def test_urn_uri(self):
-        nypl = self._library("New York Public Library")
-        nypl.urn = 'foo'
-        eq_("urn:foo", nypl.urn_uri)
-        nypl.urn = 'urn:bar'
-        eq_('urn:bar', nypl.urn_uri)
-
     def test_short_name(self):
         lib = self._library("A Library")
         lib.short_name = 'abcd'
@@ -278,6 +271,80 @@ class TestLibrary(DatabaseTest):
         except ValueError, e:
             eq_('Short name cannot contain the pipe character.',
                 e.message)
+
+    def test_set_library_stage(self):
+        lib = self._library()
+
+        # We can't change library_stage because only the registry can
+        # take a library from production to non-production.
+        def crash():
+            lib.library_stage = Library.TESTING_STAGE
+        assert_raises_regexp(
+            ValueError, "This library is already in production", crash
+        )
+
+        # Have the registry take the library out of production.
+        lib.registry_stage = Library.CANCELLED_STAGE
+        eq_(False, lib.in_production)
+
+        # Now we can change the library stage however we want.
+        lib.library_stage = Library.TESTING_STAGE
+        lib.library_stage = Library.CANCELLED_STAGE
+        lib.library_stage = Library.PRODUCTION_STAGE
+
+    def test_in_production(self):
+        lib = self._library()
+
+        # The testing code creates a library that starts out in
+        # production.
+        eq_(Library.PRODUCTION_STAGE, lib.library_stage)
+        eq_(Library.PRODUCTION_STAGE, lib.registry_stage)
+        eq_(True, lib.in_production)
+
+        # If either library_stage or registry stage is not
+        # PRODUCTION_STAGE, we are not in production.
+        lib.registry_stage = Library.CANCELLED_STAGE
+        eq_(False, lib.in_production)
+
+        lib.library_stage = Library.CANCELLED_STAGE
+        eq_(False, lib.in_production)
+
+        lib.registry_stage = Library.PRODUCTION_STAGE
+        eq_(False, lib.in_production)
+
+    def test__feed_restriction(self):
+        """Test the _feed_restriction helper method."""
+
+        def feed(production=True):
+            """Find only libraries that belong in a certain feed."""
+            qu = self._db.query(Library)
+            qu = qu.filter(Library._feed_restriction(production))
+            return qu.all()
+
+        # This library starts out in production.
+        library = self._library()
+
+        # It shows up in both the production and testing feeds.
+        for production in (True, False):
+            eq_([library], feed(production))
+
+        # Now one party thinks the library is in the testing stage.
+        library.registry_stage = Library.TESTING_STAGE
+
+        # It shows up in the testing feed but not the production feed.
+        eq_([], feed(True))
+        eq_([library], feed(False))
+
+        library.library_stage = Library.TESTING_STAGE
+        library.registry_stage = Library.PRODUCTION_STAGE
+        eq_([], feed(True))
+        eq_([library], feed(False))
+
+        # Now on party thinks the library is in the cancelled stage,
+        # and it will not show up in eithre feed.
+        library.library_stage = Library.CANCELLED_STAGE
+        for production in (True, False):
+            eq_([], feed(production))
 
     def test_set_hyperlink(self):
         library = self._library()
@@ -654,13 +721,19 @@ class TestLibrary(DatabaseTest):
         # libraries near that point in Pennsylvania.
         eq_([], Library.nearby(self._db, (40, -75.8), 100).all())
 
-        # By default, nearby() only finds libraries with the LIVE
-        # status. If we look for libraries with the APPROVED status,
-        # we find nothing.
-        eq_([],
-            Library.nearby(self._db, (41.3, -73.3),
-                           allowed_stages=[Library.APPROVED]).all()
-        )
+        # By default, nearby() only finds libraries that are in production.
+        def m(production):
+            return Library.nearby(
+                self._db, (41.3, -73.3), production=production
+            ).count()
+        # Take all the libraries we found earlier out of production.
+        for l in ct_state, nypl:
+            l.registry_stage = Library.TESTING_STAGE
+        # Now there are no results.
+        eq_(0, m(True))
+
+        # But we can run a search that includes libraries in the TESTING stage.
+        eq_(2, m(False))
 
     def test_query_cleanup(self):
         m = Library.query_cleanup
@@ -747,12 +820,13 @@ class TestLibrary(DatabaseTest):
         )
 
         # By default, search_by_library_name() only finds libraries
-        # with the LIVE status. If we look for libraries with the
-        # APPROVED status, we find nothing.
-        eq_([],
-            search("bpl", allowed_stages=[Library.APPROVED])
-        )
+        # in production. Put them in the TESTING stage and they disappear.
+        for l in (brooklyn, boston):
+            l.registry_stage = Library.TESTING_STAGE
+        eq_([], search("bpl", production=True))
 
+        # But you can find them by passing in production=False.
+        eq_(2, len(search("bpl", production=False)))
 
     def test_search_by_location(self):
         # We know about three libraries.
@@ -808,14 +882,19 @@ class TestLibrary(DatabaseTest):
         )
         eq_(nypl, brooklyn_results[0])
 
-        # By default, search_by_location_name() only finds libraries
-        # with the LIVE status. If we look for libraries with the
-        # APPROVED status, we find nothing.
+        nypl.registry_stage = Library.TESTING_STAGE
         eq_([],
             Library.search_by_location_name(
                 self._db, "brooklyn", here=GeometryUtility.point(43, -70),
-                allowed_stages=[Library.APPROVED]
+                production=True
             ).all()
+        )
+
+        eq_(1,
+            Library.search_by_location_name(
+                self._db, "brooklyn", here=GeometryUtility.point(43, -70),
+                production=False
+            ).count()
         )
 
     def test_search(self):
@@ -851,15 +930,20 @@ class TestLibrary(DatabaseTest):
         libraries = Library.search(self._db, (40.7, -73.9), "Kansas")
         eq_(['Now Work'], [x[0].name for x in libraries])
 
-        # By default, search() only finds libraries with the LIVE
-        # status. If we look for libraries with the APPROVED status,
-        # we find nothing.
-        eq_([],
-            Library.search(
-                self._db, (40.7, -73.9), "New York",
-                allowed_stages=[Library.APPROVED]
+        # By default, search() only finds libraries in production.
+        self.nypl.registry_stage = Library.TESTING_STAGE
+        new_work.registry_stage = Library.TESTING_STAGE
+        def m(production):
+            return len(
+                Library.search(
+                    self._db, (40.7, -73.9), "New York", production
+                )
             )
-        )
+        eq_(0, m(True))
+
+        # But you can find libraries that are in the testing stage
+        # by passing in production=False.
+        eq_(2, m(False))
 
     def test_search_excludes_duplicates(self):
         # Here's a library that serves a place called Kansas

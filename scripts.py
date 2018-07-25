@@ -166,8 +166,8 @@ class AddLibraryScript(Script):
             '--name', help='Official name of the library', required=True
         )
         parser.add_argument(
-            '--urn',
-            help="URN used in the library's Authentication for OPDS document.",
+            '--authentication-url',
+            help="URL to the library's Authentication for OPDS document.",
             required=True
         )
         parser.add_argument(
@@ -195,7 +195,7 @@ class AddLibraryScript(Script):
     def run(self, cmd_args=None):
         parsed = self.parse_command_line(self._db, cmd_args)
         name = parsed.name
-        urn = parsed.urn
+        authentication_url = parsed.authentication_url
         opds = parsed.opds
         web = parsed.web
         description = parsed.description
@@ -203,8 +203,9 @@ class AddLibraryScript(Script):
         places = parsed.place
         short_name = parsed.short_name
         shared_secret = parsed.shared_secret
-
-        library, is_new = get_one_or_create(self._db, Library, urn=urn)
+        library, is_new = get_one_or_create(
+            self._db, Library, authentication_url=authentication_url
+        )
         if name:
             library.name = name
         if opds:

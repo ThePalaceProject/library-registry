@@ -141,20 +141,9 @@ class LibraryRegistryController(object):
             return None
         return GeometryUtility.point_from_ip(ip_address)
 
-    def stages(self, show_live):
-        """Turn a boolean flag into an appropriate list of library stages.
-
-        The list can be passed into one of the Library query methods.
-        """
-        if show_live:
-            return [Library.LIVE]
-        else:
-            return [Library.APPROVED]
-
     def nearby(self, ip_address, live=True):
         point = self.point_from_ip(ip_address)
-        qu = Library.nearby(self._db, point,
-                            allowed_stages=self.stages(live))
+        qu = Library.nearby(self._db, point, production=live)
         qu = qu.limit(5)
         if live:
             nearby_controller = 'nearby'
@@ -177,7 +166,7 @@ class LibraryRegistryController(object):
         if query:
             # Run the query and send the results.
             results = Library.search(
-                self._db, point, query, allowed_stages=self.stages(live)
+                self._db, point, query, production=live
             )
 
             this_url = this_url = self.app.url_for(
@@ -291,6 +280,13 @@ class LibraryRegistryController(object):
 
         integration_contact_uri = flask.request.form.get("contact")
         integration_contact_email = integration_contact_uri
+
+        # If 'stage' is not provided, it means the client doesn't make the
+        # testing/production distinction. We have to assume they want
+        # production -- otherwise they wouldn't bother registering.
+        library_stage = flask.request.form.get(
+            "stage", Library.PRODUCTION_STAGE
+        )
 
         # NOTE: This is commented out until we can say that
         # registration requires providing a contact email and expect
@@ -433,8 +429,11 @@ class LibraryRegistryController(object):
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url,
-            create_method_kwargs=dict(stage=Library.REGISTERED)
         )
+        try:
+            library.library_stage = library_stage
+        except ValueError, e:
+            return LIBRARY_ALREADY_IN_PRODUCTION
         library.name = auth_document.title
         if auth_document.website:
             url = auth_document.website.get("href")

@@ -111,15 +111,24 @@ class DatabaseTest(object):
         return unicode(self._id)
 
     @property
+    def _url(self):
+        return "https://%s/" % self._str
+
+    @property
     def _time(self):
         v = self.time_counter
         self.time_counter = self.time_counter + timedelta(days=1)
         return v
 
-    def _library(self, name=None, eligibility_areas=[], focus_areas=[], audiences=None, stage=Library.LIVE):
+    def _library(self, name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE):
         name = name or self._str
-        library, ignore = get_one_or_create(self._db, Library, name=name)
-        library.urn = self._str
+        library, ignore = get_one_or_create(
+            self._db, Library, name=name,
+            create_method_kwargs=dict(
+                authentication_url=self._url,
+                opds_url=self._url
+            )
+        )
         library.short_name = self._str
         library.shared_secret = self._str
         for place in eligibility_areas:
@@ -130,7 +139,8 @@ class DatabaseTest(object):
                               place=place, type=ServiceArea.FOCUS)
         audiences = audiences or [Audience.PUBLIC]
         library.audiences = [Audience.lookup(self._db, audience) for audience in audiences]
-        library.stage = stage
+        library.library_stage = library_stage
+        library.registry_stage = registry_stage
         return library
 
     def _external_integration(self, protocol, goal=None, settings=None,
