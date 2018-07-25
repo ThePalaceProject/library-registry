@@ -40,3 +40,9 @@ INVALID_CONTACT_URI = pd(
     400,
     title=_("URI was not specified or is of the wrong type")
 )
+
+LIBRARY_ALREADY_IN_PRODUCTION = pd(
+    "http://librarysimplified.org/terms/problem/invalid-stage",
+    400,
+    title=_("Library cannot be taken out of production once in production.")
+)

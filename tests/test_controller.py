@@ -226,7 +226,6 @@ class TestLibraryRegistryController(ControllerTest):
             # We found no nearby libraries, because we were too far away
             # from them.
             eq_([], catalog['catalogs'])
-            
     def test_search_form(self):
         with self.app.test_request_context("/"):
             response = self.controller.search()
@@ -252,7 +251,7 @@ class TestLibraryRegistryController(ControllerTest):
             expect_url = self.library_registry.url_for("search_qa")
             expect_url_tag = '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
             assert expect_url_tag in response.data
-            
+
     def test_search(self):
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124")
@@ -293,15 +292,18 @@ class TestLibraryRegistryController(ControllerTest):
         # libraries when we run it looking for production libraries. If
         # all of the libraries are cancelled, we don't find anything.
         for l in self._db.query(Library):
+            eq_(l.registry_stage, Library.PRODUCTION_STAGE)
+
+        for l in self._db.query(Library):
             l.registry_stage = Library.CANCELLED_STAGE
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124", live=True)
             catalog = json.loads(response.data)
             eq_([], catalog['catalogs'])
 
-        # If we move one of the libraries back into the APPROVED
+        # If we move one of the libraries back into the PRODUCTION
         # stage, we find it.
-        self.kansas_state_library.registry_stage = Library.TESTING_STAGE
+        self.kansas_state_library.registry_stage = Library.PRODUCTION_STAGE
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search("65.88.88.124", live=True)
             catalog = json.loads(response.data)
@@ -426,7 +428,7 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INTEGRATION_DOCUMENT_NOT_FOUND.uri, response.uri)
             eq_('No Authentication For OPDS document present at http://circmanager.org/authentication.opds', response.detail)
-        
+
     def test_register_fails_on_non_authentication_document(self):
         """The request succeeds but returns something other than
         an authentication document.
@@ -692,7 +694,7 @@ class TestLibraryRegistryController(ControllerTest):
                 dict(rel=rel, href="http://not-an-email/")
             )
             _request_fails()
-        
+
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
 
@@ -724,7 +726,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Description", library.description)
             eq_("http://circmanager.org", library.web_url)
             eq_("data:image/png;imagedata", library.logo)
-            eq_(Library.TESTING_STAGE, library.library_stage)
+
+            # The client didn't specify a stage, so the server acted
+            # like the client asked to be put into production.
+            eq_(Library.PRODUCTION_STAGE, library.library_stage)
 
             eq_(True, library.anonymous_access)
             eq_(True, library.online_registration)
@@ -797,10 +802,6 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(Validation.IN_PROGRESS,
             link['properties'][Validation.STATUS_PROPERTY])
 
-        # Now, a human inspects the library, verifies that everything
-        # works, and says it's ready for production.
-        library.registry_stage = Library.PRODUCTION_STAGE
-
         # Later, the library's information changes.
         auth_document = {
             "id": auth_url,
@@ -824,11 +825,14 @@ class TestLibraryRegistryController(ControllerTest):
 
         # So the library re-registers itself, and gets an updated
         # registry entry.
+        #
+        # This time, the library explicitly specifies which stage it
+        # wants to be in.
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", auth_url),
                 ("contact", "mailto:me@library.org"),
-                ("stage", Library.PRODUCTION_STAGE)
+                ("stage", Library.TESTING_STAGE)
             ])
 
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -849,8 +853,8 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(None, library.web_url)
             eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
             # The library's library_stage has been updated to reflect
-            # the fact that the library thinks it should be live.
-            eq_(Library.PRODUCTION_STAGE, library.library_stage)
+            # the 'stage' method passed in from the client.
+            eq_(Library.TESTING_STAGE, library.library_stage)
 
             # There are still three Hyperlinks associated with the
             # library.

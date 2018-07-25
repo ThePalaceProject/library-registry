@@ -37,6 +37,9 @@ from sqlalchemy.exc import (
 from sqlalchemy.ext.declarative import (
     declarative_base
 )
+from sqlalchemy.ext.hybrid import (
+    hybrid_property,
+)
 from sqlalchemy.orm import (
     aliased,
     backref,
@@ -234,7 +237,7 @@ class Library(Base):
     # any given time, this URL is unique, but it may change over time
     # as libraries move to different servers.
     authentication_url = Column(Unicode, index=True, unique=True)
-    
+
     # The URL to the library's OPDS server root.
     opds_url = Column(Unicode)
 
@@ -256,7 +259,7 @@ class Library(Base):
     # Library.registry_stage (the registry's opinion).
     #
     # If either value is CANCELLED_STAGE, the library is in
-    # CANCELLED_STAGE.    
+    # CANCELLED_STAGE.
     #
     # Otherwise, if either value is TESTING_STAGE, the library is in
     # TESTING_STAGE.
@@ -270,8 +273,9 @@ class Library(Base):
     )
 
     # The library's opinion about which stage a library should be in.
-    library_stage = Column(
-        stage_enum, index=True, nullable=False, default=TESTING_STAGE
+    _library_stage = Column(
+        stage_enum, index=True, nullable=False, default=TESTING_STAGE,
+        name="library_stage"
     )
 
     # The registry's opinion about which stage a library should be in.
@@ -340,6 +344,30 @@ class Library(Base):
                 'Short name cannot contain the pipe character.'
             )
         return value.upper()
+
+    @hybrid_property
+    def library_stage(self):
+        return self._library_stage
+
+    @library_stage.setter
+    def library_stage(self, value):
+        """A library can't unilaterally go from being in production to
+        not being in production.
+        """
+        if self.in_production and value != self.PRODUCTION_STAGE:
+            raise ValueError(
+                "This library is already in production; only the registry can take it out of production."
+            )
+        self._library_stage = value
+
+    @property
+    def in_production(self):
+        """Is this library in production?
+
+        If both the library and the registry think it should be, it is.
+        """
+        prod = self.PRODUCTION_STAGE
+        return self.library_stage == prod and self.registry_stage == prod
 
     @classmethod
     def _feed_restriction(cls, production, library_field=None, registry_field=None):
@@ -609,7 +637,7 @@ class Library(Base):
         :return: A database query that returns lists of 2-tuples
         (library, distance from starting point). Distances are
         measured in meters.
-        """        
+        """
         # We start with a single point on the globe. Call this Point
         # A.
         if isinstance(target, tuple):

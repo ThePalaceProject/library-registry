@@ -281,6 +281,13 @@ class LibraryRegistryController(object):
         integration_contact_uri = flask.request.form.get("contact")
         integration_contact_email = integration_contact_uri
 
+        # If 'stage' is not provided, it means the client doesn't make the
+        # testing/production distinction. We have to assume they want
+        # production -- otherwise they wouldn't bother registering.
+        library_stage = flask.request.form.get(
+            "stage", Library.PRODUCTION_STAGE
+        )
+
         # NOTE: This is commented out until we can say that
         # registration requires providing a contact email and expect
         # every new library to be on a circulation manager that can meet
@@ -419,12 +426,14 @@ class LibraryRegistryController(object):
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
-        # TODO: take library_stage from input.
         library, is_new = get_one_or_create(
             self._db, Library,
             opds_url=opds_url,
-            create_method_kwargs=dict(library_stage=Library.TESTING_STAGE)
         )
+        try:
+            library.library_stage = library_stage
+        except ValueError, e:
+            return LIBRARY_ALREADY_IN_PRODUCTION
         library.name = auth_document.title
         if auth_document.website:
             url = auth_document.website.get("href")

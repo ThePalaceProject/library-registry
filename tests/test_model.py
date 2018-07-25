@@ -272,6 +272,80 @@ class TestLibrary(DatabaseTest):
             eq_('Short name cannot contain the pipe character.',
                 e.message)
 
+    def test_set_library_stage(self):
+        lib = self._library()
+
+        # We can't change library_stage because only the registry can
+        # take a library from production to non-production.
+        def crash():
+            lib.library_stage = Library.TESTING_STAGE
+        assert_raises_regexp(
+            ValueError, "This library is already in production", crash
+        )
+
+        # Have the registry take the library out of production.
+        lib.registry_stage = Library.CANCELLED_STAGE
+        eq_(False, lib.in_production)
+
+        # Now we can change the library stage however we want.
+        lib.library_stage = Library.TESTING_STAGE
+        lib.library_stage = Library.CANCELLED_STAGE
+        lib.library_stage = Library.PRODUCTION_STAGE
+
+    def test_in_production(self):
+        lib = self._library()
+
+        # The testing code creates a library that starts out in
+        # production.
+        eq_(Library.PRODUCTION_STAGE, lib.library_stage)
+        eq_(Library.PRODUCTION_STAGE, lib.registry_stage)
+        eq_(True, lib.in_production)
+
+        # If either library_stage or registry stage is not
+        # PRODUCTION_STAGE, we are not in production.
+        lib.registry_stage = Library.CANCELLED_STAGE
+        eq_(False, lib.in_production)
+
+        lib.library_stage = Library.CANCELLED_STAGE
+        eq_(False, lib.in_production)
+
+        lib.registry_stage = Library.PRODUCTION_STAGE
+        eq_(False, lib.in_production)
+
+    def test__feed_restriction(self):
+        """Test the _feed_restriction helper method."""
+
+        def feed(production=True):
+            """Find only libraries that belong in a certain feed."""
+            qu = self._db.query(Library)
+            qu = qu.filter(Library._feed_restriction(production))
+            return qu.all()
+
+        # This library starts out in production.
+        library = self._library()
+
+        # It shows up in both the production and testing feeds.
+        for production in (True, False):
+            eq_([library], feed(production))
+
+        # Now one party thinks the library is in the testing stage.
+        library.registry_stage = Library.TESTING_STAGE
+
+        # It shows up in the testing feed but not the production feed.
+        eq_([], feed(True))
+        eq_([library], feed(False))
+
+        library.library_stage = Library.TESTING_STAGE
+        library.registry_stage = Library.PRODUCTION_STAGE
+        eq_([], feed(True))
+        eq_([library], feed(False))
+
+        # Now on party thinks the library is in the cancelled stage,
+        # and it will not show up in eithre feed.
+        library.library_stage = Library.CANCELLED_STAGE
+        for production in (True, False):
+            eq_([], feed(production))
+
     def test_set_hyperlink(self):
         library = self._library()
 
@@ -869,7 +943,8 @@ class TestLibrary(DatabaseTest):
             )
         eq_(0, m(True))
 
-        # But you can find libraries that are in the TESTING stage.
+        # But you can find libraries that are in the testing stage
+        # by passing in production=False.
         eq_(2, m(False))
 
     def test_search_excludes_duplicates(self):
