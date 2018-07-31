@@ -244,21 +244,6 @@ class AdobeVendorIDModel(object):
 
         if delegated_patron_identifier:
             return self.account_id_and_label(delegated_patron_identifier)
-        else:
-            # An authdata is opaque, so we can ask some other server
-            # to turn it into an account_id and label, but we we can't
-            # assume it's a short client token create a
-            # DelegatedPatronIdentifier for it. We don't know which
-            # library or which patron it's for.
-            for delegate in self.short_client_token_decoder.delegates:
-                try:
-                    account_id, label, content = delegate.sign_in_authdata(
-                        authdata
-                    )
-                    return account_id, label
-                except Exception, e:
-                    # This delegate couldn't help us.
-                    pass
 
         # We couldn't find anything.
         return None, None

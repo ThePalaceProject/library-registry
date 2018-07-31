@@ -1642,6 +1642,9 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             except Exception, e:
                 # This delegate couldn't help us.
                 pass
+            if account_id:
+                # We got it -- no need to keep checking delegates.
+                break
 
         if not account_id:
             # The delegates couldn't help us; let's try to do it

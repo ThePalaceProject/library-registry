@@ -327,7 +327,8 @@ class TestVendorIDModel(VendorIDTest):
         eq_([], delegate1.queue)
         eq_([], delegate2.queue)
 
-        # Now test authentication by authdata.
+        # Now test authentication by treating the Short Client Token
+        # as authdata.
 
         # Delegate 1 can verify the authdata
         delegate1.enqueue(("userid", "label", "content"))
@@ -335,8 +336,9 @@ class TestVendorIDModel(VendorIDTest):
         # Delegate 2 is broken.
         delegate2.enqueue(VendorIDServerException("blah"))
 
-        result = model.authdata_lookup("some authdata")
-        eq_(("userid", "label"), result)
+        authdata = username + "|password"
+        result = model.authdata_lookup(authdata)
+        eq_(("userid", "Delegated account ID userid"), result)
 
         # We didn't even get to delegate 2.
         eq_(1, len(delegate2.queue))
@@ -344,7 +346,7 @@ class TestVendorIDModel(VendorIDTest):
         # If we try it again, we'll get an error from delegate 1,
         # since nothing is queued up, and then a queued error from
         # delegate 2.
-        result = model.authdata_lookup("some authdata")
+        result = model.authdata_lookup(authdata)
         eq_((None, None), result)
         eq_([], delegate2.queue)
 
