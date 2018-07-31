@@ -225,6 +225,16 @@ class AdobeVendorIDModel(object):
             delegated_patron_identifier = None
         if delegated_patron_identifier:
             return self.account_id_and_label(delegated_patron_identifier)
+        else:
+            for delegate in self.short_client_token_decoder.delegates:
+                try:
+                    account_id, label, content = delegate.sign_in_standard(
+                        username, password
+                    )
+                    return account_id, label
+                except Exception, e:
+                    # This delegate couldn't help us.
+                    pass
 
         # Neither this server nor the delegates were able to do anything.
         return None, None
@@ -244,7 +254,18 @@ class AdobeVendorIDModel(object):
 
         if delegated_patron_identifier:
             return self.account_id_and_label(delegated_patron_identifier)
+        else:
+            for delegate in self.short_client_token_decoder.delegates:
+                try:
+                    account_id, label, content = delegate.sign_in_authdata(
+                        authdata
+                    )
+                    return account_id, label
+                except Exception, e:
+                    # This delegate couldn't help us.
+                    pass
 
+        # Neither this server nor the delegates were able to do anything.
         # We couldn't find anything.
         return None, None
 

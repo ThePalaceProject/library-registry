@@ -1624,7 +1624,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         """
         library = patron_identifier = account_id = None
 
-        # No matter how we do this, if we're going to create 
+        # No matter how we do this, if we're going to create
         # a DelegatedPatronIdentifier, we need to extract the Library
         # and the library's identifier for this patron from the 'username'
         # part of the token.

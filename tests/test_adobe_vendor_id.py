@@ -300,8 +300,8 @@ class TestVendorIDModel(VendorIDTest):
         eq_(None, None, (self.model.authdata_lookup, bad_signature))
 
 
-    def test_delegation(self):
-        """A model that doesn't know how to authenticate something can
+    def test_delegation_standard_lookup(self):
+        """A model that doesn't know how to handle a login request can
         delegate to another Vendor ID server.
         """
         delegate1 = MockAdobeVendorIDClient()
@@ -336,27 +336,48 @@ class TestVendorIDModel(VendorIDTest):
         eq_("adobe_id", delegated.delegated_identifier)
         eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, delegated.type)
 
-        # Now test authentication by treating the Short Client Token
-        # as authdata.
+        # Now test with a username/password that's not a Short Client Token
+        # at all.
+        delegate1.enqueue(("adobe_id_2", "label_2", "content"))
+        result = model.standard_lookup(
+            dict(username="not a short client token", password="some password")
+        )
+
+        # delegate1 provided the answer, and we used it as is.
+        eq_(("adobe_id_2", "label_2"), result)
+
+        # We did not create a local DelegatedPatronIdentifier, because
+        # we don't know which Library the patron should be associated
+        # with.
+        eq_([delegated], self.library.delegated_patron_identifiers)
+
+    def test_delegation_authdata_lookup(self):
+        """Test the ability to delegate an authdata login request
+        to another server.
+        """
+        delegate1 = MockAdobeVendorIDClient()
+        delegate2 = MockAdobeVendorIDClient()
+        delegates = [delegate1, delegate2]
+        model = AdobeVendorIDModel(self._db, self.NODE_VALUE, delegates)
+
+        # First, test an authdata that is a Short Client Token.
 
         # Delegate 1 can verify the authdata
-        delegate1.enqueue(("adobe_id_2", "label", "content"))
+        delegate1.enqueue(("adobe_id", "label", "content"))
 
         # Delegate 2 is broken.
         delegate2.enqueue(VendorIDServerException("blah"))
 
-        authdata = self.library.short_name + "|1234|anotheruser|password"
+        authdata = self.library.short_name + "|1234|authdatauser|password"
         result = model.authdata_lookup(authdata)
-        eq_(("adobe_id_2", "Delegated account ID adobe_id_2"), result)
+        eq_(("adobe_id", "Delegated account ID adobe_id"), result)
 
         # We didn't even get to delegate 2.
         eq_(1, len(delegate2.queue))
 
-        [delegated] = [
-            x for x in self.library.delegated_patron_identifiers
-            if x.patron_identifier == 'anotheruser'
-        ]
-        eq_("adobe_id_2", delegated.delegated_identifier)
+        [delegated] = self.library.delegated_patron_identifiers
+        eq_("authdatauser", delegated.patron_identifier)
+        eq_("adobe_id", delegated.delegated_identifier)
         eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, delegated.type)
 
         # If we try it again, we'll get an error from delegate 1,
@@ -368,3 +389,25 @@ class TestVendorIDModel(VendorIDTest):
         eq_((None, None), result)
         eq_([], delegate2.queue)
 
+        # Finally, test authentication by treating some random data
+        # as authdata.
+
+        # Delegate 1 can verify the authdata
+        delegate1.enqueue(("adobe_id_3", "label", "content"))
+
+        # Delegate 2 is broken.
+        delegate2.enqueue(VendorIDServerException("blah"))
+
+        # This authdata is not a Short Client Token. We will ask the
+        # delegates to authenticate it, and when one succeeds we will
+        # pass on the answer exactly as is. We can't create a
+        # DelegatedPatronIdentifier, because we don't know which
+        # library originated the authdata or what the library's patron
+        # identifier is.
+        result = model.authdata_lookup("Some random authdata")
+        eq_(("adobe_id_3", "label"), result)
+
+        eq_([delegated], self.library.delegated_patron_identifiers)
+
+        # We didn't get to delegate 2, because delegate 1 had the answer.
+        eq_(1, len(delegate2.queue))
