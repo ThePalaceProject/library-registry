@@ -1534,7 +1534,7 @@ class DelegatedPatronIdentifier(Base):
     @classmethod
     def get_one_or_create(
             cls, _db, library, patron_identifier, identifier_type,
-            create_function
+            identifier_or_identifier_factory
     ):
         """Look up the delegated identifier for the given patron. If there is
         none, create one.
@@ -1550,26 +1550,30 @@ class DelegatedPatronIdentifier(Base):
         :param identifier_type: The type of the delegated identifier
          to look up. (probably ADOBE_ACCOUNT_ID)
 
-        :param create_function: If this patron does not have a
-         DelegatedPatronIdentifier, one will be created, and the given
-         function will be called to determine the value of
-         DelegatedPatronIdentifier.delegated_identifier.
+        :param identifier_or_identifier_factory: If this patron does
+         not have a DelegatedPatronIdentifier, one will be created,
+         and this object will be used to set its
+         .delegated_identifier. If a string is passed in,
+         .delegated_identifier will be that string. If a function is
+         passed in, .delegated_identifier will be set to the return
+         value of the function call.
 
         :return: A 2-tuple (DelegatedPatronIdentifier, is_new)
+
         """
         identifier, is_new = get_one_or_create(
             _db, DelegatedPatronIdentifier, library=library,
             patron_identifier=patron_identifier, type=identifier_type
         )
         if is_new:
-            if callable(create_function):
+            if callable(identifier_or_identifier_factory):
                 # We are in charge of creating the delegated identifier.
-                delegated_identifier = create_function()
+                delegated_identifier = identifier_or_identifier_factory()
             else:
                 # We haven't heard of this patron before, but some
                 # other server does know about them, and they told us
                 # this is the delegated identifier.
-                delegated_identifier=create_function
+                delegated_identifier=identifier_or_identifier_factory
             identifier.delegated_identifier = delegated_identifier
         return identifier, is_new
 
@@ -1628,6 +1632,10 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # a DelegatedPatronIdentifier, we need to extract the Library
         # and the library's identifier for this patron from the 'username'
         # part of the token.
+        #
+        # If this username/password is not actually a Short Client
+        # Token, this will raise an exception, which gives us a quick
+        # way to bail out.
         library, expires, patron_identifier = self._split_token(
             _db, username
         )
