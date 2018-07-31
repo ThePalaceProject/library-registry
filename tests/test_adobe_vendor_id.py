@@ -36,6 +36,8 @@ from . import (
 
 class VendorIDTest(DatabaseTest):
 
+    NODE_VALUE = "0x685b35c00f05"
+
     def _integration(self):
         """Configure a basic Vendor ID Service setup."""
 
@@ -45,7 +47,7 @@ class VendorIDTest(DatabaseTest):
             goal=ExternalIntegration.DRM_GOAL,
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
-        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = "685b35c00f05"
+        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = self.NODE_VALUE
         return integration
 
 class TestConfiguration(VendorIDTest):
@@ -298,48 +300,114 @@ class TestVendorIDModel(VendorIDTest):
         eq_(None, None, (self.model.authdata_lookup, bad_signature))
 
 
-    def test_delegation(self):
-        """A model that doesn't know how to authenticate something can
+    def test_delegation_standard_lookup(self):
+        """A model that doesn't know how to handle a login request can
         delegate to another Vendor ID server.
         """
         delegate1 = MockAdobeVendorIDClient()
         delegate2 = MockAdobeVendorIDClient()
 
-        self.model.delegates = [delegate1, delegate2]
-
         # Delegate 1 can't verify this user.
         delegate1.enqueue(VendorIDAuthenticationError("Nope"))
 
         # Delegate 2 can.
-        delegate2.enqueue(("userid", "label", "content"))
+        delegate2.enqueue(("adobe_id", "label", "content"))
 
-        result = self.model.standard_lookup(
-            dict(username="some", password="user")
+        delegates = [delegate1, delegate2]
+        model = AdobeVendorIDModel(self._db, self.NODE_VALUE, delegates)
+
+        # This isn't a valid Short Client Token, but as long as
+        # a delegate can decode it, that doesn't matter.
+        username = self.library.short_name + "|1234|someuser"
+
+        result = model.standard_lookup(
+            dict(username=username, password="password")
         )
-        eq_(("userid", "label"), result)
+        eq_(("adobe_id", "Delegated account ID adobe_id"), result)
 
         # We tried delegate 1 before getting the answer from delegate 2.
         eq_([], delegate1.queue)
         eq_([], delegate2.queue)
 
-        # Now test authentication by authdata.
+        # A DelegatedPatronIdentifier was created to store the information
+        # we got from the delegate.
+        [delegated] = self.library.delegated_patron_identifiers
+        eq_("someuser", delegated.patron_identifier)
+        eq_("adobe_id", delegated.delegated_identifier)
+        eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, delegated.type)
+
+        # Now test with a username/password that's not a Short Client Token
+        # at all.
+        delegate1.enqueue(("adobe_id_2", "label_2", "content"))
+        result = model.standard_lookup(
+            dict(username="not a short client token", password="some password")
+        )
+
+        # delegate1 provided the answer, and we used it as is.
+        eq_(("adobe_id_2", "label_2"), result)
+
+        # We did not create a local DelegatedPatronIdentifier, because
+        # we don't know which Library the patron should be associated
+        # with.
+        eq_([delegated], self.library.delegated_patron_identifiers)
+
+    def test_delegation_authdata_lookup(self):
+        """Test the ability to delegate an authdata login request
+        to another server.
+        """
+        delegate1 = MockAdobeVendorIDClient()
+        delegate2 = MockAdobeVendorIDClient()
+        delegates = [delegate1, delegate2]
+        model = AdobeVendorIDModel(self._db, self.NODE_VALUE, delegates)
+
+        # First, test an authdata that is a Short Client Token.
 
         # Delegate 1 can verify the authdata
-        delegate1.enqueue(("userid", "label", "content"))
+        delegate1.enqueue(("adobe_id", "label", "content"))
 
         # Delegate 2 is broken.
         delegate2.enqueue(VendorIDServerException("blah"))
 
-        result = self.model.authdata_lookup("some authdata")
-        eq_(("userid", "label"), result)
+        authdata = self.library.short_name + "|1234|authdatauser|password"
+        result = model.authdata_lookup(authdata)
+        eq_(("adobe_id", "Delegated account ID adobe_id"), result)
 
         # We didn't even get to delegate 2.
         eq_(1, len(delegate2.queue))
 
+        [delegated] = self.library.delegated_patron_identifiers
+        eq_("authdatauser", delegated.patron_identifier)
+        eq_("adobe_id", delegated.delegated_identifier)
+        eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, delegated.type)
+
         # If we try it again, we'll get an error from delegate 1,
         # since nothing is queued up, and then a queued error from
-        # delegate 2.
-        result = self.model.authdata_lookup("some authdata")
+        # delegate 2. Then we'll try to decode the token
+        # ourselves, but since it's not a valid Short Client Token,
+        # we'll get an error there, and return nothing.
+        result = model.authdata_lookup(authdata)
         eq_((None, None), result)
         eq_([], delegate2.queue)
 
+        # Finally, test authentication by treating some random data
+        # as authdata.
+
+        # Delegate 1 can verify the authdata
+        delegate1.enqueue(("adobe_id_3", "label", "content"))
+
+        # Delegate 2 is broken.
+        delegate2.enqueue(VendorIDServerException("blah"))
+
+        # This authdata is not a Short Client Token. We will ask the
+        # delegates to authenticate it, and when one succeeds we will
+        # pass on the answer exactly as is. We can't create a
+        # DelegatedPatronIdentifier, because we don't know which
+        # library originated the authdata or what the library's patron
+        # identifier is.
+        result = model.authdata_lookup("Some random authdata")
+        eq_(("adobe_id_3", "label"), result)
+
+        eq_([delegated], self.library.delegated_patron_identifiers)
+
+        # We didn't get to delegate 2, because delegate 1 had the answer.
+        eq_(1, len(delegate2.queue))

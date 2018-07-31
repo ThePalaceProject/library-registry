@@ -198,15 +198,16 @@ class AdobeVendorIDModel(object):
 
     def __init__(self, _db, node_value, delegates):
         self._db = _db
-        if isinstance(node_value, basestring):
-            node_value = int(node_value, 16)
-        self.short_client_token_decoder = ShortClientTokenDecoder(node_value)
-        self.delegates = []
+
+        delegate_objs = []
         for i in delegates:
             if isinstance(i, basestring):
-                self.delegates.append(AdobeVendorIDClient(i))
+                delegate_objs.append(AdobeVendorIDClient(i))
             else:
-                self.delegates.append(i)
+                delegate_objs.append(i)
+        self.short_client_token_decoder = ShortClientTokenDecoder(
+            node_value, delegate_objs
+        )
 
     def standard_lookup(self, authorization_data):
         """Treat an incoming username and password as the two parts of a short
@@ -225,7 +226,7 @@ class AdobeVendorIDModel(object):
         if delegated_patron_identifier:
             return self.account_id_and_label(delegated_patron_identifier)
         else:
-            for delegate in self.delegates:
+            for delegate in self.short_client_token_decoder.delegates:
                 try:
                     account_id, label, content = delegate.sign_in_standard(
                         username, password
@@ -254,7 +255,7 @@ class AdobeVendorIDModel(object):
         if delegated_patron_identifier:
             return self.account_id_and_label(delegated_patron_identifier)
         else:
-            for delegate in self.delegates:
+            for delegate in self.short_client_token_decoder.delegates:
                 try:
                     account_id, label, content = delegate.sign_in_authdata(
                         authdata
@@ -265,6 +266,7 @@ class AdobeVendorIDModel(object):
                     pass
 
         # Neither this server nor the delegates were able to do anything.
+        # We couldn't find anything.
         return None, None
 
     def account_id_and_label(self, delegated_patron_identifier):
