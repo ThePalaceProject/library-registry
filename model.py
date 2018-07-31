@@ -1562,7 +1562,15 @@ class DelegatedPatronIdentifier(Base):
             patron_identifier=patron_identifier, type=identifier_type
         )
         if is_new:
-            identifier.delegated_identifier = create_function()
+            if callable(create_function):
+                # We are in charge of creating the delegated identifier.
+                delegated_identifier = create_function()
+            else:
+                # We haven't heard of this patron before, but some
+                # other server does know about them, and they told us
+                # this is the delegated identifier.
+                delegated_identifier=create_function
+            identifier.delegated_identifier = delegated_identifier
         return identifier, is_new
 
 
@@ -1583,9 +1591,17 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         value = "urn:uuid:0" + u[1:]
         return value
 
-    def __init__(self, node_value):
+    def __init__(self, node_value, delegates):
         super(ShortClientTokenDecoder, self).__init__()
+        if isinstance(node_value, basestring):
+            # The node value may be stored in hex form (that's how
+            # Adobe gives it out) or as the equivalent decimal number.
+            if node_value.startswith('0x'):
+                node_value = int(node_value, 16)
+            else:
+                node_value = int(node_value)
         self.node_value = node_value
+        self.delegates = delegates
 
     def decode(self, _db, token):
         """Decode a short client token.
@@ -1606,20 +1622,56 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         """Decode a short client token that has already been split into
         two parts.
         """
-        try:
-            signature = self.adobe_base64_decode(password)
-        except Exception, e:
-            raise ValueError("Invalid password: %s" % password)
-        return self._decode(_db, username, signature)
+        library = patron_identifier = account_id = None
 
-    def _decode(self, _db, token, supposed_signature):
-        """Make sure a client token is properly formatted, correctly signed,
-        and not expired.
+        # No matter how we do this, if we're going to create 
+        # a DelegatedPatronIdentifier, we need to extract the Library
+        # and the library's identifier for this patron from the 'username'
+        # part of the token.
+        library, expires, patron_identifier = self._split_token(
+            _db, username
+        )
+
+        # First see if a delegate can give us an Adobe ID (account_id)
+        # for this patron.
+        for delegate in self.delegates:
+            try:
+                account_id, label, content = delegate.sign_in_standard(
+                    username, password
+                )
+            except Exception, e:
+                # This delegate couldn't help us.
+                pass
+
+        if not account_id:
+            # The delegates couldn't help us; let's try to do it
+            # ourselves.
+            try:
+                signature = self.adobe_base64_decode(password)
+            except Exception, e:
+                raise ValueError("Invalid password: %s" % password)
+            patron_identifier, account_id = self._decode(
+                _db, username, signature
+            )
+
+        # If we got this far, we have a Library, a patron_identifier,
+        # and an account_id.
+        delegated_patron_identifier, is_new = (
+            DelegatedPatronIdentifier.get_one_or_create(
+                _db, library, patron_identifier,
+                DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, account_id
+            )
+        )
+        return delegated_patron_identifier
+
+    def _split_token(self, _db, token):
+        """Split the 'username' part of a Short Client Token.
+
+        :return: A 3-tuple (Library, expiration, foreign patron identifier)
         """
         if token.count('|') < 2:
             raise ValueError("Invalid client token: %s" % token)
         library_short_name, expiration, patron_identifier = token.split("|", 2)
-
         library_short_name = library_short_name.upper()
 
         # Look up the Library object based on short name.
@@ -1628,12 +1680,18 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             raise ValueError(
                 "I don't know how to handle tokens from library \"%s\"" % library_short_name
             )
-        secret = library.shared_secret
-
         try:
             expiration = float(expiration)
         except ValueError:
             raise ValueError('Expiration time "%s" is not numeric.' % expiration)
+        return library, expiration, patron_identifier
+
+    def _decode(self, _db, token, supposed_signature):
+        """Make sure a client token is properly formatted, correctly signed,
+        and not expired.
+        """
+        library, expiration, patron_identifier = self._split_token(_db, token)
+        secret = library.shared_secret
 
         # We don't police the content of the patron identifier but there
         # has to be _something_ there.
@@ -1678,13 +1736,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
         # We have a Library, and a patron identifier which we know is valid.
         # Find or create a DelegatedPatronIdentifier for this person.
-        delegated_patron_identifier, is_new = (
-            DelegatedPatronIdentifier.get_one_or_create(
-                _db, library, patron_identifier,
-                DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, self.uuid
-            )
-        )
-        return delegated_patron_identifier
+        return patron_identifier, self.uuid
 
 class ExternalIntegration(Base):
 

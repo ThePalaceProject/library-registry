@@ -36,6 +36,8 @@ from . import (
 
 class VendorIDTest(DatabaseTest):
 
+    NODE_VALUE = "0x685b35c00f05"
+
     def _integration(self):
         """Configure a basic Vendor ID Service setup."""
 
@@ -45,7 +47,7 @@ class VendorIDTest(DatabaseTest):
             goal=ExternalIntegration.DRM_GOAL,
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
-        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = "685b35c00f05"
+        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = self.NODE_VALUE
         return integration
 
 class TestConfiguration(VendorIDTest):
@@ -305,18 +307,21 @@ class TestVendorIDModel(VendorIDTest):
         delegate1 = MockAdobeVendorIDClient()
         delegate2 = MockAdobeVendorIDClient()
 
-        self.model.delegates = [delegate1, delegate2]
-
         # Delegate 1 can't verify this user.
         delegate1.enqueue(VendorIDAuthenticationError("Nope"))
 
         # Delegate 2 can.
         delegate2.enqueue(("userid", "label", "content"))
 
-        result = self.model.standard_lookup(
-            dict(username="some", password="user")
+        delegates = [delegate1, delegate2]
+        model = AdobeVendorIDModel(self._db, self.NODE_VALUE, delegates)
+
+        username = self.library.short_name + "|1234|username"
+
+        result = model.standard_lookup(
+            dict(username=username, password="password")
         )
-        eq_(("userid", "label"), result)
+        eq_(("userid", "Delegated account ID userid"), result)
 
         # We tried delegate 1 before getting the answer from delegate 2.
         eq_([], delegate1.queue)
@@ -330,7 +335,7 @@ class TestVendorIDModel(VendorIDTest):
         # Delegate 2 is broken.
         delegate2.enqueue(VendorIDServerException("blah"))
 
-        result = self.model.authdata_lookup("some authdata")
+        result = model.authdata_lookup("some authdata")
         eq_(("userid", "label"), result)
 
         # We didn't even get to delegate 2.
@@ -339,7 +344,7 @@ class TestVendorIDModel(VendorIDTest):
         # If we try it again, we'll get an error from delegate 1,
         # since nothing is queued up, and then a queued error from
         # delegate 2.
-        result = self.model.authdata_lookup("some authdata")
+        result = model.authdata_lookup("some authdata")
         eq_((None, None), result)
         eq_([], delegate2.queue)
 

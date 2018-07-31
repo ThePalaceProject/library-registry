@@ -117,7 +117,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
     def setup(self):
         super(TestShortClientTokenDecoder, self).setup()
         self.encoder = ShortClientTokenEncoder()
-        self.decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE)
+        self.decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE, [])
         self.library = self._library()
         self.library.short_name='LIBRARY'
         self.library.shared_secret='My shared secret'
@@ -231,8 +231,12 @@ class TestShortClientTokenDecoder(DatabaseTest):
         self.decoder._decode = _decode
 
         self.decoder.test_code_ran = False
+
+        # This username is good enough to fool
+        # ShortClientDecoder._split_token, but it won't work for real.
+        fake_username = "library|12345|username"
         self.decoder.decode_two_part(
-            self._db, "username", encoded_signature
+            self._db, fake_username, encoded_signature
         )
 
         # The code in _decode_short_client_token ran. Since there was no
@@ -242,5 +246,5 @@ class TestShortClientTokenDecoder(DatabaseTest):
         assert_raises_regexp(
             ValueError, "Invalid password",
             self.decoder.decode_two_part,
-            self._db, "username", "I am not a real encoded signature"
+            self._db, fake_username, "I am not a real encoded signature"
         )
