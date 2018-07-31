@@ -228,6 +228,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
         def _decode(_db, token, supposed_signature):
             eq_(supposed_signature, signature)
             self.decoder.test_code_ran = True
+            return "identifier", "uuid"
         self.decoder._decode = _decode
 
         self.decoder.test_code_ran = False

@@ -1653,6 +1653,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 signature = self.adobe_base64_decode(password)
             except Exception, e:
                 raise ValueError("Invalid password: %s" % password)
+
             patron_identifier, account_id = self._decode(
                 _db, username, signature
             )

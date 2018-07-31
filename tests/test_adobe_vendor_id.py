@@ -311,41 +311,59 @@ class TestVendorIDModel(VendorIDTest):
         delegate1.enqueue(VendorIDAuthenticationError("Nope"))
 
         # Delegate 2 can.
-        delegate2.enqueue(("userid", "label", "content"))
+        delegate2.enqueue(("adobe_id", "label", "content"))
 
         delegates = [delegate1, delegate2]
         model = AdobeVendorIDModel(self._db, self.NODE_VALUE, delegates)
 
-        username = self.library.short_name + "|1234|username"
+        # This isn't a valid Short Client Token, but as long as
+        # a delegate can decode it, that doesn't matter.
+        username = self.library.short_name + "|1234|someuser"
 
         result = model.standard_lookup(
             dict(username=username, password="password")
         )
-        eq_(("userid", "Delegated account ID userid"), result)
+        eq_(("adobe_id", "Delegated account ID adobe_id"), result)
 
         # We tried delegate 1 before getting the answer from delegate 2.
         eq_([], delegate1.queue)
         eq_([], delegate2.queue)
 
+        # A DelegatedPatronIdentifier was created to store the information
+        # we got from the delegate.
+        [delegated] = self.library.delegated_patron_identifiers
+        eq_("someuser", delegated.patron_identifier)
+        eq_("adobe_id", delegated.delegated_identifier)
+        eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, delegated.type)
+
         # Now test authentication by treating the Short Client Token
         # as authdata.
 
         # Delegate 1 can verify the authdata
-        delegate1.enqueue(("userid", "label", "content"))
+        delegate1.enqueue(("adobe_id_2", "label", "content"))
 
         # Delegate 2 is broken.
         delegate2.enqueue(VendorIDServerException("blah"))
 
-        authdata = username + "|password"
+        authdata = self.library.short_name + "|1234|anotheruser|password"
         result = model.authdata_lookup(authdata)
-        eq_(("userid", "Delegated account ID userid"), result)
+        eq_(("adobe_id_2", "Delegated account ID adobe_id_2"), result)
 
         # We didn't even get to delegate 2.
         eq_(1, len(delegate2.queue))
 
+        [delegated] = [
+            x for x in self.library.delegated_patron_identifiers
+            if x.patron_identifier == 'anotheruser'
+        ]
+        eq_("adobe_id_2", delegated.delegated_identifier)
+        eq_(DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, delegated.type)
+
         # If we try it again, we'll get an error from delegate 1,
         # since nothing is queued up, and then a queued error from
-        # delegate 2.
+        # delegate 2. Then we'll try to decode the token
+        # ourselves, but since it's not a valid Short Client Token,
+        # we'll get an error there, and return nothing.
         result = model.authdata_lookup(authdata)
         eq_((None, None), result)
         eq_([], delegate2.queue)
