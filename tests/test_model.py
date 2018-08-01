@@ -10,6 +10,7 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 import base64
 import datetime
 import operator
+import random
 
 from config import Configuration
 from emailer import Emailer
@@ -271,6 +272,43 @@ class TestLibrary(DatabaseTest):
         except ValueError, e:
             eq_('Short name cannot contain the pipe character.',
                 e.message)
+
+    def test_for_short_name(self):
+        eq_(None, Library.for_short_name(self._db, 'ABCD'))
+        lib = self._library("A Library")
+        lib.short_name = 'ABCD'
+        eq_(lib, Library.for_short_name(self._db, 'ABCD'))
+
+    def test_random_short_name(self):
+        # First, try with no duplicate check.
+        random.seed(42)
+        name = Library.random_short_name()
+        eq_("QAHFTR", name)
+
+        # Reset the random seed so the same name will be generated again.
+        random.seed(42)
+        # Create a duplicate_check implementation that claims QAHFTR
+        # has already been used.
+        def already_used(name):
+            return name == "QAHFTR"
+        name = Library.random_short_name(duplicate_check=already_used)
+
+        # random_short_name now generates QAHFTR, but it's a
+        # duplicate, so it tries again and generates a new string
+        # which passes the already_used test.
+        eq_("XCKAFN", name)
+
+        # To avoid an infinite loop, we will stop trying and raise an
+        # exception after a certain number of attempts (the default is
+        # 20).
+        def theyre_all_duplicates(name):
+            return True
+        assert_raises_regexp(
+            ValueError,
+            "Could not generate random short name after 20 attempts!",
+            Library.random_short_name,
+            duplicate_check=theyre_all_duplicates
+        )
 
     def test_set_library_stage(self):
         lib = self._library()

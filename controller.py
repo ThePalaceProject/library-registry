@@ -501,10 +501,9 @@ class LibraryRegistryController(object):
             encryptor = PKCS1_OAEP.new(public_key)
 
             if not library.short_name:
-                # TODO: This needs to be base64 encoded or something,
-                # not hex encoded. Hex encoding limits us to 256*3
-                # libraries. Also we need to handle collisions.
-                library.short_name = os.urandom(3).encode('hex')
+                def dupe_check(candidate):
+                    return Library.for_short_name(self._db, candidate) is not None
+                library.short_name = Library.random_short_name(dupe_check)
 
             submitted_secret = None
             auth_header = flask.request.headers.get('Authorization')
