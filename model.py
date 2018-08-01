@@ -7,6 +7,8 @@ from nose.tools import set_trace
 import os
 import re
 import json
+import random
+import string
 import uuid
 import warnings
 from collections import Counter
@@ -214,7 +216,7 @@ class Library(Base):
     __tablename__ = 'libraries'
 
     id = Column(Integer, primary_key=True)
-    
+
     # The official name of the library.  This is not unique because
     # there are many "Springfield Public Library"s.  This is nullable
     # because there's a period during initial registration where a
@@ -245,7 +247,7 @@ class Library(Base):
 
     # The URL to the library's patron-facing web page.
     web_url = Column(Unicode)
-    
+
     # When our record of this library was last updated.
     timestamp = Column(DateTime, index=True,
                        default=lambda: datetime.datetime.utcnow(),
@@ -322,7 +324,7 @@ class Library(Base):
     # details, but it's useful to know approximate counts when finding
     # libraries that serve specific language communities.
     collections = relationship("CollectionSummary", backref='library')
-    
+
     # The registry may keep delegated patron identifiers (basically,
     # Adobe IDs) for a library's patrons. This allows the library's
     # patrons to decrypt Adobe ACS-encrypted books without having to
@@ -346,6 +348,44 @@ class Library(Base):
                 'Short name cannot contain the pipe character.'
             )
         return value.upper()
+
+    @classmethod
+    def for_short_name(cls, _db, short_name):
+        """Look up a library by short name.
+
+        This only exists so it can be used as a duplicate_check with
+        random_short_name.
+        """
+        return get_one(_db, Library, short_name=short_name)
+
+    @classmethod
+    def random_short_name(cls, duplicate_check=None, max_attempts=20):
+        """Generate a random short name for a library.
+
+        Library short names are six uppercase letters.
+
+        :param duplicate_check: Call this function to check whether a
+            generated name is a duplicate.
+        :param max_attempts: Stop trying to generate a name after this
+            many failures.
+        """
+        attempts = 0
+        choice = None
+        while choice is None and attempts < max_attempts:
+            choice = "".join(
+                [random.choice(string.uppercase)
+                 for i in range(6)]
+            )
+            if duplicate_check and duplicate_check(choice):
+                choice = None
+            attempts += 1
+        if choice is None:
+            # This is very bad, but it's better to raise an exception
+            # than to be stuck in an infinite loop.
+            raise ValueError(
+                "Could not generate random short name after %d attempts!" % attempts
+            )
+        return choice
 
     @hybrid_property
     def library_stage(self):

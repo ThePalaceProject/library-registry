@@ -6,6 +6,7 @@ import datetime
 import os
 import json
 import base64
+import random
 
 from controller import (
     LibraryRegistry,
@@ -709,6 +710,7 @@ class TestLibraryRegistryController(ControllerTest):
         opds_url = "http://circmanager.org/feed/"
 
         # Send a registration request to the registry.
+        random.seed(42)
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", auth_url),
@@ -759,7 +761,15 @@ class TestLibraryRegistryController(ControllerTest):
 
             # Since the auth document had a public key, the registry
             # generated a short name and shared secret for the library.
-            eq_(6, len(library.short_name))
+            #
+            # We know which short name will be generated because we seeded
+            # the random number generator for this test.
+            #
+            # We can't try the same trick with the shared secret,
+            # because it was generated using techniques designed for
+            # cryptography which ignore seed(). But we do know how
+            # long it is.
+            eq_('QAHFTR', library.short_name)
             eq_(48, len(library.shared_secret))
 
             eq_(library.short_name, catalog["metadata"]["short_name"])
