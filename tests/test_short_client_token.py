@@ -157,6 +157,13 @@ class TestShortClientTokenDecoder(DatabaseTest):
 
         assert_raises_regexp(
             ValueError,
+            'Cannot decode an empty token.',
+            self.decoder.decode,
+            self._db, ""
+        )
+
+        assert_raises_regexp(
+            ValueError,
             'Supposed client token "no pipes" does not contain a pipe.',
             self.decoder.decode,
             self._db, "no pipes"
