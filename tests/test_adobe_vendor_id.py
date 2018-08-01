@@ -288,6 +288,7 @@ class TestVendorIDModel(VendorIDTest):
             )
         )
 
+        eq_(None, None, self.model.authdata_lookup(None))
         eq_(None, None, self.model.authdata_lookup('badauthdata'))
 
         # This token is correctly formed but the signature doesn't match.

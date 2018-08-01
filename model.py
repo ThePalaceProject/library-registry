@@ -1654,6 +1654,8 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
         :raise ValueError: When the token is not valid for any reason.
         """
+        if not token:
+            raise ValueError("Cannot decode an empty token.")
         if not '|' in token:
             raise ValueError(
                 'Supposed client token "%s" does not contain a pipe.' % token
