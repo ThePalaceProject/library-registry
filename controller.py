@@ -7,6 +7,7 @@ from flask import (
     url_for,
 )
 import requests
+from smtplib import SMTPException
 import json
 import feedparser
 from Crypto.PublicKey import RSA
@@ -485,7 +486,14 @@ class LibraryRegistryController(object):
                 # what just happened. This is either so the receipient
                 # can confirm that the address works, or to inform
                 # them a new library is using their address.
-                hyperlink.notify(self.emailer, self.app.url_for)
+                try:
+                    hyperlink.notify(self.emailer, self.app.url_for)
+                except SMTPException, e:
+                    # We were unable to send the email.
+                    return INTEGRATION_ERROR.detailed(
+                        _("SMTP error while sending email to %(address)s",
+                          address=hyperlink.resource.href)
+                    )
 
         # Create an OPDS 2 catalog containing all available
         # information about the library.

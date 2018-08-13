@@ -7,6 +7,7 @@ import os
 import json
 import base64
 import random
+from smtplib import SMTPException
 
 from controller import (
     LibraryRegistry,
@@ -696,6 +697,36 @@ class TestLibraryRegistryController(ControllerTest):
                 dict(rel=rel, href="http://not-an-email/")
             )
             _request_fails()
+
+    def test_registration_fails_if_email_server_fails(self):
+        """Even if everything looks good, registration can fail if
+        the library registry can't send out the validation emails.
+        """
+        # Simulate an SMTP server that won't accept email for
+        # whatever reason.
+        class NonfunctionalEmailer(MockEmailer):
+            def send(self, *args, **kwargs):
+                raise SMTPException("SMTP server is broken")
+        self.controller.emailer = NonfunctionalEmailer()
+
+        # Pretend we are a library with a valid authentication document.
+        auth_document = self._auth_document(None)
+        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.queue_opds_success()
+
+        auth_url = "http://circmanager.org/authentication.opds"
+        # Send a registration request to the registry.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", auth_url),
+                ("contact", "mailto:me@library.org"),
+            ])
+            response = self.controller.register(do_get=self.http_client.do_get)
+
+        # We get back a ProblemDetail.
+        eq_(INTEGRATION_ERROR.uri, response.uri)
+        eq_("SMTP error while sending email to mailto:me@library.org",
+            response.detail)
 
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"

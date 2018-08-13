@@ -28,6 +28,12 @@ INTEGRATION_DOCUMENT_NOT_FOUND = pd(
     title=_("Document not found"),
 )
 
+INTEGRATION_ERROR = pd(
+    "http://librarysimplified.org/terms/problem/remote-integration-failed",
+    500,
+    title=_("Error with external integration"),
+)
+
 ERROR_RETRIEVING_DOCUMENT = pd(
     "http://librarysimplified.org/terms/problem/remote-integration-failed",
     502,
