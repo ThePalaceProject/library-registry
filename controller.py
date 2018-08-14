@@ -443,6 +443,7 @@ class LibraryRegistryController(object):
             )
             # This gives the requestor an elevated level of permissions.
             elevated_permissions = True
+            is_new = False
 
         if not library:
             # Either this is a library at a known authentication URL
@@ -455,11 +456,12 @@ class LibraryRegistryController(object):
                 library.opds_url = opds_url
 
         if elevated_permissions and library.authentication_url != auth_url:
-            # The library's URL has changed, e.g. because it moved
-            # from HTTP to HTTPS. The registration includes a valid
-            # shared secret, so it's okay to modify library.authentication_url.
-            result = self._update_library_url(
-                library, shared_secret, auth_url
+            # The library's authentication URL has changed,
+            # e.g. because it moved from HTTP to HTTPS. The
+            # registration includes a valid shared secret, so it's
+            # okay to modify library.authentication_url.
+            result = self._update_library_authentication_url(
+                library, auth_url, shared_secret
             )
             if isinstance(result, ProblemDetail):
                 return result
@@ -559,8 +561,11 @@ class LibraryRegistryController(object):
 
         return self.catalog_response(catalog, status_code)
 
-    def _update_library_url(self, library, new_authentication_url,
-                            provided_shared_secret):
+    @classmethod
+    def _update_library_authentication_url(
+            cls, library, new_authentication_url,
+            provided_shared_secret
+    ):
         """Change a library's authentication URL, assuming the provided shared
         secret gives the requester that permission.
 
