@@ -359,6 +359,7 @@ class DummyHTTPResponse(object):
         self.content = content
         self.links = links or {}
         self.url = url or "http://url/"
+        self.final_url = self.url
 
     @property
     def raw(self):
@@ -371,14 +372,18 @@ class DummyHTTPClient(object):
         self.requests = []
 
     def queue_response(self, response_code, media_type="text/html",
-                       other_headers=None, content='', links=None):
+                       other_headers=None, content='', links=None,
+                       url=None
+    ):
         headers = {}
         if media_type:
             headers["Content-Type"] = media_type
         if other_headers:
             for k, v in other_headers.items():
                 headers[k.lower()] = v
-        self.responses.insert(0, DummyHTTPResponse(response_code, headers, content, links))
+        self.responses.insert(
+            0, DummyHTTPResponse(response_code, headers, content, links, url)
+        )
 
     def do_get(self, url, headers=None, allowed_response_codes=None, **kwargs):
         self.requests.append(url)

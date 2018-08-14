@@ -432,9 +432,8 @@ class TestLibraryRegistryController(ControllerTest):
             eq_('No Authentication For OPDS document present at http://circmanager.org/authentication.opds', response.detail)
 
     def test_register_fails_on_non_authentication_document(self):
-        """The request succeeds but returns something other than
-        an authentication document.
-        """
+        # The request succeeds but returns something other than
+        # an authentication document.
         self.http_client.queue_response(
             200, content="I am not an Authentication For OPDS document."
         )
@@ -444,28 +443,32 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(INVALID_INTEGRATION_DOCUMENT, response)
 
     def test_register_fails_on_non_matching_id(self):
-        """The request returns an authentication document but its `id`
-        doesn't match the URL it was retrieved from.
-        """
+        # The request returns an authentication document but its `id`
+        # doesn't match the final URL it was retrieved from.
         auth_document = self._auth_document()
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document),
+            url="http://a-different-url/"
+        )
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
                 ("url", "http://a-different-url/"),
                 ("contact", "mailto:me@library.org"),
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
+
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
             eq_("The OPDS authentication document's id (http://circmanager.org/authentication.opds) doesn't match its url (http://a-different-url/).",
                 response.detail)
 
     def test_register_fails_on_missing_title(self):
-        """The request returns an authentication document but it's missing
-        a title.
-        """
+        # The request returns an authentication document but it's missing
+        # a title.
         auth_document = self._auth_document()
         del auth_document['title']
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -474,14 +477,15 @@ class TestLibraryRegistryController(ControllerTest):
                 response.detail)
 
     def test_register_fails_on_no_start_link(self):
-        """The request returns an authentication document but it's missing
-        a link to an OPDS feed.
-        """
+        # The request returns an authentication document but it's missing
+        # a link to an OPDS feed.
         auth_document = self._auth_document()
         for link in list(auth_document['links']):
             if link['rel'] == 'start':
                 auth_document['links'].remove(link)
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -490,11 +494,13 @@ class TestLibraryRegistryController(ControllerTest):
                 response.detail)
 
     def test_register_fails_on_start_link_not_found(self):
-        """The request returns an authentication document but an attempt
-        to retrieve the corresponding OPDS feed yields a 404.
-        """
+        # The request returns an authentication document but an attempt
+        # to retrieve the corresponding OPDS feed yields a 404.
         auth_document = self._auth_document()
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document),
+            url=auth_document['id']
+        )
         self.http_client.queue_response(404)
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
@@ -504,11 +510,12 @@ class TestLibraryRegistryController(ControllerTest):
                 response.detail)
 
     def test_register_fails_on_start_link_timeout(self):
-        """The request returns an authentication document but an attempt
-        to retrieve the corresponding OPDS feed times out.
-        """
+        # The request returns an authentication document but an attempt
+        # to retrieve the corresponding OPDS feed times out.
         auth_document = self._auth_document()
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
         self.http_client.queue_response(RequestTimedOut("http://url", "sorry"))
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
@@ -518,11 +525,12 @@ class TestLibraryRegistryController(ControllerTest):
                 response.detail)
 
     def test_register_fails_on_start_link_error(self):
-        """The request returns an authentication document but an attempt
-        to retrieve the corresponding OPDS feed gives a server-side error.
-        """
+        # The request returns an authentication document but an attempt
+        # to retrieve the corresponding OPDS feed gives a server-side error.
         auth_document = self._auth_document()
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
         self.http_client.queue_response(500)
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
@@ -535,7 +543,9 @@ class TestLibraryRegistryController(ControllerTest):
         to retrieve the corresponding OPDS feed gives a server-side error.
         """
         auth_document = self._auth_document()
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
 
         # The start link returns a 200 response code but the wrong
         # Content-Type.
@@ -548,12 +558,16 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_register_fails_if_start_link_does_not_link_back_to_auth_document(self):
         auth_document = self._auth_document()
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
 
         # The start link returns a 200 response code and the right
         # Content-Type, but there is no Link header and the body is no
         # help.
-        self.http_client.queue_response(200, OPDSCatalog.OPDS_TYPE, content='{}')
+        self.http_client.queue_response(
+            200, OPDSCatalog.OPDS_TYPE, content='{}'
+        )
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             response = self.controller.register(do_get=self.http_client.do_get)
@@ -570,7 +584,9 @@ class TestLibraryRegistryController(ControllerTest):
                 link['href'] = "http://example.com/broken-logo.png"
                 break
         # Auth document request succeeds.
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
 
         # OPDS feed request succeeds.
         self.queue_opds_success()
@@ -593,7 +609,7 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Somewhere"]}
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
             self.queue_opds_success()
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -604,7 +620,10 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
             auth_document['service_area'] = {"US": ["Manhattan"]}
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(
+                200, content=json.dumps(auth_document),
+                url=auth_document['id']
+            )
             self.queue_opds_success()
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -614,7 +633,9 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(
+                200, content=json.dumps(auth_document), url=auth_document['id']
+            )
             self.http_client.queue_response(401)
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -624,11 +645,16 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(
+                200, content=json.dumps(auth_document),
+                url=auth_document['id']
+            )
             auth_document['id'] = "http://some-other-id/"
             self.http_client.queue_response(
-                401, AuthenticationDocument.MEDIA_TYPE, content=json.dumps(auth_document
-            ))
+                401, AuthenticationDocument.MEDIA_TYPE,
+                content=json.dumps(auth_document),
+                url=auth_document['id']
+            )
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(INVALID_INTEGRATION_DOCUMENT.uri, response.uri)
@@ -638,10 +664,15 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
             self.http_client.queue_response(
-                401, AuthenticationDocument.MEDIA_TYPE, content=json.dumps(auth_document
-            ))
+                200, content=json.dumps(auth_document),
+                url=auth_document['id']
+            )
+            self.http_client.queue_response(
+                401, AuthenticationDocument.MEDIA_TYPE,
+                content=json.dumps(auth_document),
+                url=auth_document['id']
+            )
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(201, response.status_code)
@@ -684,7 +715,10 @@ class TestLibraryRegistryController(ControllerTest):
             )
 
             def _request_fails():
-                self.http_client.queue_response(200, content=json.dumps(auth_document))
+                self.http_client.queue_response(
+                    200, content=json.dumps(auth_document),
+                    url=auth_document['id']
+                )
                 with self.app.test_request_context("/", method="POST"):
                     flask.request.form = self.registration_form
                     response = self.controller.register(do_get=self.http_client.do_get)
@@ -703,7 +737,9 @@ class TestLibraryRegistryController(ControllerTest):
         # Pretend we are a library with a valid authentication document.
         key = RSA.generate(1024)
         auth_document = self._auth_document(key)
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
         self.queue_opds_success()
 
         auth_url = "http://circmanager.org/authentication.opds"
@@ -717,7 +753,6 @@ class TestLibraryRegistryController(ControllerTest):
                 ("contact", "mailto:me@library.org"),
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
-
             eq_(201, response.status_code)
             eq_(opds_directory, response.headers.get("Content-Type"))
 
@@ -827,7 +862,9 @@ class TestLibraryRegistryController(ControllerTest):
             ],
             "service_area": { "US": "Connecticut" },
         }
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document['id']
+        )
         self.queue_opds_success()
 
         # We have a new logo as well.
@@ -926,7 +963,9 @@ class TestLibraryRegistryController(ControllerTest):
 
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
+            self.http_client.queue_response(
+                200, content=json.dumps(auth_document), url=auth_document['id']
+            )
             self.queue_opds_success()
 
             response = self.controller.register(do_get=self.http_client.do_get)
