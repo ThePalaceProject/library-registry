@@ -280,6 +280,7 @@ class LibraryRegistryController(object):
 
         integration_contact_uri = flask.request.form.get("contact")
         integration_contact_email = integration_contact_uri
+        shared_secret = flask.request.form.get("shared_secret")
 
         # If 'stage' is not provided, it means the client doesn't make the
         # testing/production distinction. We have to assume they want
@@ -426,10 +427,20 @@ class LibraryRegistryController(object):
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
-        library, is_new = get_one_or_create(
-            self._db, Library,
-            opds_url=opds_url,
-        )
+        if shared_secret:
+            library = get_one (
+                self._db, Library,
+                shared_secret=shared_secret
+            )
+
+            if not library:
+                return AUTHENTICATION_FAILURE.detailed(
+                    "This library was not found in the system"
+                )
+
+
+
+
         try:
             library.library_stage = library_stage
         except ValueError, e:

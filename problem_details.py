@@ -1,6 +1,12 @@
 from util.problem_detail import ProblemDetail as pd
 from flask_babel import lazy_gettext as _
 
+AUTHENTICATION_FAILURE = pd(
+    "http://librarysimplified.org/terms/problem/credentials-invalid",
+    401,
+    _("The library could not be authenticated.")
+)
+
 NO_AUTH_URL = pd(
       "http://librarysimplified.org/terms/problem/no-opds-auth-url",
       400,
