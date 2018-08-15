@@ -280,6 +280,10 @@ class LibraryRegistryController(object):
 
         integration_contact_uri = flask.request.form.get("contact")
         integration_contact_email = integration_contact_uri
+        shared_secret = None
+        auth_header = flask.request.headers.get('Authorization')
+        if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
+            shared_secret = auth_header.split(' ', 1)[1]
 
         # If 'stage' is not provided, it means the client doesn't make the
         # testing/production distinction. We have to assume they want
@@ -367,8 +371,9 @@ class LibraryRegistryController(object):
             opds_url = auth_document.root['href']
         else:
             failure_detail = _("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
-        if auth_document.id != auth_response.url:
-            failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.url)
+
+        if auth_document.id != auth_response.final_url:
+            failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.final_url)
         if failure_detail:
             self.log.error(
                 "Registration of %s failed: %s", auth_url, failure_detail
@@ -426,10 +431,44 @@ class LibraryRegistryController(object):
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
-        library, is_new = get_one_or_create(
-            self._db, Library,
-            opds_url=opds_url,
-        )
+        library = None
+        elevated_permissions = False
+        auth_url = auth_response.final_url
+        if shared_secret:
+            # Look up a library by the provided shared secret. This
+            # will let us handle the case where the library has
+            # changed URLs (auth_url does not match
+            # library.authentication_url) but the shared secret is the
+            # same.
+            library = get_one(
+                self._db, Library,
+                shared_secret=shared_secret
+            )
+            # This gives the requestor an elevated level of permissions.
+            elevated_permissions = True
+            is_new = False
+
+        if not library:
+            # Either this is a library at a known authentication URL
+            # or it's a brand new library.
+            library, is_new = get_one_or_create(
+                self._db, Library,
+                authentication_url=auth_url
+            )
+            if opds_url:
+                library.opds_url = opds_url
+
+        if elevated_permissions and library.authentication_url != auth_url:
+            # The library's authentication URL has changed,
+            # e.g. because it moved from HTTP to HTTPS. The
+            # registration includes a valid shared secret, so it's
+            # okay to modify library.authentication_url.
+            result = self._update_library_authentication_url(
+                library, auth_url, shared_secret
+            )
+            if isinstance(result, ProblemDetail):
+                return result
+
         try:
             library.library_stage = library_stage
         except ValueError, e:
@@ -495,6 +534,8 @@ class LibraryRegistryController(object):
 
         # Annotate the catalog with some information specific to
         # the transaction that's happening right now.
+
+
         public_key = auth_document.public_key
         if public_key and public_key.get("type") == "RSA":
             public_key = RSA.importKey(public_key.get("value"))
@@ -505,11 +546,7 @@ class LibraryRegistryController(object):
                     return Library.for_short_name(self._db, candidate) is not None
                 library.short_name = Library.random_short_name(dupe_check)
 
-            submitted_secret = None
-            auth_header = flask.request.headers.get('Authorization')
-            if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
-                submitted_secret = auth_header.split(' ')[1]
-            generate_secret = (library.shared_secret is None) or (submitted_secret == library.shared_secret)
+            generate_secret = (library.shared_secret is None) or (shared_secret == library.shared_secret)
             if generate_secret:
                 library.shared_secret = os.urandom(24).encode('hex')
 
@@ -524,6 +561,27 @@ class LibraryRegistryController(object):
             status_code = 200
 
         return self.catalog_response(catalog, status_code)
+
+    @classmethod
+    def _update_library_authentication_url(
+            cls, library, new_authentication_url,
+            provided_shared_secret
+    ):
+        """Change a library's authentication URL, assuming the provided shared
+        secret gives the requester that permission.
+
+        :param library: A Library
+        :param new_authentication_url: A proposed new value for
+            Library.authentication_url
+        :param provided_shared_secret: Allegedly, the library's
+            shared secret.
+        """
+        if library.shared_secret != provided_shared_secret:
+            return AUTHENTICATION_FAILURE.detailed(
+                _("Provided shared secret is invalid")
+            )
+        library.authentication_url = new_authentication_url
+        return None
 
     @classmethod
     def _required_email_address(cls, uri, problem_title):
