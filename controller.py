@@ -280,7 +280,11 @@ class LibraryRegistryController(object):
 
         integration_contact_uri = flask.request.form.get("contact")
         integration_contact_email = integration_contact_uri
-        shared_secret = flask.request.form.get("shared_secret")
+        shared_secret = None
+        auth_header = flask.request.headers.get('Authorization')
+        if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
+            shared_secret = auth_header.split(' ')[1]
+
 
         # If 'stage' is not provided, it means the client doesn't make the
         # testing/production distinction. We have to assume they want
@@ -531,6 +535,8 @@ class LibraryRegistryController(object):
 
         # Annotate the catalog with some information specific to
         # the transaction that's happening right now.
+
+
         public_key = auth_document.public_key
         if public_key and public_key.get("type") == "RSA":
             public_key = RSA.importKey(public_key.get("value"))
@@ -541,11 +547,7 @@ class LibraryRegistryController(object):
                     return Library.for_short_name(self._db, candidate) is not None
                 library.short_name = Library.random_short_name(dupe_check)
 
-            submitted_secret = None
-            auth_header = flask.request.headers.get('Authorization')
-            if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
-                submitted_secret = auth_header.split(' ')[1]
-            generate_secret = (library.shared_secret is None) or (submitted_secret == library.shared_secret)
+            generate_secret = (library.shared_secret is None) or (shared_secret == library.shared_secret)
             if generate_secret:
                 library.shared_secret = os.urandom(24).encode('hex')
 
