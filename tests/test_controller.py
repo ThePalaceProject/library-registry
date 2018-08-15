@@ -1017,9 +1017,11 @@ class TestLibraryRegistryController(ControllerTest):
         )
         self.queue_opds_success()
         with self.app.test_request_context("/", method="POST"):
+            flask.request.headers = {
+                "Authorization": "Bearer %s" % secret
+            }
             flask.request.form = ImmutableMultiDict([
                 ("url", new_auth_url),
-                ("shared_secret", secret)
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
             # No new library was created.

@@ -283,8 +283,7 @@ class LibraryRegistryController(object):
         shared_secret = None
         auth_header = flask.request.headers.get('Authorization')
         if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
-            shared_secret = auth_header.split(' ')[1]
-
+            shared_secret = auth_header.split(' ', 1)[1]
 
         # If 'stage' is not provided, it means the client doesn't make the
         # testing/production distinction. We have to assume they want
