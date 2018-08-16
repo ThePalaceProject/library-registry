@@ -98,7 +98,7 @@ class OPDSCatalog(object):
                                     type=cls.OPDS_1_TYPE)
 
         if library.authentication_url:
-            cls.add_link_to_catalog(catalog, rel="start",
+            cls.add_link_to_catalog(catalog,
                                     href=library.authentication_url,
                                     type=AuthenticationDocument.MEDIA_TYPE)
 

@@ -86,7 +86,7 @@ class TestOPDSCatalog(DatabaseTest):
 
         eq_(metadata['updated'], OPDSCatalog._strftime(library.timestamp))
 
-        [web, help, opds, authentication_url] = sorted(catalog['links'], key=lambda x: x['rel'])
+        [authentication_url, web, help, opds] = sorted(catalog['links'], key=lambda x: x.get('rel'))
         [logo] = catalog['images']
 
         eq_("mailto:help@library.org", help['href'])
@@ -105,7 +105,7 @@ class TestOPDSCatalog(DatabaseTest):
         eq_("image/png", logo['type'])
 
         eq_(library.authentication_url, authentication_url['href'])
-        eq_("start", authentication_url['rel'])
+        assert 'rel' not in authentication_url
         eq_(AuthenticationDocument.MEDIA_TYPE, authentication_url['type'])
         # The public Hyperlink was passed into _hyperlink_args,
         # which made it show up in the list of links.
