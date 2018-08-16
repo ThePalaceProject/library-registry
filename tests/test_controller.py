@@ -745,14 +745,17 @@ class TestLibraryRegistryController(ControllerTest):
 
         # Pretend we are a library with a valid authentication document.
         auth_document = self._auth_document(None)
-        self.http_client.queue_response(200, content=json.dumps(auth_document))
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document),
+            url=auth_document['id']
+        )
         self.queue_opds_success()
 
         auth_url = "http://circmanager.org/authentication.opds"
         # Send a registration request to the registry.
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict([
-                ("url", auth_url),
+                ("url", auth_document['id']),
                 ("contact", "mailto:me@library.org"),
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
