@@ -843,7 +843,7 @@ class TestLibraryRegistryController(ControllerTest):
         # contact address -- information that wouldn't be made
         # available to the public.
         [link] = [x for x in catalog['links'] if
-                  x['rel'] == Hyperlink.INTEGRATION_CONTACT_REL]
+                  x.get('rel') == Hyperlink.INTEGRATION_CONTACT_REL]
         eq_("mailto:me@library.org", link['href'])
         eq_(Validation.IN_PROGRESS,
             link['properties'][Validation.STATUS_PROPERTY])
