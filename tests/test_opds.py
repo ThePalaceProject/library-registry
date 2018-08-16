@@ -9,6 +9,8 @@ from . import (
     DatabaseTest,
 )
 
+from authentication_document import AuthenticationDocument
+
 from model import (
     get_one_or_create,
     Hyperlink,
@@ -61,6 +63,7 @@ class TestOPDSCatalog(DatabaseTest):
         library.opds_url = "https://opds/"
         library.web_url = "https://nypl.org/"
         library.logo = "Fake logo"
+        library.authentication_url = "http://authdocument/"
 
         # This email address is a secret between the library and the
         # registry.
@@ -83,7 +86,7 @@ class TestOPDSCatalog(DatabaseTest):
 
         eq_(metadata['updated'], OPDSCatalog._strftime(library.timestamp))
 
-        [web, help, opds] = sorted(catalog['links'], key=lambda x: x['rel'])
+        [web, help, opds, authentication_url] = sorted(catalog['links'], key=lambda x: x['rel'])
         [logo] = catalog['images']
 
         eq_("mailto:help@library.org", help['href'])
@@ -101,6 +104,9 @@ class TestOPDSCatalog(DatabaseTest):
         eq_(OPDSCatalog.THUMBNAIL_REL, logo['rel'])
         eq_("image/png", logo['type'])
 
+        eq_(library.authentication_url, authentication_url['href'])
+        eq_("start", authentication_url['rel'])
+        eq_(AuthenticationDocument.MEDIA_TYPE, authentication_url['type'])
         # The public Hyperlink was passed into _hyperlink_args,
         # which made it show up in the list of links.
         #
