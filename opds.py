@@ -6,6 +6,8 @@ from model import (
     Validation,
 )
 
+from authentication_document import AuthenticationDocument
+
 class Annotator(object):
 
     def annotate_feed(self, feed):
@@ -95,6 +97,11 @@ class OPDSCatalog(object):
                                     href=library.opds_url,
                                     type=cls.OPDS_1_TYPE)
 
+        if library.authentication_url:
+            cls.add_link_to_catalog(catalog,
+                                    href=library.authentication_url,
+                                    type=AuthenticationDocument.MEDIA_TYPE)
+
         if library.web_url:
             cls.add_link_to_catalog(catalog, rel="alternate",
                                     href=library.web_url,
@@ -154,7 +161,3 @@ class OPDSCatalog(object):
             return None
 
         return json.dumps(self.catalog)
-
-
-
-
