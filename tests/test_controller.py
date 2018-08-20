@@ -313,6 +313,36 @@ class TestLibraryRegistryController(ControllerTest):
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])
 
+    def test_library(self):
+        nypl = self.nypl
+        with self.app.test_request_context():
+            # We can look up a library by its short name.
+            response = self.controller.library(nypl.short_name)
+            [catalog_entry] = json.loads(response.data).get("catalogs")
+            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
+            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
+
+            # Or by its UUID (internal URN minus the prefix).
+            uuid = nypl.internal_urn[len("urn:uuid:"):]
+            response = self.controller.library(uuid)
+            [catalog_entry] = json.loads(response.data).get("catalogs")
+            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
+            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
+
+            # We get a problem detail if the library doesn't exist..
+            response = self.controller.library("not a library")
+            eq_(LIBRARY_NOT_FOUND, response)
+
+            # Or is not in production when we requested a live library.
+            nypl.registry_stage = Library.TESTING_STAGE
+            response = self.controller.library(nypl.short_name)
+            eq_(LIBRARY_NOT_FOUND, response)
+
+            response = self.controller.library(nypl.short_name, live=False)
+            [catalog_entry] = json.loads(response.data).get("catalogs")
+            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
+            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
+
     def queue_opds_success(
             self, auth_url="http://circmanager.org/authentication.opds",
             media_type=None
