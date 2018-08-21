@@ -316,13 +316,7 @@ class TestLibraryRegistryController(ControllerTest):
     def test_library(self):
         nypl = self.nypl
         with self.app.test_request_context():
-            # We can look up a library by its short name.
-            response = self.controller.library(nypl.short_name)
-            [catalog_entry] = json.loads(response.data).get("catalogs")
-            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
-            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
-
-            # Or by its UUID (internal URN minus the prefix).
+            # We can look up a library by its UUID (internal URN minus the prefix).
             uuid = nypl.internal_urn[len("urn:uuid:"):]
             response = self.controller.library(uuid)
             [catalog_entry] = json.loads(response.data).get("catalogs")
