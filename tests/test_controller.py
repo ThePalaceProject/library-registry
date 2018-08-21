@@ -329,19 +329,9 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(nypl.name, catalog_entry.get("metadata").get("title"))
             eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
 
-            # We get a problem detail if the library doesn't exist..
+            # We get a problem detail if the library doesn't exist.
             response = self.controller.library("not a library")
             eq_(LIBRARY_NOT_FOUND, response)
-
-            # Or is not in production when we requested a live library.
-            nypl.registry_stage = Library.TESTING_STAGE
-            response = self.controller.library(nypl.short_name)
-            eq_(LIBRARY_NOT_FOUND, response)
-
-            response = self.controller.library(nypl.short_name, live=False)
-            [catalog_entry] = json.loads(response.data).get("catalogs")
-            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
-            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
 
     def queue_opds_success(
             self, auth_url="http://circmanager.org/authentication.opds",

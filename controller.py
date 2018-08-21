@@ -194,23 +194,18 @@ class LibraryRegistryController(object):
             )
             return Response(body, 200, headers)
 
-    def library(self, short_name_or_uuid, live=True):
+    def library(self, short_name_or_uuid):
         library = Library.for_short_name(self._db, short_name_or_uuid)
         if not library:
             library = Library.for_urn(self._db, "urn:uuid:" + short_name_or_uuid)
-        if not library or (live and not library.in_production):
+        if not library:
             return LIBRARY_NOT_FOUND
 
-        if live:
-            library_controller = 'library'
-        else:
-            library_controller = 'library_qa'
-
-        this_url = self.app.url_for(library_controller, short_name_or_uuid=library.short_name)
+        this_url = self.app.url_for('library', short_name_or_uuid=library.short_name)
         catalog = OPDSCatalog(
             self._db, library.name,
             this_url, [library],
-            annotator=self.annotator, live=live
+            annotator=self.annotator, live=False,
         )
         return catalog_response(catalog)
 
