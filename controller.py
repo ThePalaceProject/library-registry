@@ -17,6 +17,7 @@ import os
 from PIL import Image
 from StringIO import StringIO
 from urlparse import urljoin
+from urllib import unquote
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
@@ -109,6 +110,11 @@ class LibraryRegistryAnnotator(Annotator):
             catalog.catalog, href=register_url, rel="register", type=OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
         )
 
+        # Add a templated link for getting a single library's entry.
+        library_url = unquote(self.app.url_for("library", uuid="{uuid}"))
+        catalog.add_link_to_catalog(
+            catalog.catalog, href=library_url, rel="http://librarysimplified.org/rel/registry/library", type=OPDSCatalog.OPDS_TYPE, templated=True)
+
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
 
@@ -195,7 +201,9 @@ class LibraryRegistryController(object):
             return Response(body, 200, headers)
 
     def library(self, uuid):
-        library = Library.for_urn(self._db, "urn:uuid:" + uuid)
+        if not uuid.startswith("urn:uuid:"):
+            uuid = "urn:uuid:" + uuid
+        library = Library.for_urn(self._db, uuid)
         if not library:
             return LIBRARY_NOT_FOUND
 

@@ -8,6 +8,7 @@ import json
 import base64
 import random
 from smtplib import SMTPException
+from urllib import unquote
 
 from controller import (
     LibraryRegistry,
@@ -146,7 +147,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             # If that's not good enough, there's a link to the search
             # controller, so you can do a search.
-            [register_link, search_link, self_link] = sorted(
+            [library_link, register_link, search_link, self_link] = sorted(
                 catalog['links'], key=lambda x: x['rel']
             )
             url_for = self.app.library_registry.url_for
@@ -162,6 +163,11 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
             eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory", register_link["type"])
+
+            eq_(unquote(url_for("library", uuid="{uuid}")), library_link["href"])
+            eq_("http://librarysimplified.org/rel/registry/library", library_link["rel"])
+            eq_("application/opds+json", library_link["type"])
+            eq_(True, library_link.get("templated"))
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
@@ -189,13 +195,17 @@ class TestLibraryRegistryController(ControllerTest):
             # Some of the links are the same as in the production feed;
             # others are different.
             url_for = self.app.library_registry.url_for
-            [register_link, search_link, self_link] = sorted(
+            [library_link, register_link, search_link, self_link] = sorted(
                 catalogs['links'], key=lambda x: x['rel']
             )
 
             # The 'register' link is the same as in the main feed.
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
+
+            # So is the 'library' templated link.
+            eq_(unquote(url_for("library", uuid="{uuid}")), library_link["href"])
+            eq_("http://librarysimplified.org/rel/registry/library", library_link["rel"])
 
             # This is a QA feed, and the 'search' and 'self' links
             # will give results from the QA feed.
@@ -269,7 +279,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("Kansas State Library", ks['metadata']['title'])
             eq_("1922 km.", ks['metadata']['distance'])
 
-            [register_link, search_link, self_link] = sorted(
+            [library_link, register_link, search_link, self_link] = sorted(
                 catalog['links'], key=lambda x: x['rel']
             )
             url_for = self.app.library_registry.url_for
@@ -287,6 +297,11 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("register"), register_link["href"])
             eq_("register", register_link["rel"])
             eq_("application/opds+json;profile=https://librarysimplified.org/rel/profile/directory", register_link["type"])
+
+            eq_(unquote(url_for("library", uuid="{uuid}")), library_link["href"])
+            eq_("http://librarysimplified.org/rel/registry/library", library_link["rel"])
+            eq_("application/opds+json", library_link["type"])
+            eq_(True, library_link.get("templated"))
 
             eq_("VENDORID", catalog["metadata"]["adobe_vendor_id"])
 
@@ -316,7 +331,13 @@ class TestLibraryRegistryController(ControllerTest):
     def test_library(self):
         nypl = self.nypl
         with self.app.test_request_context():
-            # We can look up a library by its UUID (internal URN minus the prefix).
+            # We can look up a library by its internal URN...
+            response = self.controller.library(nypl.internal_urn)
+            [catalog_entry] = json.loads(response.data).get("catalogs")
+            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
+            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
+
+            # Or its UUID without the prefix.
             uuid = nypl.internal_urn[len("urn:uuid:"):]
             response = self.controller.library(uuid)
             [catalog_entry] = json.loads(response.data).get("catalogs")
