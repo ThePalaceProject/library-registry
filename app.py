@@ -93,6 +93,11 @@ def confirm_resource(secret):
         resource_id, secret
     )
 
+@app.route('/library/<uuid>')
+@returns_problem_detail
+def library(uuid):
+    return app.library_registry.registry_controller.library(uuid)
+
 @app.route('/heartbeat')
 @returns_problem_detail
 def hearbeat():

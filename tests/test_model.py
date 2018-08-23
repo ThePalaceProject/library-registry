@@ -279,6 +279,11 @@ class TestLibrary(DatabaseTest):
         lib.short_name = 'ABCD'
         eq_(lib, Library.for_short_name(self._db, 'ABCD'))
 
+    def test_for_urn(self):
+        eq_(None, Library.for_urn(self._db, 'ABCD'))
+        lib = self._library()
+        eq_(lib, Library.for_urn(self._db, lib.internal_urn))
+
     def test_random_short_name(self):
         # First, try with no duplicate check.
         random.seed(42)

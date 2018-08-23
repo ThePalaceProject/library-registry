@@ -351,12 +351,13 @@ class Library(Base):
 
     @classmethod
     def for_short_name(cls, _db, short_name):
-        """Look up a library by short name.
-
-        This only exists so it can be used as a duplicate_check with
-        random_short_name.
-        """
+        """Look up a library by short name."""
         return get_one(_db, Library, short_name=short_name)
+
+    @classmethod
+    def for_urn(cls, _db, urn):
+        """Look up a library by URN."""
+        return get_one(_db, Library, internal_urn=urn)
 
     @classmethod
     def random_short_name(cls, duplicate_check=None, max_attempts=20):

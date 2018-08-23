@@ -17,6 +17,7 @@ import os
 from PIL import Image
 from StringIO import StringIO
 from urlparse import urljoin
+from urllib import unquote
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
@@ -109,6 +110,11 @@ class LibraryRegistryAnnotator(Annotator):
             catalog.catalog, href=register_url, rel="register", type=OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
         )
 
+        # Add a templated link for getting a single library's entry.
+        library_url = unquote(self.app.url_for("library", uuid="{uuid}"))
+        catalog.add_link_to_catalog(
+            catalog.catalog, href=library_url, rel="http://librarysimplified.org/rel/registry/library", type=OPDSCatalog.OPDS_TYPE, templated=True)
+
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
 
@@ -170,7 +176,7 @@ class LibraryRegistryController(object):
                 self._db, point, query, production=live
             )
 
-            this_url = this_url = self.app.url_for(
+            this_url = self.app.url_for(
                 search_controller, q=query
             )
             catalog = OPDSCatalog(
@@ -193,6 +199,21 @@ class LibraryRegistryController(object):
                 3600 * 24 * 30
             )
             return Response(body, 200, headers)
+
+    def library(self, uuid):
+        if not uuid.startswith("urn:uuid:"):
+            uuid = "urn:uuid:" + uuid
+        library = Library.for_urn(self._db, uuid)
+        if not library:
+            return LIBRARY_NOT_FOUND
+
+        this_url = self.app.url_for('library', uuid=uuid)
+        catalog = OPDSCatalog(
+            self._db, library.name,
+            this_url, [library],
+            annotator=self.annotator, live=False,
+        )
+        return catalog_response(catalog)
 
     @classmethod
     def opds_response_links(cls, response, rel):

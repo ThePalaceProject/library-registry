@@ -58,3 +58,9 @@ LIBRARY_ALREADY_IN_PRODUCTION = pd(
     400,
     title=_("Library cannot be taken out of production once in production.")
 )
+
+LIBRARY_NOT_FOUND = pd(
+    "http://librarysimplified.org/terms/problem/library-not-found",
+    404,
+    title=_("The library does not exist in this registry."),
+)
