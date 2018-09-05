@@ -88,8 +88,8 @@ def search_qa():
 
 @app.route('/confirm/<int:resource_id>/<secret>')
 @returns_problem_detail
-def confirm_resource(secret):
-    return app.library_registry.validation_controller.validate(
+def confirm_resource(resource_id, secret):
+    return app.library_registry.validation_controller.confirm(
         resource_id, secret
     )
 
