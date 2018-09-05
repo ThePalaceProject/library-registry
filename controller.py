@@ -76,6 +76,8 @@ class LibraryRegistry(object):
         self.registry_controller = LibraryRegistryController(
             self, emailer_class
         )
+        self.validation_controller = ValidationController(self)
+
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         if vendor_id:

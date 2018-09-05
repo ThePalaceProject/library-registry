@@ -11,6 +11,7 @@ from smtplib import SMTPException
 from urllib import unquote
 
 from controller import (
+    AdobeVendorIDController,
     LibraryRegistry,
     LibraryRegistryController,
     ValidationController,
@@ -43,7 +44,7 @@ from problem_details import *
 from config import Configuration
 from testing import DummyHTTPResponse
 
-class TestLibraryRegistry(LibraryRegistry):
+class MockLibraryRegistry(LibraryRegistry):
     pass
 
 class MockEmailer(Emailer):
@@ -67,7 +68,7 @@ class ControllerTest(DatabaseTest):
         del os.environ['AUTOINITIALIZE']
         self.app = app
         self.data_setup()
-        self.library_registry = TestLibraryRegistry(
+        self.library_registry = MockLibraryRegistry(
             self._db, testing=True, emailer_class=MockEmailer,
         )
         self.app.library_registry = self.library_registry
@@ -78,6 +79,43 @@ class ControllerTest(DatabaseTest):
         object.
         """
         pass
+
+    def vendor_id_setup(self):
+        """Configure a basic vendor id service."""
+        integration, ignore = get_one_or_create(
+            self._db, ExternalIntegration,
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
+            goal=ExternalIntegration.DRM_GOAL,
+        )
+        integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
+
+
+class TestLibraryRegistry(ControllerTest):
+
+    def test_instantiated_controllers(self):
+        # Verify that the controllers were instantiated and attached
+        # to the LibraryRegistry object.
+        assert isinstance(
+            self.library_registry.registry_controller,
+            LibraryRegistryController
+        )
+        assert isinstance(
+            self.library_registry.validation_controller,
+            ValidationController
+        )
+
+        # No Adobe Vendor ID was set up.
+        eq_(None, self.library_registry.adobe_vendor_id)
+
+        # Let's configure one.
+        self.vendor_id_setup()
+        registry_with_adobe = MockLibraryRegistry(
+            self._db, testing=True, emailer_class=MockEmailer
+        )
+        assert isinstance(
+            registry_with_adobe.adobe_vendor_id,
+            AdobeVendorIDController
+        )
 
 
 class TestLibraryRegistryController(ControllerTest):
@@ -96,13 +134,7 @@ class TestLibraryRegistryController(ControllerTest):
         manhattan_ks = self.manhattan_ks
         us = self.crude_us
 
-        # Configure a basic vendor id service.
-        integration, ignore = get_one_or_create(
-            self._db, ExternalIntegration,
-            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
-            goal=ExternalIntegration.DRM_GOAL,
-        )
-        integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
+        self.vendor_id_setup()
 
     def setup(self):
         super(TestLibraryRegistryController, self).setup()
