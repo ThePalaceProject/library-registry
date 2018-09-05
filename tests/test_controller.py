@@ -11,6 +11,7 @@ from smtplib import SMTPException
 from urllib import unquote
 
 from controller import (
+    AdobeVendorIDController,
     LibraryRegistry,
     LibraryRegistryController,
     ValidationController,
