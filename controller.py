@@ -396,7 +396,7 @@ class LibraryRegistryController(object):
         else:
             failure_detail = _("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
 
-        if auth_document.id != auth_response.final_url:
+        if auth_document.id != auth_response.url:
             failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.final_url)
         if failure_detail:
             self.log.error(
