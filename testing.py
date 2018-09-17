@@ -359,7 +359,6 @@ class DummyHTTPResponse(object):
         self.content = content
         self.links = links or {}
         self.url = url or "http://url/"
-        self.final_url = self.url
 
     @property
     def raw(self):

@@ -396,8 +396,8 @@ class LibraryRegistryController(object):
         else:
             failure_detail = _("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
 
-        if auth_document.id != auth_response.final_url:
-            failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.final_url)
+        if auth_document.id != auth_response.url:
+            failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.url)
         if failure_detail:
             self.log.error(
                 "Registration of %s failed: %s", auth_url, failure_detail
@@ -457,7 +457,7 @@ class LibraryRegistryController(object):
 
         library = None
         elevated_permissions = False
-        auth_url = auth_response.final_url
+        auth_url = auth_response.url
         if shared_secret:
             # Look up a library by the provided shared secret. This
             # will let us handle the case where the library has
