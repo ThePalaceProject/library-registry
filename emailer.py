@@ -1,3 +1,4 @@
+from nose.tools import set_trace
 import email
 import smtplib
 
@@ -212,5 +213,7 @@ class EmailTemplate(object):
         for k, v in (('to_address', to_header), ('from_address', from_header)):
             if not k in kwargs:
                 kwargs[k] = v
-        message.set_payload(self.body_template % kwargs)
+        payload = self.body_template % kwargs
+        message.set_payload(payload.encode("utf8"))
         return message.as_string()
+

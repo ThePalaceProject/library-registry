@@ -32,6 +32,15 @@ The subject is red but the body is 22""",
             body
         )
 
+    def test_unicode(self):
+        snowman = u"\N{SNOWMAN}"
+        template = EmailTemplate(
+            "A snowman for you.",
+            snowman
+        )
+        body = template.body("me@example.com", "you@example.com")
+        assert snowman in body
+
 
 class MockSMTP(object):
     """Mock of smtplib.SMTP that records all incoming calls."""
