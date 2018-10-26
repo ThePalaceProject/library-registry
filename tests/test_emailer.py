@@ -10,6 +10,7 @@ from emailer import (
     Emailer,
     EmailTemplate,
 )
+import quopri
 
 
 class TestEmailTemplate(object):
@@ -23,23 +24,47 @@ class TestEmailTemplate(object):
         body = template.body("me@example.com", "you@example.com",
                       color="red", number=22
         )
-        eq_(
-"""From: me@example.com
-To: you@example.com
-Subject: A red subject
 
-The subject is red but the body is 22""",
-            body
-        )
+        # We always generate a MIME multipart message because
+        # that's how we handle non-ASCII characters.
+        for expect in (
+                "Content-Type: multipart/mixed;",
+                "Content-Transfer-Encoding: quoted-printable"
+        ):
+            assert expect in body
 
-    def test_unicode(self):
+        # A MIME multipart message contains a randomly generated
+        # component, so we can't check the exact contents, but we can
+        # verify that the email addresses made it into the From: and
+        # To: headers, and that variables were interpolated into the
+        # templates.
+        for expect in (
+            "From: me@example.com\nTo: you@example.com",
+            "Subject: =?utf-8?q?A_red_subject",
+            "\n\nThe subject is red but the body is 22"
+        ):
+            assert expect in body
+
+
+    def test_unicode_quoted_printable(self):
+        # Create an email message that includes Unicode characters in
+        # its subject and body.
         snowman = u"\N{SNOWMAN}"
         template = EmailTemplate(
-            "A snowman for you.",
-            snowman
+            u"A snowman for you! %s" % snowman,
+            u"Here he is: %s" % snowman
         )
         body = template.body("me@example.com", "you@example.com")
-        assert snowman in body
+        set_trace()
+        # The SNOWMAN character is encoded as quoted-printable in both
+        # the subject and the message contents.
+        quoted_printable_snowman = quopri.encodestring(snowman.encode("utf8"))
+        for template in (
+            "Subject: =?utf-8?q?A_snowman_for_you!_%(snowman)s?=",
+            "\n\nHere he is: %(snowman)s"
+        ):
+            expect = template % dict(snowman=quoted_printable_snowman)
+            assert expect in body
 
 
 class MockSMTP(object):

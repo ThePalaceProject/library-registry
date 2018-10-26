@@ -1,6 +1,16 @@
 from nose.tools import set_trace
+from email.header import Header
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email import Charset
 import email
 import smtplib
+
+# Set up an encoding/decoding between UTF-8 and quoted-printable.
+# Otherwise, the bodies of email messages will be encoded with base64
+# and they'll be hard to read. This way, only the non-ASCII characters
+# need to be encoded.
+Charset.add_charset('utf-8', Charset.QP, Charset.QP, 'utf-8')
 
 from config import (
     CannotLoadConfiguration,
@@ -193,27 +203,28 @@ class EmailTemplate(object):
         self.subject_template = subject_template
         self.body_template = body_template
 
-    def body(self, from_header, to_header, **kwargs):
+    def body(self, from_address, to_address, **kwargs):
         """Generate the complete body of the email message, including headers.
 
-        :param from_header: Originating address to use in From: header.
-        :param to_header: Destination address to use in To: header.
+        :param from_address: Originating address to use in From: header.
+        :param to_address: Destination address to use in To: header.
         :param kwargs: Arguments to use when filling out the template.
         """
 
-        message = email.Message.Message()
-        message['From'] = from_header
-        message['To'] = to_header
-        message['Subject'] = self.subject_template % kwargs
+        message = MIMEMultipart('mixed')
+        message['From'] = from_address
+        message['To'] = to_address
+        message['Subject'] = Header(self.subject_template % kwargs, 'utf-8')
 
         # This might look ugly, because %(from_address)s in a template
         # is expected to be an unadorned email address, whereas this
         # might look like '"Name" <email>', but it's better than
         # nothing.
-        for k, v in (('to_address', to_header), ('from_address', from_header)):
+        for k, v in (('to_address', to_address), ('from_address', from_address)):
             if not k in kwargs:
                 kwargs[k] = v
         payload = self.body_template % kwargs
-        message.set_payload(payload.encode("utf8"))
+        text_part = MIMEText(payload, 'plain', 'utf-8')
+        message.attach(text_part)
         return message.as_string()
 
