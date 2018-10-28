@@ -10,7 +10,7 @@ from authentication_document import AuthenticationDocument
 
 class Annotator(object):
 
-    def annotate_feed(self, feed):
+    def annotate_catalog(self, catalog, live=True):
         pass
 
 class OPDSCatalog(object):

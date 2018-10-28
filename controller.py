@@ -117,6 +117,14 @@ class LibraryRegistryAnnotator(Annotator):
         catalog.add_link_to_catalog(
             catalog.catalog, href=library_url, rel="http://librarysimplified.org/rel/registry/library", type=OPDSCatalog.OPDS_TYPE, templated=True)
 
+        # Add a link for the registry's web client, if it has one.
+        web_client_url = ConfigurationSetting.sitewide(
+            self.app._db, Configuration.WEB_CLIENT_URL).value
+        if web_client_url:
+            templated = ("{uuid}" in web_client_url)
+            catalog.add_link_to_catalog(
+                catalog.catalog, href=web_client_url, rel="http://librarysimplified.org/rel/web-client", type="text/html", templated=templated)
+
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
 
