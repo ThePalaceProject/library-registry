@@ -203,24 +203,24 @@ class EmailTemplate(object):
         self.subject_template = subject_template
         self.body_template = body_template
 
-    def body(self, from_address, to_address, **kwargs):
+    def body(self, from_header, to_header, **kwargs):
         """Generate the complete body of the email message, including headers.
 
-        :param from_address: Originating address to use in From: header.
-        :param to_address: Destination address to use in To: header.
+        :param from_header: Originating address to use in From: header.
+        :param to_header: Destination address to use in To: header.
         :param kwargs: Arguments to use when filling out the template.
         """
 
         message = MIMEMultipart('mixed')
-        message['From'] = from_address
-        message['To'] = to_address
+        message['From'] = from_header
+        message['To'] = to_header
         message['Subject'] = Header(self.subject_template % kwargs, 'utf-8')
 
         # This might look ugly, because %(from_address)s in a template
         # is expected to be an unadorned email address, whereas this
         # might look like '"Name" <email>', but it's better than
         # nothing.
-        for k, v in (('to_address', to_address), ('from_address', from_address)):
+        for k, v in (('to_address', to_header), ('from_address', from_header)):
             if not k in kwargs:
                 kwargs[k] = v
         payload = self.body_template % kwargs
