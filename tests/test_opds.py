@@ -10,9 +10,10 @@ from . import (
 )
 
 from authentication_document import AuthenticationDocument
-
+from config import Configuration
 from model import (
     get_one_or_create,
+    ConfigurationSetting,
     Hyperlink,
     Validation,
 )
@@ -78,6 +79,9 @@ class TestOPDSCatalog(DatabaseTest):
             "mailto:help@library.org"
         )
 
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.WEB_CLIENT_URL).value = "http://web/{uuid}"
+
         catalog = Mock.library_catalog(library)
         metadata = catalog['metadata']
         eq_(library.name, metadata['title'])
@@ -86,19 +90,23 @@ class TestOPDSCatalog(DatabaseTest):
 
         eq_(metadata['updated'], OPDSCatalog._strftime(library.timestamp))
 
-        [authentication_url, web, help, opds] = sorted(catalog['links'], key=lambda x: x.get('rel'))
+        [authentication_url, web_alternate, help, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel'), x.get('type')))
         [logo] = catalog['images']
 
         eq_("mailto:help@library.org", help['href'])
         eq_(Hyperlink.HELP_REL, help['rel'])
 
-        eq_(library.web_url, web['href'])
-        eq_("alternate", web['rel'])
-        eq_("text/html", web['type'])
+        eq_(library.web_url, web_alternate['href'])
+        eq_("alternate", web_alternate['rel'])
+        eq_("text/html", web_alternate['type'])
 
-        eq_(library.opds_url, opds['href'])
-        eq_(OPDSCatalog.CATALOG_REL, opds['rel'])
-        eq_(OPDSCatalog.OPDS_1_TYPE, opds['type'])
+        eq_(library.opds_url, opds_self['href'])
+        eq_(OPDSCatalog.CATALOG_REL, opds_self['rel'])
+        eq_(OPDSCatalog.OPDS_1_TYPE, opds_self['type'])
+
+        eq_("http://web/%s" % library.internal_urn, web_self['href'])
+        eq_("self", web_self['rel'])
+        eq_("text/html", web_self['type'])
 
         eq_(library.logo, logo['href'])
         eq_(OPDSCatalog.THUMBNAIL_REL, logo['rel'])

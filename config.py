@@ -47,6 +47,11 @@ class Configuration(object):
     # have problems.
     REGISTRY_CONTACT_EMAIL = "registry_contact_email"
 
+    # If the registry provides access to a web-based client, it can
+    # specify the URL with this setting. The URL must be templated and contain
+    # a `{uuid}` expression, to provide the web URL for a specific library.
+    WEB_CLIENT_URL = "web_client_url"
+
     @classmethod
     def database_url(cls, test=False):
         """Find the URL to the database so that other configuration

@@ -13,6 +13,7 @@ from urllib import unquote
 from controller import (
     AdobeVendorIDController,
     LibraryRegistry,
+    LibraryRegistryAnnotator,
     LibraryRegistryController,
     ValidationController,
 )
@@ -31,6 +32,7 @@ from authentication_document import AuthenticationDocument
 from emailer import Emailer
 from opds import OPDSCatalog
 from model import (
+    create,
     get_one,
     get_one_or_create,
     ConfigurationSetting,
@@ -89,6 +91,43 @@ class ControllerTest(DatabaseTest):
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
 
+class TestLibraryRegistryAnnotator(ControllerTest):
+    def test_annotate_catalog(self):
+        annotator = LibraryRegistryAnnotator(self.app.library_registry)
+        
+        integration, ignore = create(
+            self._db, ExternalIntegration,
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
+            goal=ExternalIntegration.DRM_GOAL,
+        )
+        integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
+
+        with self.app.test_request_context("/"):
+            catalog = OPDSCatalog(self._db, "Test Catalog", "http://catalog", [])
+            annotator.annotate_catalog(catalog)
+
+            # The catalog should have three new links: search, register, and a templated link
+            # for a library's OPDS entry, in addition to self. It should also have the adobe
+            # vendor id in the catalog's metadata.
+
+            links = catalog.catalog.get("links")
+            eq_(4, len(links))
+            [opds_link, register_link, search_link, self_link] = sorted(links, key=lambda x: x.get("rel"))
+
+            eq_('http://localhost/library/{uuid}', opds_link.get("href"))
+            eq_('http://librarysimplified.org/rel/registry/library', opds_link.get("rel"))
+            eq_('application/opds+json', opds_link.get("type"))
+            eq_(True, opds_link.get("templated"))
+
+            eq_('http://localhost/search', search_link.get("href"))
+            eq_("search", search_link.get("rel"))
+            eq_('application/opensearchdescription+xml', search_link.get("type"))
+
+            eq_('http://localhost/register', register_link.get("href"))
+            eq_('register', register_link.get('rel'))
+            eq_('application/opds+json;profile=https://librarysimplified.org/rel/profile/directory', register_link.get('type'))
+
+            eq_("VENDORID", catalog.catalog.get("metadata").get('adobe_vendor_id'))
 
 class TestLibraryRegistry(ControllerTest):
 
