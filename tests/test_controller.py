@@ -95,9 +95,6 @@ class TestLibraryRegistryAnnotator(ControllerTest):
     def test_annotate_catalog(self):
         annotator = LibraryRegistryAnnotator(self.app.library_registry)
         
-        ConfigurationSetting.sitewide(
-            self._db, Configuration.WEB_CLIENT_URL).value = "http://web/{uuid}"
-
         integration, ignore = create(
             self._db, ExternalIntegration,
             protocol=ExternalIntegration.ADOBE_VENDOR_ID,
@@ -109,23 +106,18 @@ class TestLibraryRegistryAnnotator(ControllerTest):
             catalog = OPDSCatalog(self._db, "Test Catalog", "http://catalog", [])
             annotator.annotate_catalog(catalog)
 
-            # The catalog should have four new links: search, register, and templated links for
-            # a library's OPDS entry and web client, in addition to self. It should also have
-            # the adobe vendor id in the catalog's metadata.
+            # The catalog should have three new links: search, register, and a templated link
+            # for a library's OPDS entry, in addition to self. It should also have the adobe
+            # vendor id in the catalog's metadata.
 
             links = catalog.catalog.get("links")
-            eq_(5, len(links))
-            [opds_link, web_link, register_link, search_link, self_link] = sorted(links, key=lambda x: x.get("rel"))
+            eq_(4, len(links))
+            [opds_link, register_link, search_link, self_link] = sorted(links, key=lambda x: x.get("rel"))
 
             eq_('http://localhost/library/{uuid}', opds_link.get("href"))
             eq_('http://librarysimplified.org/rel/registry/library', opds_link.get("rel"))
             eq_('application/opds+json', opds_link.get("type"))
             eq_(True, opds_link.get("templated"))
-
-            eq_('http://web/{uuid}', web_link.get("href"))
-            eq_('http://librarysimplified.org/rel/web-client', web_link.get("rel"))
-            eq_("text/html", web_link.get("type"))
-            eq_(True, web_link.get("templated"))
 
             eq_('http://localhost/search', search_link.get("href"))
             eq_("search", search_link.get("rel"))

@@ -2,11 +2,14 @@ from nose.tools import set_trace
 import json
 
 from model import (
+    ConfigurationSetting,
     Hyperlink,
+    Session,
     Validation,
 )
 
 from authentication_document import AuthenticationDocument
+from config import Configuration
 
 class Annotator(object):
 
@@ -123,6 +126,16 @@ class OPDSCatalog(object):
             cls.add_link_to_catalog(
                 catalog, **args
             )
+
+        # Add a link for the registry's web client, if it has one.
+        _db = Session.object_session(library)
+        web_client_url = ConfigurationSetting.sitewide(
+            _db, Configuration.WEB_CLIENT_URL).value
+        if web_client_url:
+            web_client_url = web_client_url.replace('{uuid}', library.internal_urn)
+            cls.add_link_to_catalog(
+                catalog, href=web_client_url, rel="self", type="text/html")
+
         return catalog
 
     @classmethod
