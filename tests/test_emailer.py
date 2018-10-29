@@ -4,12 +4,14 @@ from nose.tools import (
     set_trace,
 )
 from . import DatabaseTest
+from email.mime.text import MIMEText
 
 from config import CannotLoadConfiguration
 from emailer import (
     Emailer,
     EmailTemplate,
 )
+import quopri
 
 
 class TestEmailTemplate(object):
@@ -23,14 +25,46 @@ class TestEmailTemplate(object):
         body = template.body("me@example.com", "you@example.com",
                       color="red", number=22
         )
-        eq_(
-"""From: me@example.com
-To: you@example.com
-Subject: A red subject
 
-The subject is red but the body is 22""",
-            body
+        # We always generate a MIME multipart message because
+        # that's how we handle non-ASCII characters.
+        for expect in (
+                "Content-Type: multipart/mixed;",
+                "Content-Transfer-Encoding: quoted-printable"
+        ):
+            assert expect in body
+
+        # A MIME multipart message contains a randomly generated
+        # component, so we can't check the exact contents, but we can
+        # verify that the email addresses made it into the From: and
+        # To: headers, and that variables were interpolated into the
+        # templates.
+        for expect in (
+            "From: me@example.com\nTo: you@example.com",
+            "Subject: =?utf-8?q?A_red_subject",
+            "\n\nThe subject is red but the body is 22"
+        ):
+            assert expect in body
+
+
+    def test_unicode_quoted_printable(self):
+        # Create an email message that includes Unicode characters in
+        # its subject and body.
+        snowman = u"\N{SNOWMAN}"
+        template = EmailTemplate(
+            u"A snowman for you! %s" % snowman,
+            u"Here he is: %s" % snowman
         )
+        body = template.body("me@example.com", "you@example.com")
+        # The SNOWMAN character is encoded as quoted-printable in both
+        # the subject and the message contents.
+        quoted_printable_snowman = quopri.encodestring(snowman.encode("utf8"))
+        for template in (
+            "Subject: =?utf-8?q?A_snowman_for_you!_%(snowman)s?=",
+            "\n\nHere he is: %(snowman)s"
+        ):
+            expect = template % dict(snowman=quoted_printable_snowman)
+            assert expect in body
 
 
 class MockSMTP(object):
@@ -197,15 +231,23 @@ class TestEmailer(DatabaseTest):
         body = designation_template.body(
             "me@registry", "you@library", **args
         )
-        eq_(body, """From: me@registry
-To: you@library
-Subject: This address designated as the support address for My Public Library
 
-This email address, you@library, has been registered with the Library Simplified library registry as the support address for the library My Public Library (https://library/).
+        # Verify that the headers were set correctly.
+        for phrase in [
+            "From: me@registry",
+            "To: you@library",
+            "This address designated as the support address for My Public".replace(" ", "_"), # Part of the encoding process
+        ]:
+            assert phrase in body
+
+        # Verify that the body was set correctly.
+        expect = """This email address, you@library, has been registered with the Library Simplified library registry as the support address for the library My Public Library (https://library/).
 
 If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at me@registry -- something has gone wrong.
 
-If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at me@registry.""")
+If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at me@registry."""
+        text_part = MIMEText(expect, 'plain', 'utf-8')
+        assert text_part.get_payload() in body
 
         # The confirmation template has a couple extra fields that need
         # filling in.
@@ -218,14 +260,26 @@ If you do work at a public library, but you're not sure what this means, please 
         # The address confirmation template is the address designation
         # template with a couple extra paragraphs and a different
         # subject line.
-        extra = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link:
+        extra = """If you do know what this means, you should also know that you
+'re not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link:
 
 http://registry/confirm
 
 The link will expire in about a day. If the link expires, just re-register your library with the library registry, and a fresh confirmation email like this will be sent out."""
-        new_body = body.replace("Subject: This address designated as the ",
-                                "Subject: Confirm the ")
-        eq_(body2, new_body+"\n\n"+extra)
+
+        # Verify the subject line
+        assert "Confirm_the_" in body2
+
+        # Verify that the extra content is there. (TODO: I wasn't able
+        # to check the whole thing because expect2 parses into a
+        # slightly different Message object than is generated by
+        # Emailer.)
+        expect2 = expect + "\n\n" + extra
+        for phrase in [
+                "\nhttp://registry/confirm\n",
+                "The link will expire"
+        ]:
+            assert phrase in body2
 
     def test_send(self):
         """Validate our ability to construct and send email."""
@@ -246,11 +300,14 @@ The link will expire in about a day. If the link expires, just re-register your 
         # _send_email implementation.
         (to, body, smtp) = emailer.emails.pop()
         eq_("you@library", to)
-        eq_("""From: Me <me@registry>
-To: you@library
-Subject: subject Value
-
-Hello, you@library, this is me@registry.""", body)
+        for phrase in [
+            "From: Me <me@registry>",
+            "To: you@library",
+            "subject Value".replace(" ", "_"), # Part of the encoding process.
+            "Hello, you@library, this is me@registry."
+        ]:
+            print phrase
+            assert phrase in body
         eq_(mock_smtp, smtp)
 
     def test__send_email(self):
