@@ -155,11 +155,13 @@ class AuthenticationDocument(object):
         `places` is a list of Place model objects.
 
         `unknown` is a coverage object representing the subset of
-        `coverage` that had no corresponding Place objects.
+        `coverage` that had no corresponding Place objects. This
+        object will not be used for any purpose except error display.
 
-        `ambiguous` is a coverage object representing
-        the subset of `coverage` that had more than one corresponding
-        Place object.
+        `ambiguous` is a coverage object representing the subset of
+        `coverage` that had more than one corresponding Place
+        object. This object will not be used for any purpose except
+        error display.
         """
         place_objs = []
         unknown = defaultdict(list)
@@ -168,7 +170,27 @@ class AuthenticationDocument(object):
             # This library covers the entire universe! No need to
             # parse anything.
             place_objs.append(place_class.everywhere(_db))
-            coverage = dict()
+            coverage = dict() # Do no more processing
+
+        elif isinstance(coverage, basestring):
+            # The coverage is identified by a string. Try to
+            # parse it. This will go a lot easier if a default
+            # country is defined for this registry.
+            default_place = place_class.default_country(_db) or place_class.everywhere(_db)
+            default_place_name = (
+                default_place.abbreviated_name or default_place.external_name
+            )
+            try:
+                parsed = Place.by_name(_db, coverage)
+                if parsed:
+                    place_objs.append(parsed)
+                else:
+                    unknown[default_place_name].append(coverage)
+            except MultipleResultsFound, e:
+                ambiguous[default_place_name].append(coverage)
+            except NoResultsFound, e:
+                unknown[default_place_name].append(coverage)
+            coverage = dict() # Do no more processing
 
         for country, places in coverage.items():
             try:

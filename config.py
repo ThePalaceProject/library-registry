@@ -52,6 +52,10 @@ class Configuration(object):
     # a `{uuid}` expression, to provide the web URL for a specific library.
     WEB_CLIENT_URL = "web_client_url"
 
+    # If a library references a place that's not explicitly in any particular
+    # country, we assume that they're talking about this country.
+    DEFAULT_COUNTRY_NAME = "default_country_name"
+
     @classmethod
     def database_url(cls, test=False):
         """Find the URL to the database so that other configuration

@@ -24,7 +24,7 @@ from testing import MockPlace
 # Alias for a long class name
 AuthDoc = AuthenticationDocument
 
-class TestParseCoverage(object):
+class TestParseCoverage(DatabaseTest):
 
     EVERYWHERE = AuthenticationDocument.COVERAGE_EVERYWHERE
 
@@ -35,7 +35,7 @@ class TestParseCoverage(object):
         ambiguous place names, are as expected.
         """
         place_objs, unknown, ambiguous = AuthDoc.parse_coverage(
-            None, coverage_object, MockPlace
+            self._db, coverage_object, MockPlace
         )
         empty = defaultdict(list)
         expected_places = expected_places or []
@@ -141,6 +141,18 @@ class TestParseCoverage(object):
             expected_unknown={"US": ["Nowheresville"]}
         )
 
+    def test_unscoped_place(self):
+        # Test an authentication document that names a place without
+        # scoping it.
+        sf = MockPlace()
+        us = MockPlace(inside={"San Francisco": sf})
+        MockPlace.by_name["US"] = us
+        MockPlace._default = us
+
+        self.parse_places(
+            "San Francisco, US",
+            expected_places=[sf]
+        )
 
 class TestLinkExtractor(object):
     """Test the _extract_link helper method."""

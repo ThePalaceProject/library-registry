@@ -431,6 +431,10 @@ class MockRequestsResponse(object):
         return self.content.decode("utf8")
 
 
+class MockEverywhere(object):
+    abbreviated_name = None
+    external_name = "Everywhere"
+
 class MockPlace(object):
     """Used to test AuthenticationDocument.parse_coverage."""
 
@@ -439,12 +443,20 @@ class MockPlace(object):
 
     # Used to indicate coverage through the universe or through a
     # country.
-    EVERYWHERE = object()
+    EVERYWHERE = MockEverywhere
+
+    # Used within a test to provide a starting point for place
+    # names that don't mention a country.
+    _default_country = None
 
     by_name = dict()
 
     def __init__(self, inside=None):
         self.inside = inside or dict()
+
+    @classmethod
+    def default_country(cls, _db):
+        return cls._default_country
 
     @classmethod
     def lookup_one_by_name(cls, _db, name, place_type):
@@ -467,3 +479,4 @@ class MockPlace(object):
     @classmethod
     def everywhere(cls, _db):
         return cls.EVERYWHERE
+

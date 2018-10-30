@@ -1051,17 +1051,80 @@ class Place(Base):
     service_areas = relationship("ServiceArea", backref="place")
 
     @classmethod
-    def everywhere(self, _db):
+    def everywhere(cls, _db):
         """Return a special Place that represents everywhere.
 
         This place has no .geometry, so attempts to use it in
         geographic comparisons will fail.
         """
         place, is_new = get_one_or_create(
-            _db, Place, type=self.EVERYWHERE,
+            _db, Place, type=cls.EVERYWHERE,
             create_method_kwargs=dict(external_id="Everywhere",
                                       external_name="Everywhere")
         )
+        return place
+
+    @classmethod
+    def default_country(cls, _db):
+        """Return the default country for this library registry.
+
+        If an incoming place name doesn't mention a country, we'll try
+        to look it up within this country. If this is set, it's
+        probably to the name of the country in which this registry is
+        based.
+
+        :return: The default country, if one is named and the name can
+            be processed. Otherwise, None.
+        """
+        default_country = None
+        country_name=ConfigurationSetting.sitewide(
+            _db, Configuration.DEFAULT_COUNTRY_NAME
+        ).value
+        everywhere = cls.everywhere(_db)
+        if country_name:
+            default_country = everywhere.lookup_inside(country_name)
+            if not default_country:
+                self.logging.error(
+                    "Could not look up default country %s", country_name
+                )
+        return default_country
+
+    @classmethod
+    def by_name(cls, _db, name):
+        """Turn the name of a Place into the Place itself.
+
+        :param name: A human-readable name of a place. If it makes
+        sense on its own, it will be interpreted as is. Otherwise, it
+        will be interpreted in the context of this registry's
+        `default` place.
+        """
+        everywhere = cls.everywhere(_db)
+        default = cls.default(_db)
+        parents = []
+        if default and default != everywhere:
+            parents.append(default)
+        parents.append(everywhere)
+        place = None
+
+        # Keep track of the first exception that was raised during
+        # this process. If we can't parse this Place name, we'll raise
+        # that exception because it's most likely to indicate the
+        # actual problem.
+        exception = None
+        for parent in parents:
+            try:
+                place = parent.lookup_inside(name)
+                if place is not None:
+                    exception = None
+                    break
+            except MultipleResultsFound, e:
+                if not exception:
+                    exception = e
+            except NoResultsFound, e:
+                if not exception:
+                    exception = e
+        if exception is not None:
+            raise exception
         return place
 
     @classmethod
