@@ -163,64 +163,95 @@ class TestPlace(DatabaseTest):
         kansas = manhattan_ks.parent
         kings_county = self.crude_kings_county
 
-        everywhere = Place.everywhere(self._db)
-        eq_(us, everywhere.lookup_inside("US"))
-        eq_(new_york, everywhere.lookup_inside("NY"))
-        eq_(new_york, us.lookup_inside("NY"))
+        # In most cases, we want to test that both versions of
+        # lookup_inside() return the same result.
+        def lookup_both_ways(parent, name, expect):
+            eq_(expect, parent.lookup_inside(name, using_overlap=True))
+            eq_(expect, parent.lookup_inside(name, using_overlap=False))
 
-        eq_(zip_10018, new_york.lookup_inside("10018"))
-        eq_(zip_10018, us.lookup_inside("10018, NY"))
-        eq_(nyc, us.lookup_inside("New York, NY"))
-        eq_(nyc, new_york.lookup_inside("New York"))
+        everywhere = Place.everywhere(self._db)
+        lookup_both_ways(everywhere, "US", us)
+        lookup_both_ways(everywhere, "NY", new_york)
+        lookup_both_ways(us, "NY", new_york)
+
+        lookup_both_ways(new_york, "10018", zip_10018)
+        lookup_both_ways(us, "10018, NY", zip_10018)
+        lookup_both_ways(us, "New York, NY", nyc)
+        lookup_both_ways(new_york, "New York", nyc)
 
         # Test that the disambiguators "State" and "County" are handled
         # properly.
-        eq_(new_york, us.lookup_inside("New York State"))
-        eq_(kings_county, us.lookup_inside("Kings County, NY"))
-        eq_(kings_county, everywhere.lookup_inside("Kings County, US"))
+        lookup_both_ways(us, "New York State", new_york)
+        lookup_both_ways(us, "Kings County, NY", kings_county)
+        lookup_both_ways(us, "New York State", new_york)
 
+        lookup_both_ways(us, "Manhattan, KS", manhattan_ks)
+        lookup_both_ways(us, "Manhattan, Kansas", manhattan_ks)
+
+        lookup_both_ways(new_york, "Manhattan, KS", None)
+        lookup_both_ways(connecticut, "New York", None)
+        lookup_both_ways(new_york, "Manhattan, KS", None)
+        lookup_both_ways(connecticut, "New York", None)
+        lookup_both_ways(connecticut, "New York, NY", None)
+        lookup_both_ways(connecticut, "10018", None)
+
+        # You can't find a place 'inside' itself.
+        lookup_both_ways(us, "US", None)
+        lookup_both_ways(new_york, "NY, US, 10018", None)
+
+        # Or 'inside' a place that's known to be smaller than it.
+        lookup_both_ways(kings_county, "NY", None)
+        lookup_both_ways(us, "NY, 10018", None)
+        lookup_both_ways(zip_10018, "NY", None)
+
+        # Now test cases where using_overlap makes a difference.
+
+        # First, the cases where using_overlap=True performs better.
+
+        # Looking up the name of a county by itself only works with
+        # using_overlap=True, because the .parent of a county is its
+        # state, not the US.
+        #
+        # Many county names are ambiguous, but this lets us parse
+        # the ones that are not.
+        eq_(
+            kings_county,
+            everywhere.lookup_inside("Kings County, US", using_overlap=True)
+        )
+
+        # Neither of these is obviously better.
+        eq_(None, us.lookup_inside("Manhattan"))
         assert_raises_regexp(
             MultipleResultsFound,
             "More than one place called Manhattan inside United States.",
-            us.lookup_inside, "Manhattan"
+            us.lookup_inside, "Manhattan", using_overlap=True
         )
-        eq_(manhattan_ks, us.lookup_inside("Manhattan, KS"))
-        eq_(manhattan_ks, us.lookup_inside("Manhattan, Kansas"))
-        eq_(None, new_york.lookup_inside("Manhattan, KS"))
-        eq_(None, connecticut.lookup_inside("New York"))
-        eq_(None, connecticut.lookup_inside("New York, NY"))
-        eq_(None, connecticut.lookup_inside("10018"))
 
-        # You can't find a place 'inside' itself.
-        eq_(None, us.lookup_inside("US"))
-        eq_(None, new_york.lookup_inside("NY, US, 10018"))
+        # Now the cases where using_overlap=False performs better.
 
-        # Or 'inside' a place that's known to be smaller than it.
-        eq_(None, kings_county.lookup_inside("NY"))
-        eq_(None, us.lookup_inside("NY, 10018"))
-        eq_(None, zip_10018.lookup_inside("NY"))
-
-        # This is annoying, but I think it's the best overall
-        # solution. "New York, USA" really is ambiguous.
+        # "New York, US" is a little ambiguous, but they probably mean
+        # the state.
+        eq_(new_york, us.lookup_inside("New York"))
         assert_raises_regexp(
             MultipleResultsFound,
             "More than one place called New York inside United States.",
-            us.lookup_inside, "New York"
+            us.lookup_inside, "New York", using_overlap=True
         )
 
-        # However, we should be able to do better here.
+        # "New York, New York" can only be parsed by parentage.
+        eq_(nyc, us.lookup_inside("New York, New York"))
         assert_raises_regexp(
             MultipleResultsFound,
             "More than one place called New York inside United States.",
-            us.lookup_inside, "New York, New York"
+            us.lookup_inside, "New York, New York", using_overlap=True
         )
 
-        # This maybe shouldn't work -- it exposes that we're saying
-        # "inside", but our algorithm uses intersection. We handle
-        # most such cases by only looking at certain types of places,
-        # but ZIP codes don't nest within cities, so that trick
-        # doesn't work here.
-        eq_(nyc, zip_10018.lookup_inside("New York"))
+        # Using geographic overlap has another problem -- although the
+        # name of the method is 'lookup_inside', we're actually
+        # checking for _intersection_. Places that overlap are treated
+        # as being inside *each other*.
+        eq_(nyc, zip_10018.lookup_inside("New York", using_overlap=True))
+        eq_(None, zip_10018.lookup_inside("New York", using_overlap=False))
 
     def test_served_by(self):
         zip = self.zip_10018

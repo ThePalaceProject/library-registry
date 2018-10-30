@@ -1152,13 +1152,29 @@ class Place(Base):
         touches = func.ST_Touches(Place.geometry, self.geometry)
         return qu.filter(intersects).filter(touches==False)
 
-    def lookup_inside(self, name):
-        """Look up a named Place that geographically intersects this Place.
+    def lookup_inside(self, name, using_overlap=False):
+        """Look up a named Place that is geographically 'inside' this Place.
+
+        :param name: The name of a place, such as "Boston" or
+        "Calabasas, CA", or "Cook County".
+
+        :param using_overlap: If this is true, then place A is
+        'inside' place B if their shapes overlap, not counting
+        borders. For example, Montgomery is 'inside' Montgomery
+        County, Alabama, and the United States. However, Alabama is
+        not 'inside' Georgia (even though they share a border).
+
+        If `using_overlap` is false, then place A is 'inside' place B
+        only if B is the .parent of A. In this case, Alabama is
+        considered to be 'inside' the United States, but Montgomery is
+        not -- the only place it's 'inside' is Alabama. Checking this way
+        is much faster, so it's the default.
 
         :return: A Place object, or None if no match could be found.
 
         :raise MultipleResultsFound: If more than one Place with the
-        given name intersects with this Place.
+        given name is 'inside' this Place.
+
         """
         parts = Place.name_parts(name)
         if len(parts) > 1:
@@ -1170,7 +1186,7 @@ class Place(Base):
             # look for "Boston" inside the object we get back.
             look_in_here = self
             for part in parts:
-                look_in_here = look_in_here.lookup_inside(part)
+                look_in_here = look_in_here.lookup_inside(part, using_overlap)
                 if not look_in_here:
                     # A link in the chain has failed. Return None
                     # immediately.
@@ -1196,8 +1212,17 @@ class Place(Base):
         exclude_types = Place.larger_place_types(self.type)
         qu = qu.filter(~Place.type.in_(exclude_types))
 
-        if self.geometry is not None:
-            qu = self.overlaps_not_counting_border(qu)
+        if self.type==self.EVERYWHERE:
+            # The concept of 'inside' is not relevant because every
+            # place is 'inside' EVERYWHERE. We are really trying to
+            # find one and only one place with a certain name.
+            pass
+        else:
+            if using_overlap and self.geometry is not None:
+                qu = self.overlaps_not_counting_border(qu)
+            else:
+                qu = qu.filter(Place.parent==self)
+
         places = qu.all()
         if len(places) == 0:
             return None
