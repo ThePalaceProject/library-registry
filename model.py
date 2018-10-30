@@ -1065,31 +1065,27 @@ class Place(Base):
         return place
 
     @classmethod
-    def default_country(cls, _db):
-        """Return the default country for this library registry.
+    def default_nation(cls, _db):
+        """Return the default nation for this library registry.
 
-        If an incoming coverage area doesn't mention a country, we'll
-        assume it's within this country.
+        If an incoming coverage area doesn't mention a nation, we'll
+        assume it's within this nation.
 
-        :return: The default country, if one can be found. Otherwise, None.
+        :return: The default nation, if one can be found. Otherwise, None.
         """
-        default_country = None
-        country_name=ConfigurationSetting.sitewide(
-            _db, Configuration.DEFAULT_COUNTRY_NAME
+        default_nation = None
+        abbreviation=ConfigurationSetting.sitewide(
+            _db, Configuration.DEFAULT_NATION_ABBREVIATION
         ).value
-        everywhere = cls.everywhere(_db)
-        if country_name:
-            default_country = everywhere.lookup_inside(country_name)
-            if not default_country:
-                self.logging.error(
-                    "Could not look up default country %s", country_name
+        if abbreviation:
+            default_nation = get_one(
+                _db, Place, type=Place.NATION, abbreviated_name=abbreviation
+            )
+            if not default_nation:
+                logging.error(
+                    "Could not look up default nation %s", abbreviation
                 )
-            if default_country.type != Place.COUNTRY:
-                self.logging.error(
-                    "Default country %s is not a country!", country_name
-                )
-                default_country = None
-        return default_country
+        return default_nation
 
     @classmethod
     def by_name(cls, _db, name):

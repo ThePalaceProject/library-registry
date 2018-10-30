@@ -109,6 +109,28 @@ class TestPlace(DatabaseTest):
         )
         eq_([alias], new_york.aliases)
 
+    def test_default_nation(self):
+        m = Place.default_nation
+
+        # We start out with no default nation.
+        eq_(None, m(self._db))
+
+        # The abbreviation of the default nation is stored in the
+        # DEFAULT_NATION_ABBREVIATION setting.
+        setting = ConfigurationSetting.sitewide(
+            self._db, Configuration.DEFAULT_NATION_ABBREVIATION
+        )
+        eq_(None, setting.value)
+
+        # Set the default nation to the United States.
+        setting.value = self.crude_us.abbreviated_name
+        eq_(self.crude_us, m(self._db))
+
+        # If there's no nation with this abbreviation,
+        # there is no default nation.
+        setting.value = "LL"
+        eq_(None, m(self._db))
+
     def test_overlaps_not_counting_border(self):
         """Test that overlaps_not_counting_border does not count places
         that share a border as intersecting, the way the PostGIS

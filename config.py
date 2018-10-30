@@ -53,8 +53,8 @@ class Configuration(object):
     WEB_CLIENT_URL = "web_client_url"
 
     # If a library references a place that's not explicitly in any particular
-    # country, we assume that they're talking about this country.
-    DEFAULT_COUNTRY_NAME = "default_country_name"
+    # nation, we assume that they're talking about this nation.
+    DEFAULT_NATION_ABBREVIATION = "default_nation_abbreviation"
 
     @classmethod
     def database_url(cls, test=False):
