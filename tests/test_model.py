@@ -205,8 +205,9 @@ class TestPlace(DatabaseTest):
         lookup_both_ways(zip_10018, "NY", None)
 
         # Now test cases where using_overlap makes a difference.
-
+        #
         # First, the cases where using_overlap=True performs better.
+        #
 
         # Looking up the name of a county by itself only works with
         # using_overlap=True, because the .parent of a county is its
@@ -218,6 +219,12 @@ class TestPlace(DatabaseTest):
             kings_county,
             everywhere.lookup_inside("Kings County, US", using_overlap=True)
         )
+
+        # Looking up a ZIP code without the context of its state is
+        # only possible with using_overlap=True. We can change this by
+        # changing it so that the parent of a ZIP code is the nation.
+        eq_(zip_10018, us.lookup_inside("10018", using_overlap=True))
+        eq_(None, us.lookup_inside("10018", using_overlap=False))
 
         # Neither of these is obviously better.
         eq_(None, us.lookup_inside("Manhattan"))
