@@ -39,7 +39,7 @@ from . import (
 )
 
 
-class TestPlace(object):
+class TestPlace(DatabaseTest):
 
     def test_creation(self):
         # Create some US states represented by points.

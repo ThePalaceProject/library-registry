@@ -172,25 +172,18 @@ class AuthenticationDocument(object):
             place_objs.append(place_class.everywhere(_db))
             coverage = dict() # Do no more processing
 
-        elif isinstance(coverage, basestring):
-            # The coverage is identified by a string. Try to
-            # parse it. This will go a lot easier if a default
-            # country is defined for this registry.
-            default_place = place_class.default_country(_db) or place_class.everywhere(_db)
-            default_place_name = (
-                default_place.abbreviated_name or default_place.external_name
-            )
-            try:
-                parsed = Place.by_name(_db, coverage)
-                if parsed:
-                    place_objs.append(parsed)
-                else:
-                    unknown[default_place_name].append(coverage)
-            except MultipleResultsFound, e:
-                ambiguous[default_place_name].append(coverage)
-            except NoResultsFound, e:
-                unknown[default_place_name].append(coverage)
-            coverage = dict() # Do no more processing
+        elif not isinstance(coverage, dict):
+            # The coverage is not in { country: place } format.
+            # Convert it into that format using the default country.
+            default_country = place_class.default_country(_db)
+            if default_country:
+                # Oops, that's not going to work. We don't know which
+                # country this place is in. Return a coverage object
+                # that makes it semi-clear what the problem is.
+                unknown["??"] = coverage
+                coverage = dict() # Do no more processing
+            else:
+                coverage = {default_country.abbreviated_name : coverage }
 
         for country, places in coverage.items():
             try:
