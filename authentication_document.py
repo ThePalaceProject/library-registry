@@ -177,13 +177,13 @@ class AuthenticationDocument(object):
             # Convert it into that format using the default country.
             default_country = place_class.default_country(_db)
             if default_country:
+                coverage = {default_country.abbreviated_name : coverage }
+            else:
                 # Oops, that's not going to work. We don't know which
                 # country this place is in. Return a coverage object
                 # that makes it semi-clear what the problem is.
                 unknown["??"] = coverage
                 coverage = dict() # Do no more processing
-            else:
-                coverage = {default_country.abbreviated_name : coverage }
 
         for country, places in coverage.items():
             try:

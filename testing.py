@@ -453,6 +453,7 @@ class MockPlace(object):
 
     def __init__(self, inside=None):
         self.inside = inside or dict()
+        self.abbreviated_name = None
 
     @classmethod
     def default_country(cls, _db):

@@ -141,18 +141,33 @@ class TestParseCoverage(DatabaseTest):
             expected_unknown={"US": ["Nowheresville"]}
         )
 
-    def test_unscoped_place(self):
-        # Test an authentication document that names a place without
-        # scoping it.
-        sf = MockPlace()
-        us = MockPlace(inside={"San Francisco": sf})
-        MockPlace.by_name["US"] = us
-        MockPlace._default = us
+    def test_unscoped_place_is_in_default_country(self):
+        # Test an authentication document that names places without
+        # saying which country they're in.
+        ca = MockPlace()
+        ut = MockPlace()
+
+        # Without a default country on the server side, we can't make
+        # sense of these place names.
+        self.parse_places("CA", expected_unknown={"??": "CA"})
 
         self.parse_places(
-            "San Francisco, US",
-            expected_places=[sf]
+            ["CA", "UT"], expected_unknown={"??": ["CA", "UT"]}
         )
+
+        us = MockPlace(inside={"CA": ca, "UT": ut})
+        us.abbreviated_name = "US"
+        MockPlace.by_name["US"] = us
+
+        # With a default country in place, a bare string like "CA"
+        # is treated the same as a correctly formatted dictionary
+        # like {"US": ["CA"]}
+        MockPlace._default_country = us
+        self.parse_places("CA", expected_places=[ca])
+        self.parse_places(["CA", "UT"], expected_places=[ca, ut])
+
+        MockPlace._default_country = None
+
 
 class TestLinkExtractor(object):
     """Test the _extract_link helper method."""
