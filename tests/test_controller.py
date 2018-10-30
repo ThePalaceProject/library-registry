@@ -723,6 +723,13 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("The following service area was unknown: {\"US\": [\"Somewhere\"]}.", response.detail)
 
     def test_register_fails_on_ambiguous_service_area(self):
+
+        # Create a situation (which shouldn't exist in real life)
+        # where there are two places with the same name and the same
+        # .parent.
+        self.new_york_city.parent = self.crude_us
+        self.manhattan_ks.parent = self.crude_us
+
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = self.registration_form
             auth_document = self._auth_document()

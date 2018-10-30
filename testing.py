@@ -235,12 +235,12 @@ class DatabaseTest(object):
     @property
     def new_york_state(self):
         return self._place('36', 'New York', Place.STATE,
-                           'NY', None, self.new_york_state_geojson)
+                           'NY', self.crude_us, self.new_york_state_geojson)
 
     @property
     def connecticut_state(self):
         return self._place('09', 'Connecticut', Place.STATE,
-                           'CT', None, self.connecticut_state_geojson)
+                           'CT', self.crude_us, self.connecticut_state_geojson)
 
     @property
     def new_york_city(self):
@@ -272,12 +272,17 @@ class DatabaseTest(object):
     @property
     def kansas_state(self):
         return self._place('20', 'Kansas', Place.STATE,
-                           'KS', None, self.kansas_state_geojson)
+                           'KS', self.crude_us, self.kansas_state_geojson)
+
+    @property
+    def massachussets_state(self):
+        return self._place('25', 'Massachussets', Place.STATE,
+                           'MA', self.crude_us, None)
 
     @property
     def boston_ma(self):
         return self._place('2507000', 'Boston', Place.CITY,
-                           None, None,
+                           None, self.massachussets_state,
                            self.boston_geojson)
 
     @property
@@ -313,7 +318,7 @@ class DatabaseTest(object):
     @property
     def new_mexico_state(self):
         return self._place('NM', 'New Mexico', Place.STATE,
-                           'NM', None, self.new_mexico_state_geojson)
+                           'NM', self.crude_us, self.new_mexico_state_geojson)
 
     @property
     def crude_new_york_county(self):
