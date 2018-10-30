@@ -1221,7 +1221,20 @@ class Place(Base):
             if using_overlap and self.geometry is not None:
                 qu = self.overlaps_not_counting_border(qu)
             else:
-                qu = qu.filter(Place.parent==self)
+                parent = aliased(Place)
+                grandparent = aliased(Place)
+                qu = qu.join(parent, Place.parent_id==parent.id)
+                qu = qu.outerjoin(grandparent, parent.parent_id==grandparent.id)
+
+                # For postal codes, but no other types of places, we
+                # allow the lookup to skip a level. This lets you look
+                # up "93203" within a state *or* within the nation.
+                postal_code_grandparent_match = and_(
+                    Place.type==Place.POSTAL_CODE, grandparent.id==self.id,
+                )
+                qu = qu.filter(
+                    or_(Place.parent==self, postal_code_grandparent_match)
+                )
 
         places = qu.all()
         if len(places) == 0:

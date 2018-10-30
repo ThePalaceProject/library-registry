@@ -195,6 +195,11 @@ class TestPlace(DatabaseTest):
         lookup_both_ways(connecticut, "New York, NY", None)
         lookup_both_ways(connecticut, "10018", None)
 
+        # Even though the parent of a ZIP code is a state, special
+        # code allows you to look them up within the nation.
+        lookup_both_ways(us, "10018", zip_10018)
+        lookup_both_ways(new_york, "10018", zip_10018)
+
         # You can't find a place 'inside' itself.
         lookup_both_ways(us, "US", None)
         lookup_both_ways(new_york, "NY, US, 10018", None)
@@ -219,12 +224,6 @@ class TestPlace(DatabaseTest):
             kings_county,
             everywhere.lookup_inside("Kings County, US", using_overlap=True)
         )
-
-        # Looking up a ZIP code without the context of its state is
-        # only possible with using_overlap=True. We can change this by
-        # changing it so that the parent of a ZIP code is the nation.
-        eq_(zip_10018, us.lookup_inside("10018", using_overlap=True))
-        eq_(None, us.lookup_inside("10018", using_overlap=False))
 
         # Neither of these is obviously better.
         eq_(None, us.lookup_inside("Manhattan"))
