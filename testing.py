@@ -446,8 +446,8 @@ class MockPlace(object):
     EVERYWHERE = MockEverywhere
 
     # Used within a test to provide a starting point for place
-    # names that don't mention a country.
-    _default_country = None
+    # names that don't mention a nation.
+    _default_nation = None
 
     by_name = dict()
 
@@ -456,8 +456,8 @@ class MockPlace(object):
         self.abbreviated_name = None
 
     @classmethod
-    def default_country(cls, _db):
-        return cls._default_country
+    def default_nation(cls, _db):
+        return cls._default_nation
 
     @classmethod
     def lookup_one_by_name(cls, _db, name, place_type):
