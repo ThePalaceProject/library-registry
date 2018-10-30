@@ -431,10 +431,6 @@ class MockRequestsResponse(object):
         return self.content.decode("utf8")
 
 
-class MockEverywhere(object):
-    abbreviated_name = None
-    external_name = "Everywhere"
-
 class MockPlace(object):
     """Used to test AuthenticationDocument.parse_coverage."""
 
@@ -443,7 +439,7 @@ class MockPlace(object):
 
     # Used to indicate coverage through the universe or through a
     # country.
-    EVERYWHERE = MockEverywhere
+    EVERYWHERE = object()
 
     # Used within a test to provide a starting point for place
     # names that don't mention a nation.
