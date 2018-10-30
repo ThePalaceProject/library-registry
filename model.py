@@ -1088,44 +1088,6 @@ class Place(Base):
         return default_nation
 
     @classmethod
-    def by_name(cls, _db, name):
-        """Turn the name of a Place into the Place itself.
-
-        :param name: A human-readable name of a place. If it makes
-        sense on its own, it will be interpreted as is. Otherwise, it
-        will be interpreted in the context of this registry's
-        `default` place.
-        """
-        everywhere = cls.everywhere(_db)
-        default = cls.default(_db)
-        parents = []
-        if default and default != everywhere:
-            parents.append(default)
-        parents.append(everywhere)
-        place = None
-
-        # Keep track of the first exception that was raised during
-        # this process. If we can't parse this Place name, we'll raise
-        # that exception because it's most likely to indicate the
-        # actual problem.
-        exception = None
-        for parent in parents:
-            try:
-                place = parent.lookup_inside(name)
-                if place is not None:
-                    exception = None
-                    break
-            except MultipleResultsFound, e:
-                if not exception:
-                    exception = e
-            except NoResultsFound, e:
-                if not exception:
-                    exception = e
-        if exception is not None:
-            raise exception
-        return place
-
-    @classmethod
     def larger_place_types(cls, type):
         """Return a list of place types known to be bigger than `type`.
 
