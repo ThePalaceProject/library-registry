@@ -1147,6 +1147,24 @@ class Place(Base):
         return cls.lookup_by_name(_db, name, place_type).one()
 
     @classmethod
+    def to_geojson(cls, _db, *places):
+        """Convert one or more Place objects to a GeoJSON document."""
+        geojson = select(
+            [func.ST_AsGeoJSON(Place.geometry)]
+        ).where(
+            Place.id.in_([x.id for x in places])
+        )
+        results = [x[0] for x in _db.execute(geojson)]
+        if len(results) == 1:
+            # There's only one item, and it is a valid
+            # GeoJSON document on its own.
+            return results[0]
+
+        body = { "type": "GeometryCollection",
+                 "geometries" : [json.loads(x) for x in results] }
+        return json.dumps(body)
+
+    @classmethod
     def name_parts(cls, name):
         """Split a nested geographic name into parts.
 
