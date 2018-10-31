@@ -1051,18 +1051,41 @@ class Place(Base):
     service_areas = relationship("ServiceArea", backref="place")
 
     @classmethod
-    def everywhere(self, _db):
+    def everywhere(cls, _db):
         """Return a special Place that represents everywhere.
 
         This place has no .geometry, so attempts to use it in
         geographic comparisons will fail.
         """
         place, is_new = get_one_or_create(
-            _db, Place, type=self.EVERYWHERE,
+            _db, Place, type=cls.EVERYWHERE,
             create_method_kwargs=dict(external_id="Everywhere",
                                       external_name="Everywhere")
         )
         return place
+
+    @classmethod
+    def default_nation(cls, _db):
+        """Return the default nation for this library registry.
+
+        If an incoming coverage area doesn't mention a nation, we'll
+        assume it's within this nation.
+
+        :return: The default nation, if one can be found. Otherwise, None.
+        """
+        default_nation = None
+        abbreviation=ConfigurationSetting.sitewide(
+            _db, Configuration.DEFAULT_NATION_ABBREVIATION
+        ).value
+        if abbreviation:
+            default_nation = get_one(
+                _db, Place, type=Place.NATION, abbreviated_name=abbreviation
+            )
+            if not default_nation:
+                logging.error(
+                    "Could not look up default nation %s", abbreviation
+                )
+        return default_nation
 
     @classmethod
     def larger_place_types(cls, type):

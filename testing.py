@@ -441,10 +441,19 @@ class MockPlace(object):
     # country.
     EVERYWHERE = object()
 
+    # Used within a test to provide a starting point for place
+    # names that don't mention a nation.
+    _default_nation = None
+
     by_name = dict()
 
     def __init__(self, inside=None):
         self.inside = inside or dict()
+        self.abbreviated_name = None
+
+    @classmethod
+    def default_nation(cls, _db):
+        return cls._default_nation
 
     @classmethod
     def lookup_one_by_name(cls, _db, name, place_type):
@@ -467,3 +476,4 @@ class MockPlace(object):
     @classmethod
     def everywhere(cls, _db):
         return cls.EVERYWHERE
+
