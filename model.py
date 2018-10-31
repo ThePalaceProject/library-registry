@@ -1140,6 +1140,16 @@ class Place(Base):
         )
         if place_type:
             qu = qu.filter(Place.type==place_type)
+        else:
+            # The place type "county" is excluded unless it was
+            # explicitly asked for (e.g. "Cook County"). This is to
+            # avoid ambiguity in the many cases when a state contains
+            # a county and a city with the same name. In all realistic
+            # cases, someone using "Foo" to talk about a library
+            # service area is referring to the city of Foo, not Foo
+            # County -- if they want Foo County they can say "Foo
+            # County".
+            qu = qu.filter(Place.type!=Place.COUNTY)
         return qu
 
     @classmethod

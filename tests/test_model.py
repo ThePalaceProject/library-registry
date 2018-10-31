@@ -137,7 +137,7 @@ class TestPlace(DatabaseTest):
         # If you ask for the GeoJSON of one place, that place is
         # returned as-is.
         zip1 = self.zip_10018
-        geojson = json.loads(Place.to_geojson(self._db, zip1))
+        geojson = Place.to_geojson(self._db, zip1)
         eq_(geojson, json.loads(self.zip_10018_geojson))
 
         # If you ask for GeoJSON of several places, it's returned as a
@@ -196,6 +196,25 @@ class TestPlace(DatabaseTest):
         eq_(["MA", "Boston"], m("Boston, MA,"))
         eq_(["USA", "Anytown"], m("Anytown, USA"))
         eq_(["US", "Ohio", "Lake County"], m("Lake County, Ohio, US"))
+
+    def test_lookup_by_name(self):
+
+        # There are two places in California called 'Santa Barbara': a
+        # city, and a county (which includes the city).
+        sb_city = self._place(external_name="Santa Barbara", type=Place.CITY)
+        sb_county = self._place(
+            external_name="Santa Barbara", type=Place.COUNTY
+        )
+
+        # If we look up "Santa Barbara" by name, we get the city.
+        m = Place.lookup_by_name
+        eq_([sb_city], m(self._db, "Santa Barbara").all())
+
+        # To get Santa Barbara County, we have to refer to
+        # "Santa Barbara County"
+        eq_(
+            [sb_county], m(self._db, "Santa Barbara County").all()
+        )
 
     def test_lookup_inside(self):
         us = self.crude_us
