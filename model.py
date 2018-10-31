@@ -1148,7 +1148,9 @@ class Place(Base):
 
     @classmethod
     def to_geojson(cls, _db, *places):
-        """Convert one or more Place objects to a GeoJSON document."""
+        """Convert one or more Place objects to a dictionary that will become
+        a GeoJSON document when converted to JSON.
+        """
         geojson = select(
             [func.ST_AsGeoJSON(Place.geometry)]
         ).where(
@@ -1158,11 +1160,13 @@ class Place(Base):
         if len(results) == 1:
             # There's only one item, and it is a valid
             # GeoJSON document on its own.
-            return results[0]
+            return json.loads(results[0])
 
+        # We have either more or less than one valid item.
+        # In either case, a GeometryCollection is appropriate.
         body = { "type": "GeometryCollection",
                  "geometries" : [json.loads(x) for x in results] }
-        return json.dumps(body)
+        return body
 
     @classmethod
     def name_parts(cls, name):

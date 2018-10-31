@@ -26,6 +26,7 @@ from model import (
     ConfigurationSetting,
     Hyperlink,
     Library,
+    Place,
     Resource,
     ServiceArea,
     Validation,
@@ -77,6 +78,7 @@ class LibraryRegistry(object):
             self, emailer_class
         )
         self.validation_controller = ValidationController(self)
+        self.coverage_controller = CoverageController(self)
 
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
@@ -734,3 +736,31 @@ class ValidationController(object):
         resource = validation.resource
         message = _("You successfully confirmed %s.") % resource.href
         return self.html_response(200, message)
+
+
+class CoverageController(object):
+    """Converts coverage area descriptions to GeoJSON documents
+    so they can be visualized.
+    """
+
+    def __init__(self, app):
+        self.app = app
+        self._db = self.app._db
+
+    def lookup(self):
+        coverage = flask.request.args.get('coverage')
+        try:
+            coverage = json.loads(coverage)
+        except ValueError, e:
+            pass
+        places, unknown, ambiguous = AuthenticationDocument.parse_coverage(
+            self._db, coverage
+        )
+        document = Place.to_geojson(self._db, *places)
+        if unknown:
+            document['unknown'] = unknown
+        if ambiguous:
+            document['ambiguous'] = ambiguous
+
+        headers = {"Content-Type": "application/geo+json"}
+        return Response(json.dumps(document), 200, headers=headers)

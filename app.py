@@ -98,6 +98,12 @@ def confirm_resource(resource_id, secret):
 def library(uuid):
     return app.library_registry.registry_controller.library(uuid)
 
+@app.route('/coverage')
+@returns_problem_detail
+def coverage():
+    return app.library_registry.coverage_controller.lookup()
+
+
 @app.route('/heartbeat')
 @returns_problem_detail
 def hearbeat():

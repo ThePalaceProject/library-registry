@@ -134,28 +134,16 @@ class TestPlace(DatabaseTest):
 
     def test_to_geojson(self):
 
-        def json_eq(g1, g2):
-            """Make sure two objects represent the same JSON object.
-
-            This mainly avoids confusions between a Python dictionary
-            and a JSON string representing the corresponding object.
-            """
-            if not isinstance(g1, dict):
-                g1 = json.loads(g1)
-            if not isinstance(g2, dict):
-                g2 = json.loads(g2)
-            return g1 == g2
-
         # If you ask for the GeoJSON of one place, that place is
         # returned as-is.
         zip1 = self.zip_10018
-        geojson = Place.to_geojson(self._db, zip1)
-        assert json_eq(geojson, self.zip_10018_geojson)
+        geojson = json.loads(Place.to_geojson(self._db, zip1))
+        eq_(geojson, json.loads(self.zip_10018_geojson))
 
         # If you ask for GeoJSON of several places, it's returned as a
         # GeometryCollection document.
         zip2 = self.zip_11212
-        geojson = json.loads(Place.to_geojson(self._db, zip1, zip2))
+        geojson = Place.to_geojson(self._db, zip1, zip2)
         eq_("GeometryCollection", geojson['type'])
 
         # There are two geometries in this document -- one for each
@@ -163,7 +151,7 @@ class TestPlace(DatabaseTest):
         geometries = geojson['geometries']
         eq_(2, len(geometries))
         for check in [self.zip_10018_geojson, self.zip_11212_geojson]:
-            assert any(json_eq(check, x) for x in geometries)
+            assert json.loads(check) in geojson['geometries']
 
     def test_overlaps_not_counting_border(self):
         """Test that overlaps_not_counting_border does not count places
