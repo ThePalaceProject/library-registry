@@ -757,6 +757,10 @@ class CoverageController(object):
             self._db, coverage
         )
         document = Place.to_geojson(self._db, *places)
+
+        # Extend the GeoJSON with extra information about parts of the
+        # coverage document we found ambiguous or couldn't associate
+        # with a Place.
         if unknown:
             document['unknown'] = unknown
         if ambiguous:

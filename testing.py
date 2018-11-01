@@ -202,6 +202,7 @@ class DatabaseTest(object):
             abbreviated_name=abbreviated_name, parent=parent,
         )
         place.geometry=geometry
+        self._db.commit()
         return place
 
     # Some useful Libraries.
