@@ -18,6 +18,8 @@ from app_helpers import has_library_factory
 
 app = Flask(__name__)
 babel = Babel(app)
+
+# Create a has_library() annotator for this app.
 has_library = has_library_factory(app)
 
 testing = 'TESTING' in os.environ
@@ -99,16 +101,16 @@ def confirm_resource(resource_id, secret):
 def library():
     return app.library_registry.registry_controller.library()
 
-@app.route('/library/<uuid>/coverage')
+@app.route('/library/<uuid>/eligibility')
 @has_library
 @returns_problem_detail
-def library_coverage(uuid):
-    return app.library_registry.coverage_controller.coverage_for_library()
+def library_eligibility():
+    return app.library_registry.coverage_controller.eligibility_for_library()
 
 @app.route('/library/<uuid>/focus')
 @has_library
 @returns_problem_detail
-def library_focus(uuid):
+def library_focus():
     return app.library_registry.coverage_controller.focus_for_library()
 
 @app.route('/coverage')

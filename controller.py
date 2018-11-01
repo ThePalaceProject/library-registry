@@ -574,7 +574,8 @@ class LibraryRegistryController(BaseController):
         # Create an OPDS 2 catalog containing all available
         # information about the library.
         catalog = OPDSCatalog.library_catalog(
-            library, include_private_information=True
+            library, include_private_information=True,
+            url_for=self.app.url_for
         )
 
         # Annotate the catalog with some information specific to
@@ -759,6 +760,12 @@ class CoverageController(BaseController):
         self.app = app
         self._db = self.app._db
 
+    def geojson_response(self, document):
+        if isinstance(document, dict):
+            document = json.dumps(document)
+        headers = {"Content-Type": "application/geo+json"}
+        return Response(document, 200, headers=headers)
+
     def lookup(self):
         coverage = flask.request.args.get('coverage')
         try:
@@ -777,12 +784,24 @@ class CoverageController(BaseController):
             document['unknown'] = unknown
         if ambiguous:
             document['ambiguous'] = ambiguous
+        return self.geojson_response(document)
 
-        headers = {"Content-Type": "application/geo+json"}
-        return Response(json.dumps(document), 200, headers=headers)
+    def _geojson_for_service_area(self, service_type):
+        """Serve a GeoJSON document describing some subset of the active
+        library's service areas.
+        """
+        areas = [x.place for x in flask.request.library.service_areas
+                 if x.type==service_type]
+        return self.geojson_response(Place.to_geojson(self._db, *areas))
 
-    def coverage_for_library(self, uuid):
-        """Look up a GeoJSON document representing the coverage area
+    def eligibility_for_library(self):
+        """Serve a GeoJSON document representing the eligibility area
         for a specific library.
         """
-        
+        return self._geojson_for_service_area(ServiceArea.ELIGIBILITY)
+
+    def focus_for_library(self):
+        """Serve a GeoJSON document representing the focus area
+        for a specific library.
+        """
+        return self._geojson_for_service_area(ServiceArea.FOCUS)

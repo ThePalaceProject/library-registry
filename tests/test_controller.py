@@ -42,6 +42,7 @@ from model import (
     Hyperlink,
     Library,
     Place,
+    ServiceArea,
     Validation,
 )
 from util.http import RequestTimedOut
@@ -1551,3 +1552,40 @@ class TestCoverageController(ControllerTest):
         # to create an ambiguity problem.
         massachussets.external_name="Kansas"
         self.parse_to("Kansas", [], ambiguous={"US": ["Kansas"]})
+
+    def test_library_eligibility_and_focus(self):
+        # focus_for_library() and eligibility_for_library() represent
+        # a library's service area as GeoJSON.
+
+        # We don't use self.nypl here because we want to set more
+        # realistic service and focus areas.
+        nypl = self._library("NYPL")
+
+        # New York State is the eligibility area for NYPL.
+        get_one_or_create(
+            self._db, ServiceArea, library=nypl,
+            place=self.new_york_state, type=ServiceArea.ELIGIBILITY
+        )
+
+        # New York City is the focus area.
+        get_one_or_create(
+            self._db, ServiceArea, library=nypl,
+            place=self.new_york_city, type=ServiceArea.FOCUS
+        )
+
+        with self.request_context_with_library("/", library=nypl):
+            focus = self.app.library_registry.coverage_controller.focus_for_library()
+            eligibility = self.app.library_registry.coverage_controller.eligibility_for_library()
+
+            # In both cases we got a GeoJSON document
+            for response in (focus, eligibility):
+                eq_(200, response.status_code)
+                eq_("application/geo+json", response.headers['Content-Type'])
+
+            # The GeoJSON documents are the ones we'd expect from turning
+            # the corresponding service areas into GeoJSON.
+            focus = json.loads(focus.data)
+            eq_(Place.to_geojson(self._db, self.new_york_city), focus)
+
+            eligibility = json.loads(eligibility.data)
+            eq_(Place.to_geojson(self._db, self.new_york_state), eligibility)
