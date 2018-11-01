@@ -13,6 +13,7 @@ from urllib import unquote
 from contextlib import contextmanager
 from controller import (
     AdobeVendorIDController,
+    BaseController,
     CoverageController,
     LibraryRegistry,
     LibraryRegistryAnnotator,
@@ -140,6 +141,28 @@ class TestLibraryRegistryAnnotator(ControllerTest):
             eq_('application/opds+json;profile=https://librarysimplified.org/rel/profile/directory', register_link.get('type'))
 
             eq_("VENDORID", catalog.catalog.get("metadata").get('adobe_vendor_id'))
+
+
+class TestBaseController(ControllerTest):
+
+    def test_library_for_request(self):
+        # Test the code that looks up a library by its UUID and
+        # sets it as flask.request.library.
+        controller = BaseController(self.library_registry)
+        f = controller.library_for_request
+        library = self._library()
+
+        with self.app.test_request_context("/"):
+            eq_(LIBRARY_NOT_FOUND, f(None))
+            eq_(LIBRARY_NOT_FOUND, f("no such uuid"))
+
+            eq_(library, f(library.internal_urn))
+            eq_(library, flask.request.library)
+
+            flask.request.library = None
+            eq_(library, f(library.internal_urn[len("urn:uuid:"):]))
+            eq_(library, flask.request.library)
+
 
 class TestLibraryRegistry(ControllerTest):
 

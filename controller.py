@@ -124,6 +124,10 @@ class LibraryRegistryAnnotator(Annotator):
 
 class BaseController(object):
 
+    def __init__(self, app):
+        self.app = app
+        self._db = self.app._db
+
     def library_for_request(self, uuid):
         """Look up the library the user is trying to access."""
         if not uuid:
@@ -148,8 +152,7 @@ class LibraryRegistryController(BaseController):
  </OpenSearchDescription>"""
 
     def __init__(self, app, emailer_class=Emailer):
-        self.app = app
-        self._db = self.app._db
+        super(LibraryRegistryController, self).__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
         emailer = None
@@ -691,10 +694,6 @@ class ValidationController(BaseController):
 
     MESSAGE_TEMPLATE = "<html><head><title>%(message)s</title><body>%(message)s</body></html>"
 
-    def __init__(self, app):
-        self.app = app
-        self._db = self.app._db
-
     def html_response(self, status_code, message):
         """Return a human-readable message as a minimal HTML page.
 
@@ -755,10 +754,6 @@ class CoverageController(BaseController):
     """Converts coverage area descriptions to GeoJSON documents
     so they can be visualized.
     """
-
-    def __init__(self, app):
-        self.app = app
-        self._db = self.app._db
 
     def geojson_response(self, document):
         if isinstance(document, dict):
