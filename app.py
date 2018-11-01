@@ -1,5 +1,4 @@
 """Library registry web application."""
-from functools import wraps
 import os
 import sys
 import urlparse
@@ -12,13 +11,14 @@ from config import Configuration
 from controller import LibraryRegistry
 from log import LogConfiguration
 from model import SessionManager, ConfigurationSetting
-from util.problem_detail import ProblemDetail
 from util.flask_util import originating_ip
 from util.app_server import returns_problem_detail
+from app_helpers import has_library_factory
 
 
 app = Flask(__name__)
 babel = Babel(app)
+has_library = has_library_factory(app)
 
 testing = 'TESTING' in os.environ
 db_url = Configuration.database_url(testing)
@@ -52,25 +52,6 @@ def shutdown_session(exception):
             app.library_registry._db.rollback()
         else:
             app.library_registry._db.commit()
-
-
-def has_library(f):
-    """Decorator to extract the library uuid from the arguments."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if 'uuid' in kwargs:
-            uuid = kwargs.pop("uuid")
-        else:
-            uuid = None
-        library = app.library_registry.registry_controller.library_for_request(
-            uuid
-        )
-        if isinstance(library, ProblemDetail):
-            return library.response
-        else:
-            return f(*args, **kwargs)
-    return decorated
-
 
 @app.route('/')
 @returns_problem_detail

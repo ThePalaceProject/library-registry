@@ -126,6 +126,8 @@ class BaseController(object):
 
     def library_for_request(self, uuid):
         """Look up the library the user is trying to access."""
+        if not uuid:
+            return LIBRARY_NOT_FOUND
         if not uuid.startswith("urn:uuid:"):
             uuid = "urn:uuid:" + uuid
         library = Library.for_urn(self._db, uuid)
