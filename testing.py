@@ -200,8 +200,8 @@ class DatabaseTest(object):
             self._db, Place, external_id=external_id,
             external_name=external_name, type=type,
             abbreviated_name=abbreviated_name, parent=parent,
-            geometry=geometry
         )
+        place.geometry=geometry
         return place
 
     # Some useful Libraries.
