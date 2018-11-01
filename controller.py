@@ -122,7 +122,20 @@ class LibraryRegistryAnnotator(Annotator):
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
 
-class LibraryRegistryController(object):
+class BaseController(object):
+
+    def library_for_request(self, uuid):
+        """Look up the library the user is trying to access."""
+        if not uuid.startswith("urn:uuid:"):
+            uuid = "urn:uuid:" + uuid
+        library = Library.for_urn(self._db, uuid)
+        if not library:
+            return LIBRARY_NOT_FOUND
+        flask.request.library = library
+        return library
+
+
+class LibraryRegistryController(BaseController):
 
     OPENSEARCH_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
  <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
@@ -204,14 +217,11 @@ class LibraryRegistryController(object):
             )
             return Response(body, 200, headers)
 
-    def library(self, uuid):
-        if not uuid.startswith("urn:uuid:"):
-            uuid = "urn:uuid:" + uuid
-        library = Library.for_urn(self._db, uuid)
-        if not library:
-            return LIBRARY_NOT_FOUND
-
-        this_url = self.app.url_for('library', uuid=uuid)
+    def library(self):
+        library = flask.request.library
+        this_url = self.app.url_for(
+            'library', uuid=library.internal_urn
+        )
         catalog = OPDSCatalog(
             self._db, library.name,
             this_url, [library],
@@ -668,7 +678,7 @@ class LibraryRegistryController(object):
         return candidates
 
 
-class ValidationController(object):
+class ValidationController(BaseController):
     """Validates Resources based on validation codes.
 
     The confirmation codes were sent out in emails to the addresses that
@@ -738,7 +748,7 @@ class ValidationController(object):
         return self.html_response(200, message)
 
 
-class CoverageController(object):
+class CoverageController(BaseController):
     """Converts coverage area descriptions to GeoJSON documents
     so they can be visualized.
     """
@@ -768,3 +778,9 @@ class CoverageController(object):
 
         headers = {"Content-Type": "application/geo+json"}
         return Response(json.dumps(document), 200, headers=headers)
+
+    def coverage_for_library(self, uuid):
+        """Look up a GeoJSON document representing the coverage area
+        for a specific library.
+        """
+        

@@ -10,6 +10,7 @@ import random
 from smtplib import SMTPException
 from urllib import unquote
 
+from contextlib import contextmanager
 from controller import (
     AdobeVendorIDController,
     CoverageController,
@@ -92,6 +93,14 @@ class ControllerTest(DatabaseTest):
             goal=ExternalIntegration.DRM_GOAL,
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
+
+    @contextmanager
+    def request_context_with_library(self, route, *args, **kwargs):
+        library = kwargs.pop('library')
+        with self.app.test_request_context(route, *args, **kwargs) as c:
+            flask.request.library = library
+            yield c
+
 
 class TestLibraryRegistryAnnotator(ControllerTest):
     def test_annotate_catalog(self):
@@ -403,23 +412,11 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_library(self):
         nypl = self.nypl
-        with self.app.test_request_context():
-            # We can look up a library by its internal URN...
-            response = self.controller.library(nypl.internal_urn)
-            [catalog_entry] = json.loads(response.data).get("catalogs")
-            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
-            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
-
-            # Or its UUID without the prefix.
-            uuid = nypl.internal_urn[len("urn:uuid:"):]
-            response = self.controller.library(uuid)
-            [catalog_entry] = json.loads(response.data).get("catalogs")
-            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
-            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
-
-            # We get a problem detail if the library doesn't exist.
-            response = self.controller.library("not a library")
-            eq_(LIBRARY_NOT_FOUND, response)
+        with self.request_context_with_library("/", library=nypl):
+            response = self.controller.library()
+        [catalog_entry] = json.loads(response.data).get("catalogs")
+        eq_(nypl.name, catalog_entry.get("metadata").get("title"))
+        eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
 
     def queue_opds_success(
             self, auth_url="http://circmanager.org/authentication.opds",

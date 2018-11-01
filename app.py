@@ -1,4 +1,5 @@
 """Library registry web application."""
+from functools import wraps
 import os
 import sys
 import urlparse
@@ -53,6 +54,24 @@ def shutdown_session(exception):
             app.library_registry._db.commit()
 
 
+def has_library(f):
+    """Decorator to extract the library uuid from the arguments."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'uuid' in kwargs:
+            uuid = kwargs.pop("uuid")
+        else:
+            uuid = None
+        library = app.library_registry.registry_controller.library_for_request(
+            uuid
+        )
+        if isinstance(library, ProblemDetail):
+            return library.response
+        else:
+            return f(*args, **kwargs)
+    return decorated
+
+
 @app.route('/')
 @returns_problem_detail
 def nearby():
@@ -94,9 +113,22 @@ def confirm_resource(resource_id, secret):
     )
 
 @app.route('/library/<uuid>')
+@has_library
 @returns_problem_detail
-def library(uuid):
-    return app.library_registry.registry_controller.library(uuid)
+def library():
+    return app.library_registry.registry_controller.library()
+
+@app.route('/library/<uuid>/coverage')
+@has_library
+@returns_problem_detail
+def library_coverage(uuid):
+    return app.library_registry.coverage_controller.coverage_for_library()
+
+@app.route('/library/<uuid>/focus')
+@has_library
+@returns_problem_detail
+def library_focus(uuid):
+    return app.library_registry.coverage_controller.focus_for_library()
 
 @app.route('/coverage')
 @returns_problem_detail
