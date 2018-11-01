@@ -1140,11 +1140,43 @@ class Place(Base):
         )
         if place_type:
             qu = qu.filter(Place.type==place_type)
+        else:
+            # The place type "county" is excluded unless it was
+            # explicitly asked for (e.g. "Cook County"). This is to
+            # avoid ambiguity in the many cases when a state contains
+            # a county and a city with the same name. In all realistic
+            # cases, someone using "Foo" to talk about a library
+            # service area is referring to the city of Foo, not Foo
+            # County -- if they want Foo County they can say "Foo
+            # County".
+            qu = qu.filter(Place.type!=Place.COUNTY)
         return qu
 
     @classmethod
     def lookup_one_by_name(cls, _db, name, place_type=None):
         return cls.lookup_by_name(_db, name, place_type).one()
+
+    @classmethod
+    def to_geojson(cls, _db, *places):
+        """Convert one or more Place objects to a dictionary that will become
+        a GeoJSON document when converted to JSON.
+        """
+        geojson = select(
+            [func.ST_AsGeoJSON(Place.geometry)]
+        ).where(
+            Place.id.in_([x.id for x in places])
+        )
+        results = [x[0] for x in _db.execute(geojson)]
+        if len(results) == 1:
+            # There's only one item, and it is a valid
+            # GeoJSON document on its own.
+            return json.loads(results[0])
+
+        # We have either more or less than one valid item.
+        # In either case, a GeometryCollection is appropriate.
+        body = { "type": "GeometryCollection",
+                 "geometries" : [json.loads(x) for x in results] }
+        return body
 
     @classmethod
     def name_parts(cls, name):

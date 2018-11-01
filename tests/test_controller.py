@@ -12,6 +12,7 @@ from urllib import unquote
 
 from controller import (
     AdobeVendorIDController,
+    CoverageController,
     LibraryRegistry,
     LibraryRegistryAnnotator,
     LibraryRegistryController,
@@ -39,6 +40,7 @@ from model import (
     ExternalIntegration,
     Hyperlink,
     Library,
+    Place,
     Validation,
 )
 from util.http import RequestTimedOut
@@ -94,7 +96,7 @@ class ControllerTest(DatabaseTest):
 class TestLibraryRegistryAnnotator(ControllerTest):
     def test_annotate_catalog(self):
         annotator = LibraryRegistryAnnotator(self.app.library_registry)
-        
+
         integration, ignore = create(
             self._db, ExternalIntegration,
             protocol=ExternalIntegration.ADOBE_VENDOR_ID,
@@ -1486,3 +1488,69 @@ class TestValidationController(ControllerTest):
             needs_validation.id, secret, 200,
             "This URI has already been validated."
         )
+
+class TestCoverageController(ControllerTest):
+
+    def setup(self):
+        super(TestCoverageController, self).setup()
+        self.controller = CoverageController(self.library_registry)
+
+    def parse_to(
+            self, coverage, places=[], ambiguous=None,
+            unknown=None, to_json=True
+    ):
+        # Make a request to the coverage controller to turn a coverage
+        # object into GeoJSON. Verify that the Places in
+        # `places` are represented in the coverage object
+        # and that the 'ambiguous' and 'unknown' extensions
+        # are also as expected.
+        if to_json:
+            coverage = json.dumps(coverage)
+        with self.app.test_request_context(
+            "/?coverage=%s" % coverage, method="POST"
+        ):
+            response = self.controller.lookup()
+
+        # The response is always GeoJSON.
+        eq_("application/geo+json", response.headers['Content-Type'])
+        geojson = json.loads(response.data)
+
+        # Unknown or ambiguous places will be mentioned in
+        # these extra fields.
+        actual_unknown = geojson.pop('unknown', None)
+        eq_(actual_unknown, unknown)
+        actual_ambiguous = geojson.pop('ambiguous', None)
+        eq_(ambiguous, actual_ambiguous)
+
+        # Without those extra fields, the GeoJSON document should be
+        # identical to the one we get by calling Place.to_geojson
+        # on the expected places.
+        expect_geojson = Place.to_geojson(self._db, *places)
+        eq_(expect_geojson, geojson)
+
+    def test_lookup(self):
+        # Set up a default nation to make it easier to test a variety
+        # of coverage area types.
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.DEFAULT_NATION_ABBREVIATION
+        ).value = "US"
+
+        # Set up some places.
+        kansas = self.kansas_state
+        massachussets = self.massachussets_state
+        boston = self.boston_ma
+
+        # Parse some strings to GeoJSON objects.
+        self.parse_to("Boston, MA", [boston], to_json=False)
+        self.parse_to("Boston, MA", [boston], to_json=True)
+        self.parse_to("Massachussets", [massachussets])
+        self.parse_to(["Massachussets", "Kansas"], [massachussets, kansas])
+        self.parse_to({"US": "Kansas"}, [kansas])
+        self.parse_to({"US": ["Massachussets", "Kansas"]},
+                      [massachussets, kansas])
+        self.parse_to(["KS", "UT"], [kansas], unknown={"US": ["UT"]})
+
+        # Creating two states with the same name is the simplest way
+        # to create an ambiguity problem.
+        massachussets.external_name="Kansas"
+        self.parse_to("Kansas", [], ambiguous={"US": ["Kansas"]})
