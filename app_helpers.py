@@ -36,7 +36,6 @@ def uses_location_factory(app):
         def decorated(*args, **kwargs):
             """A decorator that guesses at a location for the client."""
             location = flask.request.args.get("_location")
-            set_trace()
             if location:
                 location = GeometryUtility.point_from_string(location)
             if not location:
