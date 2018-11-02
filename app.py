@@ -11,13 +11,16 @@ from config import Configuration
 from controller import LibraryRegistry
 from log import LogConfiguration
 from model import SessionManager, ConfigurationSetting
-from util.problem_detail import ProblemDetail
 from util.flask_util import originating_ip
 from util.app_server import returns_problem_detail
+from app_helpers import has_library_factory
 
 
 app = Flask(__name__)
 babel = Babel(app)
+
+# Create a has_library() annotator for this app.
+has_library = has_library_factory(app)
 
 testing = 'TESTING' in os.environ
 db_url = Configuration.database_url(testing)
@@ -51,7 +54,6 @@ def shutdown_session(exception):
             app.library_registry._db.rollback()
         else:
             app.library_registry._db.commit()
-
 
 @app.route('/')
 @returns_problem_detail
@@ -94,9 +96,28 @@ def confirm_resource(resource_id, secret):
     )
 
 @app.route('/library/<uuid>')
+@has_library
 @returns_problem_detail
-def library(uuid):
-    return app.library_registry.registry_controller.library(uuid)
+def library():
+    return app.library_registry.registry_controller.library()
+
+@app.route('/library/<uuid>/eligibility')
+@has_library
+@returns_problem_detail
+def library_eligibility():
+    return app.library_registry.coverage_controller.eligibility_for_library()
+
+@app.route('/library/<uuid>/focus')
+@has_library
+@returns_problem_detail
+def library_focus():
+    return app.library_registry.coverage_controller.focus_for_library()
+
+@app.route('/coverage')
+@returns_problem_detail
+def coverage():
+    return app.library_registry.coverage_controller.lookup()
+
 
 @app.route('/heartbeat')
 @returns_problem_detail

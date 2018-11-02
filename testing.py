@@ -200,8 +200,9 @@ class DatabaseTest(object):
             self._db, Place, external_id=external_id,
             external_name=external_name, type=type,
             abbreviated_name=abbreviated_name, parent=parent,
-            geometry=geometry
         )
+        place.geometry=geometry
+        self._db.commit()
         return place
 
     # Some useful Libraries.
@@ -235,12 +236,12 @@ class DatabaseTest(object):
     @property
     def new_york_state(self):
         return self._place('36', 'New York', Place.STATE,
-                           'NY', None, self.new_york_state_geojson)
+                           'NY', self.crude_us, self.new_york_state_geojson)
 
     @property
     def connecticut_state(self):
         return self._place('09', 'Connecticut', Place.STATE,
-                           'CT', None, self.connecticut_state_geojson)
+                           'CT', self.crude_us, self.connecticut_state_geojson)
 
     @property
     def new_york_city(self):
@@ -272,12 +273,17 @@ class DatabaseTest(object):
     @property
     def kansas_state(self):
         return self._place('20', 'Kansas', Place.STATE,
-                           'KS', None, self.kansas_state_geojson)
+                           'KS', self.crude_us, self.kansas_state_geojson)
+
+    @property
+    def massachussets_state(self):
+        return self._place('25', 'Massachussets', Place.STATE,
+                           'MA', self.crude_us, None)
 
     @property
     def boston_ma(self):
         return self._place('2507000', 'Boston', Place.CITY,
-                           None, None,
+                           None, self.massachussets_state,
                            self.boston_geojson)
 
     @property
@@ -313,7 +319,7 @@ class DatabaseTest(object):
     @property
     def new_mexico_state(self):
         return self._place('NM', 'New Mexico', Place.STATE,
-                           'NM', None, self.new_mexico_state_geojson)
+                           'NM', self.crude_us, self.new_mexico_state_geojson)
 
     @property
     def crude_new_york_county(self):
@@ -359,7 +365,6 @@ class DummyHTTPResponse(object):
         self.content = content
         self.links = links or {}
         self.url = url or "http://url/"
-        self.final_url = self.url
 
     @property
     def raw(self):
@@ -437,10 +442,19 @@ class MockPlace(object):
     # country.
     EVERYWHERE = object()
 
+    # Used within a test to provide a starting point for place
+    # names that don't mention a nation.
+    _default_nation = None
+
     by_name = dict()
 
     def __init__(self, inside=None):
         self.inside = inside or dict()
+        self.abbreviated_name = None
+
+    @classmethod
+    def default_nation(cls, _db):
+        return cls._default_nation
 
     @classmethod
     def lookup_one_by_name(cls, _db, name, place_type):
@@ -463,3 +477,4 @@ class MockPlace(object):
     @classmethod
     def everywhere(cls, _db):
         return cls.EVERYWHERE
+

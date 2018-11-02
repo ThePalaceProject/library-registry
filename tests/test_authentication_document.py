@@ -24,7 +24,7 @@ from testing import MockPlace
 # Alias for a long class name
 AuthDoc = AuthenticationDocument
 
-class TestParseCoverage(object):
+class TestParseCoverage(DatabaseTest):
 
     EVERYWHERE = AuthenticationDocument.COVERAGE_EVERYWHERE
 
@@ -35,7 +35,7 @@ class TestParseCoverage(object):
         ambiguous place names, are as expected.
         """
         place_objs, unknown, ambiguous = AuthDoc.parse_coverage(
-            None, coverage_object, MockPlace
+            self._db, coverage_object, MockPlace
         )
         empty = defaultdict(list)
         expected_places = expected_places or []
@@ -140,6 +140,33 @@ class TestParseCoverage(object):
             {"US": "Nowheresville"},
             expected_unknown={"US": ["Nowheresville"]}
         )
+
+    def test_unscoped_place_is_in_default_nation(self):
+        # Test an authentication document that names places without
+        # saying which nation they're in.
+        ca = MockPlace()
+        ut = MockPlace()
+
+        # Without a default nation on the server side, we can't make
+        # sense of these place names.
+        self.parse_places("CA", expected_unknown={"??": "CA"})
+
+        self.parse_places(
+            ["CA", "UT"], expected_unknown={"??": ["CA", "UT"]}
+        )
+
+        us = MockPlace(inside={"CA": ca, "UT": ut})
+        us.abbreviated_name = "US"
+        MockPlace.by_name["US"] = us
+
+        # With a default nation in place, a bare string like "CA"
+        # is treated the same as a correctly formatted dictionary
+        # like {"US": ["CA"]}
+        MockPlace._default_nation = us
+        self.parse_places("CA", expected_places=[ca])
+        self.parse_places(["CA", "UT"], expected_places=[ca, ut])
+
+        MockPlace._default_nation = None
 
 
 class TestLinkExtractor(object):

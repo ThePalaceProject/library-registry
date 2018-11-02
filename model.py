@@ -1051,18 +1051,41 @@ class Place(Base):
     service_areas = relationship("ServiceArea", backref="place")
 
     @classmethod
-    def everywhere(self, _db):
+    def everywhere(cls, _db):
         """Return a special Place that represents everywhere.
 
         This place has no .geometry, so attempts to use it in
         geographic comparisons will fail.
         """
         place, is_new = get_one_or_create(
-            _db, Place, type=self.EVERYWHERE,
+            _db, Place, type=cls.EVERYWHERE,
             create_method_kwargs=dict(external_id="Everywhere",
                                       external_name="Everywhere")
         )
         return place
+
+    @classmethod
+    def default_nation(cls, _db):
+        """Return the default nation for this library registry.
+
+        If an incoming coverage area doesn't mention a nation, we'll
+        assume it's within this nation.
+
+        :return: The default nation, if one can be found. Otherwise, None.
+        """
+        default_nation = None
+        abbreviation=ConfigurationSetting.sitewide(
+            _db, Configuration.DEFAULT_NATION_ABBREVIATION
+        ).value
+        if abbreviation:
+            default_nation = get_one(
+                _db, Place, type=Place.NATION, abbreviated_name=abbreviation
+            )
+            if not default_nation:
+                logging.error(
+                    "Could not look up default nation %s", abbreviation
+                )
+        return default_nation
 
     @classmethod
     def larger_place_types(cls, type):
@@ -1117,11 +1140,43 @@ class Place(Base):
         )
         if place_type:
             qu = qu.filter(Place.type==place_type)
+        else:
+            # The place type "county" is excluded unless it was
+            # explicitly asked for (e.g. "Cook County"). This is to
+            # avoid ambiguity in the many cases when a state contains
+            # a county and a city with the same name. In all realistic
+            # cases, someone using "Foo" to talk about a library
+            # service area is referring to the city of Foo, not Foo
+            # County -- if they want Foo County they can say "Foo
+            # County".
+            qu = qu.filter(Place.type!=Place.COUNTY)
         return qu
 
     @classmethod
     def lookup_one_by_name(cls, _db, name, place_type=None):
         return cls.lookup_by_name(_db, name, place_type).one()
+
+    @classmethod
+    def to_geojson(cls, _db, *places):
+        """Convert one or more Place objects to a dictionary that will become
+        a GeoJSON document when converted to JSON.
+        """
+        geojson = select(
+            [func.ST_AsGeoJSON(Place.geometry)]
+        ).where(
+            Place.id.in_([x.id for x in places])
+        )
+        results = [x[0] for x in _db.execute(geojson)]
+        if len(results) == 1:
+            # There's only one item, and it is a valid
+            # GeoJSON document on its own.
+            return json.loads(results[0])
+
+        # We have either more or less than one valid item.
+        # In either case, a GeometryCollection is appropriate.
+        body = { "type": "GeometryCollection",
+                 "geometries" : [json.loads(x) for x in results] }
+        return body
 
     @classmethod
     def name_parts(cls, name):
@@ -1152,13 +1207,29 @@ class Place(Base):
         touches = func.ST_Touches(Place.geometry, self.geometry)
         return qu.filter(intersects).filter(touches==False)
 
-    def lookup_inside(self, name):
-        """Look up a named Place that geographically intersects this Place.
+    def lookup_inside(self, name, using_overlap=False):
+        """Look up a named Place that is geographically 'inside' this Place.
+
+        :param name: The name of a place, such as "Boston" or
+        "Calabasas, CA", or "Cook County".
+
+        :param using_overlap: If this is true, then place A is
+        'inside' place B if their shapes overlap, not counting
+        borders. For example, Montgomery is 'inside' Montgomery
+        County, Alabama, and the United States. However, Alabama is
+        not 'inside' Georgia (even though they share a border).
+
+        If `using_overlap` is false, then place A is 'inside' place B
+        only if B is the .parent of A. In this case, Alabama is
+        considered to be 'inside' the United States, but Montgomery is
+        not -- the only place it's 'inside' is Alabama. Checking this way
+        is much faster, so it's the default.
 
         :return: A Place object, or None if no match could be found.
 
         :raise MultipleResultsFound: If more than one Place with the
-        given name intersects with this Place.
+        given name is 'inside' this Place.
+
         """
         parts = Place.name_parts(name)
         if len(parts) > 1:
@@ -1170,7 +1241,7 @@ class Place(Base):
             # look for "Boston" inside the object we get back.
             look_in_here = self
             for part in parts:
-                look_in_here = look_in_here.lookup_inside(part)
+                look_in_here = look_in_here.lookup_inside(part, using_overlap)
                 if not look_in_here:
                     # A link in the chain has failed. Return None
                     # immediately.
@@ -1196,8 +1267,30 @@ class Place(Base):
         exclude_types = Place.larger_place_types(self.type)
         qu = qu.filter(~Place.type.in_(exclude_types))
 
-        if self.geometry is not None:
-            qu = self.overlaps_not_counting_border(qu)
+        if self.type==self.EVERYWHERE:
+            # The concept of 'inside' is not relevant because every
+            # place is 'inside' EVERYWHERE. We are really trying to
+            # find one and only one place with a certain name.
+            pass
+        else:
+            if using_overlap and self.geometry is not None:
+                qu = self.overlaps_not_counting_border(qu)
+            else:
+                parent = aliased(Place)
+                grandparent = aliased(Place)
+                qu = qu.join(parent, Place.parent_id==parent.id)
+                qu = qu.outerjoin(grandparent, parent.parent_id==grandparent.id)
+
+                # For postal codes, but no other types of places, we
+                # allow the lookup to skip a level. This lets you look
+                # up "93203" within a state *or* within the nation.
+                postal_code_grandparent_match = and_(
+                    Place.type==Place.POSTAL_CODE, grandparent.id==self.id,
+                )
+                qu = qu.filter(
+                    or_(Place.parent==self, postal_code_grandparent_match)
+                )
+
         places = qu.all()
         if len(places) == 0:
             return None

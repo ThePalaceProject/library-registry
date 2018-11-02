@@ -155,11 +155,13 @@ class AuthenticationDocument(object):
         `places` is a list of Place model objects.
 
         `unknown` is a coverage object representing the subset of
-        `coverage` that had no corresponding Place objects.
+        `coverage` that had no corresponding Place objects. This
+        object will not be used for any purpose except error display.
 
-        `ambiguous` is a coverage object representing
-        the subset of `coverage` that had more than one corresponding
-        Place object.
+        `ambiguous` is a coverage object representing the subset of
+        `coverage` that had more than one corresponding Place
+        object. This object will not be used for any purpose except
+        error display.
         """
         place_objs = []
         unknown = defaultdict(list)
@@ -168,42 +170,55 @@ class AuthenticationDocument(object):
             # This library covers the entire universe! No need to
             # parse anything.
             place_objs.append(place_class.everywhere(_db))
-            coverage = dict()
+            coverage = dict() # Do no more processing
 
-        for country, places in coverage.items():
+        elif not isinstance(coverage, dict):
+            # The coverage is not in { nation: place } format.
+            # Convert it into that format using the default nation.
+            default_nation = place_class.default_nation(_db)
+            if default_nation:
+                coverage = {default_nation.abbreviated_name : coverage }
+            else:
+                # Oops, that's not going to work. We don't know which
+                # nation this place is in. Return a coverage object
+                # that makes it semi-clear what the problem is.
+                unknown["??"] = coverage
+                coverage = dict() # Do no more processing
+
+        for nation, places in coverage.items():
             try:
-                country_obj = place_class.lookup_one_by_name(
-                    _db, country, place_type=Place.NATION,
+                nation_obj = place_class.lookup_one_by_name(
+                    _db, nation, place_type=Place.NATION,
                 )
                 if places == cls.COVERAGE_EVERYWHERE:
-                    # This library covers an entire country.
-                    place_objs.append(country_obj)
+                    # This library covers an entire nation.
+                    place_objs.append(nation_obj)
                 else:
                     # This library covers a list of places within a
-                    # country.
+                    # nation.
                     if isinstance(places, basestring):
                         # This is invalid -- you're supposed to always
                         # pass in a list -- but we can support it.
                         places = [places]
                     for place in places:
                         try:
-                            place_obj = country_obj.lookup_inside(place)
+                            place_obj = nation_obj.lookup_inside(place)
                             if place_obj:
                                 # We found it.
                                 place_objs.append(place_obj)
                             else:
                                 # We couldn't find any place with this name.
-                                unknown[country].append(place)
+                                unknown[nation].append(place)
                         except MultipleResultsFound, e:
                             # The place was ambiguously named.
-                            ambiguous[country].append(place)
+                            ambiguous[nation].append(place)
             except MultipleResultsFound, e:
-                # A country was ambiguously named -- not very likely.
-                ambiguous[country] = places
+                # A nation was ambiguously named -- not very likely.
+                ambiguous[nation] = places
             except NoResultFound, e:
-                # Either this isn't a recognized country
+                # Either this isn't a recognized nation
                 # or we don't have a geography for it.
-                unknown[country] = places
+                unknown[nation] = places
         return place_objs, unknown, ambiguous
 
     @classmethod

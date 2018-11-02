@@ -1,16 +1,21 @@
 from nose.tools import set_trace
 import json
 
+import flask
+
 from model import (
+    ConfigurationSetting,
     Hyperlink,
+    Session,
     Validation,
 )
 
 from authentication_document import AuthenticationDocument
+from config import Configuration
 
 class Annotator(object):
 
-    def annotate_feed(self, feed):
+    def annotate_catalog(self, catalog, live=True):
         pass
 
 class OPDSCatalog(object):
@@ -32,6 +37,9 @@ class OPDSCatalog(object):
     CATALOG_REL = "http://opds-spec.org/catalog"
     THUMBNAIL_REL = "http://opds-spec.org/image/thumbnail"
 
+    ELIGIBILITY_REL = "http://librarysimplified.org/rel/registry/eligibility"
+    FOCUS_REL = "http://librarysimplified.org/rel/registry/focus"
+
     CACHE_TIME = 3600 * 12
 
     @classmethod
@@ -52,7 +60,7 @@ class OPDSCatalog(object):
         catalog.setdefault("images", []).append(image)
 
     def __init__(self, _db, title, url, libraries, annotator=None,
-                 live=True):
+                 live=True, url_for=None):
         """Turn a list of libraries into a catalog."""
         if not annotator:
             annotator = Annotator()
@@ -64,12 +72,15 @@ class OPDSCatalog(object):
         for library in libraries:
             if not isinstance(library, tuple):
                 library = (library,)
-            self.catalog["catalogs"].append(self.library_catalog(*library))
+            self.catalog["catalogs"].append(
+                self.library_catalog(*library, url_for=url_for)
+            )
         annotator.annotate_catalog(self, live=live)
 
     @classmethod
     def library_catalog(cls, library, distance=None,
-                        include_private_information=False):
+                        include_private_information=False,
+                        url_for=None):
 
         """Create an OPDS catalog for a library.
 
@@ -79,6 +90,7 @@ class OPDSCatalog(object):
         contact for integration problems will be included, where it
         normally wouldn't be.
         """
+        url_for = url_for or flask.url_for
         metadata = dict(
             id=library.internal_urn,
             title=library.name,
@@ -112,6 +124,17 @@ class OPDSCatalog(object):
                                      href=library.logo,
                                      type="image/png")
 
+        # Add links that allow clients to discover the library's
+        # focus and eligibility area.
+        for rel, route in (
+            (cls.ELIGIBILITY_REL, "library_eligibility"),
+            (cls.FOCUS_REL, "library_focus"),
+        ):
+            url = url_for(route, uuid=library.internal_urn, _external=True)
+            cls.add_link_to_catalog(
+                catalog, rel=rel, href=url, type="application/geo+json"
+            )
+
         for hyperlink in library.hyperlinks:
             if (not include_private_information and hyperlink.rel in
                 Hyperlink.PRIVATE_RELS):
@@ -123,6 +146,16 @@ class OPDSCatalog(object):
             cls.add_link_to_catalog(
                 catalog, **args
             )
+
+        # Add a link for the registry's web client, if it has one.
+        _db = Session.object_session(library)
+        web_client_url = ConfigurationSetting.sitewide(
+            _db, Configuration.WEB_CLIENT_URL).value
+        if web_client_url:
+            web_client_url = web_client_url.replace('{uuid}', library.internal_urn)
+            cls.add_link_to_catalog(
+                catalog, href=web_client_url, rel="self", type="text/html")
+
         return catalog
 
     @classmethod

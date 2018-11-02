@@ -1,5 +1,16 @@
+from nose.tools import set_trace
+from email.header import Header
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email import Charset
 import email
 import smtplib
+
+# Set up an encoding/decoding between UTF-8 and quoted-printable.
+# Otherwise, the bodies of email messages will be encoded with base64
+# and they'll be hard to read. This way, only the non-ASCII characters
+# need to be encoded.
+Charset.add_charset('utf-8', Charset.QP, Charset.QP, 'utf-8')
 
 from config import (
     CannotLoadConfiguration,
@@ -200,10 +211,10 @@ class EmailTemplate(object):
         :param kwargs: Arguments to use when filling out the template.
         """
 
-        message = email.Message.Message()
+        message = MIMEMultipart('mixed')
         message['From'] = from_header
         message['To'] = to_header
-        message['Subject'] = self.subject_template % kwargs
+        message['Subject'] = Header(self.subject_template % kwargs, 'utf-8')
 
         # This might look ugly, because %(from_address)s in a template
         # is expected to be an unadorned email address, whereas this
@@ -212,5 +223,8 @@ class EmailTemplate(object):
         for k, v in (('to_address', to_header), ('from_address', from_header)):
             if not k in kwargs:
                 kwargs[k] = v
-        message.set_payload(self.body_template % kwargs)
+        payload = self.body_template % kwargs
+        text_part = MIMEText(payload, 'plain', 'utf-8')
+        message.attach(text_part)
         return message.as_string()
+
