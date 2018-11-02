@@ -368,6 +368,43 @@ class TestLinkExtractor(object):
 
 class TestUpdateServiceAreas(DatabaseTest):
 
+    def test_set_service_areas(self):
+        """Test the method that replaces a Library's ServiceAreas."""
+        m = AuthenticationDocument.set_service_areas
+
+        library = self._library()
+        p1 = self._place()
+        p2 = self._place()
+
+        def eligibility_areas():
+            return [x.place for x in library.service_areas
+                    if x.type==ServiceArea.ELIGIBILITY]
+
+        def focus_areas():
+            return [x.place for x in library.service_areas
+                    if x.type==ServiceArea.FOCUS]
+
+        # Try a successful case.
+        service_area = [[p1], {}, {}]
+        focus_area = [[p2], {}, {}]
+        m(library, service_area, focus_area)
+        eq_([p1], eligibility_areas())
+        eq_([p2], focus_areas())
+
+        # If you pass in two empty inputs, no changes are made.
+        empty = [[], {}, {}]
+        m(library, empty, empty)
+        eq_([p1], eligibility_areas())
+        eq_([p2], focus_areas())
+
+        # If you pass in one empty input, both service and focus
+        # area are set to the same value.
+        set_trace()
+        m(library, focus_area, empty)
+        eq_([p2], eligibility_areas())
+        eq_([p2], focus_areas())
+        
+
     def test_known_place_becomes_servicearea(self):
         """Test the helper method in a successful case."""
         library = self._library()
@@ -506,7 +543,7 @@ class TestUpdateServiceAreas(DatabaseTest):
         eq_(ServiceArea.FOCUS, area.type)
 
 
-    def test_service_area_registered_as_focus_area_if_identical_to_focus_area(self):
+    def test_service_area_and_focus_area_identical(self):
         library = self._library()
 
         # Create an authentication document that defines service_area
@@ -521,9 +558,9 @@ class TestUpdateServiceAreas(DatabaseTest):
         self._db.commit()
         eq_(None, problem)
 
-        # Since focus area and eligibility area are the same, only the
-        # focus area was registered.
-        [area] = library.service_areas
+        [area] = library.eligibility_areas
+        [area2] = library.focus_areas
+        eq_(area, area2)
         eq_(Place.EVERYWHERE, area.place.type)
         eq_(ServiceArea.FOCUS, area.type)
 
