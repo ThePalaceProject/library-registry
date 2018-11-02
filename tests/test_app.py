@@ -20,7 +20,7 @@ class TestAppHelpers(ControllerTest):
             return "Called with library %s" % flask.request.library.name
 
         def assert_not_found(uuid):
-            response = route_function()
+            response = route_function(uuid)
             eq_(LIBRARY_NOT_FOUND.response, response)
 
         assert_not_found(uuid=None)
