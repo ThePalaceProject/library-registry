@@ -165,14 +165,8 @@ class LibraryRegistryController(BaseController):
             )
         self.emailer = emailer
 
-    def point_from_ip(self, ip_address):
-        if not ip_address:
-            return None
-        return GeometryUtility.point_from_ip(ip_address)
-
-    def nearby(self, ip_address, live=True):
-        point = self.point_from_ip(ip_address)
-        qu = Library.nearby(self._db, point, production=live)
+    def nearby(self, location, live=True):
+        qu = Library.nearby(self._db, location, production=live)
         qu = qu.limit(5)
         if live:
             nearby_controller = 'nearby'
@@ -185,8 +179,7 @@ class LibraryRegistryController(BaseController):
         )
         return catalog_response(catalog)
 
-    def search(self, ip_address=None, live=True):
-        point = self.point_from_ip(ip_address)
+    def search(self, location, live=True):
         query = flask.request.args.get('q')
         if live:
             search_controller = 'search'
@@ -195,7 +188,7 @@ class LibraryRegistryController(BaseController):
         if query:
             # Run the query and send the results.
             results = Library.search(
-                self._db, point, query, production=live
+                self._db, location, query, production=live
             )
 
             this_url = self.app.url_for(
