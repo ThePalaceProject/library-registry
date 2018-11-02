@@ -254,22 +254,22 @@ class SetCoverageAreaScript(LibraryScript):
             raise Exception("No library with name %r" % parsed.library)
 
         if not parsed.service_area and not parsed.focus_area:
-            raise Exception("Either --service-area or --focus-area must be specified.")
-        service_area = focus_area = None
+            logging.info("No new coverage areas specified, doing nothing.")
+            self.report(library)
+            return
 
-        def _load_area(x):
-            if not x:
-                return None
-            try:
-                x = json.loads(x)
-            except ValueError:
-                raise ValueError("Invalid JSON: %r" % x)
-            if not isinstance(x, dict):
-                raise ValueError("Not a place document: %r" % x)
-            return x
-
-        service_area = _load_area(parsed.service_area)
-        focus_area = _load_area(parsed.focus_area)
+        service_area = parsed.service_area
+        focus_area = parsed.focus_area
+        try:
+            service_area = json.loads(service_area)
+        except TypeError, e:
+            # If it's not JSON we'll just try to interpret it as a string.
+            pass
+        try:
+            focus_area = json.loads(service_area)
+        except TypeError, e:
+            # If it's not JSON we'll just try to interpret it as a string.
+            pass
 
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
             self._db, service_area, focus_area, place_class
@@ -283,6 +283,13 @@ class SetCoverageAreaScript(LibraryScript):
         AuthenticationDocument.set_service_areas(
             library, service_area, focus_area
         )
+        self._db.commit()
+        self.report(library)
+
+    def report(self, library):
+        logging.info("Service areas for %s:", library.name)
+        for area in library.service_areas:
+            logging.info("%s: %r", area.type, area.place)
 
 
 class AdobeVendorIDAcceptanceTestScript(Script):
