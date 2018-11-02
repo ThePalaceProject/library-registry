@@ -291,29 +291,10 @@ class TestSetCoverageAreaScript(DatabaseTest):
     def test_argument_parsing(self):
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
-        base = ["--library=%s" % library.name]
-        assert_raises_regexp(
-            Exception,
-            "Either --service-area or --focus-area must be specified",
-            s.run, base, place_class=MockPlace
-        )
 
-        for arg in ['service-area', 'focus-area']:
-            args = base + ['--%s=NotJSON' % arg]
-            print args
-            assert_raises_regexp(
-                ValueError,
-                "Invalid JSON:",
-                s.run, args, place_class=MockPlace
-            )
-
-            not_a_place = json.dumps("Not a place")
-            args = base + ['--%s=%s' % (arg, not_a_place)]
-            assert_raises_regexp(
-                ValueError,
-                "Not a place document:",
-                s.run, args, place_class=MockPlace
-            )
+        # You can run the script without specifying any areas, to
+        # see a library's current areas.
+        s.run(["--library=%s" % library.name], place_class=MockPlace)
 
     def test_unrecognized_place(self):
         library = self._library()
@@ -369,6 +350,19 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         # The library's former ServiceAreas have been removed.
         assert us not in places
+
+        # If a detault nation is set, you can name a single place as
+        # your service area.
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.DEFAULT_NATION_ABBREVIATION
+        ).value = "US"
+        ut = self._place(type=Place.STATE, abbreviated_name='UT', parent=us)
+
+        args = ["--library=%s" % library.name,
+                '--service-area=UT']
+        s.run(args)
+        [area] = library.service_areas
+        eq_(ut, area.place)
 
 
 class TestConfigureEmailerScript(DatabaseTest):

@@ -238,11 +238,11 @@ class SetCoverageAreaScript(LibraryScript):
         parser = super(SetCoverageAreaScript, cls).arg_parser()
         parser.add_argument(
             '--service-area',
-            help="JSON document describing the library's service area. If no value is specified, it is assumed to be the same as --focus-area."
+            help="JSON document or string describing the library's service area. If no value is specified, it is assumed to be the same as --focus-area."
         )
         parser.add_argument(
             '--focus-area',
-            help="JSON document describing the library's focus area. If no value is specified, it is assumed to be the same as --service-area."
+            help="JSON document or string describing the library's focus area. If no value is specified, it is assumed to be the same as --service-area."
         )
         return parser
 
@@ -260,15 +260,15 @@ class SetCoverageAreaScript(LibraryScript):
 
         service_area = parsed.service_area
         focus_area = parsed.focus_area
+        # If the areas make sense as JSON, parse them. Otherwise a
+        # string will be interpreted as a single place name.
         try:
             service_area = json.loads(service_area)
-        except TypeError, e:
-            # If it's not JSON we'll just try to interpret it as a string.
+        except (ValueError, TypeError), e:
             pass
         try:
-            focus_area = json.loads(service_area)
-        except TypeError, e:
-            # If it's not JSON we'll just try to interpret it as a string.
+            focus_area = json.loads(focus_area)
+        except (ValueError, TypeError), e:
             pass
 
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
