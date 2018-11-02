@@ -369,7 +369,7 @@ class TestLinkExtractor(object):
 class TestUpdateServiceAreas(DatabaseTest):
 
     def test_set_service_areas(self):
-        """Test the method that replaces a Library's ServiceAreas."""
+        # Test the method that replaces a Library's ServiceAreas.
         m = AuthenticationDocument.set_service_areas
 
         library = self._library()
@@ -385,9 +385,9 @@ class TestUpdateServiceAreas(DatabaseTest):
                     if x.type==ServiceArea.FOCUS]
 
         # Try a successful case.
-        service_area = [[p1], {}, {}]
-        focus_area = [[p2], {}, {}]
-        m(library, service_area, focus_area)
+        p1_only = [[p1], {}, {}]
+        p2_only = [[p2], {}, {}]
+        m(library, p1_only, p2_only)
         eq_([p1], eligibility_areas())
         eq_([p2], focus_areas())
 
@@ -397,11 +397,14 @@ class TestUpdateServiceAreas(DatabaseTest):
         eq_([p1], eligibility_areas())
         eq_([p2], focus_areas())
 
-        # If you pass in one empty input, both service and focus
-        # area are set to the same value.
-        set_trace()
-        m(library, focus_area, empty)
-        eq_([p2], eligibility_areas())
+        # If you pass only one value, the focus area is set to that
+        # value and the eligibility area is cleared out.
+        m(library, p1_only, empty)
+        eq_([], eligibility_areas())
+        eq_([p1], focus_areas())
+
+        m(library, empty, p2_only)
+        eq_([], eligibility_areas())
         eq_([p2], focus_areas())
         
 
@@ -558,9 +561,8 @@ class TestUpdateServiceAreas(DatabaseTest):
         self._db.commit()
         eq_(None, problem)
 
-        [area] = library.eligibility_areas
-        [area2] = library.focus_areas
-        eq_(area, area2)
+        # Only the focus area is set.
+        [area] = library.service_areas
         eq_(Place.EVERYWHERE, area.place.type)
         eq_(ServiceArea.FOCUS, area.type)
 
