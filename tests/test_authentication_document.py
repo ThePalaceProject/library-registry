@@ -406,7 +406,7 @@ class TestUpdateServiceAreas(DatabaseTest):
         m(library, empty, p2_only)
         eq_([], eligibility_areas())
         eq_([p2], focus_areas())
-        
+
 
     def test_known_place_becomes_servicearea(self):
         """Test the helper method in a successful case."""
@@ -546,7 +546,7 @@ class TestUpdateServiceAreas(DatabaseTest):
         eq_(ServiceArea.FOCUS, area.type)
 
 
-    def test_service_area_and_focus_area_identical(self):
+    def test_service_area_registered_as_focus_area_if_identical_to_focus_area(self):
         library = self._library()
 
         # Create an authentication document that defines service_area
@@ -561,7 +561,8 @@ class TestUpdateServiceAreas(DatabaseTest):
         self._db.commit()
         eq_(None, problem)
 
-        # Only the focus area is set.
+        # Since focus area and eligibility area are the same, only the
+        # focus area was registered.
         [area] = library.service_areas
         eq_(Place.EVERYWHERE, area.place.type)
         eq_(ServiceArea.FOCUS, area.type)
