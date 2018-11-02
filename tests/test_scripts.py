@@ -351,7 +351,7 @@ class TestSetCoverageAreaScript(DatabaseTest):
         # The library's former ServiceAreas have been removed.
         assert us not in places
 
-        # If a detault nation is set, you can name a single place as
+        # If a default nation is set, you can name a single place as
         # your service area.
         ConfigurationSetting.sitewide(
             self._db, Configuration.DEFAULT_NATION_ABBREVIATION
