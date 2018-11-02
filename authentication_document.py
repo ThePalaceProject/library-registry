@@ -357,6 +357,14 @@ class AuthenticationDocument(object):
         # no input was specified.
         empty = [[],{},{}]
 
+        if focus_area == empty and service_area == empty:
+            # A library can't lose its entire coverage area -- it's
+            # more likely that the coverage area was grandfathered in
+            # and it just isn't set on the remote side.
+            #
+            # Do nothing.
+            return
+
         if (focus_area == empty and service_area != empty
             or service_area == focus_area):
             # Service area and focus area are the same, either because
