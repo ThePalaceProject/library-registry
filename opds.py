@@ -1,6 +1,8 @@
 from nose.tools import set_trace
 import json
 
+import flask
+
 from model import (
     ConfigurationSetting,
     Hyperlink,
@@ -35,6 +37,9 @@ class OPDSCatalog(object):
     CATALOG_REL = "http://opds-spec.org/catalog"
     THUMBNAIL_REL = "http://opds-spec.org/image/thumbnail"
 
+    ELIGIBILITY_REL = "http://librarysimplified.org/rel/registry/eligibility"
+    FOCUS_REL = "http://librarysimplified.org/rel/registry/focus"
+
     CACHE_TIME = 3600 * 12
 
     @classmethod
@@ -55,7 +60,7 @@ class OPDSCatalog(object):
         catalog.setdefault("images", []).append(image)
 
     def __init__(self, _db, title, url, libraries, annotator=None,
-                 live=True):
+                 live=True, url_for=None):
         """Turn a list of libraries into a catalog."""
         if not annotator:
             annotator = Annotator()
@@ -67,12 +72,15 @@ class OPDSCatalog(object):
         for library in libraries:
             if not isinstance(library, tuple):
                 library = (library,)
-            self.catalog["catalogs"].append(self.library_catalog(*library))
+            self.catalog["catalogs"].append(
+                self.library_catalog(*library, url_for=url_for)
+            )
         annotator.annotate_catalog(self, live=live)
 
     @classmethod
     def library_catalog(cls, library, distance=None,
-                        include_private_information=False):
+                        include_private_information=False,
+                        url_for=None):
 
         """Create an OPDS catalog for a library.
 
@@ -82,6 +90,7 @@ class OPDSCatalog(object):
         contact for integration problems will be included, where it
         normally wouldn't be.
         """
+        url_for = url_for or flask.url_for
         metadata = dict(
             id=library.internal_urn,
             title=library.name,
@@ -114,6 +123,17 @@ class OPDSCatalog(object):
             cls.add_image_to_catalog(catalog, rel=cls.THUMBNAIL_REL,
                                      href=library.logo,
                                      type="image/png")
+
+        # Add links that allow clients to discover the library's
+        # focus and eligibility area.
+        for rel, route in (
+            (cls.ELIGIBILITY_REL, "library_eligibility"),
+            (cls.FOCUS_REL, "library_focus"),
+        ):
+            url = url_for(route, uuid=library.internal_urn, _external=True)
+            cls.add_link_to_catalog(
+                catalog, rel=rel, href=url, type="application/geo+json"
+            )
 
         for hyperlink in library.hyperlinks:
             if (not include_private_information and hyperlink.rel in

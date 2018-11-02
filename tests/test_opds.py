@@ -21,6 +21,12 @@ from opds import OPDSCatalog
 
 class TestOPDSCatalog(DatabaseTest):
 
+    def mock_url_for(self, route, uuid, **kwargs):
+        """A simple replacement for url_for that doesn't require an
+        application context.
+        """
+        return "http://%s/%s" % (route, uuid)
+
     def test_library_catalogs(self):
         l1 = self._library("The New York Public Library")
         l2 = self._library("Brooklyn Public Library")
@@ -30,7 +36,7 @@ class TestOPDSCatalog(DatabaseTest):
 
         catalog = OPDSCatalog(
             self._db, "A Catalog!", "http://url/", [l1, l2],
-            TestAnnotator()
+            TestAnnotator(), url_for=self.mock_url_for
         )
         catalog = unicode(catalog)
         parsed = json.loads(catalog)
@@ -82,7 +88,7 @@ class TestOPDSCatalog(DatabaseTest):
         ConfigurationSetting.sitewide(
             self._db, Configuration.WEB_CLIENT_URL).value = "http://web/{uuid}"
 
-        catalog = Mock.library_catalog(library)
+        catalog = Mock.library_catalog(library, url_for=self.mock_url_for)
         metadata = catalog['metadata']
         eq_(library.name, metadata['title'])
         eq_(library.internal_urn, metadata['id'])
@@ -90,7 +96,7 @@ class TestOPDSCatalog(DatabaseTest):
 
         eq_(metadata['updated'], OPDSCatalog._strftime(library.timestamp))
 
-        [authentication_url, web_alternate, help, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel'), x.get('type')))
+        [authentication_url, web_alternate, help, eligibility, focus, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel'), x.get('type')))
         [logo] = catalog['images']
 
         eq_("mailto:help@library.org", help['href'])
@@ -108,6 +114,16 @@ class TestOPDSCatalog(DatabaseTest):
         eq_("self", web_self['rel'])
         eq_("text/html", web_self['type'])
 
+        eq_("http://library_eligibility/%s" % library.internal_urn,
+            eligibility['href'])
+        eq_(OPDSCatalog.ELIGIBILITY_REL, eligibility['rel'])
+        eq_("application/geo+json", eligibility['type'])
+
+        eq_("http://library_focus/%s" % library.internal_urn,
+            focus['href'])
+        eq_(OPDSCatalog.FOCUS_REL, focus['rel'])
+        eq_("application/geo+json", focus['type'])
+
         eq_(library.logo, logo['href'])
         eq_(OPDSCatalog.THUMBNAIL_REL, logo['rel'])
         eq_("image/png", logo['type'])
@@ -124,7 +140,10 @@ class TestOPDSCatalog(DatabaseTest):
 
         # If library_catalog is called with include_private_information=True,
         # both Hyperlinks are passed into _hyperlink_args.
-        catalog = Mock.library_catalog(library, include_private_information=True)
+        catalog = Mock.library_catalog(
+            library, include_private_information=True,
+            url_for=self.mock_url_for
+        )
         eq_(set([public_hyperlink, private_hyperlink]), set(Mock.hyperlinks))
 
     def test__hyperlink_args(self):

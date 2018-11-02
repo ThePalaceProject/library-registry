@@ -122,7 +122,26 @@ class LibraryRegistryAnnotator(Annotator):
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
 
-class LibraryRegistryController(object):
+class BaseController(object):
+
+    def __init__(self, app):
+        self.app = app
+        self._db = self.app._db
+
+    def library_for_request(self, uuid):
+        """Look up the library the user is trying to access."""
+        if not uuid:
+            return LIBRARY_NOT_FOUND
+        if not uuid.startswith("urn:uuid:"):
+            uuid = "urn:uuid:" + uuid
+        library = Library.for_urn(self._db, uuid)
+        if not library:
+            return LIBRARY_NOT_FOUND
+        flask.request.library = library
+        return library
+
+
+class LibraryRegistryController(BaseController):
 
     OPENSEARCH_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
  <OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
@@ -133,8 +152,7 @@ class LibraryRegistryController(object):
  </OpenSearchDescription>"""
 
     def __init__(self, app, emailer_class=Emailer):
-        self.app = app
-        self._db = self.app._db
+        super(LibraryRegistryController, self).__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
         emailer = None
@@ -204,14 +222,11 @@ class LibraryRegistryController(object):
             )
             return Response(body, 200, headers)
 
-    def library(self, uuid):
-        if not uuid.startswith("urn:uuid:"):
-            uuid = "urn:uuid:" + uuid
-        library = Library.for_urn(self._db, uuid)
-        if not library:
-            return LIBRARY_NOT_FOUND
-
-        this_url = self.app.url_for('library', uuid=uuid)
+    def library(self):
+        library = flask.request.library
+        this_url = self.app.url_for(
+            'library', uuid=library.internal_urn
+        )
         catalog = OPDSCatalog(
             self._db, library.name,
             this_url, [library],
@@ -562,7 +577,8 @@ class LibraryRegistryController(object):
         # Create an OPDS 2 catalog containing all available
         # information about the library.
         catalog = OPDSCatalog.library_catalog(
-            library, include_private_information=True
+            library, include_private_information=True,
+            url_for=self.app.url_for
         )
 
         # Annotate the catalog with some information specific to
@@ -668,7 +684,7 @@ class LibraryRegistryController(object):
         return candidates
 
 
-class ValidationController(object):
+class ValidationController(BaseController):
     """Validates Resources based on validation codes.
 
     The confirmation codes were sent out in emails to the addresses that
@@ -677,10 +693,6 @@ class ValidationController(object):
     """
 
     MESSAGE_TEMPLATE = "<html><head><title>%(message)s</title><body>%(message)s</body></html>"
-
-    def __init__(self, app):
-        self.app = app
-        self._db = self.app._db
 
     def html_response(self, status_code, message):
         """Return a human-readable message as a minimal HTML page.
@@ -738,14 +750,16 @@ class ValidationController(object):
         return self.html_response(200, message)
 
 
-class CoverageController(object):
+class CoverageController(BaseController):
     """Converts coverage area descriptions to GeoJSON documents
     so they can be visualized.
     """
 
-    def __init__(self, app):
-        self.app = app
-        self._db = self.app._db
+    def geojson_response(self, document):
+        if isinstance(document, dict):
+            document = json.dumps(document)
+        headers = {"Content-Type": "application/geo+json"}
+        return Response(document, 200, headers=headers)
 
     def lookup(self):
         coverage = flask.request.args.get('coverage')
@@ -765,6 +779,24 @@ class CoverageController(object):
             document['unknown'] = unknown
         if ambiguous:
             document['ambiguous'] = ambiguous
+        return self.geojson_response(document)
 
-        headers = {"Content-Type": "application/geo+json"}
-        return Response(json.dumps(document), 200, headers=headers)
+    def _geojson_for_service_area(self, service_type):
+        """Serve a GeoJSON document describing some subset of the active
+        library's service areas.
+        """
+        areas = [x.place for x in flask.request.library.service_areas
+                 if x.type==service_type]
+        return self.geojson_response(Place.to_geojson(self._db, *areas))
+
+    def eligibility_for_library(self):
+        """Serve a GeoJSON document representing the eligibility area
+        for a specific library.
+        """
+        return self._geojson_for_service_area(ServiceArea.ELIGIBILITY)
+
+    def focus_for_library(self):
+        """Serve a GeoJSON document representing the focus area
+        for a specific library.
+        """
+        return self._geojson_for_service_area(ServiceArea.FOCUS)

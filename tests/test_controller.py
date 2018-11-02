@@ -10,8 +10,10 @@ import random
 from smtplib import SMTPException
 from urllib import unquote
 
+from contextlib import contextmanager
 from controller import (
     AdobeVendorIDController,
+    BaseController,
     CoverageController,
     LibraryRegistry,
     LibraryRegistryAnnotator,
@@ -41,6 +43,7 @@ from model import (
     Hyperlink,
     Library,
     Place,
+    ServiceArea,
     Validation,
 )
 from util.http import RequestTimedOut
@@ -93,6 +96,14 @@ class ControllerTest(DatabaseTest):
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
 
+    @contextmanager
+    def request_context_with_library(self, route, *args, **kwargs):
+        library = kwargs.pop('library')
+        with self.app.test_request_context(route, *args, **kwargs) as c:
+            flask.request.library = library
+            yield c
+
+
 class TestLibraryRegistryAnnotator(ControllerTest):
     def test_annotate_catalog(self):
         annotator = LibraryRegistryAnnotator(self.app.library_registry)
@@ -130,6 +141,28 @@ class TestLibraryRegistryAnnotator(ControllerTest):
             eq_('application/opds+json;profile=https://librarysimplified.org/rel/profile/directory', register_link.get('type'))
 
             eq_("VENDORID", catalog.catalog.get("metadata").get('adobe_vendor_id'))
+
+
+class TestBaseController(ControllerTest):
+
+    def test_library_for_request(self):
+        # Test the code that looks up a library by its UUID and
+        # sets it as flask.request.library.
+        controller = BaseController(self.library_registry)
+        f = controller.library_for_request
+        library = self._library()
+
+        with self.app.test_request_context("/"):
+            eq_(LIBRARY_NOT_FOUND, f(None))
+            eq_(LIBRARY_NOT_FOUND, f("no such uuid"))
+
+            eq_(library, f(library.internal_urn))
+            eq_(library, flask.request.library)
+
+            flask.request.library = None
+            eq_(library, f(library.internal_urn[len("urn:uuid:"):]))
+            eq_(library, flask.request.library)
+
 
 class TestLibraryRegistry(ControllerTest):
 
@@ -403,23 +436,11 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_library(self):
         nypl = self.nypl
-        with self.app.test_request_context():
-            # We can look up a library by its internal URN...
-            response = self.controller.library(nypl.internal_urn)
-            [catalog_entry] = json.loads(response.data).get("catalogs")
-            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
-            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
-
-            # Or its UUID without the prefix.
-            uuid = nypl.internal_urn[len("urn:uuid:"):]
-            response = self.controller.library(uuid)
-            [catalog_entry] = json.loads(response.data).get("catalogs")
-            eq_(nypl.name, catalog_entry.get("metadata").get("title"))
-            eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
-
-            # We get a problem detail if the library doesn't exist.
-            response = self.controller.library("not a library")
-            eq_(LIBRARY_NOT_FOUND, response)
+        with self.request_context_with_library("/", library=nypl):
+            response = self.controller.library()
+        [catalog_entry] = json.loads(response.data).get("catalogs")
+        eq_(nypl.name, catalog_entry.get("metadata").get("title"))
+        eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
 
     def queue_opds_success(
             self, auth_url="http://circmanager.org/authentication.opds",
@@ -1554,3 +1575,40 @@ class TestCoverageController(ControllerTest):
         # to create an ambiguity problem.
         massachussets.external_name="Kansas"
         self.parse_to("Kansas", [], ambiguous={"US": ["Kansas"]})
+
+    def test_library_eligibility_and_focus(self):
+        # focus_for_library() and eligibility_for_library() represent
+        # a library's service area as GeoJSON.
+
+        # We don't use self.nypl here because we want to set more
+        # realistic service and focus areas.
+        nypl = self._library("NYPL")
+
+        # New York State is the eligibility area for NYPL.
+        get_one_or_create(
+            self._db, ServiceArea, library=nypl,
+            place=self.new_york_state, type=ServiceArea.ELIGIBILITY
+        )
+
+        # New York City is the focus area.
+        get_one_or_create(
+            self._db, ServiceArea, library=nypl,
+            place=self.new_york_city, type=ServiceArea.FOCUS
+        )
+
+        with self.request_context_with_library("/", library=nypl):
+            focus = self.app.library_registry.coverage_controller.focus_for_library()
+            eligibility = self.app.library_registry.coverage_controller.eligibility_for_library()
+
+            # In both cases we got a GeoJSON document
+            for response in (focus, eligibility):
+                eq_(200, response.status_code)
+                eq_("application/geo+json", response.headers['Content-Type'])
+
+            # The GeoJSON documents are the ones we'd expect from turning
+            # the corresponding service areas into GeoJSON.
+            focus = json.loads(focus.data)
+            eq_(Place.to_geojson(self._db, self.new_york_city), focus)
+
+            eligibility = json.loads(eligibility.data)
+            eq_(Place.to_geojson(self._db, self.new_york_state), eligibility)
