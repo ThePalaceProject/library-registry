@@ -29,6 +29,7 @@ from Crypto.Cipher import PKCS1_OAEP
 
 from . import DatabaseTest
 from testing import DummyHTTPClient
+from util import GeometryUtility
 from util.problem_detail import ProblemDetail
 
 from authentication_document import AuthenticationDocument
@@ -223,6 +224,10 @@ class TestLibraryRegistryController(ControllerTest):
             ("contact", "mailto:integrationproblems@library.org"),
         ])
 
+        # Turn some places into geographic points.
+        self.manhattan = GeometryUtility.point_from_ip("65.88.88.124")
+        self.oakland = GeometryUtility.point_from_string("37.8,-122.2")
+
     def test_instantiate_without_emailer(self):
         """If there is no emailer configured, the controller will still start
         up.
@@ -232,7 +237,7 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_nearby(self):
         with self.app.test_request_context("/"):
-            response = self.controller.nearby("65.88.88.124")
+            response = self.controller.nearby(self.manhattan, live=True)
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
@@ -283,13 +288,13 @@ class TestLibraryRegistryController(ControllerTest):
         for library in self._db.query(Library):
             library.registry_stage = Library.TESTING_STAGE
         with self.app.test_request_context("/"):
-            response = self.controller.nearby("65.88.88.124", live=True)
+            response = self.controller.nearby(self.manhattan, live=True)
             catalogs = json.loads(response.data)
             eq_([], catalogs['catalogs'])
 
         # However, they will show up in the QA feed.
         with self.app.test_request_context("/"):
-            response = self.controller.nearby("65.88.88.124", live=False)
+            response = self.controller.nearby(self.manhattan, live=False)
             catalogs = json.loads(response.data)
             eq_(2, len(catalogs['catalogs']))
             [catalog] = [
@@ -321,7 +326,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("search_qa"), search_link['href'])
             eq_("search", search_link['rel'])
 
-    def test_nearby_no_ip_address(self):
+    def test_nearby_no_location(self):
         with self.app.test_request_context("/"):
             response = self.controller.nearby(None)
             assert isinstance(response, Response)
@@ -329,25 +334,25 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
             catalogs = json.loads(response.data)
 
-            # We found no nearby libraries, because we had no IP address to
+            # We found no nearby libraries, because we had no location to
             # start with.
             eq_([], catalogs['catalogs'])
 
     def test_nearby_no_libraries(self):
         with self.app.test_request_context("/"):
-            response = self.controller.nearby("8.8.8.8") # California
+            response = self.controller.nearby(self.oakland)
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
             catalog = json.loads(response.data)
 
-            # We found no nearby libraries, because we were too far away
-            # from them.
+            # We found no nearby libraries, because we were across the
+            # country from the only ones in the registry.
             eq_([], catalog['catalogs'])
 
     def test_search_form(self):
         with self.app.test_request_context("/"):
-            response = self.controller.search()
+            response = self.controller.search(None)
             eq_("200 OK", response.status)
             eq_("application/opensearchdescription+xml",
                 response.headers['Content-Type'])
@@ -364,7 +369,7 @@ class TestLibraryRegistryController(ControllerTest):
     def test_qa_search_form(self):
         """The QA search form links to the QA search controller."""
         with self.app.test_request_context("/"):
-            response = self.controller.search(live=False)
+            response = self.controller.search(None, live=False)
             eq_("200 OK", response.status)
 
             expect_url = self.library_registry.url_for("search_qa")
@@ -373,7 +378,7 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_search(self):
         with self.app.test_request_context("/?q=manhattan"):
-            response = self.controller.search("65.88.88.124")
+            response = self.controller.search(self.manhattan)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
             catalog = json.loads(response.data)
@@ -421,7 +426,7 @@ class TestLibraryRegistryController(ControllerTest):
         for l in self._db.query(Library):
             l.registry_stage = Library.CANCELLED_STAGE
         with self.app.test_request_context("/?q=manhattan"):
-            response = self.controller.search("65.88.88.124", live=True)
+            response = self.controller.search(self.manhattan, live=True)
             catalog = json.loads(response.data)
             eq_([], catalog['catalogs'])
 
@@ -429,7 +434,7 @@ class TestLibraryRegistryController(ControllerTest):
         # stage, we find it.
         self.kansas_state_library.registry_stage = Library.PRODUCTION_STAGE
         with self.app.test_request_context("/?q=manhattan"):
-            response = self.controller.search("65.88.88.124", live=True)
+            response = self.controller.search(self.manhattan, live=True)
             catalog = json.loads(response.data)
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])

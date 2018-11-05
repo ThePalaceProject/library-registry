@@ -11,16 +11,19 @@ from config import Configuration
 from controller import LibraryRegistry
 from log import LogConfiguration
 from model import SessionManager, ConfigurationSetting
-from util.flask_util import originating_ip
 from util.app_server import returns_problem_detail
-from app_helpers import has_library_factory
+from app_helpers import (
+    has_library_factory,
+    uses_location_factory,
+)
 
 
 app = Flask(__name__)
 babel = Babel(app)
 
-# Create a has_library() annotator for this app.
+# Create annotators for this app.
 has_library = has_library_factory(app)
+uses_location = uses_location_factory(app)
 
 testing = 'TESTING' in os.environ
 db_url = Configuration.database_url(testing)
@@ -56,17 +59,17 @@ def shutdown_session(exception):
             app.library_registry._db.commit()
 
 @app.route('/')
+@uses_location
 @returns_problem_detail
-def nearby():
-    return app.library_registry.registry_controller.nearby(
-        originating_ip()
-    )
+def nearby(_location):
+    return app.library_registry.registry_controller.nearby(_location)
 
 @app.route('/qa')
+@uses_location
 @returns_problem_detail
-def nearby_qa():
+def nearby_qa(_location):
     return app.library_registry.registry_controller.nearby(
-        originating_ip(), live=False
+        _location, live=False
     )
 
 @app.route("/register", methods=["GET","POST"])
@@ -75,17 +78,17 @@ def register():
     return app.library_registry.registry_controller.register()
 
 @app.route('/search')
+@uses_location
 @returns_problem_detail
-def search():
-    return app.library_registry.registry_controller.search(
-        originating_ip()
-    )
+def search(_location):
+    return app.library_registry.registry_controller.search(_location)
 
 @app.route('/qa/search')
+@uses_location
 @returns_problem_detail
-def search_qa():
+def search_qa(_location):
     return app.library_registry.registry_controller.search(
-        originating_ip(), live=False
+        _location, live=False
     )
 
 @app.route('/confirm/<int:resource_id>/<secret>')

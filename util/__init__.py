@@ -16,10 +16,30 @@ class GeometryUtility(object):
 
     @classmethod
     def point_from_ip(cls, ip_address):
+        if not ip_address:
+            return None
         match = geolite2.lookup(ip_address)
         if match is None:
             return None
         return cls.point(*match.location)        
+
+    @classmethod
+    def point_from_string(cls, s):
+        """Parse a string representing latitude and longitude
+        into a Geometry object.
+        """
+        if not s or not ',' in s:
+            return None
+        parts = []
+        for i in s.split(',', 1):
+            try:
+                i = float(i.strip())
+            except ValueError, e:
+                return None
+            parts.append(i)
+        if any(abs(x) > 180 for x in parts):
+            return None
+        return cls.point(*parts)
     
     @classmethod
     def point(cls, latitude, longitude):

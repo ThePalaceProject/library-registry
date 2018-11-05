@@ -368,6 +368,46 @@ class TestLinkExtractor(object):
 
 class TestUpdateServiceAreas(DatabaseTest):
 
+    def test_set_service_areas(self):
+        # Test the method that replaces a Library's ServiceAreas.
+        m = AuthenticationDocument.set_service_areas
+
+        library = self._library()
+        p1 = self._place()
+        p2 = self._place()
+
+        def eligibility_areas():
+            return [x.place for x in library.service_areas
+                    if x.type==ServiceArea.ELIGIBILITY]
+
+        def focus_areas():
+            return [x.place for x in library.service_areas
+                    if x.type==ServiceArea.FOCUS]
+
+        # Try a successful case.
+        p1_only = [[p1], {}, {}]
+        p2_only = [[p2], {}, {}]
+        m(library, p1_only, p2_only)
+        eq_([p1], eligibility_areas())
+        eq_([p2], focus_areas())
+
+        # If you pass in two empty inputs, no changes are made.
+        empty = [[], {}, {}]
+        m(library, empty, empty)
+        eq_([p1], eligibility_areas())
+        eq_([p2], focus_areas())
+
+        # If you pass only one value, the focus area is set to that
+        # value and the eligibility area is cleared out.
+        m(library, p1_only, empty)
+        eq_([], eligibility_areas())
+        eq_([p1], focus_areas())
+
+        m(library, empty, p2_only)
+        eq_([], eligibility_areas())
+        eq_([p2], focus_areas())
+
+
     def test_known_place_becomes_servicearea(self):
         """Test the helper method in a successful case."""
         library = self._library()
