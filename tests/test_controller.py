@@ -1136,7 +1136,7 @@ class TestLibraryRegistryController(ControllerTest):
             ("contact", "mailto:me@library.org")
         ])
         form_args_with_reset = ImmutableMultiDict(
-            form_args_no_reset + [
+            form_args_no_reset.items() + [
                 ("reset_shared_secret", "y")
             ]
         )
@@ -1171,15 +1171,19 @@ class TestLibraryRegistryController(ControllerTest):
             with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % secret}):
                 flask.request.form = form
 
-            key = RSA.generate(1024)
-            auth_document = self._auth_document(key)
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
-            self.queue_opds_success()
+                key = RSA.generate(1024)
+                auth_document = self._auth_document(key)
+                self.http_client.queue_response(
+                    200, content=json.dumps(auth_document)
+                )
+                self.queue_opds_success()
 
-            response = self.controller.register(do_get=self.http_client.do_get)
+                response = self.controller.register(
+                    do_get=self.http_client.do_get
+                )
 
-            eq_(200, response.status_code)
-            eq_(old_secret, library.shared_secret)
+                eq_(200, response.status_code)
+                eq_(old_secret, library.shared_secret)
 
     def test_register_with_secret_changes_authentication_url(self):
         # This Library was created previously with a certain shared
