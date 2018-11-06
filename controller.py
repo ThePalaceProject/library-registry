@@ -303,12 +303,13 @@ class LibraryRegistryController(BaseController):
         headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
         return Response(document, status, headers=headers)
 
-    def register(self, do_get=HTTP.get_with_timeout):
+    def register(self, do_get=HTTP.debuggable_get):
         if flask.request.method == 'GET':
             document = self.registration_document
             return self.catalog_response(document)
 
         auth_url = flask.request.form.get("url")
+        self.log.info("Got request to register %s", auth_url)
         if not auth_url:
             return NO_AUTH_URL
 
@@ -318,13 +319,16 @@ class LibraryRegistryController(BaseController):
         auth_header = flask.request.headers.get('Authorization')
         if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
             shared_secret = auth_header.split(' ', 1)[1]
+            self.log.info("Incoming shared secret: %s...", shared_secret[:4])
 
         # If 'stage' is not provided, it means the client doesn't make the
         # testing/production distinction. We have to assume they want
         # production -- otherwise they wouldn't bother registering.
-        library_stage = flask.request.form.get(
-            "stage", Library.PRODUCTION_STAGE
-        )
+
+        library_stage = flask.request.form.get("stage")
+        self.log.info("Incoming stage: %s", library_stage)
+        library_stage = library_stage or Library.PRODUCTION_STAGE
+
 
         # NOTE: This is commented out until we can say that
         # registration requires providing a contact email and expect
@@ -482,6 +486,14 @@ class LibraryRegistryController(BaseController):
             elevated_permissions = True
             is_new = False
 
+        reset_shared_secret = False
+        if elevated_permissions:
+            # If you provide the shared secret you can also ask that
+            # it be reset.
+            reset_shared_secret = flask.request.form.get(
+                "reset_shared_secret", False
+            )
+
         if not library:
             # Either this is a library at a known authentication URL
             # or it's a brand new library.
@@ -588,7 +600,9 @@ class LibraryRegistryController(BaseController):
                     return Library.for_short_name(self._db, candidate) is not None
                 library.short_name = Library.random_short_name(dupe_check)
 
-            generate_secret = (library.shared_secret is None) or (shared_secret == library.shared_secret)
+            generate_secret = (
+                (library.shared_secret is None) or reset_shared_secret
+            )
             if generate_secret:
                 library.shared_secret = os.urandom(24).encode('hex')
 
