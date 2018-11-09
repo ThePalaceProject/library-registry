@@ -1128,14 +1128,20 @@ class TestLibraryRegistryController(ControllerTest):
                  "http://circmanager.org/logo.png"], self.http_client.requests)
 
 
-        # If we include the old secret in a request, the registry will
-        # generate a new secret.
+        # If we include the old secret in a request and also set
+        # reset_shared_secret, the registry will generate a new
+        # secret.
+        form_args_no_reset = ImmutableMultiDict([
+            ("url", "http://circmanager.org/authentication.opds"),
+            ("contact", "mailto:me@library.org")
+        ])
+        form_args_with_reset = ImmutableMultiDict(
+            form_args_no_reset.items() + [
+                ("reset_shared_secret", "y")
+            ]
+        )
         with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % old_secret}, method="POST"):
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org/authentication.opds"),
-                ("contact", "mailto:me@library.org"),
-            ])
-
+            flask.request.form = form_args_with_reset
             key = RSA.generate(1024)
             auth_document = self._auth_document(key)
             self.http_client.queue_response(
@@ -1156,22 +1162,28 @@ class TestLibraryRegistryController(ControllerTest):
 
         old_secret = library.shared_secret
 
-        # If we include an incorrect secret in the request, the secret stays the same.
-        with self.app.test_request_context("/", headers={"Authorization": "Bearer notthesecret"}):
-            flask.request.form = ImmutableMultiDict([
-                ("url", "http://circmanager.org/authentication.opds"),
-                ("contact", "mailto:me@library.org"),
-            ])
+        # If we include an incorrect secret, or we don't ask for the
+        # secret to be reset, the secret doesn't change.
+        for secret, form in (
+            ("notthesecret", form_args_with_reset),
+            (library.shared_secret, form_args_no_reset)
+        ):
+            with self.app.test_request_context("/", headers={"Authorization": "Bearer %s" % secret}):
+                flask.request.form = form
 
-            key = RSA.generate(1024)
-            auth_document = self._auth_document(key)
-            self.http_client.queue_response(200, content=json.dumps(auth_document))
-            self.queue_opds_success()
+                key = RSA.generate(1024)
+                auth_document = self._auth_document(key)
+                self.http_client.queue_response(
+                    200, content=json.dumps(auth_document)
+                )
+                self.queue_opds_success()
 
-            response = self.controller.register(do_get=self.http_client.do_get)
+                response = self.controller.register(
+                    do_get=self.http_client.do_get
+                )
 
-            eq_(200, response.status_code)
-            eq_(old_secret, library.shared_secret)
+                eq_(200, response.status_code)
+                eq_(old_secret, library.shared_secret)
 
     def test_register_with_secret_changes_authentication_url(self):
         # This Library was created previously with a certain shared
