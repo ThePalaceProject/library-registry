@@ -504,13 +504,16 @@ class LibraryRegistryController(BaseController):
             if opds_url:
                 library.opds_url = opds_url
 
-        if elevated_permissions and library.authentication_url != auth_url:
-            # The library's authentication URL has changed,
-            # e.g. because it moved from HTTP to HTTPS. The
-            # registration includes a valid shared secret, so it's
-            # okay to modify library.authentication_url.
+        if elevated_permissions and (
+            library.authentication_url != auth_url
+            or library.opds_url != opds_url
+        ):
+            # The library's authentication URL and/or OPDS URL has
+            # changed, e.g. moved from HTTP to HTTPS. The registration
+            # includes a valid shared secret, so it's okay to modify
+            # the corresponding database fields.
             result = self._update_library_authentication_url(
-                library, auth_url, shared_secret
+                library, auth_url, opds_url, shared_secret
             )
             if isinstance(result, ProblemDetail):
                 return result
@@ -621,7 +624,7 @@ class LibraryRegistryController(BaseController):
     @classmethod
     def _update_library_authentication_url(
             cls, library, new_authentication_url,
-            provided_shared_secret
+            new_opds_url, provided_shared_secret,
     ):
         """Change a library's authentication URL, assuming the provided shared
         secret gives the requester that permission.
@@ -629,6 +632,7 @@ class LibraryRegistryController(BaseController):
         :param library: A Library
         :param new_authentication_url: A proposed new value for
             Library.authentication_url
+        :param new_opds_url: A proposed new value for Library.opds_url.
         :param provided_shared_secret: Allegedly, the library's
             shared secret.
         """
@@ -636,7 +640,10 @@ class LibraryRegistryController(BaseController):
             return AUTHENTICATION_FAILURE.detailed(
                 _("Provided shared secret is invalid")
             )
-        library.authentication_url = new_authentication_url
+        if new_authentication_url:
+            library.authentication_url = new_authentication_url
+        if new_opds_url:
+            library.opds_url = new_opds_url
         return None
 
     @classmethod
