@@ -1185,12 +1185,13 @@ class TestLibraryRegistryController(ControllerTest):
                 eq_(200, response.status_code)
                 eq_(old_secret, library.shared_secret)
 
-    def test_register_with_secret_changes_authentication_url(self):
+    def test_register_with_secret_changes_authentication_url_and_opds_url(self):
         # This Library was created previously with a certain shared
         # secret, at a URL that's no longer valid.
         secret = "it's a secret"
         library = self._library()
-        library.authentication_url = "http://old-url/"
+        library.authentication_url = "http://old-url/authentication_document"
+        library.opds_url = "http://old-url/opds"
         library.shared_secret = secret
 
         # We're going to register a library at an apparently new URL,
@@ -1199,6 +1200,10 @@ class TestLibraryRegistryController(ControllerTest):
         # of creating a new one.
         auth_document = self._auth_document()
         new_auth_url = auth_document['id']
+        [new_opds_url] = [
+            x['href'] for x in auth_document['links']
+            if x['rel']=='start'
+        ]
         self.http_client.queue_response(
             200, content=json.dumps(auth_document), url=new_auth_url
         )
@@ -1214,8 +1219,9 @@ class TestLibraryRegistryController(ControllerTest):
             # No new library was created.
             eq_(200, response.status_code)
 
-        # The library's authentication_url has been modified.
+        # The library's authentication_url and opds_url have been modified.
         eq_(new_auth_url, library.authentication_url)
+        eq_(new_opds_url, library.opds_url)
 
     def test_opds_response_links(self):
         """Test the opds_response_links method.
@@ -1421,22 +1427,30 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test__update_library_authentication_url(self):
         """Test the code that modifies Library.authentication_url
-        if the right shared secret was provided.
+        and Library.opds_url if the right shared secret was provided.
         """
         library = self._library()
         secret = "it's a secret"
         library.shared_secret = secret
-        library.authentication_url = "old value"
+        library.authentication_url = "old auth"
+        library.opds_url = "old opds"
 
         m = LibraryRegistryController._update_library_authentication_url
-        problem = m(library, "new value", "wrong secret")
+        problem = m(library, "new auth", "new opds", "wrong secret")
         eq_(AUTHENTICATION_FAILURE.uri, problem.uri)
         eq_("Provided shared secret is invalid", problem.detail)
-        eq_("old value", library.authentication_url)
+        eq_("old auth", library.authentication_url)
 
-        result = m(library, "new value", secret)
+        result = m(library, "new auth", "new opds", secret)
         eq_(result, None)
-        eq_("new value", library.authentication_url)
+        eq_("new auth", library.authentication_url)
+        eq_("new opds", library.opds_url)
+
+        # If a value is missing, the field isn't changed.
+        result = m(library, None, None, secret)
+        eq_(result, None)
+        eq_("new auth", library.authentication_url)
+        eq_("new opds", library.opds_url)
 
 class TestValidationController(ControllerTest):
 
