@@ -64,6 +64,11 @@ def shutdown_session(exception):
 def nearby(_location):
     return app.library_registry.registry_controller.nearby(_location)
 
+@app.route('/admin')
+@returns_problem_detail
+def admin_view():
+    return app.library_registry.registry_controller.render()
+
 @app.route('/qa')
 @uses_location
 @returns_problem_detail

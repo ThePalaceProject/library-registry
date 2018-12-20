@@ -1,0 +1,25 @@
+{
+  "name": "library_registry",
+  "version": "1.0.0",
+  "description": "After creating the database for this application, you must enable two PostgreSQL extentions:",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NYPL-Simplified/library_registry.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NYPL-Simplified/library_registry/issues"
+  },
+  "dependencies": {
+    "simplified-circulation-web": "0.0.96"
+  },
+  "homepage": "https://github.com/NYPL-Simplified/library_registry#readme"
+}
