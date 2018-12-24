@@ -11,7 +11,8 @@ from config import Configuration
 from controller import LibraryRegistry
 from log import LogConfiguration
 from model import SessionManager, ConfigurationSetting
-from util.app_server import returns_problem_detail
+from nose.tools import set_trace
+from util.app_server import returns_problem_detail, returns_json_or_response_or_problem_detail
 from app_helpers import (
     has_library_factory,
     uses_location_factory,
@@ -64,10 +65,16 @@ def shutdown_session(exception):
 def nearby(_location):
     return app.library_registry.registry_controller.nearby(_location)
 
-@app.route('/admin')
-@returns_problem_detail
-def admin_view():
-    return app.library_registry.registry_controller.render()
+# @app.route('/admin/', strict_slashes=False)
+# # @app.route('/admin/<path:etc>') # catchall for single-page URLs
+# def admin_view():
+#     return app.library_registry.registry_controller.render()
+
+# @app.route('/admin/', strict_slashes=False)
+# @returns_problem_detail
+# def admin_base(**kwargs):
+#     return redirect(app.library_registry.url_for('admin_view'))
+
 
 @app.route('/qa')
 @uses_location
@@ -103,9 +110,14 @@ def confirm_resource(resource_id, secret):
         resource_id, secret
     )
 
+@app.route('/admin/libraries')
+@returns_json_or_response_or_problem_detail
+def libraries():
+    return app.library_registry.registry_controller.libraries()
+
 @app.route('/library/<uuid>')
 @has_library
-@returns_problem_detail
+@returns_json_or_response_or_problem_detail
 def library():
     return app.library_registry.registry_controller.library()
 
@@ -156,6 +168,30 @@ def adobe_vendor_id_status():
         return app.library_registry.adobe_vendor_id.status_handler()
     else:
         return Response("", 404)
+
+
+@app.route('/admin/', strict_slashes=False)
+# @app.route('/admin/web/libraries')
+# @app.route('/admin/web/<path:etc>') # catchall for single-page URLs
+def admin_view():
+    return app.library_registry.view_controller()
+
+# @app.route('/admin/', strict_slashes=False)
+# def admin_base(**kwargs):
+#     return redirect(app.library_registry.url_for('admin_view'))
+
+@app.route('/admin/static/registry-admin.js')
+@returns_problem_detail
+def admin_js():
+    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
+    return app.library_registry.static_files.static_file(directory, "registry-admin.js")
+
+@app.route('/admin/static/registry-admin.css')
+@returns_problem_detail
+def admin_css():
+    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
+    return app.library_registry.static_files.static_file(directory, "registry-admin.css")
+
 
 if __name__ == '__main__':
     debug = True

@@ -19,7 +19,7 @@
     "url": "https://github.com/NYPL-Simplified/library_registry/issues"
   },
   "dependencies": {
-    "simplified-circulation-web": "0.0.96"
+    "simplified-registry-admin": "0.0.1"
   },
   "homepage": "https://github.com/NYPL-Simplified/library_registry#readme"
 }

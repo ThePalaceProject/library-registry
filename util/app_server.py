@@ -51,6 +51,17 @@ def returns_problem_detail(f):
         return v
     return decorated
 
+def returns_json_or_response_or_problem_detail(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        v = f(*args, **kwargs)
+        if isinstance(v, ProblemDetail):
+            return v.response
+        if isinstance(v, flask.Response):
+            return v
+        return flask.jsonify(**v)
+    return decorated
+
 class ErrorHandler(object):
     def __init__(self, app, debug):
         self.app = app

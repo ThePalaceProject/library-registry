@@ -42,7 +42,7 @@ from opds import (
     Annotator,
     OPDSCatalog,
 )
-
+from templates import admin as admin_template
 from util import GeometryUtility
 from util.app_server import (
     HeartbeatController,
@@ -79,6 +79,8 @@ class LibraryRegistry(object):
         )
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
+        self.static_files = StaticFileController(self)
+        self.view_controller = ViewController(self)
 
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
@@ -139,6 +141,28 @@ class BaseController(object):
             return LIBRARY_NOT_FOUND
         flask.request.library = library
         return library
+
+class StaticFileController(BaseController):
+    def static_file(self, directory, filename):
+        return flask.send_from_directory(directory, filename, cache_timeout=None)
+
+
+class ViewController(BaseController):
+    def __call__(self):
+
+        csrf_token = flask.request.cookies.get("csrf_token") or self.generate_csrf_token()
+
+        response = Response(flask.render_template_string(
+            admin_template,
+            csrf_token=csrf_token,
+        ))
+
+        # The CSRF token is in its own cookie instead of the session cookie,
+        # because if your session expires and you log in again, you should
+        # be able to submit a form you already had open. The CSRF token lasts
+        # until the user closes the browser window.
+        response.set_cookie("csrf_token", csrf_token, httponly=True)
+        return response
 
 
 class LibraryRegistryController(BaseController):
@@ -215,6 +239,18 @@ class LibraryRegistryController(BaseController):
             )
             return Response(body, 200, headers)
 
+    def libraries(self):
+        libraries = []
+        all =  self._db.query(Library).order_by(Library.name)
+        names = [lib.name for lib in all]
+        for library in all:
+            libraries += [dict(
+                    id=library.id,
+                    name=library.name,
+                    short_name=library.short_name,
+                )]
+        return Response("12345", 200)
+
     def library(self):
         library = flask.request.library
         this_url = self.app.url_for(
@@ -240,8 +276,10 @@ class LibraryRegistryController(BaseController):
         return Response(page, status_code, headers=headers)
 
     def render(self):
-        return self.html_response(200, _("it's rendering!"))
-
+        response = Response(flask.render_template_string(
+            admin_template
+        ))
+        return response
 
     @classmethod
     def opds_response_links(cls, response, rel):
