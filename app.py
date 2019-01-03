@@ -115,7 +115,17 @@ def confirm_resource(resource_id, secret):
 def libraries():
     return app.library_registry.registry_controller.libraries()
 
-@app.route('/library/<uuid>')
+@app.route('/admin/libraries/<uuid>')
+@returns_json_or_response_or_problem_detail
+def library_details(uuid):
+    return app.library_registry.registry_controller.library_details(uuid)
+
+@app.route('/admin/libraries/registration', methods=["POST"])
+@returns_json_or_response_or_problem_detail
+def edit_registration():
+    return app.library_registry.registry_controller.edit_registration()
+
+@app.route('/admin/library/<uuid>')
 @has_library
 @returns_json_or_response_or_problem_detail
 def library():
@@ -171,8 +181,7 @@ def adobe_vendor_id_status():
 
 
 @app.route('/admin/', strict_slashes=False)
-# @app.route('/admin/web/libraries')
-# @app.route('/admin/web/<path:etc>') # catchall for single-page URLs
+# @app.route('/admin/<path:etc>') # catchall for single-page URLs
 def admin_view():
     return app.library_registry.view_controller()
 

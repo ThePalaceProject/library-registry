@@ -227,4 +227,3 @@ class EmailTemplate(object):
         text_part = MIMEText(payload, 'plain', 'utf-8')
         message.attach(text_part)
         return message.as_string()
-

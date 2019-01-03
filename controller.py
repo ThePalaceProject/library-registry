@@ -74,13 +74,13 @@ class LibraryRegistry(object):
 
     def setup_controllers(self, emailer_class=Emailer):
         """Set up all the controllers that will be used by the web app."""
+        self.view_controller = ViewController(self)
         self.registry_controller = LibraryRegistryController(
             self, emailer_class
         )
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
         self.static_files = StaticFileController(self)
-        self.view_controller = ViewController(self)
 
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
@@ -142,6 +142,24 @@ class BaseController(object):
         flask.request.library = library
         return library
 
+    def check_csrf_token(self):
+        """Verifies that the CSRF token in the form data or X-CSRF-Token header
+        matches the one in the session cookie.
+        """
+        cookie_token = self.get_csrf_token()
+        header_token = flask.request.headers.get("X-CSRF-Token")
+        if not cookie_token or cookie_token != header_token:
+            return "INVALID_CSRF_TOKEN"
+        return cookie_token
+
+    def get_csrf_token(self):
+        """Returns the CSRF token for the current session."""
+        return flask.request.cookies.get("csrf_token")
+
+    def generate_csrf_token(self):
+        """Generate a random CSRF token."""
+        return base64.b64encode(os.urandom(24))
+
 class StaticFileController(BaseController):
     def static_file(self, directory, filename):
         return flask.send_from_directory(directory, filename, cache_timeout=None)
@@ -156,7 +174,6 @@ class ViewController(BaseController):
             admin_template,
             csrf_token=csrf_token,
         ))
-
         # The CSRF token is in its own cookie instead of the session cookie,
         # because if your session expires and you log in again, you should
         # be able to submit a form you already had open. The CSRF token lasts
@@ -241,15 +258,45 @@ class LibraryRegistryController(BaseController):
 
     def libraries(self):
         libraries = []
-        all =  self._db.query(Library).order_by(Library.name)
-        names = [lib.name for lib in all]
+        all = self._db.query(Library).order_by(Library.name)
         for library in all:
+            uuid = library.internal_urn.split("uuid:")[1]
             libraries += [dict(
                     id=library.id,
                     name=library.name,
                     short_name=library.short_name,
+                    uuid=uuid,
+                    registry_stage=library.registry_stage,
+                    library_stage=library.library_stage,
                 )]
-        return Response("12345", 200)
+        return dict(libraries=libraries)
+
+    def library_details(self, uuid):
+        library = self.library_for_request(uuid)
+        library_info = dict(
+            name=library.name,
+            short_name=library.short_name,
+            authentication_url=library.authentication_url,
+            online_registration=library.online_registration,
+            description=library.description,
+            timestamp=library.timestamp,
+            internal_urn=library.internal_urn,
+            library_stage=library._library_stage,
+            opds_url=library.opds_url,
+            registry_stage=library.registry_stage,
+            web_url=library.web_url,
+        )
+        return library_info
+
+    def edit_registration(self):
+        uuid = flask.request.form.get("uuid")
+        library = self.library_for_request(uuid)
+        registry_stage = flask.request.form.get("Registry Stage")
+        library_stage = flask.request.form.get("Library Stage")
+
+        library.library_stage = library_stage
+        library.registry_stage = registry_stage
+        return Response(unicode(library.internal_urn), 200)
 
     def library(self):
         library = flask.request.library
