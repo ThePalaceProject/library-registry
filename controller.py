@@ -317,18 +317,6 @@ class LibraryRegistryController(BaseController):
         )
         return catalog_response(catalog)
 
-    MESSAGE_TEMPLATE = "<html><head><title>%(message)s</title><body>%(message)s</body></html>"
-
-    def html_response(self, status_code, message):
-        """Return a human-readable message as a minimal HTML page.
-
-        This controller is used by human beings, so HTML is better
-        than Problem Detail Documents.
-        """
-        headers = {"Content-Type": "text/html"}
-        page = self.MESSAGE_TEMPLATE % dict(message=message)
-        return Response(page, status_code, headers=headers)
-
     def render(self):
         response = Response(flask.render_template_string(
             admin_template

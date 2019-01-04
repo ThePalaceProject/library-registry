@@ -1,7 +1,7 @@
 {
   "name": "library_registry",
   "version": "1.0.0",
-  "description": "After creating the database for this application, you must enable two PostgreSQL extensions:",
+  "description": "Library Registry Admin Interface",
   "main": "index.js",
   "repository": {
     "type": "git",
