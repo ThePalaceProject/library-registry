@@ -296,6 +296,8 @@ class LibraryRegistryController(BaseController):
         # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
         uuid = flask.request.form.get("uuid")
         library = self.library_for_request(uuid)
+        if isinstance(library, ProblemDetail):
+            return library
         registry_stage = flask.request.form.get("Registry Stage")
         library_stage = flask.request.form.get("Library Stage")
 

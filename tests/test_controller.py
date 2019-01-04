@@ -307,6 +307,20 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(edited_library.library_stage, Library.TESTING_STAGE)
         eq_(edited_library.registry_stage, Library.PRODUCTION_STAGE)
 
+    def test_edit_registration_with_error(self):
+        uuid = "not a real UUID!"
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("Library Stage", "testing"),
+                ("Registry Stage", "production"),
+            ])
+            response = self.controller.edit_registration()
+        assert isinstance(response, ProblemDetail)
+        eq_(response.status_code, 404)
+        eq_(response.title, LIBRARY_NOT_FOUND.title)
+        eq_(response.uri, LIBRARY_NOT_FOUND.uri)
+
     def test_edit_registration_with_override(self):
         # Normally, if a library is already in production, its library_stage cannot be edited.
         # Admins should be able to override this by using the interface.
