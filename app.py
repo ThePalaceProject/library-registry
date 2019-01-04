@@ -65,17 +65,6 @@ def shutdown_session(exception):
 def nearby(_location):
     return app.library_registry.registry_controller.nearby(_location)
 
-# @app.route('/admin/', strict_slashes=False)
-# # @app.route('/admin/<path:etc>') # catchall for single-page URLs
-# def admin_view():
-#     return app.library_registry.registry_controller.render()
-
-# @app.route('/admin/', strict_slashes=False)
-# @returns_problem_detail
-# def admin_base(**kwargs):
-#     return redirect(app.library_registry.url_for('admin_view'))
-
-
 @app.route('/qa')
 @uses_location
 @returns_problem_detail
@@ -181,13 +170,8 @@ def adobe_vendor_id_status():
 
 
 @app.route('/admin/', strict_slashes=False)
-# @app.route('/admin/<path:etc>') # catchall for single-page URLs
 def admin_view():
     return app.library_registry.view_controller()
-
-# @app.route('/admin/', strict_slashes=False)
-# def admin_base(**kwargs):
-#     return redirect(app.library_registry.url_for('admin_view'))
 
 @app.route('/admin/static/registry-admin.js')
 @returns_problem_detail
