@@ -275,6 +275,8 @@ class LibraryRegistryController(BaseController):
     def library_details(self, uuid):
         # Return complete information about one specific library; this is triggered when an admin opens the detail page for a library.
         library = self.library_for_request(uuid)
+        if isinstance(library, ProblemDetail):
+            return library
         library_info = dict(
             name=library.name,
             short_name=library.short_name,

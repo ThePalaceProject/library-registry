@@ -271,6 +271,17 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(set(response.keys()), set(expected_keys))
         self._is_library(self.nypl, response)
 
+    def test_library_details_with_error(self):
+        # Test that the controller returns a problem detail document if the requested library doesn't exist.
+        uuid = "not a real UUID!"
+        with self.app.test_request_context("/"):
+            response = self.controller.library_details(uuid)
+
+        assert isinstance(response, ProblemDetail)
+        eq_(response.status_code, 404)
+        eq_(response.title, LIBRARY_NOT_FOUND.title)
+        eq_(response.uri, LIBRARY_NOT_FOUND.uri)
+
     def test_edit_registration(self):
         # Test that a specific library's stages can be edited via submitting a form.
         library = self._library(
