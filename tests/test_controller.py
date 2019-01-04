@@ -287,15 +287,15 @@ class TestLibraryRegistryController(ControllerTest):
         library = self._library(
             name="Test Library",
             short_name="test_lib",
-            library_stage=Library.TESTING_STAGE,
-            registry_stage=Library.CANCELLED_STAGE
+            library_stage=Library.CANCELLED_STAGE,
+            registry_stage=Library.TESTING_STAGE
         )
         uuid = library.internal_urn.split("uuid:")[1]
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
-                ("Library Stage", "production"),
-                ("Registry Stage", "testing"),
+                ("Library Stage", "testing"),
+                ("Registry Stage", "production"),
             ])
 
             response = self.controller.edit_registration()
@@ -304,8 +304,26 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(response.response[0], library.internal_urn)
 
         edited_library = get_one(self._db, Library, short_name=library.short_name)
-        eq_(edited_library.library_stage, Library.PRODUCTION_STAGE)
-        eq_(edited_library.registry_stage, Library.TESTING_STAGE)
+        eq_(edited_library.library_stage, Library.TESTING_STAGE)
+        eq_(edited_library.registry_stage, Library.PRODUCTION_STAGE)
+
+    def test_edit_registration_with_override(self):
+        # Normally, if a library is already in production, its library_stage cannot be edited.
+        # Admins should be able to override this by using the interface.
+        nypl = self.nypl
+        uuid = nypl.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("Library Stage", "cancelled"),
+                ("Registry Stage", "cancelled")
+            ])
+
+            response = self.controller.edit_registration()
+            eq_(response._status_code, 200)
+            eq_(response.response[0], nypl.internal_urn)
+            edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
+
 
     def test_instantiate_without_emailer(self):
         """If there is no emailer configured, the controller will still start

@@ -299,7 +299,7 @@ class LibraryRegistryController(BaseController):
         registry_stage = flask.request.form.get("Registry Stage")
         library_stage = flask.request.form.get("Library Stage")
 
-        library.library_stage = library_stage
+        library._library_stage = library_stage
         library.registry_stage = registry_stage
         return Response(unicode(library.internal_urn), 200)
 
