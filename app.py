@@ -125,7 +125,7 @@ def library_details(uuid):
 def edit_registration():
     return app.library_registry.registry_controller.edit_registration()
 
-@app.route('/admin/library/<uuid>')
+@app.route('/library/<uuid>')
 @has_library
 @returns_json_or_response_or_problem_detail
 def library():

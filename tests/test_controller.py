@@ -23,7 +23,7 @@ from controller import (
 
 import flask
 from flask import Response
-from werkzeug import ImmutableMultiDict
+from werkzeug import ImmutableMultiDict, MultiDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
@@ -227,6 +227,74 @@ class TestLibraryRegistryController(ControllerTest):
         # Turn some places into geographic points.
         self.manhattan = GeometryUtility.point_from_ip("65.88.88.124")
         self.oakland = GeometryUtility.point_from_string("37.8,-122.2")
+
+    def _is_library(self, expected, actual):
+        # Helper method to check that a library found by a controller is equivalent to a particular library in the database
+        for k in actual.keys():
+            if k == "library_stage":
+                eq_(actual.get("library_stage"), expected._library_stage)
+            elif k == "timestamp":
+                actual_time = [actual.get("timestamp").year, actual.get("timestamp").month, actual.get("timestamp").day]
+                expected_time = [expected.timestamp.year, expected.timestamp.month, expected.timestamp.day]
+                eq_(actual_time, expected_time)
+            elif k == "uuid":
+                expected_uuid = expected.internal_urn.split("uuid:")[1]
+                eq_(actual.get("uuid"), expected_uuid)
+            else:
+                eq_(actual.get(k), expected.__dict__.get(k))
+
+    def test_libraries(self):
+        # Test that the controller returns a specific set of information for each library.
+        response = self.controller.libraries()
+        libraries = response.get("libraries")
+
+        eq_(len(libraries), 3)
+        for library in libraries:
+            eq_(set(library.keys()), set(['library_stage', 'uuid', 'short_name', 'registry_stage', 'id', 'name']))
+
+        expected_names = [library.name for library in [self.connecticut_state_library, self.kansas_state_library, self.nypl]]
+        actual_names = [library.get("name") for library in libraries]
+        eq_(set(expected_names), set(actual_names))
+
+        self._is_library(self.connecticut_state_library, libraries[0])
+        self._is_library(self.kansas_state_library, libraries[1])
+        self._is_library(self.nypl, libraries[2])
+
+    def test_library_details(self):
+        # Test that the controller can look up the complete information for one specific library.
+        uuid = self.nypl.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/"):
+            response = self.controller.library_details(uuid)
+
+        expected_keys = ['library_stage', 'online_registration', 'description', 'short_name', 'timestamp', 'internal_urn', 'web_url', 'authentication_url', 'opds_url', 'registry_stage', 'name']
+
+        eq_(set(response.keys()), set(expected_keys))
+        self._is_library(self.nypl, response)
+
+    def test_edit_registration(self):
+        # Test that a specific library's stages can be edited via submitting a form.
+        library = self._library(
+            name="Test Library",
+            short_name="test_lib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.CANCELLED_STAGE
+        )
+        uuid = library.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("Library Stage", "production"),
+                ("Registry Stage", "testing"),
+            ])
+
+            response = self.controller.edit_registration()
+
+        eq_(response._status_code, 200)
+        eq_(response.response[0], library.internal_urn)
+
+        edited_library = get_one(self._db, Library, short_name=library.short_name)
+        eq_(edited_library.library_stage, Library.PRODUCTION_STAGE)
+        eq_(edited_library.registry_stage, Library.TESTING_STAGE)
 
     def test_instantiate_without_emailer(self):
         """If there is no emailer configured, the controller will still start

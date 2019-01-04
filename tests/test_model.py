@@ -915,7 +915,7 @@ class TestLibrary(DatabaseTest):
 
         # The Brooklyn Public Library serves New York City.
         brooklyn = self._library(
-            "Brooklyn Public Library", [self.new_york_city, self.zip_11212]
+            name="Brooklyn Public Library", focus_areas=[self.new_york_city, self.zip_11212]
         )
 
         # We can find the library by its name.
@@ -932,7 +932,7 @@ class TestLibrary(DatabaseTest):
 
         # The Boston Public Library serves Boston, MA.
         boston = self._library(
-            "Boston Public Library", [self.boston_ma]
+            name="Boston Public Library", focus_areas=[self.boston_ma]
         )
 
         # Both libraries are known colloquially as 'BPL'.
@@ -1045,7 +1045,7 @@ class TestLibrary(DatabaseTest):
 
         # Here's a Kansas library with a confusing name whose
         # Levenshtein distance from "New York" is 2.
-        new_work = self._library("Now Work", [self.kansas_state])
+        new_work = self._library(name="Now Work", focus_areas=[self.kansas_state])
 
         # Here's a library whose service area includes a place called
         # "New York".
@@ -1091,8 +1091,7 @@ class TestLibrary(DatabaseTest):
     def test_search_excludes_duplicates(self):
         # Here's a library that serves a place called Kansas
         # whose name is also "Kansas"
-        library = self._library("Kansas", [self.kansas_state])
-
+        library = self._library(name="Kansas", focus_areas=[self.kansas_state])
         # It matches both the name search and the location search.
         eq_([library],
             Library.search_by_location_name(self._db, "kansas").all())

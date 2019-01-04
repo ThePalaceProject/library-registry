@@ -257,6 +257,7 @@ class LibraryRegistryController(BaseController):
             return Response(body, 200, headers)
 
     def libraries(self):
+        # Return a specific set of information about all libraries; this generates the library list in the admin interface,
         libraries = []
         all = self._db.query(Library).order_by(Library.name)
         for library in all:
@@ -272,6 +273,7 @@ class LibraryRegistryController(BaseController):
         return dict(libraries=libraries)
 
     def library_details(self, uuid):
+        # Return complete information about one specific library; this is triggered when an admin opens the detail page for a library.
         library = self.library_for_request(uuid)
         library_info = dict(
             name=library.name,
@@ -289,6 +291,7 @@ class LibraryRegistryController(BaseController):
         return library_info
 
     def edit_registration(self):
+        # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
         uuid = flask.request.form.get("uuid")
         library = self.library_for_request(uuid)
         registry_stage = flask.request.form.get("Registry Stage")

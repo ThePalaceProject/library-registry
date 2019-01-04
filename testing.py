@@ -120,7 +120,7 @@ class DatabaseTest(object):
         self.time_counter = self.time_counter + timedelta(days=1)
         return v
 
-    def _library(self, name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE):
+    def _library(self, name=None, short_name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE):
         name = name or self._str
         library, ignore = get_one_or_create(
             self._db, Library, name=name,
@@ -129,7 +129,7 @@ class DatabaseTest(object):
                 opds_url=self._url
             )
         )
-        library.short_name = self._str
+        library.short_name = short_name or self._str
         library.shared_secret = self._str
         for place in eligibility_areas:
             get_one_or_create(self._db, ServiceArea, library=library,
@@ -208,16 +208,21 @@ class DatabaseTest(object):
     # Some useful Libraries.
     @property
     def nypl(self):
-        return self._library("NYPL", [self.new_york_city, self.zip_11212])
+        return self._library("NYPL", "nypl", [self.new_york_city, self.zip_11212])
 
     @property
     def connecticut_state_library(self):
         return self._library("Connecticut State Library",
+                            "CT",
                             [self.connecticut_state])
 
     @property
     def kansas_state_library(self):
-        return self._library("Kansas State Library", [self.kansas_state])
+        return self._library(
+            "Kansas State Library",
+            "KS",
+            [self.kansas_state]
+        )
 
     # Some useful Places.
 
@@ -477,4 +482,3 @@ class MockPlace(object):
     @classmethod
     def everywhere(cls, _db):
         return cls.EVERYWHERE
-
