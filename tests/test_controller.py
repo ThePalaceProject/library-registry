@@ -240,6 +240,9 @@ class TestLibraryRegistryController(ControllerTest):
             elif k == "uuid":
                 expected_uuid = expected.internal_urn.split("uuid:")[1]
                 eq_(actual.get("uuid"), expected_uuid)
+            elif k == "contact_email":
+                expected_contact_email = expected.__dict__.get("name") + "@library.org"
+                eq_(actual.get("contact_email"), expected_contact_email)
             else:
                 eq_(actual.get(k), expected.__dict__.get(k))
 
@@ -262,14 +265,29 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.
-        uuid = self.nypl.internal_urn.split("uuid:")[1]
+        library = self.nypl
+        uuid = library.internal_urn.split("uuid:")[1]
+        # library.set_hyperlink(Hyperlink.INTEGRATION_CONTACT_REL, "mailto:1@library.org")
         with self.app.test_request_context("/"):
             response = self.controller.library_details(uuid)
 
-        expected_keys = ['library_stage', 'online_registration', 'description', 'short_name', 'timestamp', 'internal_urn', 'web_url', 'authentication_url', 'opds_url', 'registry_stage', 'name']
+        expected_keys = [
+                            'library_stage',
+                            'online_registration',
+                            'description',
+                            'short_name',
+                            'timestamp',
+                            'internal_urn',
+                            'web_url',
+                            'authentication_url',
+                            'opds_url',
+                            'registry_stage',
+                            'name',
+                            'contact_email'
+                        ]
 
         eq_(set(response.keys()), set(expected_keys))
-        self._is_library(self.nypl, response)
+        self._is_library(library, response)
 
     def test_library_details_with_error(self):
         # Test that the controller returns a problem detail document if the requested library doesn't exist.

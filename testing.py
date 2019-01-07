@@ -21,6 +21,7 @@ from model import (
     Audience,
     Base,
     ExternalIntegration,
+    Hyperlink,
     Library,
     Place,
     PlaceAlias,
@@ -120,7 +121,7 @@ class DatabaseTest(object):
         self.time_counter = self.time_counter + timedelta(days=1)
         return v
 
-    def _library(self, name=None, short_name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE):
+    def _library(self, name=None, short_name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE, has_email=False):
         name = name or self._str
         library, ignore = get_one_or_create(
             self._db, Library, name=name,
@@ -141,6 +142,8 @@ class DatabaseTest(object):
         library.audiences = [Audience.lookup(self._db, audience) for audience in audiences]
         library.library_stage = library_stage
         library.registry_stage = registry_stage
+        if has_email:
+            library.set_hyperlink(Hyperlink.INTEGRATION_CONTACT_REL, "mailto:" + name + "@library.org")
         return library
 
     def _external_integration(self, protocol, goal=None, settings=None,
@@ -208,7 +211,7 @@ class DatabaseTest(object):
     # Some useful Libraries.
     @property
     def nypl(self):
-        return self._library("NYPL", "nypl", [self.new_york_city, self.zip_11212])
+        return self._library("NYPL", "nypl", [self.new_york_city, self.zip_11212], has_email=True)
 
     @property
     def connecticut_state_library(self):
