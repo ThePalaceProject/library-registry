@@ -9,9 +9,7 @@ admin = """
 <body>
   <script src=\"/admin/static/registry-admin.js\"></script>
   <script>
-    var registryAdmin = new RegistryAdmin({
-        csrfToken: \"{{ csrf_token }}\",
-    });
+    var registryAdmin = new RegistryAdmin();
   </script>
   <h1></h1>
 </body>

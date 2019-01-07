@@ -142,24 +142,6 @@ class BaseController(object):
         flask.request.library = library
         return library
 
-    def check_csrf_token(self):
-        """Verifies that the CSRF token in the form data or X-CSRF-Token header
-        matches the one in the session cookie.
-        """
-        cookie_token = self.get_csrf_token()
-        header_token = flask.request.headers.get("X-CSRF-Token")
-        if not cookie_token or cookie_token != header_token:
-            return "INVALID_CSRF_TOKEN"
-        return cookie_token
-
-    def get_csrf_token(self):
-        """Returns the CSRF token for the current session."""
-        return flask.request.cookies.get("csrf_token")
-
-    def generate_csrf_token(self):
-        """Generate a random CSRF token."""
-        return base64.b64encode(os.urandom(24))
-
 class StaticFileController(BaseController):
     def static_file(self, directory, filename):
         return flask.send_from_directory(directory, filename, cache_timeout=None)
