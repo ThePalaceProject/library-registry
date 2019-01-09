@@ -217,14 +217,16 @@ class DatabaseTest(object):
     def connecticut_state_library(self):
         return self._library("Connecticut State Library",
                             "CT",
-                            [self.connecticut_state])
+                            [self.connecticut_state],
+                            has_email=True)
 
     @property
     def kansas_state_library(self):
         return self._library(
             "Kansas State Library",
             "KS",
-            [self.kansas_state]
+            [self.kansas_state],
+            has_email=True
         )
 
     # Some useful Places.

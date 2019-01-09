@@ -244,31 +244,20 @@ class LibraryRegistryController(BaseController):
         all = self._db.query(Library).order_by(Library.name)
         for library in all:
             uuid = library.internal_urn.split("uuid:")[1]
-            libraries += [dict(
-                        name=library.name,
-                        uuid=uuid,
-                        short_name=library.short_name,
-                        authentication_url=library.authentication_url,
-                        online_registration=library.online_registration,
-                        description=library.description,
-                        timestamp=library.timestamp,
-                        internal_urn=library.internal_urn,
-                        library_stage=library._library_stage,
-                        opds_url=library.opds_url,
-                        registry_stage=library.registry_stage,
-                        web_url=library.web_url,
-                        contact_email=self._contact_email(library.id)
-                )]
+            libraries += [self.library_details(uuid, library)]
         return dict(libraries=libraries)
 
-    def library_details(self, uuid):
-        # Return complete information about one specific library; this is triggered when an admin opens the detail page for a library.
-        library = self.library_for_request(uuid)
+    def library_details(self, uuid, library=None):
+        # Return complete information about one specific library.
+        if not library:
+            library = self.library_for_request(uuid)
+
         if isinstance(library, ProblemDetail):
             return library
 
         library_info = dict(
             name=library.name,
+            uuid=uuid,
             short_name=library.short_name,
             authentication_url=library.authentication_url,
             online_registration=library.online_registration,

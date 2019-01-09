@@ -251,9 +251,25 @@ class TestLibraryRegistryController(ControllerTest):
         response = self.controller.libraries()
         libraries = response.get("libraries")
 
+        expected_keys = [
+                            'uuid',
+                            'library_stage',
+                            'online_registration',
+                            'description',
+                            'short_name',
+                            'timestamp',
+                            'internal_urn',
+                            'web_url',
+                            'authentication_url',
+                            'opds_url',
+                            'registry_stage',
+                            'name',
+                            'contact_email'
+                        ]
+
         eq_(len(libraries), 3)
         for library in libraries:
-            eq_(set(library.keys()), set(['library_stage', 'uuid', 'short_name', 'registry_stage', 'id', 'name']))
+            eq_(set(library.keys()), set(expected_keys))
 
         expected_names = [library.name for library in [self.connecticut_state_library, self.kansas_state_library, self.nypl]]
         actual_names = [library.get("name") for library in libraries]
@@ -273,6 +289,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         expected_keys = [
                             'library_stage',
+                            'uuid',
                             'online_registration',
                             'description',
                             'short_name',
