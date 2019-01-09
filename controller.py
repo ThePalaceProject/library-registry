@@ -245,12 +245,19 @@ class LibraryRegistryController(BaseController):
         for library in all:
             uuid = library.internal_urn.split("uuid:")[1]
             libraries += [dict(
-                    id=library.id,
-                    name=library.name,
-                    short_name=library.short_name,
-                    uuid=uuid,
-                    registry_stage=library.registry_stage,
-                    library_stage=library.library_stage,
+                        name=library.name,
+                        uuid=uuid,
+                        short_name=library.short_name,
+                        authentication_url=library.authentication_url,
+                        online_registration=library.online_registration,
+                        description=library.description,
+                        timestamp=library.timestamp,
+                        internal_urn=library.internal_urn,
+                        library_stage=library._library_stage,
+                        opds_url=library.opds_url,
+                        registry_stage=library.registry_stage,
+                        web_url=library.web_url,
+                        contact_email=self._contact_email(library.id)
                 )]
         return dict(libraries=libraries)
 
