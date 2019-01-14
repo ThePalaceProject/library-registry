@@ -22,7 +22,7 @@ from controller import (
 )
 
 import flask
-from flask import Response
+from flask import Response, session
 from werkzeug import ImmutableMultiDict, MultiDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
@@ -373,6 +373,26 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(response.response[0], nypl.internal_urn)
             edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
 
+    def _log_in(self):
+        flask.request.form = MultiDict([
+            ("username", "Admin"),
+            ("password", "123"),
+        ])
+        return self.controller.log_in()
+
+    def test_log_in(self):
+        with self.app.test_request_context("/", method="POST"):
+            response = self._log_in()
+            eq_(response.status, "302 FOUND")
+            eq_(session["username"], "Admin")
+
+    def test_log_out(self):
+        with self.app.test_request_context("/"):
+            self._log_in()
+            eq_(session["username"], "Admin")
+            response = self.controller.log_out();
+            eq_(session["username"], "")
+            eq_(response.status, "302 FOUND")
 
     def test_instantiate_without_emailer(self):
         """If there is no emailer configured, the controller will still start
