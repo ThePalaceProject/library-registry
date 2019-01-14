@@ -21,6 +21,7 @@ from app_helpers import (
 
 app = Flask(__name__)
 babel = Babel(app)
+app.secret_key = "secretkey"
 
 # Create annotators for this app.
 has_library = has_library_factory(app)
@@ -98,6 +99,16 @@ def confirm_resource(resource_id, secret):
     return app.library_registry.validation_controller.confirm(
         resource_id, secret
     )
+
+@app.route('/admin/log_in', methods=["POST"])
+@returns_problem_detail
+def log_in():
+    return app.library_registry.registry_controller.log_in()
+
+@app.route('/admin/log_out')
+@returns_problem_detail
+def log_out():
+    return app.library_registry.registry_controller.log_out()
 
 @app.route('/admin/libraries')
 @returns_json_or_response_or_problem_detail

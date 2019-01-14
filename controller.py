@@ -4,7 +4,9 @@ import flask
 from flask_babel import lazy_gettext as _
 from flask import (
     Response,
+    redirect,
     url_for,
+    session,
 )
 import requests
 from smtplib import SMTPException
@@ -151,10 +153,11 @@ class ViewController(BaseController):
     def __call__(self):
 
         csrf_token = flask.request.cookies.get("csrf_token") or self.generate_csrf_token()
-
+        username = session["username"]
         response = Response(flask.render_template_string(
             admin_template,
             csrf_token=csrf_token,
+            username=username
         ))
         # The CSRF token is in its own cookie instead of the session cookie,
         # because if your session expires and you log in again, you should
@@ -293,6 +296,16 @@ class LibraryRegistryController(BaseController):
         library._library_stage = library_stage
         library.registry_stage = registry_stage
         return Response(unicode(library.internal_urn), 200)
+
+    def log_in(self):
+        username = flask.request.form.get("username")
+        password = flask.request.form.get("password")
+        session["username"] = username
+        return redirect(url_for('admin_view'))
+
+    def log_out(self):
+        session["username"] = "";
+        return redirect(url_for('admin_view'))
 
     def library(self):
         library = flask.request.library
