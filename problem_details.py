@@ -64,3 +64,9 @@ LIBRARY_NOT_FOUND = pd(
     404,
     title=_("The library does not exist in this registry."),
 )
+
+INVALID_CREDENTIALS = pd(
+    "http://librarysimplified.org/terms/problem/invalid-credentials",
+    401,
+    title=_("The username or password is incorrect.")
+)

@@ -153,6 +153,8 @@ class ViewController(BaseController):
     def __call__(self):
 
         csrf_token = flask.request.cookies.get("csrf_token") or self.generate_csrf_token()
+        if not session["username"]:
+            session["username"] = ""
         username = session["username"]
         response = Response(flask.render_template_string(
             admin_template,
@@ -300,8 +302,11 @@ class LibraryRegistryController(BaseController):
     def log_in(self):
         username = flask.request.form.get("username")
         password = flask.request.form.get("password")
-        session["username"] = username
-        return redirect(url_for('admin_view'))
+        if username == "Admin" and password == "123":
+            session["username"] = username
+            return redirect(url_for('admin_view'))
+        else:
+            return INVALID_CREDENTIALS
 
     def log_out(self):
         session["username"] = "";

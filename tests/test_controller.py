@@ -386,6 +386,18 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(response.status, "302 FOUND")
             eq_(session["username"], "Admin")
 
+    def test_log_in_with_error(self):
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("username", "wrong"),
+                ("password", "abc"),
+            ])
+            response = self.controller.log_in()
+            assert(isinstance(response, ProblemDetail))
+            eq_(response.status_code, 401)
+            eq_(response.title, INVALID_CREDENTIALS.title)
+            eq_(response.uri, INVALID_CREDENTIALS.uri)
+
     def test_log_out(self):
         with self.app.test_request_context("/"):
             self._log_in()

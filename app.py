@@ -21,7 +21,7 @@ from app_helpers import (
 
 app = Flask(__name__)
 babel = Babel(app)
-app.secret_key = "secretkey"
+app.secret_key = '\x10x\x1a\xc4\x0ef6\xbdcy\x0b\xba\xf8KV\x19\x02\x82\xed\x9b;\xca9#'
 
 # Create annotators for this app.
 has_library = has_library_factory(app)
