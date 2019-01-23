@@ -230,11 +230,12 @@ class TestLibraryRegistryController(ControllerTest):
 
     def _is_library(self, expected, actual):
         # Helper method to check that a library found by a controller is equivalent to a particular library in the database
-
         flattened = {}
-        for category in ["basic_info", "urls_and_contact", "stages"]:
-            for k in actual[category].keys():
-                flattened[k] = actual[category][k]
+        # Getting rid of the "uuid" key before populating flattened, because its value is just a string, not a subdictionary.
+        # The UUID information is still being checked elsewhere.
+        del actual["uuid"]
+        for subdictionary in actual.values():
+            flattened.update(subdictionary)
 
         for k in flattened:
             if k == "library_stage":
@@ -249,6 +250,7 @@ class TestLibraryRegistryController(ControllerTest):
                 expected_contact_email = expected.__dict__.get("name") + "@library.org"
                 eq_(flattened.get("contact_email"), expected_contact_email)
             elif k == "online_registration":
+                # set_trace()
                 eq_(flattened.get("online_registration"), str(expected.__dict__.get("online_registration")))
             else:
                 eq_(flattened.get(k), expected.__dict__.get(k))
@@ -282,12 +284,13 @@ class TestLibraryRegistryController(ControllerTest):
         for library in libraries:
             self._check_keys(library)
 
-        expected_names = [library.name for library in [ct, ks, nypl]]
+        expected_names = [expected.name for expected in [ct, ks, nypl]]
         actual_names = [library.get("basic_info").get("name") for library in libraries]
         eq_(set(expected_names), set(actual_names))
 
-        for idx, expected in enumerate([ct, ks, nypl]):
-            self._is_library(expected, libraries[idx])
+        self._is_library(ct, libraries[0])
+        self._is_library(ks, libraries[1])
+        self._is_library(nypl, libraries[2])
 
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.
@@ -299,7 +302,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(uuid, response.get("uuid"))
 
         self._check_keys(response)
-        self._is_library(library, response)
+        self._is_library(self.nypl, response)
 
     def test_library_details_with_error(self):
         # Test that the controller returns a problem detail document if the requested library doesn't exist.
