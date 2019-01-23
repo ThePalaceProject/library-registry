@@ -247,12 +247,12 @@ class TestLibraryRegistryController(ControllerTest):
                 expected_time = [expected_ts.year, expected_ts.month, expected_ts.day]
                 eq_(actual_time, expected_time)
             elif k == "contact_email":
-                expected_contact_email = expected.__dict__.get("name") + "@library.org"
+                expected_contact_email = expected.name + "@library.org"
                 eq_(flattened.get("contact_email"), expected_contact_email)
             elif k == "online_registration":
-                eq_(flattened.get("online_registration"), str(expected.__dict__.get("online_registration")))
+                eq_(flattened.get("online_registration"), str(expected.online_registration))
             else:
-                eq_(flattened.get(k), expected.__dict__.get(k))
+                eq_(flattened.get(k), getattr(expected, k))
 
     def _check_keys(self, library):
         # Helper method to check that the controller is sending the right pieces of information about a library.
@@ -301,7 +301,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(uuid, response.get("uuid"))
 
         self._check_keys(response)
-        self._is_library(self.nypl, response)
+        self._is_library(library, response)
 
     def test_library_details_with_error(self):
         # Test that the controller returns a problem detail document if the requested library doesn't exist.
