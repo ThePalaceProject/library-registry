@@ -250,7 +250,6 @@ class TestLibraryRegistryController(ControllerTest):
                 expected_contact_email = expected.__dict__.get("name") + "@library.org"
                 eq_(flattened.get("contact_email"), expected_contact_email)
             elif k == "online_registration":
-                # set_trace()
                 eq_(flattened.get("online_registration"), str(expected.__dict__.get("online_registration")))
             else:
                 eq_(flattened.get(k), expected.__dict__.get(k))
