@@ -134,6 +134,11 @@ class TestSearchLibraryScript(DatabaseTest):
 class TestConfigureSiteScript(DatabaseTest):
 
     def test_settings(self):
+
+        secret_keys = self._db.query(ConfigurationSetting).filter(
+            ConfigurationSetting.key==Configuration.SECRET_KEY)
+        [self._db.delete(secret_key) for secret_key in secret_keys]
+
         script = ConfigureSiteScript()
         output = StringIO()
         script.do_run(

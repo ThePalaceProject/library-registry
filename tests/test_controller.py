@@ -71,6 +71,7 @@ class MockEmailer(Emailer):
 class ControllerTest(DatabaseTest):
     def setup(self):
         super(ControllerTest, self).setup()
+        ConfigurationSetting.sitewide(self._db, Configuration.SECRET_KEY).value = "a secret"
         os.environ['AUTOINITIALIZE'] = "False"
         from app import app
         del os.environ['AUTOINITIALIZE']
