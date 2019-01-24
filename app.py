@@ -37,7 +37,6 @@ debug = log_level == 'DEBUG'
 app.config['DEBUG'] = debug
 app.debug = debug
 
-app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
 
 if os.environ.get('AUTOINITIALIZE') == 'False':
     pass
@@ -46,6 +45,11 @@ if os.environ.get('AUTOINITIALIZE') == 'False':
 else:
     if getattr(app, 'library_registry', None) is None:
         app.library_registry = LibraryRegistry(_db)
+
+@app.before_first_request
+def set_secret_key(_db=None):
+    _db = _db or app._db
+    app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
 
 @app.teardown_request
 def shutdown_session(exception):
