@@ -20,6 +20,7 @@ from model import (
     get_one_or_create,
     Audience,
     Base,
+    ConfigurationSetting,
     ExternalIntegration,
     Hyperlink,
     Library,
@@ -94,6 +95,12 @@ class DatabaseTest(object):
         self.longitude_counter = -90
 
     def teardown(self):
+        self._db.rollback()
+
+        secret_keys = self._db.query(ConfigurationSetting).filter(
+            ConfigurationSetting.key==Configuration.SECRET_KEY
+        )
+        [self._db.delete(secret_key) for secret_key in secret_keys]
         # Close the session.
         self._db.close()
 

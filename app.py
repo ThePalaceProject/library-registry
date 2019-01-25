@@ -21,7 +21,6 @@ from app_helpers import (
 
 app = Flask(__name__)
 babel = Babel(app)
-app.secret_key = '\x10x\x1a\xc4\x0ef6\xbdcy\x0b\xba\xf8KV\x19\x02\x82\xed\x9b;\xca9#'
 
 # Create annotators for this app.
 has_library = has_library_factory(app)
@@ -38,6 +37,7 @@ debug = log_level == 'DEBUG'
 app.config['DEBUG'] = debug
 app.debug = debug
 
+
 if os.environ.get('AUTOINITIALIZE') == 'False':
     pass
     # It's the responsibility of the importing code to set app.library_registry
@@ -45,6 +45,11 @@ if os.environ.get('AUTOINITIALIZE') == 'False':
 else:
     if getattr(app, 'library_registry', None) is None:
         app.library_registry = LibraryRegistry(_db)
+
+@app.before_first_request
+def set_secret_key(_db=None):
+    _db = _db or app._db
+    app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
 
 @app.teardown_request
 def shutdown_session(exception):

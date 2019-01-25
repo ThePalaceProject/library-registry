@@ -56,6 +56,9 @@ class Configuration(object):
     # nation, we assume that they're talking about this nation.
     DEFAULT_NATION_ABBREVIATION = "default_nation_abbreviation"
 
+    # The name of the sitewide secret used for admin login.
+    SECRET_KEY = u"secret_key"
+
     @classmethod
     def database_url(cls, test=False):
         """Find the URL to the database so that other configuration
