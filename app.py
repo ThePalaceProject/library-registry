@@ -36,7 +36,7 @@ log_level = LogConfiguration.initialize(_db, testing=testing)
 debug = log_level == 'DEBUG'
 app.config['DEBUG'] = debug
 app.debug = debug
-
+app._db = _db
 
 if os.environ.get('AUTOINITIALIZE') == 'False':
     pass
