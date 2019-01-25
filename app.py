@@ -11,7 +11,8 @@ from config import Configuration
 from controller import LibraryRegistry
 from log import LogConfiguration
 from model import SessionManager, ConfigurationSetting
-from util.app_server import returns_problem_detail
+from nose.tools import set_trace
+from util.app_server import returns_problem_detail, returns_json_or_response_or_problem_detail
 from app_helpers import (
     has_library_factory,
     uses_location_factory,
@@ -36,6 +37,7 @@ debug = log_level == 'DEBUG'
 app.config['DEBUG'] = debug
 app.debug = debug
 
+
 if os.environ.get('AUTOINITIALIZE') == 'False':
     pass
     # It's the responsibility of the importing code to set app.library_registry
@@ -43,6 +45,11 @@ if os.environ.get('AUTOINITIALIZE') == 'False':
 else:
     if getattr(app, 'library_registry', None) is None:
         app.library_registry = LibraryRegistry(_db)
+
+@app.before_first_request
+def set_secret_key(_db=None):
+    _db = _db or app._db
+    app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
 
 @app.teardown_request
 def shutdown_session(exception):
@@ -98,9 +105,34 @@ def confirm_resource(resource_id, secret):
         resource_id, secret
     )
 
+@app.route('/admin/log_in', methods=["POST"])
+@returns_problem_detail
+def log_in():
+    return app.library_registry.registry_controller.log_in()
+
+@app.route('/admin/log_out')
+@returns_problem_detail
+def log_out():
+    return app.library_registry.registry_controller.log_out()
+
+@app.route('/admin/libraries')
+@returns_json_or_response_or_problem_detail
+def libraries():
+    return app.library_registry.registry_controller.libraries()
+
+@app.route('/admin/libraries/<uuid>')
+@returns_json_or_response_or_problem_detail
+def library_details(uuid):
+    return app.library_registry.registry_controller.library_details(uuid)
+
+@app.route('/admin/libraries/registration', methods=["POST"])
+@returns_json_or_response_or_problem_detail
+def edit_registration():
+    return app.library_registry.registry_controller.edit_registration()
+
 @app.route('/library/<uuid>')
 @has_library
-@returns_problem_detail
+@returns_json_or_response_or_problem_detail
 def library():
     return app.library_registry.registry_controller.library()
 
@@ -151,6 +183,24 @@ def adobe_vendor_id_status():
         return app.library_registry.adobe_vendor_id.status_handler()
     else:
         return Response("", 404)
+
+
+@app.route('/admin/', strict_slashes=False)
+def admin_view():
+    return app.library_registry.view_controller()
+
+@app.route('/admin/static/registry-admin.js')
+@returns_problem_detail
+def admin_js():
+    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
+    return app.library_registry.static_files.static_file(directory, "registry-admin.js")
+
+@app.route('/admin/static/registry-admin.css')
+@returns_problem_detail
+def admin_css():
+    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
+    return app.library_registry.static_files.static_file(directory, "registry-admin.css")
+
 
 if __name__ == '__main__':
     debug = True

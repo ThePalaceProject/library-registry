@@ -4,7 +4,9 @@ import flask
 from flask_babel import lazy_gettext as _
 from flask import (
     Response,
+    redirect,
     url_for,
+    session,
 )
 import requests
 from smtplib import SMTPException
@@ -42,7 +44,7 @@ from opds import (
     Annotator,
     OPDSCatalog,
 )
-
+from templates import admin as admin_template
 from util import GeometryUtility
 from util.app_server import (
     HeartbeatController,
@@ -74,11 +76,13 @@ class LibraryRegistry(object):
 
     def setup_controllers(self, emailer_class=Emailer):
         """Set up all the controllers that will be used by the web app."""
+        self.view_controller = ViewController(self)
         self.registry_controller = LibraryRegistryController(
             self, emailer_class
         )
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
+        self.static_files = StaticFileController(self)
 
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
@@ -139,6 +143,30 @@ class BaseController(object):
             return LIBRARY_NOT_FOUND
         flask.request.library = library
         return library
+
+class StaticFileController(BaseController):
+    def static_file(self, directory, filename):
+        return flask.send_from_directory(directory, filename, cache_timeout=None)
+
+
+class ViewController(BaseController):
+    def __call__(self):
+
+        csrf_token = flask.request.cookies.get("csrf_token") or self.generate_csrf_token()
+        if not session["username"]:
+            session["username"] = ""
+        username = session["username"]
+        response = Response(flask.render_template_string(
+            admin_template,
+            csrf_token=csrf_token,
+            username=username
+        ))
+        # The CSRF token is in its own cookie instead of the session cookie,
+        # because if your session expires and you log in again, you should
+        # be able to submit a form you already had open. The CSRF token lasts
+        # until the user closes the browser window.
+        response.set_cookie("csrf_token", csrf_token, httponly=True)
+        return response
 
 
 class LibraryRegistryController(BaseController):
@@ -215,6 +243,75 @@ class LibraryRegistryController(BaseController):
             )
             return Response(body, 200, headers)
 
+    def libraries(self):
+        # Return a specific set of information about all libraries; this generates the library list in the admin interface,
+        libraries = []
+        all = self._db.query(Library).order_by(Library.name)
+        for library in all:
+            uuid = library.internal_urn.split("uuid:")[1]
+            libraries += [self.library_details(uuid, library)]
+        return dict(libraries=libraries)
+
+    def library_details(self, uuid, library=None):
+        # Return complete information about one specific library.
+        if not library:
+            library = self.library_for_request(uuid)
+
+        if isinstance(library, ProblemDetail):
+            return library
+
+        library_info = dict(
+            name=library.name,
+            uuid=uuid,
+            short_name=library.short_name,
+            authentication_url=library.authentication_url,
+            online_registration=library.online_registration,
+            description=library.description,
+            timestamp=library.timestamp,
+            internal_urn=library.internal_urn,
+            library_stage=library._library_stage,
+            opds_url=library.opds_url,
+            registry_stage=library.registry_stage,
+            web_url=library.web_url,
+            contact_email=self._contact_email(library.id)
+        )
+        return library_info
+
+    def _contact_email(self, id):
+        return self._db.query(Resource).join(
+                Hyperlink, Resource.id==Hyperlink.resource_id
+            ).filter(
+                Hyperlink.library_id==id, Hyperlink.rel == Hyperlink.INTEGRATION_CONTACT_REL
+            ).first().href.split(
+                "mailto:"
+            )[1]
+
+    def edit_registration(self):
+        # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
+        uuid = flask.request.form.get("uuid")
+        library = self.library_for_request(uuid)
+        if isinstance(library, ProblemDetail):
+            return library
+        registry_stage = flask.request.form.get("Registry Stage")
+        library_stage = flask.request.form.get("Library Stage")
+
+        library._library_stage = library_stage
+        library.registry_stage = registry_stage
+        return Response(unicode(library.internal_urn), 200)
+
+    def log_in(self):
+        username = flask.request.form.get("username")
+        password = flask.request.form.get("password")
+        if username == "Admin" and password == "123":
+            session["username"] = username
+            return redirect(url_for('admin_view'))
+        else:
+            return INVALID_CREDENTIALS
+
+    def log_out(self):
+        session["username"] = "";
+        return redirect(url_for('admin_view'))
+
     def library(self):
         library = flask.request.library
         this_url = self.app.url_for(
@@ -226,6 +323,12 @@ class LibraryRegistryController(BaseController):
             annotator=self.annotator, live=False,
         )
         return catalog_response(catalog)
+
+    def render(self):
+        response = Response(flask.render_template_string(
+            admin_template
+        ))
+        return response
 
     @classmethod
     def opds_response_links(cls, response, rel):

@@ -1,0 +1,16 @@
+{
+  "name": "library_registry",
+  "version": "1.0.0",
+  "description": "Library Registry Admin Interface",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NYPL-Simplified/library_registry.git"
+  },
+  "author": "NYPL",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "simplified-registry-admin": "0.0.1"
+  },
+  "homepage": "https://github.com/NYPL-Simplified/library_registry#readme"
+}

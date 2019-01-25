@@ -203,7 +203,7 @@ def create(db, model, create_method='',
     db.flush()
     return created, True
 
-
+    
 Base = declarative_base()
 
 class Library(Base):
@@ -2281,4 +2281,3 @@ libraries_audiences = Table(
      ),
      UniqueConstraint('library_id', 'audience_id'),
  )
-

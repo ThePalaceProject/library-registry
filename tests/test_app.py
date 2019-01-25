@@ -52,4 +52,3 @@ class TestAppHelpers(ControllerTest):
         with self.app.test_request_context("/?_location=-10,10"):
             eq_("Called with location SRID=4326;POINT (10.0 -10.0)",
                 route_function())
-
