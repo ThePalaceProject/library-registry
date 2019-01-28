@@ -234,80 +234,77 @@ class TestLibraryRegistryController(ControllerTest):
 
     def _is_library(self, expected, actual):
         # Helper method to check that a library found by a controller is equivalent to a particular library in the database
-        for k in actual.keys():
+        flattened = {}
+        # Getting rid of the "uuid" key before populating flattened, because its value is just a string, not a subdictionary.
+        # The UUID information is still being checked elsewhere.
+        del actual["uuid"]
+        for subdictionary in actual.values():
+            flattened.update(subdictionary)
+
+        for k in flattened:
             if k == "library_stage":
-                eq_(actual.get("library_stage"), expected._library_stage)
+                eq_(flattened.get("library_stage"), expected._library_stage)
             elif k == "timestamp":
-                actual_time = [actual.get("timestamp").year, actual.get("timestamp").month, actual.get("timestamp").day]
-                expected_time = [expected.timestamp.year, expected.timestamp.month, expected.timestamp.day]
+                actual_ts = flattened.get("timestamp")
+                expected_ts = expected.timestamp
+                actual_time = [actual_ts.year, actual_ts.month, actual_ts.day]
+                expected_time = [expected_ts.year, expected_ts.month, expected_ts.day]
                 eq_(actual_time, expected_time)
-            elif k == "uuid":
-                expected_uuid = expected.internal_urn.split("uuid:")[1]
-                eq_(actual.get("uuid"), expected_uuid)
             elif k == "contact_email":
-                expected_contact_email = expected.__dict__.get("name") + "@library.org"
-                eq_(actual.get("contact_email"), expected_contact_email)
+                expected_contact_email = expected.name + "@library.org"
+                eq_(flattened.get("contact_email"), expected_contact_email)
+            elif k == "online_registration":
+                eq_(flattened.get("online_registration"), str(expected.online_registration))
             else:
-                eq_(actual.get(k), expected.__dict__.get(k))
+                eq_(flattened.get(k), getattr(expected, k))
+
+    def _check_keys(self, library):
+        # Helper method to check that the controller is sending the right pieces of information about a library.
+
+        expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages']
+        eq_(set(expected_categories), set(library.keys()))
+
+        expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration']
+        eq_(set(expected_info_keys), set(library.get("basic_info").keys()))
+
+        expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'opds_url']
+        eq_(set(expected_url_contact_keys), set(library.get("urls_and_contact")))
+
+        expected_stage_keys = ['library_stage', 'registry_stage']
+        eq_(set(expected_stage_keys), set(library.get("stages").keys()))
+
 
     def test_libraries(self):
         # Test that the controller returns a specific set of information for each library.
+        ct = self.connecticut_state_library
+        ks = self.kansas_state_library
+        nypl = self.nypl
+
         response = self.controller.libraries()
         libraries = response.get("libraries")
 
-        expected_keys = [
-                            'uuid',
-                            'library_stage',
-                            'online_registration',
-                            'description',
-                            'short_name',
-                            'timestamp',
-                            'internal_urn',
-                            'web_url',
-                            'authentication_url',
-                            'opds_url',
-                            'registry_stage',
-                            'name',
-                            'contact_email'
-                        ]
-
         eq_(len(libraries), 3)
         for library in libraries:
-            eq_(set(library.keys()), set(expected_keys))
+            self._check_keys(library)
 
-        expected_names = [library.name for library in [self.connecticut_state_library, self.kansas_state_library, self.nypl]]
-        actual_names = [library.get("name") for library in libraries]
+        expected_names = [expected.name for expected in [ct, ks, nypl]]
+        actual_names = [library.get("basic_info").get("name") for library in libraries]
         eq_(set(expected_names), set(actual_names))
 
-        self._is_library(self.connecticut_state_library, libraries[0])
-        self._is_library(self.kansas_state_library, libraries[1])
-        self._is_library(self.nypl, libraries[2])
+        self._is_library(ct, libraries[0])
+        self._is_library(ks, libraries[1])
+        self._is_library(nypl, libraries[2])
 
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.
         library = self.nypl
         uuid = library.internal_urn.split("uuid:")[1]
-        # library.set_hyperlink(Hyperlink.INTEGRATION_CONTACT_REL, "mailto:1@library.org")
         with self.app.test_request_context("/"):
             response = self.controller.library_details(uuid)
 
-        expected_keys = [
-                            'library_stage',
-                            'uuid',
-                            'online_registration',
-                            'description',
-                            'short_name',
-                            'timestamp',
-                            'internal_urn',
-                            'web_url',
-                            'authentication_url',
-                            'opds_url',
-                            'registry_stage',
-                            'name',
-                            'contact_email'
-                        ]
+        eq_(uuid, response.get("uuid"))
 
-        eq_(set(response.keys()), set(expected_keys))
+        self._check_keys(response)
         self._is_library(library, response)
 
     def test_library_details_with_error(self):

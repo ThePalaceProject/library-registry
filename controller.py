@@ -259,23 +259,25 @@ class LibraryRegistryController(BaseController):
 
         if isinstance(library, ProblemDetail):
             return library
-
-        library_info = dict(
+        basic_info = dict(
             name=library.name,
-            uuid=uuid,
             short_name=library.short_name,
-            authentication_url=library.authentication_url,
-            online_registration=library.online_registration,
             description=library.description,
             timestamp=library.timestamp,
             internal_urn=library.internal_urn,
-            library_stage=library._library_stage,
-            opds_url=library.opds_url,
-            registry_stage=library.registry_stage,
-            web_url=library.web_url,
-            contact_email=self._contact_email(library.id)
+            online_registration=str(library.online_registration),
         )
-        return library_info
+        urls_and_contact = dict(
+            contact_email=self._contact_email(library.id),
+            authentication_url=library.authentication_url,
+            opds_url=library.opds_url,
+            web_url=library.web_url,
+        )
+        stages = dict(
+            library_stage=library._library_stage,
+            registry_stage=library.registry_stage,
+        )
+        return dict(uuid=uuid, basic_info=basic_info, urls_and_contact=urls_and_contact, stages=stages)
 
     def _contact_email(self, id):
         return self._db.query(Resource).join(
