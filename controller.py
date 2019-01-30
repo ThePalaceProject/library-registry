@@ -151,23 +151,14 @@ class StaticFileController(BaseController):
 
 class ViewController(BaseController):
     def __call__(self):
-
-        csrf_token = flask.request.cookies.get("csrf_token") or self.generate_csrf_token()
         if not session["username"]:
             session["username"] = ""
         username = session["username"]
         response = Response(flask.render_template_string(
             admin_template,
-            csrf_token=csrf_token,
             username=username
         ))
-        # The CSRF token is in its own cookie instead of the session cookie,
-        # because if your session expires and you log in again, you should
-        # be able to submit a form you already had open. The CSRF token lasts
-        # until the user closes the browser window.
-        response.set_cookie("csrf_token", csrf_token, httponly=True)
         return response
-
 
 class LibraryRegistryController(BaseController):
 
