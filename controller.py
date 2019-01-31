@@ -151,9 +151,7 @@ class StaticFileController(BaseController):
 
 class ViewController(BaseController):
     def __call__(self):
-        if not session["username"]:
-            session["username"] = ""
-        username = session["username"]
+        username = session.get('username', '')
         response = Response(flask.render_template_string(
             admin_template,
             username=username
