@@ -22,8 +22,8 @@ from controller import (
 )
 
 import flask
-from flask import Response
-from werkzeug import ImmutableMultiDict
+from flask import Response, session
+from werkzeug import ImmutableMultiDict, MultiDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
@@ -70,9 +70,13 @@ class MockEmailer(Emailer):
 
 class ControllerTest(DatabaseTest):
     def setup(self):
+        from app import app, set_secret_key
+
         super(ControllerTest, self).setup()
+        ConfigurationSetting.sitewide(self._db, Configuration.SECRET_KEY).value = "a secret"
+        set_secret_key(self._db)
+
         os.environ['AUTOINITIALIZE'] = "False"
-        from app import app
         del os.environ['AUTOINITIALIZE']
         self.app = app
         self.data_setup()
@@ -227,6 +231,181 @@ class TestLibraryRegistryController(ControllerTest):
         # Turn some places into geographic points.
         self.manhattan = GeometryUtility.point_from_ip("65.88.88.124")
         self.oakland = GeometryUtility.point_from_string("37.8,-122.2")
+
+    def _is_library(self, expected, actual):
+        # Helper method to check that a library found by a controller is equivalent to a particular library in the database
+        flattened = {}
+        # Getting rid of the "uuid" key before populating flattened, because its value is just a string, not a subdictionary.
+        # The UUID information is still being checked elsewhere.
+        del actual["uuid"]
+        for subdictionary in actual.values():
+            flattened.update(subdictionary)
+
+        for k in flattened:
+            if k == "library_stage":
+                eq_(flattened.get("library_stage"), expected._library_stage)
+            elif k == "timestamp":
+                actual_ts = flattened.get("timestamp")
+                expected_ts = expected.timestamp
+                actual_time = [actual_ts.year, actual_ts.month, actual_ts.day]
+                expected_time = [expected_ts.year, expected_ts.month, expected_ts.day]
+                eq_(actual_time, expected_time)
+            elif k == "contact_email":
+                expected_contact_email = expected.name + "@library.org"
+                eq_(flattened.get("contact_email"), expected_contact_email)
+            elif k == "online_registration":
+                eq_(flattened.get("online_registration"), str(expected.online_registration))
+            else:
+                eq_(flattened.get(k), getattr(expected, k))
+
+    def _check_keys(self, library):
+        # Helper method to check that the controller is sending the right pieces of information about a library.
+
+        expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages']
+        eq_(set(expected_categories), set(library.keys()))
+
+        expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration']
+        eq_(set(expected_info_keys), set(library.get("basic_info").keys()))
+
+        expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'opds_url']
+        eq_(set(expected_url_contact_keys), set(library.get("urls_and_contact")))
+
+        expected_stage_keys = ['library_stage', 'registry_stage']
+        eq_(set(expected_stage_keys), set(library.get("stages").keys()))
+
+
+    def test_libraries(self):
+        # Test that the controller returns a specific set of information for each library.
+        ct = self.connecticut_state_library
+        ks = self.kansas_state_library
+        nypl = self.nypl
+
+        response = self.controller.libraries()
+        libraries = response.get("libraries")
+
+        eq_(len(libraries), 3)
+        for library in libraries:
+            self._check_keys(library)
+
+        expected_names = [expected.name for expected in [ct, ks, nypl]]
+        actual_names = [library.get("basic_info").get("name") for library in libraries]
+        eq_(set(expected_names), set(actual_names))
+
+        self._is_library(ct, libraries[0])
+        self._is_library(ks, libraries[1])
+        self._is_library(nypl, libraries[2])
+
+    def test_library_details(self):
+        # Test that the controller can look up the complete information for one specific library.
+        library = self.nypl
+        uuid = library.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/"):
+            response = self.controller.library_details(uuid)
+
+        eq_(uuid, response.get("uuid"))
+
+        self._check_keys(response)
+        self._is_library(library, response)
+
+    def test_library_details_with_error(self):
+        # Test that the controller returns a problem detail document if the requested library doesn't exist.
+        uuid = "not a real UUID!"
+        with self.app.test_request_context("/"):
+            response = self.controller.library_details(uuid)
+
+        assert isinstance(response, ProblemDetail)
+        eq_(response.status_code, 404)
+        eq_(response.title, LIBRARY_NOT_FOUND.title)
+        eq_(response.uri, LIBRARY_NOT_FOUND.uri)
+
+    def test_edit_registration(self):
+        # Test that a specific library's stages can be edited via submitting a form.
+        library = self._library(
+            name="Test Library",
+            short_name="test_lib",
+            library_stage=Library.CANCELLED_STAGE,
+            registry_stage=Library.TESTING_STAGE
+        )
+        uuid = library.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("Library Stage", "testing"),
+                ("Registry Stage", "production"),
+            ])
+
+            response = self.controller.edit_registration()
+
+        eq_(response._status_code, 200)
+        eq_(response.response[0], library.internal_urn)
+
+        edited_library = get_one(self._db, Library, short_name=library.short_name)
+        eq_(edited_library.library_stage, Library.TESTING_STAGE)
+        eq_(edited_library.registry_stage, Library.PRODUCTION_STAGE)
+
+    def test_edit_registration_with_error(self):
+        uuid = "not a real UUID!"
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("Library Stage", "testing"),
+                ("Registry Stage", "production"),
+            ])
+            response = self.controller.edit_registration()
+        assert isinstance(response, ProblemDetail)
+        eq_(response.status_code, 404)
+        eq_(response.title, LIBRARY_NOT_FOUND.title)
+        eq_(response.uri, LIBRARY_NOT_FOUND.uri)
+
+    def test_edit_registration_with_override(self):
+        # Normally, if a library is already in production, its library_stage cannot be edited.
+        # Admins should be able to override this by using the interface.
+        nypl = self.nypl
+        uuid = nypl.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("Library Stage", "cancelled"),
+                ("Registry Stage", "cancelled")
+            ])
+
+            response = self.controller.edit_registration()
+            eq_(response._status_code, 200)
+            eq_(response.response[0], nypl.internal_urn)
+            edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
+
+    def _log_in(self):
+        flask.request.form = MultiDict([
+            ("username", "Admin"),
+            ("password", "123"),
+        ])
+        return self.controller.log_in()
+
+    def test_log_in(self):
+        with self.app.test_request_context("/", method="POST"):
+            response = self._log_in()
+            eq_(response.status, "302 FOUND")
+            eq_(session["username"], "Admin")
+
+    def test_log_in_with_error(self):
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("username", "wrong"),
+                ("password", "abc"),
+            ])
+            response = self.controller.log_in()
+            assert(isinstance(response, ProblemDetail))
+            eq_(response.status_code, 401)
+            eq_(response.title, INVALID_CREDENTIALS.title)
+            eq_(response.uri, INVALID_CREDENTIALS.uri)
+
+    def test_log_out(self):
+        with self.app.test_request_context("/"):
+            self._log_in()
+            eq_(session["username"], "Admin")
+            response = self.controller.log_out();
+            eq_(session["username"], "")
+            eq_(response.status, "302 FOUND")
 
     def test_instantiate_without_emailer(self):
         """If there is no emailer configured, the controller will still start

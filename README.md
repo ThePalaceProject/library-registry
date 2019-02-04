@@ -1,5 +1,5 @@
 After creating the database for this application, you must enable two
-PostgreSQL extentions:
+PostgreSQL extensions:
 
 ```
 CREATE EXTENSION postgis;

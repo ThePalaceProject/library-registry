@@ -20,7 +20,9 @@ from model import (
     get_one_or_create,
     Audience,
     Base,
+    ConfigurationSetting,
     ExternalIntegration,
+    Hyperlink,
     Library,
     Place,
     PlaceAlias,
@@ -93,6 +95,12 @@ class DatabaseTest(object):
         self.longitude_counter = -90
 
     def teardown(self):
+        self._db.rollback()
+
+        secret_keys = self._db.query(ConfigurationSetting).filter(
+            ConfigurationSetting.key==Configuration.SECRET_KEY
+        )
+        [self._db.delete(secret_key) for secret_key in secret_keys]
         # Close the session.
         self._db.close()
 
@@ -120,7 +128,7 @@ class DatabaseTest(object):
         self.time_counter = self.time_counter + timedelta(days=1)
         return v
 
-    def _library(self, name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE):
+    def _library(self, name=None, short_name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE, has_email=False):
         name = name or self._str
         library, ignore = get_one_or_create(
             self._db, Library, name=name,
@@ -129,7 +137,7 @@ class DatabaseTest(object):
                 opds_url=self._url
             )
         )
-        library.short_name = self._str
+        library.short_name = short_name or self._str
         library.shared_secret = self._str
         for place in eligibility_areas:
             get_one_or_create(self._db, ServiceArea, library=library,
@@ -141,6 +149,8 @@ class DatabaseTest(object):
         library.audiences = [Audience.lookup(self._db, audience) for audience in audiences]
         library.library_stage = library_stage
         library.registry_stage = registry_stage
+        if has_email:
+            library.set_hyperlink(Hyperlink.INTEGRATION_CONTACT_REL, "mailto:" + name + "@library.org")
         return library
 
     def _external_integration(self, protocol, goal=None, settings=None,
@@ -208,16 +218,23 @@ class DatabaseTest(object):
     # Some useful Libraries.
     @property
     def nypl(self):
-        return self._library("NYPL", [self.new_york_city, self.zip_11212])
+        return self._library("NYPL", "nypl", [self.new_york_city, self.zip_11212], has_email=True)
 
     @property
     def connecticut_state_library(self):
         return self._library("Connecticut State Library",
-                            [self.connecticut_state])
+                            "CT",
+                            [self.connecticut_state],
+                            has_email=True)
 
     @property
     def kansas_state_library(self):
-        return self._library("Kansas State Library", [self.kansas_state])
+        return self._library(
+            "Kansas State Library",
+            "KS",
+            [self.kansas_state],
+            has_email=True
+        )
 
     # Some useful Places.
 
@@ -477,4 +494,3 @@ class MockPlace(object):
     @classmethod
     def everywhere(cls, _db):
         return cls.EVERYWHERE
-
