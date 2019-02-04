@@ -298,14 +298,22 @@ class TestLibraryRegistryController(ControllerTest):
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.
         library = self.nypl
-        uuid = library.internal_urn.split("uuid:")[1]
-        with self.app.test_request_context("/"):
-            response = self.controller.library_details(uuid)
 
-        eq_(uuid, response.get("uuid"))
+        def check():
+            uuid = library.internal_urn.split("uuid:")[1]
+            with self.app.test_request_context("/"):
+                response = self.controller.library_details(uuid)
+            eq_(uuid, response.get("uuid"))
+            self._check_keys(response)
+            self._is_library(library, response)
 
-        self._check_keys(response)
-        self._is_library(library, response)
+        check()
+
+        # Delete the library's contact email, simulating an old
+        # library created before this rule was instituted, and try
+        # again.
+        [self._db.delete(x) for x in library.hyperlinks]
+        check()
 
     def test_library_details_with_error(self):
         # Test that the controller returns a problem detail document if the requested library doesn't exist.
