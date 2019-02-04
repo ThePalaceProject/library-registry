@@ -232,7 +232,7 @@ class TestLibraryRegistryController(ControllerTest):
         self.manhattan = GeometryUtility.point_from_ip("65.88.88.124")
         self.oakland = GeometryUtility.point_from_string("37.8,-122.2")
 
-    def _is_library(self, expected, actual):
+    def _is_library(self, expected, actual, has_email=True):
         # Helper method to check that a library found by a controller is equivalent to a particular library in the database
         flattened = {}
         # Getting rid of the "uuid" key before populating flattened, because its value is just a string, not a subdictionary.
@@ -251,8 +251,9 @@ class TestLibraryRegistryController(ControllerTest):
                 expected_time = [expected_ts.year, expected_ts.month, expected_ts.day]
                 eq_(actual_time, expected_time)
             elif k == "contact_email":
-                expected_contact_email = expected.name + "@library.org"
-                eq_(flattened.get("contact_email"), expected_contact_email)
+                if has_email:
+                    expected_contact_email = expected.name + "@library.org"
+                    eq_(flattened.get("contact_email"), expected_contact_email)
             elif k == "online_registration":
                 eq_(flattened.get("online_registration"), str(expected.online_registration))
             else:
@@ -299,13 +300,13 @@ class TestLibraryRegistryController(ControllerTest):
         # Test that the controller can look up the complete information for one specific library.
         library = self.nypl
 
-        def check():
+        def check(has_email=True):
             uuid = library.internal_urn.split("uuid:")[1]
             with self.app.test_request_context("/"):
                 response = self.controller.library_details(uuid)
             eq_(uuid, response.get("uuid"))
             self._check_keys(response)
-            self._is_library(library, response)
+            self._is_library(library, response, has_email)
 
         check()
 
@@ -313,7 +314,7 @@ class TestLibraryRegistryController(ControllerTest):
         # library created before this rule was instituted, and try
         # again.
         [self._db.delete(x) for x in library.hyperlinks]
-        check()
+        check(False)
 
     def test_library_details_with_error(self):
         # Test that the controller returns a problem detail document if the requested library doesn't exist.

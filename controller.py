@@ -274,16 +274,17 @@ class LibraryRegistryController(BaseController):
         return dict(uuid=uuid, basic_info=basic_info, urls_and_contact=urls_and_contact, stages=stages)
 
     def _contact_email(self, id):
-        contact_email = self._db.query(Resource).join(
+        contact_email = None
+        query = self._db.query(Resource).join(
                 Hyperlink, Resource.id==Hyperlink.resource_id
             ).filter(
                 Hyperlink.library_id==id, Hyperlink.rel == Hyperlink.INTEGRATION_CONTACT_REL
-            ).first().href.split(
-                "mailto:"
-            )[1]
+            )
 
-        if contact_email:
-            return contact_email
+        if query.first():
+            contact_email = query.first().href.split("mailto:")[1]
+
+        return contact_email
 
     def edit_registration(self):
         # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
