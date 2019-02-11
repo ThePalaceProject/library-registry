@@ -249,9 +249,11 @@ class LibraryRegistryController(BaseController):
         if isinstance(library, ProblemDetail):
             return library
 
-        contact_email = None
-        if self._contact_email(library.id):
-            contact_email = self._contact_email(library.id)
+        # Find the resource having to do with the contact email for this library;
+        # we'll need this to look up both the email address and the validation information.
+        resource = self._get_resource(library.id, Hyperlink.INTEGRATION_CONTACT_REL)
+        contact_email = self._contact_email(resource)
+        validated_at = self._validated_at(resource)
 
         basic_info = dict(
             name=library.name,
@@ -263,6 +265,7 @@ class LibraryRegistryController(BaseController):
         )
         urls_and_contact = dict(
             contact_email=contact_email,
+            validated=validated_at,
             authentication_url=library.authentication_url,
             opds_url=library.opds_url,
             web_url=library.web_url,
@@ -273,18 +276,52 @@ class LibraryRegistryController(BaseController):
         )
         return dict(uuid=uuid, basic_info=basic_info, urls_and_contact=urls_and_contact, stages=stages)
 
-    def _contact_email(self, id):
-        contact_email = None
-        query = self._db.query(Resource).join(
-                Hyperlink, Resource.id==Hyperlink.resource_id
-            ).filter(
-                Hyperlink.library_id==id, Hyperlink.rel == Hyperlink.INTEGRATION_CONTACT_REL
+    def _contact_email(self, resource):
+        if resource and resource.href:
+            return resource.href.split("mailto:")[1]
+
+    def _validated_at(self, resource):
+        validated_at = "Not validated"
+        validation = get_one(self._db, Validation, resource=resource)
+        if validation:
+            validated_at = validation.started_at
+        return validated_at
+
+    def _get_resource(self, library_id, rel):
+        hyperlink = self._get_hyperlink(library_id, rel)
+        if hyperlink:
+            query = self._db.query(Resource).filter(
+                Resource.id==hyperlink.resource_id
+            )
+            return query.first()
+
+    def _get_hyperlink(self, library_id, rel):
+        query = self._db.query(Hyperlink).filter(
+            Hyperlink.library_id==library_id,
+            Hyperlink.rel==rel
+        )
+        hyperlink = query.first()
+        return hyperlink
+
+    def email(self):
+        uuid = flask.request.form.get("uuid")
+        library = self.library_for_request(uuid)
+        hyperlink = self._get_hyperlink(library.id, Hyperlink.INTEGRATION_CONTACT_REL)
+
+        if not hyperlink or isinstance(hyperlink, ProblemDetail):
+            return INVALID_CONTACT_URI.detailed(
+                "The contact URI for this library is missing or invalid"
             )
 
-        if query.first():
-            contact_email = query.first().href.split("mailto:")[1]
-
-        return contact_email
+        try:
+            hyperlink.notify(self.emailer, self.app.url_for)
+        except SMTPException, e:
+            # We were unable to send the email.
+            return INTEGRATION_ERROR.detailed(
+                _("SMTP error while sending email to %(address)s",
+                  address=hyperlink.resource.href)
+            )
+        return Response(unicode(library.internal_urn), 200)
 
     def edit_registration(self):
         # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.

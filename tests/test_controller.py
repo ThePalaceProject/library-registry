@@ -254,6 +254,8 @@ class TestLibraryRegistryController(ControllerTest):
                 if has_email:
                     expected_contact_email = expected.name + "@library.org"
                     eq_(flattened.get("contact_email"), expected_contact_email)
+            elif k == "validated":
+                eq_(flattened.get("validated"), "Not validated")
             elif k == "online_registration":
                 eq_(flattened.get("online_registration"), str(expected.online_registration))
             else:
@@ -268,7 +270,7 @@ class TestLibraryRegistryController(ControllerTest):
         expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration']
         eq_(set(expected_info_keys), set(library.get("basic_info").keys()))
 
-        expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'opds_url']
+        expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'validated', 'opds_url']
         eq_(set(expected_url_contact_keys), set(library.get("urls_and_contact")))
 
         expected_stage_keys = ['library_stage', 'registry_stage']
@@ -382,6 +384,48 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(response._status_code, 200)
             eq_(response.response[0], nypl.internal_urn)
             edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
+
+    def test_email(self):
+        nypl = self.nypl
+        uuid = nypl.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+            ])
+            response = self.controller.email()
+        eq_(response.response, [nypl.internal_urn])
+        eq_(response.status_code, 200)
+
+    def test_missing_email_error(self):
+        nypl = self.nypl
+        uuid = nypl.internal_urn.split("uuid:")[1]
+        [self._db.delete(x) for x in nypl.hyperlinks]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+            ])
+            response = self.controller.email()
+        assert isinstance(response, ProblemDetail)
+        eq_(response.status_code, 400)
+        eq_(response.detail, 'The contact URI for this library is missing or invalid')
+        eq_(response.uri, 'http://librarysimplified.org/terms/problem/invalid-contact-uri')
+
+    def test_smtp_email_error(self):
+        class NonfunctionalEmailer(MockEmailer):
+            def send(self, *args, **kwargs):
+                raise SMTPException("SMTP server is broken")
+        self.controller.emailer = NonfunctionalEmailer()
+        nypl = self.nypl
+        uuid = nypl.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+            ])
+            response = self.controller.email()
+        assert isinstance(response, ProblemDetail)
+        eq_(response.status_code, 500)
+        eq_(response.detail, 'SMTP error while sending email to mailto:NYPL@library.org')
+        eq_(response.uri, 'http://librarysimplified.org/terms/problem/remote-integration-failed')
 
     def _log_in(self):
         flask.request.form = MultiDict([
