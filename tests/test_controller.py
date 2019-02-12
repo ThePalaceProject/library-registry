@@ -255,10 +255,7 @@ class TestLibraryRegistryController(ControllerTest):
                     expected_contact_email = expected.name + "@library.org"
                     eq_(flattened.get("contact_email"), expected_contact_email)
             elif k == "validated":
-                if (has_email):
-                    eq_(flattened.get("validated"), "Not validated")
-                else:
-                    eq_(flattened.get("validated"), None)
+                eq_(flattened.get("validated"), "Not validated")
             elif k == "online_registration":
                 eq_(flattened.get("online_registration"), str(expected.online_registration))
             else:
@@ -406,14 +403,14 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(template_args.get("rel_desc"), Hyperlink.REL_DESCRIPTIONS.get(Hyperlink.INTEGRATION_CONTACT_REL))
 
     def test_missing_email_error(self):
-        nypl = self.nypl
-        uuid = nypl.internal_urn.split("uuid:")[1]
-        [self._db.delete(x) for x in nypl.hyperlinks]
+        library_without_email = self._library()
+        uuid = library_without_email.internal_urn.split("uuid:")[1]
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
             ])
             response = self.controller.email()
+
         assert isinstance(response, ProblemDetail)
         eq_(response.status_code, 400)
         eq_(response.detail, 'The contact URI for this library is missing or invalid')
