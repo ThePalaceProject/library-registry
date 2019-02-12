@@ -249,11 +249,13 @@ class LibraryRegistryController(BaseController):
         if isinstance(library, ProblemDetail):
             return library
 
-        # Find the resource having to do with the contact email for this library;
-        # we'll need this to look up both the email address and the validation information.
-        resource = self._get_resource(library.id, Hyperlink.INTEGRATION_CONTACT_REL)
-        contact_email = self._contact_email(resource)
-        validated_at = self._validated_at(resource)
+        contact_email = None
+        validated_at = None
+
+        hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
+        if hyperlink and hyperlink.resource:
+            contact_email = self._contact_email(hyperlink.resource)
+            validated_at = self._validated_at(hyperlink.resource)
 
         basic_info = dict(
             name=library.name,
@@ -287,28 +289,12 @@ class LibraryRegistryController(BaseController):
             validated_at = validation.started_at
         return validated_at
 
-    def _get_resource(self, library_id, rel):
-        hyperlink = self._get_hyperlink(library_id, rel)
-        if hyperlink:
-            query = self._db.query(Resource).filter(
-                Resource.id==hyperlink.resource_id
-            )
-            return query.first()
-
-    def _get_hyperlink(self, library_id, rel):
-        query = self._db.query(Hyperlink).filter(
-            Hyperlink.library_id==library_id,
-            Hyperlink.rel==rel
-        )
-        hyperlink = query.first()
-        return hyperlink
-
     def email(self):
         uuid = flask.request.form.get("uuid")
         library = self.library_for_request(uuid)
-        hyperlink = self._get_hyperlink(library.id, Hyperlink.INTEGRATION_CONTACT_REL)
+        hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
 
-        if not hyperlink or isinstance(hyperlink, ProblemDetail):
+        if not hyperlink or not hyperlink.resource or isinstance(hyperlink, ProblemDetail):
             return INVALID_CONTACT_URI.detailed(
                 "The contact URI for this library is missing or invalid"
             )

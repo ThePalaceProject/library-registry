@@ -541,6 +541,17 @@ class TestLibrary(DatabaseTest):
         eq_(library2, link5.library)
         eq_(link4.resource, link5.resource)
 
+    def test_get_hyperlink(self):
+        library = self._library()
+        link1, is_modified = library.set_hyperlink("contact_email", "contact_href")
+        link2, is_modified = library.set_hyperlink("help_email", "help_href")
+
+        contact_link = Library.get_hyperlink(library, "contact_email")
+        eq_(contact_link, link1)
+
+        help_link = Library.get_hyperlink(library, "help_email")
+        eq_(help_link, link2)
+
     def test_library_service_area(self):
         zip = self.zip_10018
         nypl = self._library("New York Public Library", eligibility_areas=[zip])

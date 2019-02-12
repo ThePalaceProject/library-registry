@@ -203,7 +203,6 @@ def create(db, model, create_method='',
     db.flush()
     return created, True
 
-    
 Base = declarative_base()
 
 class Library(Base):
@@ -945,6 +944,11 @@ class Library(Base):
 
         return hyperlink, is_modified
 
+    @classmethod
+    def get_hyperlink(cls, library, rel):
+        link = [x for x in library.hyperlinks if x.rel == rel]
+        if len(link) > 0:
+            return link[0]
 
 class LibraryAlias(Base):
 
