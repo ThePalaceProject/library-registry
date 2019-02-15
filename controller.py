@@ -288,7 +288,8 @@ class LibraryRegistryController(BaseController):
                 return validation.started_at
         return validated_at
 
-    def email(self):
+    def validate_email(self):
+        # Manually validate an email address, without the admin having to click on a confirmation link
         uuid = flask.request.form.get("uuid")
         library = self.library_for_request(uuid)
         hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
@@ -297,15 +298,14 @@ class LibraryRegistryController(BaseController):
                 "The contact URI for this library is missing or invalid"
             )
 
-        try:
-            hyperlink.notify(self.emailer, self.app.url_for)
-        except SMTPException, e:
-            # We were unable to send the email.
-            return INTEGRATION_ERROR.detailed(
-                _("SMTP error while sending email to %(address)s",
-                  address=hyperlink.resource.href)
-            )
-        return Response(unicode(library.internal_urn), 200)
+        validation, is_new = get_one_or_create(self._db, Validation, resource=hyperlink.resource)
+        validation.restart()
+        validation.mark_as_successful()
+
+        if (validation.success):
+            return Response(unicode(library.internal_urn), 200)
+        else:
+            return CANNOT_VALIDATE
 
     def edit_registration(self):
         # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
