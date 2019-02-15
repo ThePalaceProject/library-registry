@@ -385,22 +385,23 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(response.response[0], nypl.internal_urn)
             edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
 
-    def test_email(self):
+    def test_validate_email(self):
         nypl = self.nypl
         uuid = nypl.internal_urn.split("uuid:")[1]
+        validation = nypl.hyperlinks[0].resource.validation
+        eq_(validation, None)
+
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
             ])
-            response = self.controller.email()
+            response = self.controller.validate_email()
         eq_(response.response, [nypl.internal_urn])
         eq_(response.status_code, 200)
 
-        type, address, template_args = self.controller.emailer.sent_out[0]
-        eq_(type, Emailer.ADDRESS_NEEDS_CONFIRMATION)
-        eq_(address, "NYPL@library.org")
-        eq_(template_args.get("library"), "NYPL")
-        eq_(template_args.get("rel_desc"), Hyperlink.REL_DESCRIPTIONS.get(Hyperlink.INTEGRATION_CONTACT_REL))
+        validation = nypl.hyperlinks[0].resource.validation
+        assert isinstance(validation, Validation)
+        eq_(validation.success, True)
 
     def test_missing_email_error(self):
         library_without_email = self._library()
@@ -409,29 +410,12 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
             ])
-            response = self.controller.email()
+            response = self.controller.validate_email()
 
         assert isinstance(response, ProblemDetail)
         eq_(response.status_code, 400)
         eq_(response.detail, 'The contact URI for this library is missing or invalid')
         eq_(response.uri, 'http://librarysimplified.org/terms/problem/invalid-contact-uri')
-
-    def test_smtp_email_error(self):
-        class NonfunctionalEmailer(MockEmailer):
-            def send(self, *args, **kwargs):
-                raise SMTPException("SMTP server is broken")
-        self.controller.emailer = NonfunctionalEmailer()
-        nypl = self.nypl
-        uuid = nypl.internal_urn.split("uuid:")[1]
-        with self.app.test_request_context("/", method="POST"):
-            flask.request.form = MultiDict([
-                ("uuid", uuid),
-            ])
-            response = self.controller.email()
-        assert isinstance(response, ProblemDetail)
-        eq_(response.status_code, 500)
-        eq_(response.detail, 'SMTP error while sending email to mailto:NYPL@library.org')
-        eq_(response.uri, 'http://librarysimplified.org/terms/problem/remote-integration-failed')
 
     def _log_in(self):
         flask.request.form = MultiDict([
