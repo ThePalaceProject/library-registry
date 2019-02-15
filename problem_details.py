@@ -70,9 +70,3 @@ INVALID_CREDENTIALS = pd(
     401,
     title=_("The username or password is incorrect.")
 )
-
-CANNOT_VALIDATE = pd(
-    "http://librarysimplified.org/terms/problem/invalid-credentials",
-    500,
-    title=_("Unable to validate this email address.")
-)
