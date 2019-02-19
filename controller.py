@@ -302,7 +302,7 @@ class LibraryRegistryController(BaseController):
         validation.restart()
         validation.mark_as_successful()
 
-        return Response(unicode(library.internal_urn), 200)
+        return self.library_details(uuid)
 
     def edit_registration(self):
         # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
