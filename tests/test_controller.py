@@ -395,9 +395,7 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
             ])
-            response = self.controller.validate_email()
-        eq_(response.response, [nypl.internal_urn])
-        eq_(response.status_code, 200)
+            self.controller.validate_email()
 
         validation = nypl.hyperlinks[0].resource.validation
         assert isinstance(validation, Validation)
