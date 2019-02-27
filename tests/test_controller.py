@@ -724,21 +724,20 @@ class TestLibraryRegistryController(ControllerTest):
             eq_('{}', response.data)
 
         # Set some terms of service.
-        tos = "Some terms"
+        tos = "http://terms.com/service.html"
         ConfigurationSetting.sitewide(
-            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_TEXT
+            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_URL
         ).value = tos
 
-        # Now the document 'links' to the terms of service via a data:
-        # URI.
+        # Now the document contains one link, to the terms of service
+        # document.
         with self.app.test_request_context("/", method="GET"):
             response = self.controller.register()
             eq_(200, response.status_code)
             data = json.loads(response.data)
             [link] = data['links']
             eq_("terms-of-service", link["rel"])
-            eq_("data:text/html;%s" % base64.encodestring(tos),
-                link['href'])
+            eq_(tos, link['href'])
 
     def test_register_fails_when_no_auth_document_url_provided(self):
         """Without the URL to an Authentication For OPDS document,

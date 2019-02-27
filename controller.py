@@ -401,19 +401,17 @@ class LibraryRegistryController(BaseController):
         """Serve a document that describes the registration process,
         notably the terms of service for that process.
 
-        The terms of service are included inline as a data: URI,
-        to avoid the need to fetch them in a separate request.
+        The terms of service are hosted elsewhere; we only know the
+        URL of the page they're stored.
         """
         document = dict()
-        terms_of_service = ConfigurationSetting.sitewide(
-            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_TEXT
+        terms_of_service_url = ConfigurationSetting.sitewide(
+            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_URL
         ).value
-        if terms_of_service:
-            terms_of_service = base64.encodestring(terms_of_service)
-            terms_of_service_uri = "data:text/html;%s" % terms_of_service
+        if terms_of_service_url:
             OPDSCatalog.add_link_to_catalog(
                 document, rel="terms-of-service",
-                href=terms_of_service_uri
+                href=terms_of_service_url
             )
         return document
 

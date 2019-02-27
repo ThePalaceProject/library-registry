@@ -39,8 +39,9 @@ class Configuration(object):
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
     ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
 
-    # The text to which users must agree to register a library.
-    REGISTRATION_TERMS_OF_SERVICE_TEXT = "registration_terms_of_service_text"
+    # The URL to the document containing the terms of servier for
+    # library registration
+    REGISTRATION_TERMS_OF_SERVICE_URL = "registration_terms_of_service_url"
 
     # Email sent by the library registry will be 'from' this address,
     # and receipients will be invited to contact this address if they
