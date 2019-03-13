@@ -84,35 +84,15 @@ class Script(object):
 
 
 class LibraryScript(Script):
-    """A script that operates on one or more specific libraries."""
-
-    # If this is True, the script will only ever operate on one library,
-    # and which library to use is a required input. If this is False, the
-    # script can operate on a specific library, but if no library is provided
-    # it will operate on all libraries.
-    REQUIRES_SINGLE_LIBRARY = True
+    """A script that operates on one specific library."""
 
     @classmethod
     def arg_parser(cls):
         parser = super(LibraryScript, cls).arg_parser()
         parser.add_argument(
-            '--library', help='Official name of the library to process.',
-            required=cls.REQUIRES_SINGLE_LIBRARY
+            '--library', help='Official name of the library', required=True
         )
         return parser
-
-    def libraries(self, library_name=None):
-        """Find all libraries on which this script should operate.
-
-        :param library_name: The library name passed in on the command line,
-            if any.
-        """
-        if library_name:
-            library = get_one(self._db, Library, name=library_name)
-            if not library:
-                raise Exception("No library with name %r" % library_name)
-            return [library]
-        return self._db.query(Library)
 
 
 class LoadPlacesScript(Script):
@@ -269,7 +249,9 @@ class SetCoverageAreaScript(LibraryScript):
     def run(self, cmd_args=None, place_class=Place):
         parsed = self.parse_command_line(self._db, cmd_args)
 
-        [library] = self.libraries(parsed.library)
+        library = get_one(self._db, Library, name=parsed.library)
+        if not library:
+            raise Exception("No library with name %r" % parsed.library)
 
         if not parsed.service_area and not parsed.focus_area:
             logging.info("No new coverage areas specified, doing nothing.")
@@ -308,22 +290,6 @@ class SetCoverageAreaScript(LibraryScript):
         logging.info("Service areas for %s:", library.name)
         for area in library.service_areas:
             logging.info("%s: %r", area.type, area.place)
-
-
-class RegistrationRefreshScript(LibraryScript):
-    """Refresh our view of every library in the system based on their current
-    authentication document.
-    """
-
-    REQUIRES_SINGLE_LIBRARY = False
-
-    def run(self, cmd_args=None):
-        parsed = self.parse_command_line(self._db, cmd_args)
-        for library in self.libraries(parsed.library):
-            self.refresh(library)
-
-    def refresh(self, library):
-
 
 
 class AdobeVendorIDAcceptanceTestScript(Script):
