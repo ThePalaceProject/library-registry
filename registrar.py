@@ -55,8 +55,8 @@ class LibraryRegistrar(object):
         # circulation manager moved unless the registration process
         # was manually initiated by a library administrator who knows
         # the secret.
-        result = library.register(
-            _db, library.authentication_url, shared_secret=None,
+        result = cls.register(
+            auth_url = library.authentication_url, shared_secret=None,
             library_stage=library.library_stage,
         )
         if isinstance(result, ProblemDetail):
@@ -67,11 +67,12 @@ class LibraryRegistrar(object):
         # objects, since that might result in emails being sent out
         # unexpectedly. The library admin must explicitly re-register
         # for that to happen.
+        #
+        # Basically, we don't actually use any of the items returned
+        # by register() -- only the controller uses that stuff.
         return None
 
-    def register(
-            self, auth_url, shared_secret, library_stage,
-    ):
+    def register(self, auth_url, shared_secret, library_stage):
         """Register the given authentication document as a library in this
         registry, if possible.
 
@@ -85,8 +86,16 @@ class LibraryRegistrar(object):
         :param library_stage: The library administrator's proposed value for
             Library.library_stage.
 
-        :return: A ProblemDetail if there's a problem. Otherwise, a 3-tuple
-            (library, is_new, new_hyperlinks). `new_hyperlinks` is a 
+        :return: A ProblemDetail if there's a problem. Otherwise, a 5-tuple
+            (library, is_new, from_shared_secret, auth_document, new_hyperlinks,
+             elevated_permissions).
+
+        `from_shared_secret` is True if `shared_secret` was
+             and actually useful when looking up `library`.
+        `auth_document` is an AuthenticationDocument corresponding to
+            the library's authentication document, as found at auth_url.
+        `new_hyperlinks` is a list of Hyperlinks
+             that ought to be created for registration to be complete.
 
         """
         hyperlinks_to_create = []
@@ -268,7 +277,8 @@ class LibraryRegistrar(object):
             )
             return problem
 
-        return library, is_new, auth_document, hyperlinks_to_create, elevated_permissions
+        return (library, is_new, elevated_permissions, auth_document,
+                hyperlinks_to_create)
 
 
     def _make_request(self, registration_url, url, on_404, on_timeout, on_exception, allow_401=False):

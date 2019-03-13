@@ -16,6 +16,14 @@ from util.problem_detail import ProblemDetail
 
 class TestRegistrar(DatabaseTest):
 
+    # TODO: The core method, register(), is tested indirectly in
+    # test_controller.py, because the LibraryRegistrar code was
+    # originally part of LibraryRegistryController. This could be
+    # refactored.
+
+    def test_reregister(self):
+        pass
+
     def test_opds_response_links(self):
         """Test the opds_response_links method.
 
