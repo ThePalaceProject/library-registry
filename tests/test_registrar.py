@@ -22,7 +22,29 @@ class TestRegistrar(DatabaseTest):
     # refactored.
 
     def test_reregister(self):
-        pass
+        class Mock(LibraryRegistrar):
+            RETURN_VALUE = NO_AUTH_URL
+
+            def register(self, auth_url, shared_secret, library_stage):
+                self.called_with = (auth_url, shared_secret, library_stage)
+                return self.RETURN_VALUE
+
+        library = self._library()
+        registrar = Mock(object(), object())
+
+        # Test the case where register() returns a problem detail.
+        result = registrar.reregister(library)
+        eq_(
+            (library.authentication_url, None, library.library_stage),
+            registrar.called_with
+        )
+        eq_(Mock.RETURN_VALUE, result)
+
+        # If register() returns anything other than a problem detail,
+        # we presume success and return nothing.
+        registrar.RETURN_VALUE = (object(), object(), object())
+        result = registrar.reregister(library)
+        eq_(None, result)
 
     def test_opds_response_links(self):
         """Test the opds_response_links method.

@@ -32,8 +32,7 @@ class LibraryRegistrar(object):
         self.do_get = do_get
         self.log = logging.getLogger("Library registrar")
 
-    @classmethod
-    def reregister(cls, library):
+    def reregister(self, library):
         """Re-register the given Library by fetching its authentication
         document and updating its record appropriately.
 
@@ -41,12 +40,11 @@ class LibraryRegistrar(object):
         by the library administrator, but it can be used to
         automatically keep us up to date on minor changes to a
         library's description, logo, etc.
-        
+
         :param library: A Library.
 
         :return: A ProblemDetail if there's a problem. Otherwise, None.
         """
-        _db = Session.object_session(library)
 
         # We don't provide the shared secret to avoid complications
         # when someone else now controls the
@@ -55,7 +53,7 @@ class LibraryRegistrar(object):
         # circulation manager moved unless the registration process
         # was manually initiated by a library administrator who knows
         # the secret.
-        result = cls.register(
+        result = self.register(
             auth_url = library.authentication_url, shared_secret=None,
             library_stage=library.library_stage,
         )
