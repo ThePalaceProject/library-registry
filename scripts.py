@@ -113,7 +113,7 @@ class LibraryScript(Script):
                 raise Exception("No library with name %r" % library_name)
             return [library]
         return self._db.query(Library)
-    
+
 
 class LoadPlacesScript(Script):
 
@@ -323,7 +323,7 @@ class RegistrationRefreshScript(LibraryScript):
             self.refresh(library)
 
     def refresh(self, library):
-        
+
 
 
 class AdobeVendorIDAcceptanceTestScript(Script):

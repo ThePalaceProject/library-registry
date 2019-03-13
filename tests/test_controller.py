@@ -1120,8 +1120,8 @@ class TestLibraryRegistryController(ControllerTest):
             ])
             response = self.controller.register(do_get=self.http_client.do_get)
 
-        # We get back a ProblemDetail the first time 
-        # we got a problem sending an email. In this case, it was 
+        # We get back a ProblemDetail the first time
+        # we got a problem sending an email. In this case, it was
         # trying to contact the library's 'help' address included in the
         # library's authentication document.
         eq_(INTEGRATION_ERROR.uri, response.uri)
