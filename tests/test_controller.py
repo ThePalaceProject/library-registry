@@ -297,6 +297,53 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(ct, libraries[0])
         self._is_library(ks, libraries[1])
         self._is_library(nypl, libraries[2])
+    
+    def test_libraries_opds(self):
+        library = self._library(
+            name="Test Cancelled Library",
+            short_name="test_cancelled_lib",
+            library_stage=Library.CANCELLED_STAGE,
+            registry_stage=Library.TESTING_STAGE
+        )
+        response = self.controller.libraries()
+        libraries = response.get("libraries")
+
+        # There are currently four libraries,
+        # These libraries have been added from the previous test.
+        eq_(len(libraries), 4)
+
+        with self.app.test_request_context("/libraries_opds"):
+            response = self.controller.libraries_opds()
+    
+            eq_("200 OK", response.status)
+            eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
+
+            catalog = json.loads(response.data)
+
+            # In the OPDS response, instead of getting four libraries like
+            # libraries() returns, we should only get three back because
+            # the last library has a stage that is cancelled.
+            eq_(len(catalog['catalogs']), 3)
+
+            [ct, ks, nypl] = catalog['catalogs']
+            eq_("Connecticut State Library", ct['metadata']['title'])
+            eq_(self.connecticut_state_library.internal_urn, ct['metadata']['id'])
+
+            eq_("Kansas State Library", ks['metadata']['title'])
+            eq_(self.kansas_state_library.internal_urn, ks['metadata']['id'])
+            
+            eq_("NYPL", nypl['metadata']['title'])
+            eq_(self.nypl.internal_urn, nypl['metadata']['id'])
+            
+            [library_link, register_link, search_link, self_link] = sorted(
+                catalog['links'], key=lambda x: x['rel']
+            )
+            url_for = self.app.library_registry.url_for
+
+            eq_(url_for("libraries_opds"), self_link['href'])
+            eq_("self", self_link['rel'])
+            eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
+
 
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.

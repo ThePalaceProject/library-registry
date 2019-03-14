@@ -120,6 +120,11 @@ def log_out():
 def libraries():
     return app.library_registry.registry_controller.libraries()
 
+@app.route('/admin/libraries_opds')
+@returns_problem_detail
+def libraries_opds():
+    return app.library_registry.registry_controller.libraries_opds()
+
 @app.route('/admin/libraries/<uuid>')
 @returns_json_or_response_or_problem_detail
 def library_details(uuid):
