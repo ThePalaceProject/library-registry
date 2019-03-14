@@ -1,2 +1,2 @@
 #!/bin/sh
-nosetests -vv tests
+nosetests tests
