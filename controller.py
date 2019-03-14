@@ -409,6 +409,10 @@ class LibraryRegistryController(BaseController):
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
 
+        # Registration is a complex multi-step process. Start a subtransaction
+        # so we can back out of the whole thing if any part of it fails.
+        __transaction = self._db.begin_nested()
+
         library = None
         elevated_permissions = False
         if shared_secret:
@@ -436,10 +440,6 @@ class LibraryRegistryController(BaseController):
                 # We want to do this before the registration, so that
                 # we request the new URL instead of the old one.
                 library.authentication_url = auth_url
-
-        # Registration is a complex multi-step process. Start a subtransaction
-        # so we can back out of the whole thing if any part of it fails.
-        __transaction = self._db.begin_nested()
 
         if not library:
             # Either this is a library at a known authentication URL
