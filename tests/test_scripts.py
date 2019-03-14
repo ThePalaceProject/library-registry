@@ -16,6 +16,8 @@ from model import (
     create,
     get_one,
 )
+from problem_details import INVALID_INTEGRATION_DOCUMENT
+from registrar import LibraryRegistrar
 from scripts import (
     AddLibraryScript,
     ConfigureEmailerScript,
@@ -24,6 +26,7 @@ from scripts import (
     ConfigureVendorIDScript,
     LibraryScript,
     LoadPlacesScript,
+    RegistrationRefreshScript,
     SearchLibraryScript,
     SearchPlacesScript,
     SetCoverageAreaScript,
@@ -43,23 +46,20 @@ class TestLibraryScript(DatabaseTest):
         ignored = self._library(name="Ignored Library")
 
         class Mock(LibraryScript):
+            # Mock of LibraryScript that returns a special value
+            # when all_libraries is called.
 
             all_libraries_return_value = object()
-
             @property
             def all_libraries(self):
-                # In this context, 'all libraries' means the first
-                # library but not the second.
                 return self.all_libraries_return_value
-
-
         script = Mock(self._db)
 
         # Any library can be processed if it's identified by name.
         for l in library, ignored:
             eq_([l], script.libraries(l.name))
         assert_raises_regexp(
-            ValueError, "No library with name 'Nonexistent Library'", 
+            ValueError, "No library with name 'Nonexistent Library'",
             script.libraries, "Nonexistent Library"
         )
 
@@ -68,12 +68,12 @@ class TestLibraryScript(DatabaseTest):
         eq_(script.all_libraries_return_value, script.libraries())
 
     def test_all_libraries(self):
-
+        # Three libraries, one in each state.
         production = self._library()
         testing = self._library(library_stage=Library.TESTING_STAGE)
         cancelled = self._library(library_stage=Library.CANCELLED_STAGE)
-        
-        # all_libraries omits the cancelled library.
+
+        # The all_libraries property omits the cancelled library.
         script = LibraryScript(self._db)
         eq_(set([production, testing]), set(script.all_libraries))
 
@@ -330,6 +330,72 @@ class TestConfigureIntegrationScript(DatabaseTest):
         expect_output = "Configuration settings stored.\n" + "\n".join(integration.explain()) + "\n"
         eq_(expect_output, output.getvalue())
 
+
+class TestRegistrationRefreshScript(DatabaseTest):
+
+    def test_run(self):
+        # Verify that run() instantiates a LibraryRegistrar using .registrar,
+        # then calles its reregister() method on every library that it's
+        # been asked to handle.
+        success_library = self._library(name="Success")
+        failure_library = self._library(name="Failure")
+
+        class MockRegistrar(object):
+            reregistered = []
+
+            def reregister(self, library):
+                # Pretend to reregister a library.
+                self.reregistered.append(library)
+
+                # The difference between success and failure isn't
+                # tested here; this just lets us check that both code
+                # paths execute without crashing.
+                if library is success_library:
+                    # When registration is not a problem detail
+                    # document, the return value is ignored.
+                    return object()
+                else:
+                    # When the return value is a problem detail
+                    # document, reregistration is assumed to be a
+                    # failure.
+                    return INVALID_INTEGRATION_DOCUMENT
+
+        mock_registrar = MockRegistrar()
+        class MockScript(RegistrationRefreshScript):
+            def libraries(self, library_name):
+                # Return a predefined set of libraries.
+                self.libraries_called_with = library_name
+                return [success_library, failure_library]
+
+            @property
+            def registrar(self):
+                # Return a fake LibraryRegistrar.
+                return mock_registrar
+        script = MockScript(self._db)
+
+        # Run with no arguments -- this will process all libraries in
+        # script.libraries.
+        script.run(cmd_args=[])
+
+        # LibraryRegistrar.reregister() was called twice: on
+        # success_library and on failure_library.
+        eq_(None, script.libraries_called_with)
+        eq_([success_library, failure_library], mock_registrar.reregistered)
+
+        # We can also tell the script to reregister one specific
+        # library. This tests that the command line is parsed and a
+        # library name is passed into libraries(), even though our
+        # mock implementation ignores the library name.
+        script.run(cmd_args=["--library=Library1"])
+        eq_("Library1", script.libraries_called_with)
+
+    def test_registrar(self):
+        # Verify that the normal, non-mocked value of script.registrar
+        # is a LibraryRegistrar.
+        script = RegistrationRefreshScript(self._db)
+        registrar = script.registrar
+        assert isinstance(registrar, LibraryRegistrar)
+        eq_(self._db, registrar._db)
 
 class TestSetCoverageAreaScript(DatabaseTest):
 

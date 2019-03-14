@@ -117,7 +117,7 @@ class LibraryScript(Script):
 
     @property
     def all_libraries(self):
-        """Find an iterator over all libraries, whatever 
+        """Find an iterator over all libraries, whatever
         'all libraries' means in the context of this script.
 
         By default, 'all libraries' means all libraries in the
@@ -330,9 +330,9 @@ class RegistrationRefreshScript(LibraryScript):
 
     REQUIRES_SINGLE_LIBRARY = False
 
-    def run(self, cmd_args=None, registrar_class=LibraryRegistrar):
+    def run(self, cmd_args=None):
         parsed = self.parse_command_line(self._db, cmd_args)
-        registrar = registrar_class(self._db)
+        registrar = self.registrar
         for library in self.libraries(parsed.library):
             result = registrar.reregister(library)
             if isinstance(result, ProblemDetail):
@@ -346,6 +346,12 @@ class RegistrationRefreshScript(LibraryScript):
                     "SUCCESS %s (%s)", library.name, library.authentication_url
                 )
                 self._db.commit()
+
+    @property
+    def registrar(self):
+        """Overridable method to create a LibraryRegistrar."""
+        return LibraryRegistrar(self._db)
+
 
 class AdobeVendorIDAcceptanceTestScript(Script):
     """Verify basic Adobe Vendor ID functionality, the way Adobe does
