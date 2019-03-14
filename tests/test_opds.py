@@ -12,7 +12,7 @@ from . import (
 from authentication_document import AuthenticationDocument
 from config import Configuration
 from model import (
-    get_one_or_create,
+    create,
     ConfigurationSetting,
     Hyperlink,
     Validation,
@@ -165,9 +165,8 @@ class TestOPDSCatalog(DatabaseTest):
         eq_(dict(href=hyperlink.href, rel=hyperlink.rel), m(hyperlink))
 
         # Create a Validation.
-        validation, is_new = get_one_or_create(
-            self._db, Validation, resource=hyperlink.resource
-        )
+        validation, is_new = create(self._db, Validation)
+        hyperlink.resource.validation = validation
 
         def assert_reservation_status(expect):
             args = m(hyperlink)

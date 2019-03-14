@@ -1379,6 +1379,9 @@ class TestConfigurationSetting(DatabaseTest):
             key=key,
             library_id=library.id, external_integration=integration
         )
+        # We really screwed up the database session there -- roll it back
+        # so that test cleanup can proceed.
+        self._db.rollback()
 
     def test_int_value(self):
         number = ConfigurationSetting.sitewide(self._db, "number")
