@@ -423,6 +423,7 @@ class LibraryRegistryController(BaseController):
             # same.
             library = get_one(self._db, Library, shared_secret=shared_secret)
             if not library:
+                __transaction.rollback()
                 return AUTHENTICATION_FAILURE.detailed(
                     _("Provided shared secret is invalid")
                 )
