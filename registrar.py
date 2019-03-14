@@ -270,8 +270,9 @@ class LibraryRegistrar(object):
         problem = auth_document.update_library(library)
         if problem:
             self.log.error(
-                "Registration of %s failed: problem during registration: %r",
-                auth_url, problem
+                "Registration of %s failed: problem during registration: %s/%s/%s/%s",
+                auth_url, problem.uri, problem.title, problem.detail,
+                problem.debug_message
             )
             return problem
 
