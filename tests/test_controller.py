@@ -309,10 +309,9 @@ class TestLibraryRegistryController(ControllerTest):
         libraries = response.get("libraries")
 
         # There are currently four libraries,
-        # These libraries have been added from the previous test.
         eq_(len(libraries), 4)
 
-        with self.app.test_request_context("/libraries_opds"):
+        with self.app.test_request_context("/libraries"):
             response = self.controller.libraries_opds()
     
             eq_("200 OK", response.status)
