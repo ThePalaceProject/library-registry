@@ -95,8 +95,6 @@ class DatabaseTest(object):
         self.longitude_counter = -90
 
     def teardown(self):
-        self._db.rollback()
-
         secret_keys = self._db.query(ConfigurationSetting).filter(
             ConfigurationSetting.key==Configuration.SECRET_KEY
         )

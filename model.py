@@ -1516,9 +1516,14 @@ class Hyperlink(Base):
             to_address = to_address[7:]
         deadline = None
 
-        validation, is_new = get_one_or_create(
-            _db, Validation, resource=resource
-        )
+        # Make sure there's a Validation object associated with this
+        # Resource.
+        if resource.validation is None:
+            resource.validation, is_new = create(_db, Validation)
+        else:
+            is_new = False
+        validation = resource.validation
+
         if is_new or not validation.active:
             # Either this Validation was just created or it expired
             # before being verified. Restart the validation process
