@@ -1499,7 +1499,6 @@ class Hyperlink(Base):
             # We can't actually send any emails.
             return
         _db = Session.object_session(self)
-        _db.flush()
 
         # These shouldn't happen, but just to be safe, do nothing if
         # this Hyperlink is disconnected from the other data model
@@ -1517,16 +1516,14 @@ class Hyperlink(Base):
             to_address = to_address[7:]
         deadline = None
 
-        logging.info("About to look up validation for resource %s", resource.href)
-
-        validation = resource.validation
-        if validation:
-            is_new = False
+        # Make sure there's a Validation object associated with this
+        # Resource.
+        if resource.validation is None:
+            resource.validation, is_new = create(_db, Validation)
         else:
-            validation, is_new = create(_db, Validation)
-            resource.validation = validation
+            is_new = False
+        validation = resource.validation
 
-        logging.info("Found %r", validation)
         if is_new or not validation.active:
             # Either this Validation was just created or it expired
             # before being verified. Restart the validation process
