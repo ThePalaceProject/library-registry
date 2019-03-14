@@ -409,17 +409,6 @@ class LibraryRegistryController(BaseController):
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
 
-        # The registration process may have queued up a number of
-        # Hyperlinks that needed to be created (taken from the
-        # library's authentication document), but we also need to
-        # create a hyperlink for the integration contact provided with
-        # the registration request itself.
-        hyperlinks_to_create = []
-        if integration_contact_email:
-            hyperlinks_to_create.append(
-                (Hyperlink.INTEGRATION_CONTACT_REL, [integration_contact_email])
-            )
-
         registrar = LibraryRegistrar(self._db, do_get=do_get)
         result = registrar.register(
             auth_url, shared_secret, library_stage
@@ -427,8 +416,17 @@ class LibraryRegistryController(BaseController):
         if isinstance(result, ProblemDetail):
             return result
         (library, library_is_new, from_shared_secret, auth_document,
-         discovered_hyperlinks) = result
-        hyperlinks_to_create.extend(discovered_hyperlinks)
+         hyperlinks_to_create) = result
+
+        # The registration process may have queued up a number of
+        # Hyperlinks that needed to be created (taken from the
+        # library's authentication document), but we also need to
+        # create a hyperlink for the integration contact provided with
+        # the registration request itself.
+        if integration_contact_email:
+            hyperlinks_to_create.append(
+                (Hyperlink.INTEGRATION_CONTACT_REL, [integration_contact_email])
+            )
 
         reset_shared_secret = False
         if from_shared_secret:
