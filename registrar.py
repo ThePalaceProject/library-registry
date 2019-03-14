@@ -45,18 +45,7 @@ class LibraryRegistrar(object):
 
         :return: A ProblemDetail if there's a problem. Otherwise, None.
         """
-
-        # We don't provide the shared secret to avoid complications
-        # when someone else now controls the
-        # library.authentication_url. In general, we trust what the
-        # authentication document says, but we won't believe the
-        # circulation manager moved unless the registration process
-        # was manually initiated by a library administrator who knows
-        # the secret.
-        result = self.register(
-            auth_url = library.authentication_url, shared_secret=None,
-            library_stage=library.library_stage,
-        )
+        result = self.register(library, library.library_stage)
         if isinstance(result, ProblemDetail):
             return result
 
@@ -70,34 +59,24 @@ class LibraryRegistrar(object):
         # by register() -- only the controller uses that stuff.
         return None
 
-    def register(self, auth_url, shared_secret, library_stage):
-        """Register the given authentication document as a library in this
-        registry, if possible.
+    def register(self, library, library_stage):
+        """Register the given Library with this registry, if possible.
 
-        :param auth_url: The URL to the library's authentication document.
-
-        :param shared_secret: A preexisting shared secret between the
-            library and the registry. This is optional, but providing it will
-            allow you to do things you wouldn't normally be able to
-            do, such as change the library's circulation manager URL.
-
+        :param library: A Library to register or re-register.
         :param library_stage: The library administrator's proposed value for
             Library.library_stage.
 
-        :return: A ProblemDetail if there's a problem. Otherwise, a 5-tuple
-            (library, is_new, from_shared_secret, auth_document, new_hyperlinks,
-             elevated_permissions).
+        :return: A ProblemDetail if there's a problem. Otherwise, a 2-tuple
+            (auth_document, new_hyperlinks).
 
-        `from_shared_secret` is True if `shared_secret` was
-             and actually useful when looking up `library`.
         `auth_document` is an AuthenticationDocument corresponding to
             the library's authentication document, as found at auth_url.
         `new_hyperlinks` is a list of Hyperlinks
              that ought to be created for registration to be complete.
-
         """
         hyperlinks_to_create = []
 
+        auth_url = library.authentication_url
         auth_response = self._make_request(
             auth_url,
             auth_url,
@@ -186,46 +165,7 @@ class LibraryRegistrar(object):
             )
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
-        library = None
-        elevated_permissions = False
         auth_url = auth_response.url
-        if shared_secret:
-            # Look up a library by the provided shared secret. This
-            # will let us handle the case where the library has
-            # changed URLs (auth_url does not match
-            # library.authentication_url) but the shared secret is the
-            # same.
-            library = get_one(
-                self._db, Library,
-                shared_secret=shared_secret
-            )
-            # This gives the requestor an elevated level of permissions.
-            elevated_permissions = True
-            is_new = False
-
-        if not library:
-            # Either this is a library at a known authentication URL
-            # or it's a brand new library.
-            library, is_new = get_one_or_create(
-                self._db, Library,
-                authentication_url=auth_url
-            )
-            if opds_url:
-                library.opds_url = opds_url
-
-        if elevated_permissions and (
-            library.authentication_url != auth_url
-            or library.opds_url != opds_url
-        ):
-            # The library's authentication URL and/or OPDS URL has
-            # changed, e.g. moved from HTTP to HTTPS. The registration
-            # includes a valid shared secret, so it's okay to modify
-            # the corresponding database fields.
-            result = self._update_library_authentication_url(
-                library, auth_url, opds_url, shared_secret
-            )
-            if isinstance(result, ProblemDetail):
-                return result
 
         try:
             library.library_stage = library_stage
@@ -276,9 +216,7 @@ class LibraryRegistrar(object):
             )
             return problem
 
-        return (library, is_new, elevated_permissions, auth_document,
-                hyperlinks_to_create)
-
+        return auth_document, hyperlinks_to_create
 
     def _make_request(self, registration_url, url, on_404, on_timeout, on_exception, allow_401=False):
         allowed_codes = ["2xx", "3xx", 404]
@@ -414,28 +352,3 @@ class LibraryRegistrar(object):
             problem.title = problem_title
             return problem
         return uri
-
-    @classmethod
-    def _update_library_authentication_url(
-            cls, library, new_authentication_url,
-            new_opds_url, provided_shared_secret,
-    ):
-        """Change a library's authentication URL, assuming the provided shared
-        secret gives the requester that permission.
-
-        :param library: A Library
-        :param new_authentication_url: A proposed new value for
-            Library.authentication_url
-        :param new_opds_url: A proposed new value for Library.opds_url.
-        :param provided_shared_secret: Allegedly, the library's
-            shared secret.
-        """
-        if library.shared_secret != provided_shared_secret:
-            return AUTHENTICATION_FAILURE.detailed(
-                _("Provided shared secret is invalid")
-            )
-        if new_authentication_url:
-            library.authentication_url = new_authentication_url
-        if new_opds_url:
-            library.opds_url = new_opds_url
-        return None

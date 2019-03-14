@@ -409,14 +409,70 @@ class LibraryRegistryController(BaseController):
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
 
+        library = None
+        elevated_permissions = False
+        if shared_secret:
+            # Look up a library by the provided shared secret. This
+            # will let us handle the case where the library has
+            # changed URLs (auth_url does not match
+            # library.authentication_url) but the shared secret is the
+            # same.
+            library = get_one(self._db, Library, shared_secret=shared_secret)
+            if not library:
+                return AUTHENTICATION_FAILURE.detailed(
+                    _("Provided shared secret is invalid")
+                )
+
+            # This gives the requestor an elevated level of permissions.
+            elevated_permissions = True
+            library_is_new = False
+
+            if library.authentication_url != auth_url:
+                # The library's authentication URL has changed,
+                # e.g. moved from HTTP to HTTPS. The registration
+                # includes a valid shared secret, so it's okay to
+                # modify the corresponding database field.
+                #
+                # We want to do this before the registration, so that
+                # we request the new URL instead of the old one.
+                library.authentication_url = auth_url
+
+        # We're going to create a Library object inside a subtransaction,
+        # and back out of the transaction if registration fails.
+        __transaction = self._db.begin_nested()
+
+        if not library:
+            # Either this is a library at a known authentication URL
+            # or it's a brand new library.
+            library, library_is_new = get_one_or_create(
+                self._db, Library,
+                authentication_url=auth_url
+            )
+
         registrar = LibraryRegistrar(self._db, do_get=do_get)
-        result = registrar.register(
-            auth_url, shared_secret, library_stage
-        )
+        result = registrar.register(library, library_stage)
         if isinstance(result, ProblemDetail):
+            __transaction.rollback()
             return result
-        (library, library_is_new, from_shared_secret, auth_document,
-         hyperlinks_to_create) = result
+
+        # At this point registration (or re-registration) has
+        # succeeded, so we won't be rolling back the subtransaction
+        # that created the Library.
+        __transaction.commit()
+        auth_document, hyperlinks_to_create = result
+
+        # Now that we've completed the registration process, we
+        # know the opds_url -- it's the 'start' link found in
+        # the auth_document.
+        #
+        # Registration will fail if this link is missing or the
+        # URL doesn't work, so we can assume this is valid.
+        opds_url = auth_document.root['href']
+
+        if library_is_new:
+            # The library was just created, so it had no opds_url.
+            # Set it now.
+            library.opds_url = opds_url
 
         # The registration process may have queued up a number of
         # Hyperlinks that needed to be created (taken from the
@@ -429,12 +485,19 @@ class LibraryRegistryController(BaseController):
             )
 
         reset_shared_secret = False
-        if from_shared_secret:
-            # If you provide the shared secret you can also ask that
-            # it be reset.
+        if elevated_permissions:
+            # If you have elevated permissions you may ask for the
+            # shared secret to be reset.
             reset_shared_secret = flask.request.form.get(
                 "reset_shared_secret", False
             )
+
+            if library.opds_url != opds_url:
+                # The library's OPDS URL has changed, e.g. moved from
+                # HTTP to HTTPS. Since we have elevated permissions,
+                # it's okay to modify the corresponding database
+                # field.
+                library.opds_url = opds_url
 
         for rel, candidates in hyperlinks_to_create:
             hyperlink, is_modified = library.set_hyperlink(rel, *candidates)

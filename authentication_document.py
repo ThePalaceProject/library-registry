@@ -421,7 +421,6 @@ class AuthenticationDocument(object):
                 msgs.append(str(_("The following service area was unknown: %(service_area)s.", service_area=json.dumps(unknown))))
             if ambiguous:
                 msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
-            _db.rollback()
             return INVALID_INTEGRATION_DOCUMENT.detailed(" ".join(msgs))
 
         for place in places:

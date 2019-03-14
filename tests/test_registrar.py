@@ -25,8 +25,8 @@ class TestRegistrar(DatabaseTest):
         class Mock(LibraryRegistrar):
             RETURN_VALUE = NO_AUTH_URL
 
-            def register(self, auth_url, shared_secret, library_stage):
-                self.called_with = (auth_url, shared_secret, library_stage)
+            def register(self, library, library_stage):
+                self.called_with = (library, library_stage)
                 return self.RETURN_VALUE
 
         library = self._library()
@@ -35,7 +35,7 @@ class TestRegistrar(DatabaseTest):
         # Test the case where register() returns a problem detail.
         result = registrar.reregister(library)
         eq_(
-            (library.authentication_url, None, library.library_stage),
+            (library, library.library_stage),
             registrar.called_with
         )
         eq_(Mock.RETURN_VALUE, result)
@@ -247,30 +247,3 @@ class TestRegistrar(DatabaseTest):
         # Multiple links that work.
         result = m("rel2", links, "a title")
         eq_(["mailto:me@library.org", "mailto:me2@library.org"], result)
-
-    def test__update_library_authentication_url(self):
-        """Test the code that modifies Library.authentication_url
-        and Library.opds_url if the right shared secret was provided.
-        """
-        library = self._library()
-        secret = "it's a secret"
-        library.shared_secret = secret
-        library.authentication_url = "old auth"
-        library.opds_url = "old opds"
-
-        m = LibraryRegistrar._update_library_authentication_url
-        problem = m(library, "new auth", "new opds", "wrong secret")
-        eq_(AUTHENTICATION_FAILURE.uri, problem.uri)
-        eq_("Provided shared secret is invalid", problem.detail)
-        eq_("old auth", library.authentication_url)
-
-        result = m(library, "new auth", "new opds", secret)
-        eq_(result, None)
-        eq_("new auth", library.authentication_url)
-        eq_("new opds", library.opds_url)
-
-        # If a value is missing, the field isn't changed.
-        result = m(library, None, None, secret)
-        eq_(result, None)
-        eq_("new auth", library.authentication_url)
-        eq_("new opds", library.opds_url)
