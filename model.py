@@ -937,6 +937,8 @@ class Library(Base):
         hyperlink, is_modified = get_one_or_create(
             _db, Hyperlink, library=self, rel=rel,
         )
+        if is_modified:
+            hyperlink.validation_id = None
 
         if hyperlink.href not in hrefs:
             hyperlink.href = default_href
@@ -1562,7 +1564,7 @@ class Resource(Base):
     # Every Resource may have at most one Validation. There's no
     # need to validate it separately for every relationship.
     validation_id = Column(Integer, ForeignKey('validations.id'),
-                           index=True)
+                           index=True, nullable=True)
 
     def restart_validation(self):
         """Start or restart the validation process for this resource."""
