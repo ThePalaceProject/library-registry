@@ -1125,7 +1125,7 @@ class TestLibraryRegistryController(ControllerTest):
         # trying to contact the library's 'help' address included in the
         # library's authentication document.
         eq_(INTEGRATION_ERROR.uri, response.uri)
-        eq_("SMTP error while sending email to mailto:help@library.org",
+        eq_("SMTP error while sending email to mailto:me@library.org",
             response.detail)
 
     def test_register_success(self):
