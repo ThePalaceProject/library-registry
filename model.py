@@ -1518,9 +1518,14 @@ class Hyperlink(Base):
         deadline = None
 
         logging.info("About to look up validation for resource %s", resource.href)
-        validation, is_new = get_one_or_create(
-            _db, Validation, resource_id=resource.id
-        )
+
+        validation = resource.validation
+        if validation:
+            is_new = False
+        else:
+            validation, is_new = create(_db, Validation)
+            resource.validation = validation
+
         logging.info("Found %r", validation)
         if is_new or not validation.active:
             # Either this Validation was just created or it expired
