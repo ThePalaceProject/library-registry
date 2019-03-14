@@ -22,6 +22,7 @@ from scripts import (
     ConfigureIntegrationScript,
     ConfigureSiteScript,
     ConfigureVendorIDScript,
+    LibraryScript,
     LoadPlacesScript,
     SearchLibraryScript,
     SearchPlacesScript,
@@ -32,6 +33,50 @@ from testing import MockPlace
 from . import (
     DatabaseTest
 )
+
+
+class TestLibraryScript(DatabaseTest):
+
+    def test_libraries(self):
+
+        library = self._library(name="The Library")
+        ignored = self._library(name="Ignored Library")
+
+        class Mock(LibraryScript):
+
+            all_libraries_return_value = object()
+
+            @property
+            def all_libraries(self):
+                # In this context, 'all libraries' means the first
+                # library but not the second.
+                return self.all_libraries_return_value
+
+
+        script = Mock(self._db)
+
+        # Any library can be processed if it's identified by name.
+        for l in library, ignored:
+            eq_([l], script.libraries(l.name))
+        assert_raises_regexp(
+            ValueError, "No library with name 'Nonexistent Library'", 
+            script.libraries, "Nonexistent Library"
+        )
+
+        # If no library is identified by name, the output of
+        # all_libraries is used as the list of libraries.
+        eq_(script.all_libraries_return_value, script.libraries())
+
+    def test_all_libraries(self):
+
+        production = self._library()
+        testing = self._library(library_stage=Library.TESTING_STAGE)
+        cancelled = self._library(library_stage=Library.CANCELLED_STAGE)
+        
+        # all_libraries omits the cancelled library.
+        script = LibraryScript(self._db)
+        eq_(set([production, testing]), set(script.all_libraries))
+
 
 class TestLoadPlacesScript(DatabaseTest):
 

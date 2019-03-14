@@ -86,7 +86,7 @@ class Script(object):
 
 
 class LibraryScript(Script):
-    """A script that operates on one library or all non-cancelled libraries."""
+    """A script that operates on one library or all libraries."""
 
     # If this is True, the script will only ever operate on one library,
     # and which library to use is a required input. If this is False, the
@@ -111,12 +111,21 @@ class LibraryScript(Script):
         if library_name:
             library = get_one(self._db, Library, name=library_name)
             if not library:
-                raise Exception("No library with name %r" % library_name)
+                raise ValueError("No library with name %r" % library_name)
             return [library]
+        return self.all_libraries
+
+    @property
+    def all_libraries(self):
+        """Find an iterator over all libraries, whatever 
+        'all libraries' means in the context of this script.
+
+        By default, 'all libraries' means all libraries in the
+        production or testing stages.
+        """
         return self._db.query(Library).filter(
-            Library._library_stage!=Library.CANCELLED_STAGE).filter(
-                Library.registry_stage!=Library.CANCELLED_STAGE
-            )
+            Library._feed_restriction(production=False)
+        )
 
 
 class LoadPlacesScript(Script):
