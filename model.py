@@ -1499,6 +1499,7 @@ class Hyperlink(Base):
             # We can't actually send any emails.
             return
         _db = Session.object_session(self)
+        _db.flush()
 
         # These shouldn't happen, but just to be safe, do nothing if
         # this Hyperlink is disconnected from the other data model
@@ -1518,7 +1519,7 @@ class Hyperlink(Base):
 
         logging.info("About to look up validation for resource %s", resource.href)
         validation, is_new = get_one_or_create(
-            _db, Validation, resource=resource
+            _db, Validation, resource_id=resource.id
         )
         logging.info("Found %r", validation)
         if is_new or not validation.active:
