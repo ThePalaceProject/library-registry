@@ -437,8 +437,8 @@ class LibraryRegistryController(BaseController):
                 # we request the new URL instead of the old one.
                 library.authentication_url = auth_url
 
-        # We're going to create a Library object inside a subtransaction,
-        # and back out of the transaction if registration fails.
+        # Registration is a complex multi-step process. Start a subtransaction
+        # so we can back out of the whole thing if any part of it fails.
         __transaction = self._db.begin_nested()
 
         if not library:
