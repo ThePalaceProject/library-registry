@@ -335,7 +335,7 @@ class TestRegistrationRefreshScript(DatabaseTest):
 
     def test_run(self):
         # Verify that run() instantiates a LibraryRegistrar using .registrar,
-        # then calles its reregister() method on every library that it's
+        # then calls its reregister() method on every library that it's
         # been asked to handle.
         success_library = self._library(name="Success")
         failure_library = self._library(name="Failure")
