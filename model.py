@@ -9,6 +9,7 @@ import re
 import json
 import random
 import string
+import uszipcode
 import uuid
 import warnings
 from collections import Counter
@@ -1211,7 +1212,7 @@ class Place(Base):
         touches = func.ST_Touches(Place.geometry, self.geometry)
         return qu.filter(intersects).filter(touches==False)
 
-    def lookup_inside(self, name, using_overlap=False):
+    def lookup_inside(self, name, using_overlap=False, using_external_source=True):
         """Look up a named Place that is geographically 'inside' this Place.
 
         :param name: The name of a place, such as "Boston" or
@@ -1228,6 +1229,10 @@ class Place(Base):
         considered to be 'inside' the United States, but Montgomery is
         not -- the only place it's 'inside' is Alabama. Checking this way
         is much faster, so it's the default.
+
+        :param using_external_source: If this is True, then if no named
+        place can be found in the database, the uszipcodes library
+        will be used in an attempt to find some equivalent postal codes.
 
         :return: A Place object, or None if no match could be found.
 
@@ -1297,7 +1302,16 @@ class Place(Base):
 
         places = qu.all()
         if len(places) == 0:
-            return None
+            if using_external_source:
+                # We don't have any matching places in the database _now_,
+                # but there's a possibility we can find a representative
+                # postal code.
+                return self.lookup_one_through_external_source(name)
+            else:
+                # We're not allowed to use uszipcodes, probably
+                # because this method was called by
+                # lookup_through_external_source.
+                return None
         if len(places) > 1:
             raise MultipleResultsFound(
                 "More than one place called %s inside %s." % (
@@ -1305,6 +1319,44 @@ class Place(Base):
                 )
             )
         return places[0]
+
+    def lookup_one_through_external_source(self, name):
+        """Use an external source to find a Place that is a) inside `self`
+        and b) identifies the place human beings call `name`.
+
+        Currently the only way this might work is when using
+        uszipcodes to look up a city inside a state. In this case the result
+        will be a Place representing one of the city's postal codes.
+
+        :return: A Place, or None if the lookup fails.
+        """
+        if self.type != Place.STATE:
+            # uszipcodes keeps track of places in terms of their state.
+            return None
+
+        _db = Session.object_session(self)
+        search = uszipcode.SearchEngine(simple_zipcode=True)
+        state = self.abbreviated_name
+        uszipcode_matches = []
+        if name in search.state_to_city_mapper[state]:
+            # The given name is an exact match for one of the
+            # cities. Let's look up every ZIP code for that city.
+            uszipcode_matches = search.by_city_and_state(
+                name, state, returns=None
+            )
+
+        # Look up a Place object for each ZIP code and return the
+        # first one we actually know about.
+        #
+        # Set using_external_source to False to eliminate the
+        # possibility of wasted effort or (I don't think this can
+        # happen) infinite recursion.
+        for match in uszipcode_matches:
+            place = self.lookup_inside(
+                match.zipcode, using_external_source=False
+            )
+            if place:
+                return place
 
     def served_by(self):
         """Find all Libraries with a ServiceArea whose Place overlaps
