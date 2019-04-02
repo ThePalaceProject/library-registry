@@ -225,6 +225,7 @@ class TestPlace(DatabaseTest):
         manhattan_ks = self.manhattan_ks
         kansas = manhattan_ks.parent
         kings_county = self.crude_kings_county
+        zip_12601 = self.zip_12601
 
         # In most cases, we want to test that both versions of
         # lookup_inside() return the same result.
@@ -271,6 +272,13 @@ class TestPlace(DatabaseTest):
         lookup_both_ways(kings_county, "NY", None)
         lookup_both_ways(us, "NY, 10018", None)
         lookup_both_ways(zip_10018, "NY", None)
+
+        # There is a limited ability to look up places even when the
+        # name of the city is not in the database -- a representative
+        # postal code is returned. This goes through
+        # lookup_one_through_external_source, which is tested in more
+        # detail below.
+        lookup_both_ways(new_york, "Poughkeepsie", zip_12601)
 
         # Now test cases where using_overlap makes a difference.
         #
