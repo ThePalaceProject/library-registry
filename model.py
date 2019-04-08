@@ -1338,7 +1338,8 @@ class Place(Base):
         search = uszipcode.SearchEngine(simple_zipcode=True)
         state = self.abbreviated_name
         uszipcode_matches = []
-        if name in search.state_to_city_mapper[state]:
+        if (state in search.state_to_city_mapper
+            and name in search.state_to_city_mapper[state]):
             # The given name is an exact match for one of the
             # cities. Let's look up every ZIP code for that city.
             uszipcode_matches = search.by_city_and_state(

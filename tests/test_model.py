@@ -358,6 +358,11 @@ class TestPlace(DatabaseTest):
         # Similarly if we ask about a nonexistent place.
         eq_(None, m("ZXCVB"))
 
+        # Or if we try to use uszipcode on a place that's not in the US.
+        ontario = self._place('35', 'Ontario', Place.STATE,
+                              'ON', None, None)
+        eq_(None, ontario.lookup_one_through_external_source('Hamilton'))
+
         # Calling this method on a Place that's not a state doesn't
         # make sense (because uszipcode only knows about cities within
         # states), and the result is always None.
