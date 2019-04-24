@@ -130,6 +130,11 @@ def libraries():
 def library_details(uuid):
     return app.library_registry.registry_controller.library_details(uuid)
 
+@app.route('/admin/libraries/search_by_name', methods=["POST"])
+@returns_json_or_response_or_problem_detail
+def search_by_name():
+    return app.library_registry.registry_controller.search_by_name()
+
 @app.route('/admin/libraries/email', methods=["POST"])
 @returns_json_or_response_or_problem_detail
 def validate_email():
