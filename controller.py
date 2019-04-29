@@ -343,9 +343,10 @@ class LibraryRegistryController(BaseController):
 
     def search_by_name(self):
         name = flask.request.form.get("name")
-        search_result = Library.search_by_library_name(self._db, name, production=False).first()
-        if search_result:
-            return self.library_details(search_result.internal_urn.split("uuid:")[1], search_result)
+        search_results = Library.search(self._db, {}, name, production=False)
+        if search_results:
+            info = [self.library_details(lib.internal_urn.split("uuid:")[1], lib) for lib in search_results]
+            return dict(libraries=info)
         else:
             return LIBRARY_NOT_FOUND
 

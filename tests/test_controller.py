@@ -464,14 +464,16 @@ class TestLibraryRegistryController(ControllerTest):
     def test_search_by_name(self):
         library = self.nypl
 
-        # Searching for the name of a real library returns that library.
+        # Searching for the name of a real library returns a dict whose value is a list containing
+        # that library.
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("name", "NYPL"),
             ])
             response = self.controller.search_by_name()
 
-        self._is_library(library, response)
+        for response_library in response.get("libraries"):
+            self._is_library(library, response_library)
 
         # Searching for a name that cannot be found returns a problem detail.
         with self.app.test_request_context("/", method="POST"):
