@@ -297,7 +297,7 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(ct, libraries[0])
         self._is_library(ks, libraries[1])
         self._is_library(nypl, libraries[2])
-    
+
     def test_libraries_opds(self):
         library = self._library(
             name="Test Cancelled Library",
@@ -313,7 +313,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         with self.app.test_request_context("/libraries"):
             response = self.controller.libraries_opds()
-    
+
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
 
@@ -330,10 +330,10 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_("Kansas State Library", ks['metadata']['title'])
             eq_(self.kansas_state_library.internal_urn, ks['metadata']['id'])
-            
+
             eq_("NYPL", nypl['metadata']['title'])
             eq_(self.nypl.internal_urn, nypl['metadata']['id'])
-            
+
             [library_link, register_link, search_link, self_link] = sorted(
                 catalog['links'], key=lambda x: x['rel']
             )
@@ -460,6 +460,29 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(response.status_code, 400)
         eq_(response.detail, 'The contact URI for this library is missing or invalid')
         eq_(response.uri, 'http://librarysimplified.org/terms/problem/invalid-contact-uri')
+
+    def test_search_details(self):
+        library = self.nypl
+
+        # Searching for the name of a real library returns a dict whose value is a list containing
+        # that library.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("name", "NYPL"),
+            ])
+            response = self.controller.search_details()
+
+        for response_library in response.get("libraries"):
+            self._is_library(library, response_library)
+
+        # Searching for a name that cannot be found returns a problem detail.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("name", "other"),
+            ])
+            response = self.controller.search_details()
+
+        eq_(response, LIBRARY_NOT_FOUND)
 
     def _log_in(self):
         flask.request.form = MultiDict([
