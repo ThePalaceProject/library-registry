@@ -461,7 +461,7 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(response.detail, 'The contact URI for this library is missing or invalid')
         eq_(response.uri, 'http://librarysimplified.org/terms/problem/invalid-contact-uri')
 
-    def test_search_by_name(self):
+    def test_search_details(self):
         library = self.nypl
 
         # Searching for the name of a real library returns a dict whose value is a list containing
@@ -470,7 +470,7 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = MultiDict([
                 ("name", "NYPL"),
             ])
-            response = self.controller.search_by_name()
+            response = self.controller.search_details()
 
         for response_library in response.get("libraries"):
             self._is_library(library, response_library)
@@ -480,7 +480,7 @@ class TestLibraryRegistryController(ControllerTest):
             flask.request.form = MultiDict([
                 ("name", "other"),
             ])
-            response = self.controller.search_by_name()
+            response = self.controller.search_details()
 
         eq_(response, LIBRARY_NOT_FOUND)
 

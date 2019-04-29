@@ -341,7 +341,7 @@ class LibraryRegistryController(BaseController):
         session["username"] = "";
         return redirect(url_for('admin_view'))
 
-    def search_by_name(self):
+    def search_details(self):
         name = flask.request.form.get("name")
         search_results = Library.search(self._db, {}, name, production=False)
         if search_results:
