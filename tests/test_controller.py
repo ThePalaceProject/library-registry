@@ -341,10 +341,10 @@ class TestLibraryRegistryController(ControllerTest):
             library_stage=Library.CANCELLED_STAGE,
             registry_stage=Library.TESTING_STAGE
         )
-        response = self.controller.libraries()
+        response = self.controller.libraries_qa()
         libraries = response.get("libraries")
 
-        # There are currently four libraries,
+        # There are currently four libraries
         eq_(len(libraries), 4)
 
         with self.app.test_request_context("/libraries"):
@@ -356,7 +356,7 @@ class TestLibraryRegistryController(ControllerTest):
             catalog = json.loads(response.data)
 
             # In the OPDS response, instead of getting four libraries like
-            # libraries() returns, we should only get three back because
+            # libraries_qa() returns, we should only get three back because
             # the last library has a stage that is cancelled.
             eq_(len(catalog['catalogs']), 3)
 
