@@ -228,23 +228,20 @@ class LibraryRegistryController(BaseController):
             )
             return Response(body, 200, headers)
 
-    def libraries(self):
-        # Return a specific set of information about all libraries in production; this generates the library list in the admin interface,
-        libraries = []
-        in_production = self._db.query(Library).filter(Library.registry_stage=="production").order_by(Library.name)
-        for library in in_production:
-            uuid = library.internal_urn.split("uuid:")[1]
-            libraries += [self.library_details(uuid, library)]
-        return dict(libraries=libraries)
+    def libraries(self, live=True):
+        # Return a specific set of information about all libraries in production; this generates the library list in the admin interface.
+        # If :param live is set to False, libraries in testing will also be shown.
+        result = []
+        libraries = self._db.query(Library).order_by(Library.name)
 
-    def libraries_qa(self):
-        # Return a specific set of information about all libraries; this generates the library list in the admin interface,
-        libraries = []
-        all = self._db.query(Library).order_by(Library.name)
-        for library in all:
+        if live:
+            libraries = libraries.filter(Library.registry_stage=="production")
+
+        for library in libraries:
             uuid = library.internal_urn.split("uuid:")[1]
-            libraries += [self.library_details(uuid, library)]
-        return dict(libraries=libraries)
+            result += [self.library_details(uuid, library)]
+
+        return dict(libraries=result)
 
     def libraries_opds(self):
         """Return all the libraries in OPDS format"""

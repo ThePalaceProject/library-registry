@@ -318,7 +318,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         )
 
-        response = self.controller.libraries_qa()
+        response = self.controller.libraries(False)
         libraries = response.get("libraries")
 
         eq_(len(libraries), 4)
@@ -341,7 +341,7 @@ class TestLibraryRegistryController(ControllerTest):
             library_stage=Library.CANCELLED_STAGE,
             registry_stage=Library.TESTING_STAGE
         )
-        response = self.controller.libraries_qa()
+        response = self.controller.libraries(False)
         libraries = response.get("libraries")
 
         # There are currently four libraries

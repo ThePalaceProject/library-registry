@@ -128,7 +128,7 @@ def libraries():
 @app.route('/admin/libraries/qa')
 @returns_json_or_response_or_problem_detail
 def libraries_qa():
-    return app.library_registry.registry_controller.libraries_qa()
+    return app.library_registry.registry_controller.libraries(live=False)
 
 @app.route('/admin/libraries/<uuid>')
 @returns_json_or_response_or_problem_detail
