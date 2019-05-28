@@ -235,7 +235,7 @@ class LibraryRegistryController(BaseController):
         libraries = self._db.query(Library).order_by(Library.name)
 
         if live:
-            libraries = libraries.filter(Library.registry_stage=="production")
+            libraries = libraries.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
 
         for library in libraries:
             uuid = library.internal_urn.split("uuid:")[1]
