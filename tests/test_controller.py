@@ -213,6 +213,7 @@ class TestLibraryRegistryController(ControllerTest):
         manhattan_ks = self.manhattan_ks
         us = self.crude_us
 
+
         self.vendor_id_setup()
 
     def setup(self):
@@ -282,6 +283,12 @@ class TestLibraryRegistryController(ControllerTest):
         ct = self.connecticut_state_library
         ks = self.kansas_state_library
         nypl = self.nypl
+        in_testing = self._library(
+            name="Testing",
+            short_name="test_lib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE
+        )
 
         response = self.controller.libraries()
         libraries = response.get("libraries")
@@ -298,6 +305,35 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(ks, libraries[1])
         self._is_library(nypl, libraries[2])
 
+    def test_libraries_qa(self):
+        # Test that the controller returns a specific set of information for each library.
+        ct = self.connecticut_state_library
+        ks = self.kansas_state_library
+        nypl = self.nypl
+        in_testing = self._library(
+            name="Testing",
+            short_name="test_lib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+
+        )
+
+        response = self.controller.libraries(False)
+        libraries = response.get("libraries")
+
+        eq_(len(libraries), 4)
+        for library in libraries:
+            self._check_keys(library)
+
+        expected_names = [expected.name for expected in [ct, ks, nypl, in_testing]]
+        actual_names = [library.get("basic_info").get("name") for library in libraries]
+        eq_(set(expected_names), set(actual_names))
+
+        self._is_library(ct, libraries[0])
+        self._is_library(ks, libraries[1])
+        self._is_library(nypl, libraries[2])
+        self._is_library(in_testing, libraries[3], False)
+
     def test_libraries_opds(self):
         library = self._library(
             name="Test Cancelled Library",
@@ -305,10 +341,10 @@ class TestLibraryRegistryController(ControllerTest):
             library_stage=Library.CANCELLED_STAGE,
             registry_stage=Library.TESTING_STAGE
         )
-        response = self.controller.libraries()
+        response = self.controller.libraries(False)
         libraries = response.get("libraries")
 
-        # There are currently four libraries,
+        # There are currently four libraries
         eq_(len(libraries), 4)
 
         with self.app.test_request_context("/libraries"):
@@ -320,7 +356,7 @@ class TestLibraryRegistryController(ControllerTest):
             catalog = json.loads(response.data)
 
             # In the OPDS response, instead of getting four libraries like
-            # libraries() returns, we should only get three back because
+            # libraries_qa() returns, we should only get three back because
             # the last library has a stage that is cancelled.
             eq_(len(catalog['catalogs']), 3)
 
