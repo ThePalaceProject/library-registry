@@ -305,7 +305,7 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(ks, libraries[1])
         self._is_library(nypl, libraries[2])
 
-    def test_libraries_qa(self):
+    def test_libraries_qa_admin(self):
         # Test that the controller returns a specific set of information for each library.
         ct = self.connecticut_state_library
         ks = self.kansas_state_library
@@ -334,7 +334,7 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(nypl, libraries[2])
         self._is_library(in_testing, libraries[3], False)
 
-    def test_libraries_opds(self):
+    def test_libraries_opds_qa(self):
         library = self._library(
             name="Test Cancelled Library",
             short_name="test_cancelled_lib",
@@ -346,6 +346,52 @@ class TestLibraryRegistryController(ControllerTest):
 
         # There are currently four libraries
         eq_(len(libraries), 4)
+
+        with self.app.test_request_context("/libraries"):
+            response = self.controller.libraries_opds(False)
+
+            eq_("200 OK", response.status)
+            eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
+
+            catalog = json.loads(response.data)
+
+            eq_(len(catalog['catalogs']), 4)
+
+            [ct, ks, nypl, cancelled_library] = catalog['catalogs']
+            eq_("Connecticut State Library", ct['metadata']['title'])
+            eq_(self.connecticut_state_library.internal_urn, ct['metadata']['id'])
+
+            eq_("Kansas State Library", ks['metadata']['title'])
+            eq_(self.kansas_state_library.internal_urn, ks['metadata']['id'])
+
+            eq_("NYPL", nypl['metadata']['title'])
+            eq_(self.nypl.internal_urn, nypl['metadata']['id'])
+
+            eq_("Test Cancelled Library", cancelled_library['metadata']['title'])
+            eq_(library.internal_urn, cancelled_library['metadata']['id'])
+
+
+            [library_link, register_link, search_link, self_link] = sorted(
+                catalog['links'], key=lambda x: x['rel']
+            )
+            url_for = self.app.library_registry.url_for
+
+            eq_(url_for("libraries_opds"), self_link['href'])
+            eq_("self", self_link['rel'])
+            eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
+
+    def test_libraries_opds(self):
+        library = self._library(
+            name="Test Cancelled Library",
+            short_name="test_cancelled_lib",
+            library_stage=Library.CANCELLED_STAGE,
+            registry_stage=Library.TESTING_STAGE
+        )
+        response = self.controller.libraries()
+        libraries = response.get("libraries")
+
+        # There are currently four libraries, but only the three in production are shown.
+        eq_(len(libraries), 3)
 
         with self.app.test_request_context("/libraries"):
             response = self.controller.libraries_opds()
