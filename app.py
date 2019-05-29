@@ -110,6 +110,11 @@ def confirm_resource(resource_id, secret):
 def libraries_opds():
     return app.library_registry.registry_controller.libraries_opds()
 
+@app.route('/libraries/qa')
+@returns_problem_detail
+def libraries_qa():
+    return app.library_registry.registry_controller.libraries_opds(live=False)
+
 @app.route('/admin/log_in', methods=["POST"])
 @returns_problem_detail
 def log_in():
@@ -127,7 +132,7 @@ def libraries():
 
 @app.route('/admin/libraries/qa')
 @returns_json_or_response_or_problem_detail
-def libraries_qa():
+def libraries_qa_admin():
     return app.library_registry.registry_controller.libraries(live=False)
 
 @app.route('/admin/libraries/<uuid>')
