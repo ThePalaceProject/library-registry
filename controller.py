@@ -243,18 +243,19 @@ class LibraryRegistryController(BaseController):
 
         return dict(libraries=result)
 
-    def libraries_opds(self):
+    def libraries_opds(self, live=True):
         """Return all the libraries in OPDS format"""
 
-        qu = self._db.query(Library)
+        libraries = self._db.query(Library).order_by(Library.name)
         # We want to restrict libraries that are either in production
         # or in the testing stage but not cancelled.
-        all_libraries = qu.filter(Library._feed_restriction(production=False)).order_by(Library.name)
+        if live:
+            libraries = libraries.filter(Library._feed_restriction(production=True))
 
         url = self.app.url_for("libraries_opds")
         catalog = OPDSCatalog(
-            self._db, 'Libraries', url, all_libraries,
-            annotator=self.annotator, live=True
+            self._db, 'Libraries', url, libraries,
+            annotator=self.annotator, live=live
         )
         return catalog_response(catalog)
 
