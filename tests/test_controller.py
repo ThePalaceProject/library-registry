@@ -259,13 +259,18 @@ class TestLibraryRegistryController(ControllerTest):
                 eq_(flattened.get("validated"), "Not validated")
             elif k == "online_registration":
                 eq_(flattened.get("online_registration"), str(expected.online_registration))
+            elif k in ["focus", "service"]:
+                area_type_names = dict(focus=ServiceArea.FOCUS, service=ServiceArea.ELIGIBILITY)
+                actual_areas = flattened.get(k)
+                expected_areas = ["%s (%s)" %(x.place.external_name, x.place.parent.abbreviated_name) for x in expected.service_areas if x.type == area_type_names[k]]
+                eq_(actual_areas, expected_areas)
             else:
                 eq_(flattened.get(k), getattr(expected, k))
 
     def _check_keys(self, library):
         # Helper method to check that the controller is sending the right pieces of information about a library.
 
-        expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages']
+        expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages', 'areas']
         eq_(set(expected_categories), set(library.keys()))
 
         expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration']
@@ -273,6 +278,9 @@ class TestLibraryRegistryController(ControllerTest):
 
         expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'validated', 'opds_url']
         eq_(set(expected_url_contact_keys), set(library.get("urls_and_contact")))
+
+        expected_area_keys = ['focus', 'service']
+        eq_(set(expected_area_keys), set(library.get("areas")))
 
         expected_stage_keys = ['library_stage', 'registry_stage']
         eq_(set(expected_stage_keys), set(library.get("stages").keys()))
@@ -315,7 +323,6 @@ class TestLibraryRegistryController(ControllerTest):
             short_name="test_lib",
             library_stage=Library.TESTING_STAGE,
             registry_stage=Library.TESTING_STAGE,
-
         )
 
         response = self.controller.libraries(False)
