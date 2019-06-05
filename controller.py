@@ -288,11 +288,23 @@ class LibraryRegistryController(BaseController):
             opds_url=library.opds_url,
             web_url=library.web_url,
         )
+        areas = self._areas(library.service_areas)
         stages = dict(
             library_stage=library._library_stage,
             registry_stage=library.registry_stage,
         )
-        return dict(uuid=uuid, basic_info=basic_info, urls_and_contact=urls_and_contact, stages=stages)
+        return dict(uuid=uuid, basic_info=basic_info, urls_and_contact=urls_and_contact, areas=areas, stages=stages)
+
+    def _areas(self, areas):
+        result = {}
+        for (a, b) in [(ServiceArea.FOCUS, "focus"), (ServiceArea.ELIGIBILITY, "service")]:
+            filtered = filter(lambda place: (place.type == a), areas)
+            result[b] = [self._format_place_name(item.place) for item in filtered]
+        return result
+
+    def _format_place_name(self, place):
+        parent_name = (place.parent.abbreviated_name or place.parent.external_name) if place.parent else "unknown"
+        return "%s (%s)" %(place.external_name, parent_name)
 
     def _contact_email(self, hyperlink):
         if hyperlink and hyperlink.resource and hyperlink.resource.href:
