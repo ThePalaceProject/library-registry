@@ -1,5 +1,5 @@
 addons:
-  postgresql: "9.3"
+  postgresql: "9.6"
 
 services:
   - postgresql
@@ -16,7 +16,7 @@ git:
 
 before_install:
   - pip install "setuptools>=18.5"
-  - sudo apt-get install -y postgresql-9.3-postgis-2.3
+  - sudo apt-get install -y postgresql-9.6-postgis-2.3
   - sleep 10
 
 install:
