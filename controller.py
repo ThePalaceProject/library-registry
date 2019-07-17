@@ -272,7 +272,7 @@ class LibraryRegistryController(BaseController):
         hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
         contact_email = self._contact_email(hyperlink)
         validated_at = self._validated_at(hyperlink)
-
+        pls_id = ConfigurationSetting.for_library("pls_id", library)
         basic_info = dict(
             name=library.name,
             short_name=library.short_name,
@@ -280,6 +280,7 @@ class LibraryRegistryController(BaseController):
             timestamp=library.timestamp,
             internal_urn=library.internal_urn,
             online_registration=str(library.online_registration),
+            pls_id=pls_id.value
         )
         urls_and_contact = dict(
             contact_email=contact_email,
@@ -345,6 +346,15 @@ class LibraryRegistryController(BaseController):
 
         library._library_stage = library_stage
         library.registry_stage = registry_stage
+        return Response(unicode(library.internal_urn), 200)
+
+    def add_or_edit_pls_id(self):
+        uuid = flask.request.form.get("uuid")
+        library = self.library_for_request(uuid)
+        if isinstance(library, ProblemDetail):
+            return library
+        pls_id = flask.request.form.get("pls_id")
+        ConfigurationSetting.for_library("pls_id", library).value = pls_id
         return Response(unicode(library.internal_urn), 200)
 
     def log_in(self):

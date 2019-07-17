@@ -264,6 +264,9 @@ class TestLibraryRegistryController(ControllerTest):
                 actual_areas = flattened.get(k)
                 expected_areas = ["%s (%s)" %(x.place.external_name, x.place.parent.abbreviated_name) for x in expected.service_areas if x.type == area_type_names[k]]
                 eq_(actual_areas, expected_areas)
+            elif k == "pls_id":
+                expected_pls_id = ConfigurationSetting.for_library("pls_id", expected).value
+                eq_(flattened.get(k), expected_pls_id)
             else:
                 eq_(flattened.get(k), getattr(expected, k))
 
@@ -273,7 +276,7 @@ class TestLibraryRegistryController(ControllerTest):
         expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages', 'areas']
         eq_(set(expected_categories), set(library.keys()))
 
-        expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration']
+        expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration', 'pls_id']
         eq_(set(expected_info_keys), set(library.get("basic_info").keys()))
 
         expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'validated', 'opds_url']
@@ -436,6 +439,7 @@ class TestLibraryRegistryController(ControllerTest):
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.
         library = self.nypl
+        pls_id = ConfigurationSetting.for_library("pls_id", library)
 
         def check(has_email=True):
             uuid = library.internal_urn.split("uuid:")[1]
@@ -549,6 +553,35 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(response.status_code, 400)
         eq_(response.detail, 'The contact URI for this library is missing or invalid')
         eq_(response.uri, 'http://librarysimplified.org/terms/problem/invalid-contact-uri')
+
+    def test_add_or_edit_pls_id(self):
+        # Test that the user can input a new PLS ID
+        library = self.nypl
+        ConfigurationSetting.for_library("pls_id", library)
+        eq_(ConfigurationSetting.for_library("pls_id", library).value, None)
+        uuid = library.internal_urn.split("uuid:")[1]
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("pls_id", "12345")
+            ])
+            response = self.controller.add_or_edit_pls_id()
+        eq_(response._status_code, 200)
+        eq_(response.response[0], library.internal_urn)
+
+        library_with_pls_id = get_one(self._db, Library, short_name=library.short_name)
+        eq_(ConfigurationSetting.for_library("pls_id", library_with_pls_id).value, "12345")
+
+        # Test that the user can edit an existing PLS ID
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", uuid),
+                ("pls_id", "abcde")
+            ])
+            response = self.controller.add_or_edit_pls_id()
+
+        updated = get_one(self._db, Library, short_name=library.short_name)
+        eq_(ConfigurationSetting.for_library("pls_id", updated).value, "abcde")
 
     def test_search_details(self):
         library = self.nypl

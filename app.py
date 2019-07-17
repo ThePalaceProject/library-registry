@@ -155,6 +155,11 @@ def validate_email():
 def edit_registration():
     return app.library_registry.registry_controller.edit_registration()
 
+@app.route('/admin/libraries/pls_id', methods=["POST"])
+@returns_json_or_response_or_problem_detail
+def pls_id():
+    return app.library_registry.registry_controller.add_or_edit_pls_id()
+
 @app.route('/library/<uuid>')
 @has_library
 @returns_json_or_response_or_problem_detail
