@@ -784,7 +784,13 @@ class Library(Base):
                 x for x in libraries_for_location if not x in for_name
             ]
 
-        return libraries_for_name + libraries_for_location
+        # A lot of libraries list their locations only within their description, so it's worth
+        # checking the description for the search term.
+        libraries_for_description = cls.search_within_description(
+            _db, query, here, production
+        ).limit(max_libraries).all()
+
+        return libraries_for_name + libraries_for_location + libraries_for_description
 
     @classmethod
     def search_by_library_name(cls, _db, name, here=None, production=True):
@@ -795,26 +801,10 @@ class Library(Base):
         :param production: If True, only libraries that are ready for
             production are shown.
         """
-
-        qu = _db.query(Library).outerjoin(Library.aliases)
-        if here:
-            qu = qu.outerjoin(Library.service_areas).outerjoin(ServiceArea.place)
-
         name_matches = cls.fuzzy_match(Library.name, name)
         alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
         partial_matches = cls.partial_match(Library.name, name)
-        qu = qu.filter(or_(name_matches, alias_matches, partial_matches))
-        qu = qu.filter(cls._feed_restriction(production))
-        if here:
-            # Order by the minimum distance between one of the
-            # library's service areas and the current location.
-            min_distance = func.min(
-                func.ST_Distance_Sphere(here, Place.geometry)
-            )
-            qu = qu.add_column(min_distance)
-            qu = qu.group_by(Library.id)
-            qu = qu.order_by(min_distance.asc())
-        return qu
+        return cls.create_query(_db, here, production, name_matches, alias_matches, partial_matches)
 
     @classmethod
     def search_by_location_name(cls, _db, query, type=None, here=None,
@@ -853,6 +843,37 @@ class Library(Base):
     us_zip = re.compile("^[0-9]{5}$")
     us_zip_plus_4 = re.compile("^[0-9]{5}-[0-9]{4}$")
     running_whitespace = re.compile("\s+")
+
+    @classmethod
+    def create_query(cls, _db, here=None, production=True, *args):
+        qu = _db.query(Library).outerjoin(Library.aliases)
+        if here:
+            qu = qu.outerjoin(Library.service_areas).outerjoin(ServiceArea.place)
+        qu = qu.filter(or_(*args))
+        qu = qu.filter(cls._feed_restriction(production))
+        if here:
+            # Order by the minimum distance between one of the
+            # library's service areas and the current location.
+            min_distance = func.min(
+                func.ST_Distance_Sphere(here, Place.geometry)
+            )
+            qu = qu.add_column(min_distance)
+            qu = qu.group_by(Library.id)
+            qu = qu.order_by(min_distance.asc())
+        return qu
+
+    @classmethod
+    def search_within_description(cls, _db, query, here=None, production=True):
+        """Find libraries whose descriptions include the search term.
+
+        :param query: The string to search for.
+        :param here: Order results by proximity to this location.
+        :param production: If True, only libraries that are ready for
+            production are shown.
+        """
+        description_matches = cls.fuzzy_match(Library.description, query)
+        partial_matches = cls.partial_match(Library.description, query)
+        return cls.create_query(_db, here, production, description_matches, partial_matches)
 
     @classmethod
     def query_cleanup(cls, query):
@@ -927,6 +948,8 @@ class Library(Base):
 
     @classmethod
     def partial_match(cls, field, value):
+        """Create a SQL clause that attempts to match a partial value--e.g.
+        just one word of a library's name--against the given field."""
         return field.ilike("%{}%".format(value))
 
     def set_hyperlink(self, rel, *hrefs):

@@ -594,6 +594,11 @@ class TestLibraryRegistryController(ControllerTest):
         library = self.nypl
         kansas = self.kansas_state_library
         connecticut = self.connecticut_state_library
+        with_description = self._library(
+            name="Library With Description",
+            has_email=True,
+            description="For testing purposes"
+        )
 
         # Searching for the name of a real library returns a dict whose value is a list containing
         # that library.
@@ -626,6 +631,15 @@ class TestLibraryRegistryController(ControllerTest):
         eq_(len(libraries), 2)
         self._is_library(kansas, libraries[0])
         self._is_library(connecticut, libraries[1])
+
+        # Searching for a word or phrase found within a library's description returns a dict whose value is a list containing
+        # that library.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("name", "testing")
+            ])
+            response = self.controller.search_details()
+        self._is_library(with_description, response.get("libraries")[0])
 
         # Searching for a name that cannot be found returns a problem detail.
         with self.app.test_request_context("/", method="POST"):

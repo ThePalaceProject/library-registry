@@ -126,7 +126,7 @@ class DatabaseTest(object):
         self.time_counter = self.time_counter + timedelta(days=1)
         return v
 
-    def _library(self, name=None, short_name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE, has_email=False):
+    def _library(self, name=None, short_name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE, has_email=False, description=None):
         name = name or self._str
         library, ignore = get_one_or_create(
             self._db, Library, name=name,
@@ -137,6 +137,7 @@ class DatabaseTest(object):
         )
         library.short_name = short_name or self._str
         library.shared_secret = self._str
+        library.description = description or self._str
         for place in eligibility_areas:
             get_one_or_create(self._db, ServiceArea, library=library,
                               place=place, type=ServiceArea.ELIGIBILITY)

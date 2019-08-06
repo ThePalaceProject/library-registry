@@ -1106,6 +1106,15 @@ class TestLibrary(DatabaseTest):
             ).count()
         )
 
+    def test_search_within_description(self):
+        """Test searching for a phrase within a library's description."""
+        library = self._library(
+            name="Library With Description",
+            description="We are giving this library a description for testing purposes."
+        )
+        results = list(Library.search_within_description(self._db, "testing purposes"))
+        eq_([library], results)
+
     def test_search(self):
         """Test the overall search method."""
 
