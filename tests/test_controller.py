@@ -592,6 +592,8 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_search_details(self):
         library = self.nypl
+        kansas = self.kansas_state_library
+        connecticut = self.connecticut_state_library
 
         # Searching for the name of a real library returns a dict whose value is a list containing
         # that library.
@@ -603,6 +605,27 @@ class TestLibraryRegistryController(ControllerTest):
 
         for response_library in response.get("libraries"):
             self._is_library(library, response_library)
+
+        # Searching for part of the library's name--"kansas" instead of "kansas state library" works.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("name", "kansas"),
+            ])
+            response = self.controller.search_details()
+
+        for response_library in response.get("libraries"):
+            self._is_library(kansas, response_library)
+
+        # Searching for a partial name may yield multiple results.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("name", "state"),
+            ])
+            response = self.controller.search_details()
+        libraries = response.get("libraries")
+        eq_(len(libraries), 2)
+        self._is_library(kansas, libraries[0])
+        self._is_library(connecticut, libraries[1])
 
         # Searching for a name that cannot be found returns a problem detail.
         with self.app.test_request_context("/", method="POST"):

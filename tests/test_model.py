@@ -998,6 +998,9 @@ class TestLibrary(DatabaseTest):
             name="Boston Public Library", focus_areas=[self.boston_ma]
         )
 
+        # Searching for part of the name--i.e. "boston" rather than "boston public library"--should work.
+        eq_([boston], search("boston"))
+
         # Both libraries are known colloquially as 'BPL'.
         for library in (brooklyn, boston):
             get_one_or_create(

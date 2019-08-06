@@ -783,6 +783,7 @@ class Library(Base):
             libraries_for_location = [
                 x for x in libraries_for_location if not x in for_name
             ]
+
         return libraries_for_name + libraries_for_location
 
     @classmethod
@@ -801,7 +802,8 @@ class Library(Base):
 
         name_matches = cls.fuzzy_match(Library.name, name)
         alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
-        qu = qu.filter(or_(name_matches, alias_matches))
+        partial_matches = cls.partial_match(Library.name, name)
+        qu = qu.filter(or_(name_matches, alias_matches, partial_matches))
         qu = qu.filter(cls._feed_restriction(production))
         if here:
             # Order by the minimum distance between one of the
@@ -922,6 +924,10 @@ class Library(Base):
         long_value_is_approximate_match = (is_long & close_enough)
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)
+
+    @classmethod
+    def partial_match(cls, field, value):
+        return field.ilike("%{}%".format(value))
 
     def set_hyperlink(self, rel, *hrefs):
         """Make sure this library has a Hyperlink with the given `rel` that
