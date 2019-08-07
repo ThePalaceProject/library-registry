@@ -998,6 +998,9 @@ class TestLibrary(DatabaseTest):
             name="Boston Public Library", focus_areas=[self.boston_ma]
         )
 
+        # Searching for part of the name--i.e. "boston" rather than "boston public library"--should work.
+        eq_([boston], search("boston"))
+
         # Both libraries are known colloquially as 'BPL'.
         for library in (brooklyn, boston):
             get_one_or_create(
@@ -1102,6 +1105,15 @@ class TestLibrary(DatabaseTest):
                 production=False
             ).count()
         )
+
+    def test_search_within_description(self):
+        """Test searching for a phrase within a library's description."""
+        library = self._library(
+            name="Library With Description",
+            description="We are giving this library a description for testing purposes."
+        )
+        results = list(Library.search_within_description(self._db, "testing purposes"))
+        eq_([library], results)
 
     def test_search(self):
         """Test the overall search method."""
