@@ -423,7 +423,7 @@ class TestLibrary(DatabaseTest):
             raise Error("Expected exception not raised.")
         except ValueError, e:
             eq_('Short name cannot contain the pipe character.',
-                str(e))
+                unicode(e))
 
     def test_for_short_name(self):
         eq_(None, Library.for_short_name(self._db, 'ABCD'))
@@ -457,8 +457,9 @@ class TestLibrary(DatabaseTest):
         # duplicate, so it tries again and generates a new string
         # which passes the already_used test.
 
-        # TODO PYTHON expect_next = "HEXDVX"
-        eq_("XCKAFN", name)
+        # TODO PYTHON3 expect_next = "HEXDVX"
+        expect_next = "XCKAFN"
+        eq_(expect_next, name)
 
         # To avoid an infinite loop, we will stop trying and raise an
         # exception after a certain number of attempts (the default is
