@@ -462,7 +462,7 @@ class AuthenticationDocument(object):
                     CollectionSummary.set(library, None, unknown_size)
                 )
         except ValueError, e:
-            return INVALID_INTEGRATION_DOCUMENT.detailed(e.message)
+            return INVALID_INTEGRATION_DOCUMENT.detailed(unicode(e))
 
         # Destroy any CollectionSummaries representing collections
         # no longer associated with this library.

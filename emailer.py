@@ -2,7 +2,7 @@ from nose.tools import set_trace
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email import Charset
+from email import charset
 import email
 import smtplib
 
@@ -10,7 +10,7 @@ import smtplib
 # Otherwise, the bodies of email messages will be encoded with base64
 # and they'll be hard to read. This way, only the non-ASCII characters
 # need to be encoded.
-Charset.add_charset('utf-8', Charset.QP, Charset.QP, 'utf-8')
+charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
 from config import (
     CannotLoadConfiguration,

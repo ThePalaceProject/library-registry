@@ -423,7 +423,7 @@ class TestLibrary(DatabaseTest):
             raise Error("Expected exception not raised.")
         except ValueError, e:
             eq_('Short name cannot contain the pipe character.',
-                e.message)
+                unicode(e))
 
     def test_for_short_name(self):
         eq_(None, Library.for_short_name(self._db, 'ABCD'))
@@ -440,20 +440,26 @@ class TestLibrary(DatabaseTest):
         # First, try with no duplicate check.
         random.seed(42)
         name = Library.random_short_name()
-        eq_("QAHFTR", name)
+
+        # TODO PYTHON3 expect = "UDAXIH"
+        expect = 'QAHFTR'
+        eq_(expect, name)
 
         # Reset the random seed so the same name will be generated again.
         random.seed(42)
         # Create a duplicate_check implementation that claims QAHFTR
         # has already been used.
         def already_used(name):
-            return name == "QAHFTR"
+            return name == expect
         name = Library.random_short_name(duplicate_check=already_used)
 
-        # random_short_name now generates QAHFTR, but it's a
+        # random_short_name now generates `expect`, but it's a
         # duplicate, so it tries again and generates a new string
         # which passes the already_used test.
-        eq_("XCKAFN", name)
+
+        # TODO PYTHON3 expect_next = "HEXDVX"
+        expect_next = "XCKAFN"
+        eq_(expect_next, name)
 
         # To avoid an infinite loop, we will stop trying and raise an
         # exception after a certain number of attempts (the default is

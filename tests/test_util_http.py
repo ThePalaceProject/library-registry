@@ -64,9 +64,8 @@ class TestHTTP(object):
         )
 
     def test_allowed_response_codes(self):
-        """Test our ability to raise BadResponseException when
-        an HTTP-based integration does not behave as we'd expect.
-        """
+        # Test our ability to raise BadResponseException when
+        # an HTTP-based integration does not behave as we'd expect.
 
         def fake_401_response(*args, **kwargs):
             return MockRequestsResponse(401, content="Weird")
@@ -122,15 +121,15 @@ class TestHTTP(object):
         eq_(401, response.status_code)
 
         # The exception can be turned into a useful problem detail document.
-        exc = None
+        exception = None
         try:
             m(url, fake_200_response,
               disallowed_response_codes=["2xx"])
-        except Exception, exc:
-            pass
-        assert exc is not None
+        except Exception, e:
+            exception = e
+        assert exception is not None
 
-        debug_doc = exc.as_problem_detail_document(debug=True)
+        debug_doc = exception.as_problem_detail_document(debug=True)
 
         # 502 is the status code to be returned if this integration error
         # interrupts the processing of an incoming HTTP request, not the
@@ -139,9 +138,9 @@ class TestHTTP(object):
         eq_(502, debug_doc.status_code)
         eq_("Bad response", debug_doc.title)
         eq_('The server made a request to http://url/, and got an unexpected or invalid response.', debug_doc.detail)
-        eq_('Got status code 200 from external server, cannot continue.\n\nResponse content: Hurray', debug_doc.debug_message)
+        eq_('Bad response from http://url/: Got status code 200 from external server, cannot continue.\n\nResponse content: Hurray', debug_doc.debug_message)
 
-        no_debug_doc = exc.as_problem_detail_document(debug=False)
+        no_debug_doc = exception.as_problem_detail_document(debug=False)
         eq_("Bad response", no_debug_doc.title)
         eq_('The server made a request to url, and got an unexpected or invalid response.', no_debug_doc.detail)
         eq_(None, no_debug_doc.debug_message)
@@ -215,7 +214,7 @@ class TestBadResponseException(object):
         eq_('Bad response', doc['title'])
         eq_('The server made a request to http://url/, and got an unexpected or invalid response.', doc['detail'])
         eq_(
-            u'Terrible response, just terrible\n\nStatus code: 102\nContent: nonsense',
+            u'Bad response from http://url/: Terrible response, just terrible\n\nStatus code: 102\nContent: nonsense',
             doc['debug_message']
         )
 
@@ -232,7 +231,7 @@ class TestBadResponseException(object):
         doc, status_code, headers = exc.as_problem_detail_document(debug=True).response
         doc = json.loads(doc)
 
-        assert doc['debug_message'].startswith("Got status code 500 from external server, cannot continue.")
+        assert "Got status code 500 from external server, cannot continue." in  doc['debug_message']
 
     def test_as_problem_detail_document(self):
         exception = BadResponseException(
@@ -245,7 +244,7 @@ class TestBadResponseException(object):
         eq_("The server made a request to http://url/, and got an unexpected or invalid response.",
             document.detail
         )
-        eq_("What even is this\n\nsome debug info", document.debug_message)
+        eq_("Bad response from http://url/: What even is this\n\nsome debug info", document.debug_message)
 
 
 class TestRequestTimedOut(object):

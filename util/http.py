@@ -69,7 +69,8 @@ class RemoteIntegrationException(IntegrationException):
         super(RemoteIntegrationException, self).__init__(message, debug_message)
 
     def __str__(self):
-        return self.internal_message % (self.url, self.message)
+        base_message = super(RemoteIntegrationException, self).__str__()
+        return self.internal_message % (self.url, base_message)
 
     def document_detail(self, debug=True):
         if debug:
@@ -107,7 +108,7 @@ class BadResponseException(RemoteIntegrationException):
 
     def document_debug_message(self, debug=True):
         if debug:
-            msg = self.message
+            msg = unicode(self)
             if self.debug_message:
                 msg += "\n\n" + self.debug_message
             return msg
@@ -249,14 +250,14 @@ class HTTP(object):
                     url, response.status_code, response.headers,
                     response.content
                 )
-        except requests.exceptions.Timeout, e:
+        except requests.exceptions.Timeout as e:
             # Wrap the requests-specific Timeout exception
             # in a generic RequestTimedOut exception.
-            raise RequestTimedOut(url, e.message)
-        except requests.exceptions.RequestException, e:
+            raise RequestTimedOut(url, unicode(e))
+        except requests.exceptions.RequestException as e:
             # Wrap all other requests-specific exceptions in
             # a generic RequestNetworkException.
-            raise RequestNetworkException(url, e.message)
+            raise RequestNetworkException(url, unicode(e))
 
         return process_response_with(
             url, response, allowed_response_codes, disallowed_response_codes
@@ -322,7 +323,7 @@ class HTTP(object):
     @classmethod
     def series(cls, status_code):
         """Return the HTTP series for the given status code."""
-        return "%sxx" % (status_code / 100)
+        return "%sxx" % (status_code // 100)
 
     @classmethod
     def debuggable_get(cls, url, **kwargs):

@@ -9,7 +9,7 @@ class ShortClientTokenTool(object):
     signer = HMACAlgorithm(HMACAlgorithm.SHA256)
 
     @classmethod
-    def adobe_base64_encode(cls, str):
+    def adobe_base64_encode(cls, to_encode):
         """A modified base64 encoding that avoids triggering an Adobe bug.
 
         The bug seems to happen when the 'password' portion of a
@@ -17,14 +17,18 @@ class ShortClientTokenTool(object):
         with :. We also replace / (another "suspicious" character)
         with ;. and strip newlines.
         """
-        encoded = base64.encodestring(str)
-        return encoded.replace("+", ":").replace("/", ";").replace("=", "@").strip()
+        if isinstance(to_encode, unicode):
+            to_encode = to_encode.encode("utf8")
+        encoded = base64.encodestring(to_encode)
+        return encoded.replace(b"+", b":").replace(b"/", b";").replace(b"=", b"@").strip()
 
     @classmethod
-    def adobe_base64_decode(cls, str):
+    def adobe_base64_decode(cls, to_decode):
         """Undoes adobe_base64_encode."""
-        encoded = str.replace(":", "+").replace(";", "/").replace("@", "=")
-        return base64.decodestring(encoded)
+        if isinstance(to_decode, unicode):
+            to_decode = to_decode.encode("utf8")        
+        to_decode = to_decode.replace(b":", b"+").replace(b";", b"/").replace(b"@", b"=")
+        return base64.decodestring(to_decode)
 
     # The JWT spec takes January 1 1970 as the epoch.
     JWT_EPOCH = datetime.datetime(1970, 1, 1)
@@ -65,7 +69,7 @@ class ShortClientTokenEncoder(ShortClientTokenTool):
         where it can be picked up by a client and sent to a library
         registry to look up an Adobe ID.
 
-        :return: A short client token.
+        :return: A string containing a short client token.
         """
         if not library_short_name or not library_secret:
             raise ValueError(
@@ -85,7 +89,8 @@ class ShortClientTokenEncoder(ShortClientTokenTool):
         short_token_signing_key = self.signer.prepare_key(library_secret)
         
         base = library_short_name + "|" + str(expires) + "|" + patron_identifier
-        signature = self.signer.sign(base, short_token_signing_key)
+        base_bytestring = base.encode("utf8")
+        signature = self.signer.sign(base_bytestring, short_token_signing_key)
         signature = self.adobe_base64_encode(signature)
         if len(base) > 80:
             self.log.error(
@@ -95,4 +100,4 @@ class ShortClientTokenEncoder(ShortClientTokenTool):
             self.log.error(
                 "Password portion of short client token exceeds 76 characters; Adobe will probably truncate it."
             )
-        return base + "|" + signature
+        return (base_bytestring + b"|" + signature).decode("utf8")

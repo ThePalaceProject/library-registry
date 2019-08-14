@@ -9,6 +9,8 @@ import requests
 from model import (
     ShortClientTokenDecoder,
 )
+
+from util.string_helpers import base64
 from util.xmlparser import XMLParser
 
 
