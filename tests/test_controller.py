@@ -523,6 +523,18 @@ class TestLibraryRegistryController(ControllerTest):
             edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
 
     def test_validate_email(self):
+
+        # You can't validate an email for a nonexistent library.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("uuid", "no:such:library"),
+            ])
+            response = self.controller.validate_email()
+        assert isinstance(response, ProblemDetail)
+        eq_(response.status_code, 404)
+        eq_(response.title, LIBRARY_NOT_FOUND.title)
+        eq_(response.uri, LIBRARY_NOT_FOUND.uri)
+
         nypl = self.nypl
         uuid = nypl.internal_urn.split("uuid:")[1]
         validation = nypl.hyperlinks[0].resource.validation
