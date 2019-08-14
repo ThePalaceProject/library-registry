@@ -189,7 +189,7 @@ class OPDSCatalog(object):
             args['properties'] = properties
         return args
 
-    def __unicode__(self):
+    def __str__(self):
         if self.catalog is None:
             return None
 

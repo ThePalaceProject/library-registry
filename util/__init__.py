@@ -1,7 +1,7 @@
 from nose.tools import set_trace
 from sqlalchemy import func
 from geoalchemy2 import Geometry
-from geoip import geolite2
+from geolite2 import geolite2
 
 class GeometryUtility(object):
 
@@ -16,12 +16,16 @@ class GeometryUtility(object):
 
     @classmethod
     def point_from_ip(cls, ip_address):
+        reader = geolite2.reader()
         if not ip_address:
             return None
-        match = geolite2.lookup(ip_address)
+        match = reader.get(ip_address)
         if match is None:
             return None
-        return cls.point(*match.location)        
+        latitude, longitude = [
+            match['location'][x] for x in ('latitude', 'longitude')
+        ]
+        return cls.point(latitude, longitude)
 
     @classmethod
     def point_from_string(cls, s):

@@ -2,10 +2,10 @@ from nose.tools import (
     eq_,
     set_trace,
 )
+import base64
 import datetime
 import os
 import json
-import base64
 import random
 from smtplib import SMTPException
 from urllib import unquote
@@ -485,7 +485,7 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.edit_registration()
 
         eq_(response._status_code, 200)
-        eq_(response.response[0], library.internal_urn)
+        eq_(response.response[0].decode("utf8"), library.internal_urn)
 
         edited_library = get_one(self._db, Library, short_name=library.short_name)
         eq_(edited_library.library_stage, Library.TESTING_STAGE)
@@ -519,7 +519,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             response = self.controller.edit_registration()
             eq_(response._status_code, 200)
-            eq_(response.response[0], nypl.internal_urn)
+            eq_(response.response[0].decode("utf8"), nypl.internal_urn)
             edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
 
     def test_validate_email(self):
@@ -564,7 +564,7 @@ class TestLibraryRegistryController(ControllerTest):
             ])
             response = self.controller.add_or_edit_pls_id()
         eq_(response._status_code, 200)
-        eq_(response.response[0], library.internal_urn)
+        eq_(response.response[0].decode("utf8"), library.internal_urn)
 
         library_with_pls_id = get_one(self._db, Library, short_name=library.short_name)
         eq_(library_with_pls_id.pls_id.value, "12345")
@@ -709,7 +709,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("NYPL", nypl['metadata']['title'])
             eq_("0 km.", nypl['metadata']['distance'])
             eq_("Connecticut State Library", ct['metadata']['title'])
-            eq_("35 km.", ct['metadata']['distance'])
+            eq_("29 km.", ct['metadata']['distance'])
 
             # If that's not good enough, there's a link to the search
             # controller, so you can do a search.
@@ -819,7 +819,7 @@ class TestLibraryRegistryController(ControllerTest):
             # The search form points the client to the search controller.
             expect_url = self.library_registry.url_for("search")
             expect_url_tag = '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
-            assert expect_url_tag in response.data
+            assert expect_url_tag in response.data.decode("utf8")
 
     def test_qa_search_form(self):
         """The QA search form links to the QA search controller."""
@@ -829,7 +829,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             expect_url = self.library_registry.url_for("search_qa")
             expect_url_tag = '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
-            assert expect_url_tag in response.data
+            assert expect_url_tag in response.data.decode("utf8")
 
     def test_search(self):
         with self.app.test_request_context("/?q=manhattan"):
@@ -843,7 +843,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("0 km.", nypl['metadata']['distance'])
 
             eq_("Kansas State Library", ks['metadata']['title'])
-            eq_("1922 km.", ks['metadata']['distance'])
+            eq_("1928 km.", ks['metadata']['distance'])
 
             [library_link, register_link, search_link, self_link] = sorted(
                 catalog['links'], key=lambda x: x['rel']
@@ -944,7 +944,7 @@ class TestLibraryRegistryController(ControllerTest):
         if key:
             auth_document['public_key'] = {
                 "type": "RSA",
-                "value": key.publickey().exportKey(),
+                "value": key.publickey().exportKey().decode("utf8")
             }
         return auth_document
 
@@ -956,7 +956,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="GET"):
             response = self.controller.register()
             eq_(200, response.status_code)
-            eq_('{}', response.data)
+            eq_({}, json.loads(response.data))
 
         # Set some terms of service.
         tos = "http://terms.com/service.html"
@@ -1436,15 +1436,19 @@ class TestLibraryRegistryController(ControllerTest):
             # because it was generated using techniques designed for
             # cryptography which ignore seed(). But we do know how
             # long it is.
-            eq_('QAHFTR', library.short_name)
+            # TODO PYTHON3 expect = 'UDAXIH'
+            expect = u'QAHFTR'
+            eq_(expect, library.short_name)
             eq_(48, len(library.shared_secret))
 
             eq_(library.short_name, catalog["metadata"]["short_name"])
             # The registry encrypted the secret with the public key, and
             # it can be decrypted with the private key.
             encryptor = PKCS1_OAEP.new(key)
-            encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
-            eq_(library.shared_secret, encryptor.decrypt(encrypted_secret))
+            shared_secret = catalog["metadata"]["shared_secret"]
+            encrypted_secret = base64.b64decode(shared_secret.encode("utf8"))
+            decrypted_secret = encryptor.decrypt(encrypted_secret)
+            eq_(library.shared_secret, decrypted_secret.decode("utf8"))
 
         old_secret = library.shared_secret
         self.http_client.requests = []
@@ -1500,7 +1504,7 @@ class TestLibraryRegistryController(ControllerTest):
         self.queue_opds_success()
 
         # We have a new logo as well.
-        image_data = '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
+        image_data = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x01\x03\x00\x00\x00%\xdbV\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
         self.http_client.queue_response(200, content=image_data, media_type="image/png")
 
         # So the library re-registers itself, and gets an updated
@@ -1531,7 +1535,8 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("A Library", library.name)
             eq_("New and improved", library.description)
             eq_(None, library.web_url)
-            eq_("data:image/png;base64,%s" % base64.b64encode(image_data), library.logo)
+            encoded_image = base64.b64encode(image_data).decode("utf8")
+            eq_("data:image/png;base64,%s" % encoded_image, library.logo)
             # The library's library_stage has been updated to reflect
             # the 'stage' method passed in from the client.
             eq_(Library.TESTING_STAGE, library.library_stage)
@@ -1615,7 +1620,8 @@ class TestLibraryRegistryController(ControllerTest):
             # it can be decrypted with the private key.
             encryptor = PKCS1_OAEP.new(key)
             encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
-            eq_(library.shared_secret, encryptor.decrypt(encrypted_secret))
+            eq_(library.shared_secret,
+                encryptor.decrypt(encrypted_secret).decode("utf8"))
 
         old_secret = library.shared_secret
 
@@ -1684,13 +1690,13 @@ class TestLibraryRegistryController(ControllerTest):
 class TestValidationController(ControllerTest):
 
     def test_html_response(self):
-        """Test the generation of a simple HTML-based HTTP response."""
+        # Test the generation of a simple HTML-based HTTP response.
         controller = ValidationController(self.library_registry)
         response = controller.html_response(999, "a message")
         eq_(999, response.status_code)
         eq_("text/html", response.headers['Content-Type'])
         eq_(controller.MESSAGE_TEMPLATE % dict(message="a message"),
-            response.data)
+            response.data.decode("utf8"))
 
     def test_validate(self):
         class Mock(ValidationController):

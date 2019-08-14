@@ -12,7 +12,10 @@ class TestGeometryUtility(object):
 
     def test_point_from_ip(self):
         point = GeometryUtility.point_from_ip("65.88.88.124")
-        eq_('SRID=4326;POINT (-73.9813 40.7769)', point)
+        eq_('SRID=4326;POINT (-73.9169 40.8056)', point)
+
+        point = GeometryUtility.point_from_ip("127.0.0.1")
+        eq_(None, point)
 
     def test_point_from_string(self):
         m = GeometryUtility.point_from_string

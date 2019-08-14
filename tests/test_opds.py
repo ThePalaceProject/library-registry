@@ -96,7 +96,7 @@ class TestOPDSCatalog(DatabaseTest):
 
         eq_(metadata['updated'], OPDSCatalog._strftime(library.timestamp))
 
-        [authentication_url, web_alternate, help, eligibility, focus, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel'), x.get('type')))
+        [authentication_url, web_alternate, help, eligibility, focus, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel', ''), x.get('type', '')))
         [logo] = catalog['images']
 
         eq_("mailto:help@library.org", help['href'])
