@@ -108,7 +108,7 @@ class BadResponseException(RemoteIntegrationException):
 
     def document_debug_message(self, debug=True):
         if debug:
-            msg = str(self)
+            msg = unicode(self)
             if self.debug_message:
                 msg += "\n\n" + self.debug_message
             return msg

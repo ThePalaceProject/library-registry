@@ -1,8 +1,7 @@
+import base64
 import datetime
 import logging
 from jwt.algorithms import HMACAlgorithm
-#from util.string_helpers import base64
-import base64
 
 class ShortClientTokenTool(object):
 
