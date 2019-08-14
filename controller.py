@@ -422,7 +422,7 @@ class LibraryRegistryController(BaseController):
 
     def catalog_response(self, document, status=200):
         """Serve an OPDS 2.0 catalog."""
-        if not isinstance(document, basestring):
+        if not isinstance(document, (bytes, unicode)):
             document = json.dumps(document)
         headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
         return Response(document, status, headers=headers)

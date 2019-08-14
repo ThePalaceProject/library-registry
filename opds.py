@@ -189,7 +189,8 @@ class OPDSCatalog(object):
             args['properties'] = properties
         return args
 
-    def __str__(self):
+    # TODO PYTHON3 rename to __str__
+    def __unicode__(self):
         if self.catalog is None:
             return None
 
