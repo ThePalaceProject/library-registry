@@ -1,6 +1,6 @@
 admin = """
 <!doctype html>
-<html>
+<html lang="en">
 <head>
 <title>Library Registry</title>
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
