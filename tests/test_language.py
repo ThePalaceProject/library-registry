@@ -64,4 +64,4 @@ class TestLanguageCodes(object):
         eq_(u"English/español", m(["eng", "spa"]))
         eq_(u"español/English", m("spa,eng"))
         eq_(u"español/English/Chinese", m(["spa","eng","chi"]))
-        assert_raises(ValueError(m, ["eng, nxx"]))
+        assert_raises(ValueError, m, ["eng, nxx"])

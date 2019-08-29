@@ -1,6 +1,6 @@
 {
   "name": "library_registry",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Library Registry Admin Interface",
   "main": "index.js",
   "repository": {

@@ -19,20 +19,19 @@ class TestShortClientTokenEncoder(object):
         self.encoder = ShortClientTokenEncoder()
 
     def test_adobe_base64_encode_decode(self):
-        """Test our special variant of base64 encoding designed to avoid
-        triggering an Adobe bug.
-        """
-        value = "!\tFN6~'Es52?X!#)Z*_S"
+        # Test our special variant of base64 encoding designed to avoid
+        # triggering an Adobe bug.
+        value = b"!\tFN6~'Es52?X!#)Z*_S"
 
         encoded = self.encoder.adobe_base64_encode(value)
-        eq_('IQlGTjZ:J0VzNTI;WCEjKVoqX1M@', encoded)
+        eq_(b'IQlGTjZ:J0VzNTI;WCEjKVoqX1M@', encoded)
 
         # This is like normal base64 encoding, but with a colon
         # replacing the plus character, a semicolon replacing the
         # slash, an at sign replacing the equal sign and the final
         # newline stripped.
         eq_(
-            encoded.replace(":", "+").replace(";", "/").replace("@", "=") + "\n",
+            encoded.replace(b":", b"+").replace(b";", b"/").replace(b"@", b"=") + b"\n",
             base64.encodestring(value)
         )
 
@@ -104,9 +103,8 @@ class TestShortClientTokenEncoder(object):
 
         # The signature comes from signing the token with the
         # secret associated with this library.
-        expect_signature = self.encoder.signer.sign(
-            token, self.encoder.signer.prepare_key(secret)
-        )
+        key = self.encoder.signer.prepare_key(secret)
+        expect_signature = self.encoder.signer.sign(token.encode("utf8"), key)
         eq_(expect_signature, signature)
 
 
@@ -223,12 +221,12 @@ class TestShortClientTokenDecoder(DatabaseTest):
         library = self._library()
 
         # The base64 encoding of this signature has a plus sign in it.
-        signature = 'LbU}66%\\-4zt>R>_)\n2Q'
+        signature = b'LbU}66%\\-4zt>R>_)\n2Q'
         encoded_signature = self.encoder.adobe_base64_encode(signature)
 
         # We replace the plus sign with a colon.
-        assert ':' in encoded_signature
-        assert '+' not in encoded_signature
+        assert b':' in encoded_signature
+        assert b'+' not in encoded_signature
 
         # Make sure that decode properly reverses that change when
         # decoding the 'password'.

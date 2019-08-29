@@ -7,7 +7,7 @@ import socket
 from config import Configuration
 from StringIO import StringIO
 from loggly.handlers import HTTPSHandler as LogglyHandler
-
+from util.string_helpers import native_string
 
 class JSONFormatter(logging.Formatter):
     hostname = socket.gethostname()
@@ -34,16 +34,16 @@ class JSONFormatter(logging.Formatter):
             data['traceback'] = self.formatException(record.exc_info)
         return json.dumps(data)
 
-class UTF8Formatter(logging.Formatter):
-    """Encode all Unicode output to UTF-8 to prevent encoding errors."""
+
+class StringFormatter(logging.Formatter):
+    """Encode all output as a string.
+    
+    In Python 2, this means a UTF-8 bytestring. In Python 3, it means a
+    Unicode string.
+    """
     def format(self, record):
-        try:
-            data = super(UTF8Formatter, self).format(record)
-        except Exception, e:
-            data = super(UTF8Formatter, self).format(record)
-        if isinstance(data, unicode):
-            data = data.encode("utf8")
-        return data
+        data = super(StringFormatter, self).format(record)
+        return native_string(data)
 
 
 class LogConfiguration(object):
@@ -202,7 +202,7 @@ class LogConfiguration(object):
             or isinstance(handler, LogglyHandler)):
             formatter = JSONFormatter()
         else:
-            formatter = UTF8Formatter(message_template)
+            formatter = StringFormatter(message_template)
         handler.setFormatter(formatter)
 
     @classmethod

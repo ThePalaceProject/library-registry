@@ -13,7 +13,6 @@ from smtplib import SMTPException
 import json
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
-import base64
 import os
 from urllib import unquote
 
@@ -51,6 +50,10 @@ from util.http import (
     HTTP,
 )
 from util.problem_detail import ProblemDetail
+from util.string_helpers import (
+    base64,
+    random_string,
+)
 from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
@@ -322,6 +325,8 @@ class LibraryRegistryController(BaseController):
         # Manually validate an email address, without the admin having to click on a confirmation link
         uuid = flask.request.form.get("uuid")
         library = self.library_for_request(uuid)
+        if isinstance(library, ProblemDetail):
+            return library
         hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
         if not hyperlink or not hyperlink.resource or isinstance(hyperlink, ProblemDetail):
             return INVALID_CONTACT_URI.detailed(
@@ -417,7 +422,7 @@ class LibraryRegistryController(BaseController):
 
     def catalog_response(self, document, status=200):
         """Serve an OPDS 2.0 catalog."""
-        if not isinstance(document, basestring):
+        if not isinstance(document, (bytes, unicode)):
             document = json.dumps(document)
         headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
         return Response(document, status, headers=headers)
@@ -591,9 +596,11 @@ class LibraryRegistryController(BaseController):
                 (library.shared_secret is None) or reset_shared_secret
             )
             if generate_secret:
-                library.shared_secret = os.urandom(24).encode('hex')
+                library.shared_secret = random_string(24)
 
-            encrypted_secret = encryptor.encrypt(str(library.shared_secret))
+            encrypted_secret = encryptor.encrypt(
+                library.shared_secret.encode("utf8")
+            )
 
             catalog["metadata"]["short_name"] = library.short_name
             catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)

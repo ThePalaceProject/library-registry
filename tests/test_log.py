@@ -8,7 +8,7 @@ from nose.tools import (
 
 from . import DatabaseTest
 from log import (
-    UTF8Formatter,
+    StringFormatter,
     JSONFormatter,
     LogglyHandler,
     LogConfiguration,
@@ -72,7 +72,7 @@ class TestLogConfiguration(DatabaseTest):
 
         [stream_handler] = [x for x in handlers
                             if isinstance(x, logging.StreamHandler)]
-        assert isinstance(stream_handler.formatter, UTF8Formatter)
+        assert isinstance(stream_handler.formatter, StringFormatter)
         eq_(template, stream_handler.formatter._fmt)
 
         # If testing=True, then the database configuration is ignored,
@@ -115,7 +115,7 @@ class TestLogConfiguration(DatabaseTest):
             handler, LogConfiguration.TEXT_LOG_FORMAT, template
         )
         formatter = handler.formatter
-        assert isinstance(formatter, UTF8Formatter)
+        assert isinstance(formatter, StringFormatter)
         eq_(template, formatter._fmt)
 
         # Configure a similar handler for JSON output.

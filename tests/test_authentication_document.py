@@ -41,9 +41,14 @@ class TestParseCoverage(DatabaseTest):
         expected_places = expected_places or []
         expected_unknown = expected_unknown or empty
         expected_ambiguous = expected_ambiguous or empty
-        eq_(sorted(expected_places), sorted(place_objs))
-        eq_(expected_unknown, unknown)
-        eq_(expected_ambiguous, ambiguous)
+        # TODO PYTHON3 replace eq_sorted() with eq_()
+        def eq_sorted(a, b):
+            def key(x):
+                return id(x)
+            eq_(sorted(a, key=key), sorted(b, key=key))
+        eq_sorted(expected_places, place_objs)
+        eq_sorted(expected_unknown, unknown)
+        eq_sorted(expected_ambiguous, ambiguous)
 
     def test_universal_coverage(self):
         # Test an authentication document that says a library covers the
@@ -595,7 +600,7 @@ class TestUpdateAudiences(DatabaseTest):
         doc = AuthenticationDocument.from_dict(self._db, doc_dict)
         problem = doc.update_audiences(self.library)
         eq_(None, problem)
-        eq_(audiences, [x.name for x in self.library.audiences])
+        eq_(set(audiences), set([x.name for x in self.library.audiences]))
 
         # Set them again to different but partially overlapping values.
         audiences = [

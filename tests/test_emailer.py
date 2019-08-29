@@ -58,7 +58,9 @@ class TestEmailTemplate(object):
         body = template.body("me@example.com", "you@example.com")
         # The SNOWMAN character is encoded as quoted-printable in both
         # the subject and the message contents.
-        quoted_printable_snowman = quopri.encodestring(snowman.encode("utf8"))
+        quoted_printable_snowman = quopri.encodestring(
+            snowman.encode("utf8")
+        ).decode("utf8")
         for template in (
             "Subject: =?utf-8?q?A_snowman_for_you!_%(snowman)s?=",
             "\n\nHere he is: %(snowman)s"

@@ -5,7 +5,7 @@ import json
 import logging
 from nose.tools import set_trace
 from PIL import Image
-from StringIO import StringIO
+from io import BytesIO
 from urlparse import urljoin
 
 from authentication_document import AuthenticationDocument
@@ -199,9 +199,9 @@ class LibraryRegistrar(object):
                     _("Could not read logo image %(image_url)s", image_url=image_url)
                 )
             # Convert to PNG.
-            buffer = StringIO()
+            buffer = BytesIO()
             image.save(buffer, format="PNG")
-            b64 = base64.b64encode(buffer.getvalue())
+            b64 = base64.b64encode(buffer.getvalue()).decode("utf8")
             type = logo_response.headers.get("Content-Type") or auth_document.logo_link.get("type")
             if type:
                 library.logo = "data:%s;base64,%s" % (type, b64)

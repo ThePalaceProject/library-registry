@@ -1,4 +1,3 @@
-import base64
 from config import Configuration
 from flask_babel import lazy_gettext as _
 import datetime
@@ -76,6 +75,10 @@ from util import (
     GeometryUtility,
 )
 from util.short_client_token import ShortClientTokenTool
+from util.string_helpers import (
+    native_string,
+    random_string,
+)
 
 def production_session():
     url = Configuration.database_url()
@@ -97,7 +100,7 @@ DEBUG = False
 
 def generate_secret():
     """Generate a random secret."""
-    return os.urandom(24).encode('hex')
+    return random_string(24)
 
 class SessionManager(object):
 
@@ -379,7 +382,7 @@ class Library(Base):
         choice = None
         while choice is None and attempts < max_attempts:
             choice = "".join(
-                [random.choice(string.uppercase)
+                [random.choice(string.ascii_uppercase)
                  for i in range(6)]
             )
             if duplicate_check and duplicate_check(choice):
@@ -1424,7 +1427,7 @@ class Place(Base):
         output = u"<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
             self.external_name, self.type, abbr, self.external_id, parent
         )
-        return output.encode("utf8")
+        return native_string(output)
 
 
 class PlaceAlias(Base):
@@ -1975,7 +1978,8 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
         # Sign the token and check against the provided signature.
         key = self.signer.prepare_key(secret)
-        actual_signature = self.signer.sign(token, key)
+        token_bytes = token.encode("utf8")
+        actual_signature = self.signer.sign(token_bytes, key)
 
         if actual_signature != supposed_signature:
             raise ValueError(
