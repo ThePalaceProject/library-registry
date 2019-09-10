@@ -410,14 +410,33 @@ class LibraryRegistryController(BaseController):
         URL of the page they're stored.
         """
         document = dict()
+
+        # The terms of service may be encapsulated in a link to
+        # a web page.
         terms_of_service_url = ConfigurationSetting.sitewide(
             self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_URL
         ).value
+        type = "text/html"
+        rel = "terms-of-service"
         if terms_of_service_url:
             OPDSCatalog.add_link_to_catalog(
-                document, rel="terms-of-service",
-                href=terms_of_service_url
+                document, rel=rel, type=type,
+                href=terms_of_service_url,
             )
+
+        # And/or the terms of service may be described in
+        # human-readable HTML, which we'll present as a data: link.
+        terms_of_service_html = ConfigurationSetting.sitewide(
+            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_HTML
+        ).value
+        if terms_of_service_html:
+            encoded = base64.b64encode(terms_of_service_html)
+            terms_of_service_link = "data:%s;base64,%s" % (type, encoded)
+            OPDSCatalog.add_link_to_catalog(
+                document, rel=rel, type=type,
+                href=terms_of_service_link
+            )
+
         return document
 
     def catalog_response(self, document, status=200):

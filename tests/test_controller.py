@@ -970,21 +970,43 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(200, response.status_code)
             eq_({}, json.loads(response.data))
 
-        # Set some terms of service.
+        # Set a terms-of-service link.
         tos = "http://terms.com/service.html"
         ConfigurationSetting.sitewide(
             self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_URL
         ).value = tos
 
-        # Now the document contains one link, to the terms of service
-        # document.
+        # And a terms-of-service HTML snippet.
+        html = 'Terms of service are <a href="http://terms.com/service.html">over here</a>.'
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.REGISTRATION_TERMS_OF_SERVICE_HTML
+        ).value = html
+
+        # Now the document contains two links, both with the
+        # 'terms-of-service' rel. One links to the terms of service
+        # document, the other is a data: URI containing a snippet of
+        # HTML.
         with self.app.test_request_context("/", method="GET"):
             response = self.controller.register()
             eq_(200, response.status_code)
             data = json.loads(response.data)
-            [link] = data['links']
-            eq_("terms-of-service", link["rel"])
-            eq_(tos, link['href'])
+
+            # Both links have the same rel and type.
+            for link in data['links']:
+                eq_("terms-of-service", link["rel"])
+                eq_("text/html", link["type"])
+
+            # Verifying the http: link is simple.
+            [http_link, data_link] = data['links']
+            eq_(tos, http_link['href'])
+
+            # To verify the data: link we must first separate it from its
+            # header and decode it.
+            header, encoded = data_link['href'].split(",", 1)
+            eq_("data:text/html;base64", header)
+
+            decoded = base64.b64decode(encoded)
+            eq_(html, decoded)
 
     def test_register_fails_when_no_auth_document_url_provided(self):
         """Without the URL to an Authentication For OPDS document,
