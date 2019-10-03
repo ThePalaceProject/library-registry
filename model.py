@@ -2408,18 +2408,16 @@ class Admin(Base):
         """Finds an authenticated Admin by username and password
         :return: Admin or None
         """
+        setting_up = _db.query(Admin).count() == 0
         admin, is_new = get_one_or_create(
             _db, Admin, username=username
         )
-        if is_new:
+        if setting_up:
             admin.password = cls.make_password(password)
             return admin
-        else:
-            match = _db.query(Admin).filter(Admin.username==username).first()
-            if match and not match.check_password(password):
-                # Admin with this email was found, but password is invalid.
-                match = None
-            return match
+        elif not is_new and admin and admin.check_password(password):
+            return admin
+        return None
 
     def __repr__(self):
         return u"<Admin: username=%s>" % self.username
