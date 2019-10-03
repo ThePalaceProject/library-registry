@@ -19,6 +19,7 @@ from model import (
     create,
     get_one,
     get_one_or_create,
+    Admin,
     Audience,
     CollectionSummary,
     ConfigurationSetting,
@@ -1673,3 +1674,26 @@ class TestValidation(DatabaseTest):
             Exception, "This validation has expired",
             validation.mark_as_successful
         )
+
+class TestAdmin(DatabaseTest):
+    def setup(self):
+        super(TestAdmin, self).setup()
+        self.admin = self._admin()
+
+    def test_make_password(self):
+        assert self.admin.password.startswith("$2b$")
+
+    def test_check_password(self):
+        assert self.admin.check_password("123")
+        assert not self.admin.check_password("wrong")
+
+    def test_authenticate(self):
+        # Successfully authenticate existing admin
+        eq_(self.admin, Admin.authenticate(self._db, "Admin", "123"))
+        # Unsuccessfully authenticate existing admin
+        eq_(None, Admin.authenticate(self._db, "Admin", "wrong"))
+        # Create new admin
+        new_admin = Admin.authenticate(self._db, "New", "password")
+        eq_(new_admin.username, "New")
+        assert new_admin.password.startswith("$2b$")
+        assert new_admin.password != self.admin.password
