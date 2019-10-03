@@ -20,6 +20,7 @@ from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
 from emailer import Emailer
 from model import (
+    Admin,
     ConfigurationSetting,
     Hyperlink,
     Library,
@@ -364,7 +365,7 @@ class LibraryRegistryController(BaseController):
     def log_in(self):
         username = flask.request.form.get("username")
         password = flask.request.form.get("password")
-        if username == "Admin" and password == "123":
+        if Admin.authenticate(self._db, username, password):
             session["username"] = username
             return redirect(url_for('admin_view'))
         else:
