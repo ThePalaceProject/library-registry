@@ -1,5 +1,9 @@
 from config import Configuration
 from flask_babel import lazy_gettext as _
+from flask_bcrypt import (
+    check_password_hash,
+    generate_password_hash
+)
 import datetime
 import logging
 from nose.tools import set_trace
@@ -2385,3 +2389,35 @@ libraries_audiences = Table(
      ),
      UniqueConstraint('library_id', 'audience_id'),
  )
+
+class Admin(Base):
+    __tablename__ = 'admins'
+    id = Column(Integer, primary_key=True)
+    username = Column(Unicode, index=True, unique=True, nullable=False)
+    password = Column(Unicode, index=True)
+
+    @classmethod
+    def make_password(cls, raw_password):
+        return generate_password_hash(raw_password).decode('utf-8')
+
+    def check_password(self, raw_password):
+        return check_password_hash(self.password, raw_password)
+
+    @classmethod
+    def authenticate(cls, _db, username, password):
+        """Finds an authenticated Admin by username and password
+        :return: Admin or None
+        """
+        setting_up = _db.query(Admin).count() == 0
+        admin, is_new = get_one_or_create(
+            _db, Admin, username=username
+        )
+        if setting_up:
+            admin.password = cls.make_password(password)
+            return admin
+        elif not is_new and admin and admin.check_password(password):
+            return admin
+        return None
+
+    def __repr__(self):
+        return u"<Admin: username=%s>" % self.username

@@ -1,5 +1,6 @@
 feedparser
 flask
+flask-bcrypt
 flask-sqlalchemy-session
 geoalchemy2
 pyjwt

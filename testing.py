@@ -18,6 +18,7 @@ from config import Configuration
 from log import LogConfiguration
 from model import (
     get_one_or_create,
+    Admin,
     Audience,
     Base,
     ConfigurationSetting,
@@ -125,6 +126,11 @@ class DatabaseTest(object):
         v = self.time_counter
         self.time_counter = self.time_counter + timedelta(days=1)
         return v
+
+    def _admin(self, username=None, password=None):
+        username = username or "Admin"
+        password = password or "123"
+        return Admin.authenticate(self._db, username, password)
 
     def _library(self, name=None, short_name=None, eligibility_areas=[], focus_areas=[], audiences=None, library_stage=Library.PRODUCTION_STAGE, registry_stage=Library.PRODUCTION_STAGE, has_email=False, description=None):
         name = name or self._str

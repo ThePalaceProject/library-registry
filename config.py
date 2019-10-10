@@ -39,9 +39,15 @@ class Configuration(object):
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
     ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
 
-    # The URL to the document containing the terms of servier for
+    # The URL to the document containing the terms of service for
     # library registration
     REGISTRATION_TERMS_OF_SERVICE_URL = "registration_terms_of_service_url"
+
+    # An HTML snippet describing the terms of service for library
+    # registration. It's better if this is a short snippet of text
+    # with a link, rather than the actual text of the terms of
+    # service.
+    REGISTRATION_TERMS_OF_SERVICE_HTML = "registration_terms_of_service_html"
 
     # Email sent by the library registry will be 'from' this address,
     # and receipients will be invited to contact this address if they
