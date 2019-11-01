@@ -420,6 +420,13 @@ class Library(Base):
         return ConfigurationSetting.for_library(Library.PLS_ID, self)
 
     @property
+    def number_of_patrons(self):
+        # This is only meaningful if the library is in production.
+        if not self.in_production:
+            return '0'
+        return str(len(filter(lambda id: (id.type == 'Adobe Account ID'), self.delegated_patron_identifiers)))
+
+    @property
     def in_production(self):
         """Is this library in production?
 
