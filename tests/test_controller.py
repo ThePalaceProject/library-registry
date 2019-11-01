@@ -266,6 +266,8 @@ class TestLibraryRegistryController(ControllerTest):
                 eq_(actual_areas, expected_areas)
             elif k == Library.PLS_ID:
                 eq_(flattened.get(k), expected.pls_id.value)
+            elif k == "number_of_patrons":
+                eq_(flattened.get(k), expected.number_of_patrons(self._db))
             else:
                 eq_(flattened.get(k), getattr(expected, k))
 
