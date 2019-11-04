@@ -419,15 +419,17 @@ class Library(Base):
     def pls_id(self):
         return ConfigurationSetting.for_library(Library.PLS_ID, self)
 
-    def number_of_patrons(self, _db):
+    @property
+    def number_of_patrons(self):
+        db = Session.object_session(self)
         # This is only meaningful if the library is in production.
         if not self.in_production:
-            return '0'
-        query = _db.query(DelegatedPatronIdentifier).filter(
+            return 0
+        query = db.query(DelegatedPatronIdentifier).filter(
             DelegatedPatronIdentifier.type==DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
             DelegatedPatronIdentifier.library_id==self.id
         )
-        return str(query.count())
+        return query.count()
 
     @property
     def in_production(self):
