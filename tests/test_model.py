@@ -514,6 +514,28 @@ class TestLibrary(DatabaseTest):
         lib.registry_stage = Library.PRODUCTION_STAGE
         eq_(False, lib.in_production)
 
+    def test_number_of_patrons(self):
+        production_library = self._library()
+        eq_(production_library.number_of_patrons, 0)
+        identifier1, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, production_library, self._str, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            None
+        )
+        eq_(production_library.number_of_patrons, 1)
+        # Identifiers that aren't Adobe Account IDs don't count towards the total.
+        identifier2, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, production_library, self._str, "abc", None
+        )
+        eq_(production_library.number_of_patrons, 1)
+        # Identifiers can't be assigned to libraries that aren't in production.
+        testing_library = self._library(library_stage=Library.TESTING_STAGE)
+        eq_(testing_library.number_of_patrons, 0)
+        identifier3, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, testing_library, self._str, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            None
+        )
+        eq_(testing_library.number_of_patrons, 0)
+
     def test__feed_restriction(self):
         """Test the _feed_restriction helper method."""
 

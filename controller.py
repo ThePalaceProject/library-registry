@@ -283,7 +283,8 @@ class LibraryRegistryController(BaseController):
             timestamp=library.timestamp,
             internal_urn=library.internal_urn,
             online_registration=str(library.online_registration),
-            pls_id=library.pls_id.value
+            pls_id=library.pls_id.value,
+            number_of_patrons=str(library.number_of_patrons)
         )
         urls_and_contact = dict(
             contact_email=contact_email,

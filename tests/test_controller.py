@@ -266,6 +266,8 @@ class TestLibraryRegistryController(ControllerTest):
                 eq_(actual_areas, expected_areas)
             elif k == Library.PLS_ID:
                 eq_(flattened.get(k), expected.pls_id.value)
+            elif k == "number_of_patrons":
+                eq_(flattened.get(k), str(getattr(expected, k)))
             else:
                 eq_(flattened.get(k), getattr(expected, k))
 
@@ -275,7 +277,7 @@ class TestLibraryRegistryController(ControllerTest):
         expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages', 'areas']
         eq_(set(expected_categories), set(library.keys()))
 
-        expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration', 'pls_id']
+        expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration', 'pls_id', 'number_of_patrons']
         eq_(set(expected_info_keys), set(library.get("basic_info").keys()))
 
         expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'validated', 'opds_url']
