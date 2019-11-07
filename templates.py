@@ -11,7 +11,6 @@ admin = """
   <script>
     var registryAdmin = new RegistryAdmin({username: \"{{ username }}\"});
   </script>
-  <h1></h1>
 </body>
 </html>
 """
