@@ -366,9 +366,10 @@ class TestLibraryRegistryController(ControllerTest):
 
             catalog = json.loads(response.data)
 
-            eq_(len(catalog['catalogs']), 4)
+            # The cancelled library got filtered out.
+            eq_(len(catalog['catalogs']), 3)
 
-            [ct, ks, nypl, cancelled_library] = catalog['catalogs']
+            [ct, ks, nypl] = catalog['catalogs']
             eq_("Connecticut State Library", ct['metadata']['title'])
             eq_(self.connecticut_state_library.internal_urn, ct['metadata']['id'])
 
@@ -377,10 +378,6 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_("NYPL", nypl['metadata']['title'])
             eq_(self.nypl.internal_urn, nypl['metadata']['id'])
-
-            eq_("Test Cancelled Library", cancelled_library['metadata']['title'])
-            eq_(library.internal_urn, cancelled_library['metadata']['id'])
-
 
             [library_link, register_link, search_link, self_link] = sorted(
                 catalog['links'], key=lambda x: x['rel']

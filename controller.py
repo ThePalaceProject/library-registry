@@ -251,10 +251,9 @@ class LibraryRegistryController(BaseController):
         """Return all the libraries in OPDS format"""
 
         libraries = self._db.query(Library).order_by(Library.name)
-        # We want to restrict libraries that are either in production
-        # or in the testing stage but not cancelled.
-        if live:
-            libraries = libraries.filter(Library._feed_restriction(production=True))
+        # We always want to filter out cancelled libraries.  If live, we also filter out
+        # libraries that are in the testing stage, i.e. only show production libraries.
+        libraries = libraries.filter(Library._feed_restriction(production=live))
 
         url = self.app.url_for("libraries_opds")
         catalog = OPDSCatalog(
