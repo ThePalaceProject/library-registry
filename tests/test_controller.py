@@ -23,7 +23,7 @@ from controller import (
 
 import flask
 from flask import Response, session
-from werkzeug import ImmutableMultiDict, MultiDict
+from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
