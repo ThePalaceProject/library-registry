@@ -255,8 +255,20 @@ class TestLibraryRegistryController(ControllerTest):
                 if has_email:
                     expected_contact_email = expected.name + "@library.org"
                     eq_(flattened.get("contact_email"), expected_contact_email)
-            elif k == "validated":
-                eq_(flattened.get("validated"), "Not validated")
+            elif k == "help_email":
+                if has_email:
+                    expected_help_email = expected.name + "@library.org"
+                    eq_(flattened.get("help_email"), expected_help_email)
+            elif k == "copyright_email":
+                if has_email:
+                    expected_copyright_email = expected.name + "@library.org"
+                    eq_(flattened.get("copyright_email"), expected_copyright_email)
+            elif k == "contact_validated":
+                eq_(flattened.get("contact_validated"), "Not validated")
+            elif k == "help_validated":
+                eq_(flattened.get("help_validated"), "Not validated")
+            elif k == "copyright_validated":
+                eq_(flattened.get("copyright_validated"), "Not validated")
             elif k == "online_registration":
                 eq_(flattened.get("online_registration"), str(expected.online_registration))
             elif k in ["focus", "service"]:
@@ -273,14 +285,13 @@ class TestLibraryRegistryController(ControllerTest):
 
     def _check_keys(self, library):
         # Helper method to check that the controller is sending the right pieces of information about a library.
-
         expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages', 'areas']
         eq_(set(expected_categories), set(library.keys()))
 
         expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn', 'online_registration', 'pls_id', 'number_of_patrons']
         eq_(set(expected_info_keys), set(library.get("basic_info").keys()))
 
-        expected_url_contact_keys = ['contact_email', 'web_url', 'authentication_url', 'validated', 'opds_url']
+        expected_url_contact_keys = ['contact_email', 'help_email', 'copyright_email', 'web_url', 'authentication_url', 'contact_validated', 'help_validated', 'copyright_validated', 'opds_url']
         eq_(set(expected_url_contact_keys), set(library.get("urls_and_contact")))
 
         expected_area_keys = ['focus', 'service']
@@ -527,6 +538,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("uuid", "no:such:library"),
+                ("email", "contact_email")
             ])
             response = self.controller.validate_email()
         assert isinstance(response, ProblemDetail)
@@ -542,6 +554,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
+                ("email", "contact_email")
             ])
             self.controller.validate_email()
 
@@ -555,6 +568,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
+                ("email", "contact_email")
             ])
             response = self.controller.validate_email()
 

@@ -271,10 +271,21 @@ class LibraryRegistryController(BaseController):
             return library
 
         contact_email = None
+        help_email = None
+        copyright_email = None
 
-        hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
-        contact_email = self._contact_email(hyperlink)
-        validated_at = self._validated_at(hyperlink)
+        contact_email_hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
+        contact_email = self._get_email(contact_email_hyperlink)
+        contact_email_validated_at = self._validated_at(contact_email_hyperlink)
+
+        help_email_hyperlink = Library.get_hyperlink(library, Hyperlink.HELP_REL)
+        help_email = self._get_email(help_email_hyperlink)
+        help_email_validated_at = self._validated_at(help_email_hyperlink)
+
+        copyright_email_hyperlink = Library.get_hyperlink(library, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL)
+        copyright_email = self._get_email(copyright_email_hyperlink)
+        copyright_email_validated_at = self._validated_at(copyright_email_hyperlink)
+
         basic_info = dict(
             name=library.name,
             short_name=library.short_name,
@@ -287,7 +298,11 @@ class LibraryRegistryController(BaseController):
         )
         urls_and_contact = dict(
             contact_email=contact_email,
-            validated=validated_at,
+            contact_validated=contact_email_validated_at,
+            help_email=help_email,
+            help_validated=help_email_validated_at,
+            copyright_email=copyright_email,
+            copyright_validated=copyright_email_validated_at,
             authentication_url=library.authentication_url,
             opds_url=library.opds_url,
             web_url=library.web_url,
@@ -310,7 +325,7 @@ class LibraryRegistryController(BaseController):
         parent_name = (place.parent.abbreviated_name or place.parent.external_name) if place.parent else "unknown"
         return "%s (%s)" %(place.external_name, parent_name)
 
-    def _contact_email(self, hyperlink):
+    def _get_email(self, hyperlink):
         if hyperlink and hyperlink.resource and hyperlink.resource.href:
             return hyperlink.resource.href.split("mailto:")[1]
 
@@ -325,15 +340,20 @@ class LibraryRegistryController(BaseController):
     def validate_email(self):
         # Manually validate an email address, without the admin having to click on a confirmation link
         uuid = flask.request.form.get("uuid")
+        email = flask.request.form.get("email")
         library = self.library_for_request(uuid)
         if isinstance(library, ProblemDetail):
             return library
-        hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
+        email_types = {
+            "contact_email": Hyperlink.INTEGRATION_CONTACT_REL,
+            "help_email": Hyperlink.HELP_REL,
+            "copyright_email": Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL
+        }
+        hyperlink = Library.get_hyperlink(library, email_types[email])
         if not hyperlink or not hyperlink.resource or isinstance(hyperlink, ProblemDetail):
             return INVALID_CONTACT_URI.detailed(
                 "The contact URI for this library is missing or invalid"
             )
-
         validation, is_new = get_one_or_create(self._db, Validation, resource=hyperlink.resource)
         validation.restart()
         validation.mark_as_successful()
@@ -472,7 +492,6 @@ class LibraryRegistryController(BaseController):
         library_stage = flask.request.form.get("stage")
         self.log.info("Incoming stage: %s", library_stage)
         library_stage = library_stage or Library.PRODUCTION_STAGE
-
 
         # NOTE: This is commented out until we can say that
         # registration requires providing a contact email and expect

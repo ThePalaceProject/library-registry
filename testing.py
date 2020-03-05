@@ -156,6 +156,8 @@ class DatabaseTest(object):
         library.registry_stage = registry_stage
         if has_email:
             library.set_hyperlink(Hyperlink.INTEGRATION_CONTACT_REL, "mailto:" + name + "@library.org")
+            library.set_hyperlink(Hyperlink.HELP_REL, "mailto:" + name + "@library.org")
+            library.set_hyperlink(Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, "mailto:" + name + "@library.org")
         return library
 
     def _external_integration(self, protocol, goal=None, settings=None,
