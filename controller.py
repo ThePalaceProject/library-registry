@@ -270,21 +270,11 @@ class LibraryRegistryController(BaseController):
         if isinstance(library, ProblemDetail):
             return library
 
-        contact_email = None
-        help_email = None
-        copyright_email = None
-
-        contact_email_hyperlink = Library.get_hyperlink(library, Hyperlink.INTEGRATION_CONTACT_REL)
-        contact_email = self._get_email(contact_email_hyperlink)
-        contact_email_validated_at = self._validated_at(contact_email_hyperlink)
-
-        help_email_hyperlink = Library.get_hyperlink(library, Hyperlink.HELP_REL)
-        help_email = self._get_email(help_email_hyperlink)
-        help_email_validated_at = self._validated_at(help_email_hyperlink)
-
-        copyright_email_hyperlink = Library.get_hyperlink(library, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL)
-        copyright_email = self._get_email(copyright_email_hyperlink)
-        copyright_email_validated_at = self._validated_at(copyright_email_hyperlink)
+        hyperlink_types = [Hyperlink.INTEGRATION_CONTACT_REL, Hyperlink.HELP_REL, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL]
+        hyperlinks = [Library.get_hyperlink(library, x) for x in hyperlink_types]
+        contact_email, help_email, copyright_email = [self._get_email(x) for x in hyperlinks]
+        contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [self._validated_at(x) for x in hyperlinks]
+        contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = hyperlinks
 
         basic_info = dict(
             name=library.name,

@@ -251,24 +251,12 @@ class TestLibraryRegistryController(ControllerTest):
                 actual_time = [actual_ts.year, actual_ts.month, actual_ts.day]
                 expected_time = [expected_ts.year, expected_ts.month, expected_ts.day]
                 eq_(actual_time, expected_time)
-            elif k == "contact_email":
+            elif "_email" in k:
                 if has_email:
-                    expected_contact_email = expected.name + "@library.org"
-                    eq_(flattened.get("contact_email"), expected_contact_email)
-            elif k == "help_email":
-                if has_email:
-                    expected_help_email = expected.name + "@library.org"
-                    eq_(flattened.get("help_email"), expected_help_email)
-            elif k == "copyright_email":
-                if has_email:
-                    expected_copyright_email = expected.name + "@library.org"
-                    eq_(flattened.get("copyright_email"), expected_copyright_email)
-            elif k == "contact_validated":
-                eq_(flattened.get("contact_validated"), "Not validated")
-            elif k == "help_validated":
-                eq_(flattened.get("help_validated"), "Not validated")
-            elif k == "copyright_validated":
-                eq_(flattened.get("copyright_validated"), "Not validated")
+                    expected_email = expected.name + "@library.org"
+                    eq_(flattened.get(k), expected_email)
+            elif "_validated" in k:
+                eq_(flattened.get(k), "Not validated")
             elif k == "online_registration":
                 eq_(flattened.get("online_registration"), str(expected.online_registration))
             elif k in ["focus", "service"]:
