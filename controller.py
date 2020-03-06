@@ -339,7 +339,9 @@ class LibraryRegistryController(BaseController):
             "help_email": Hyperlink.HELP_REL,
             "copyright_email": Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL
         }
-        hyperlink = Library.get_hyperlink(library, email_types[email])
+        hyperlink = None
+        if email_types[email]:
+            hyperlink = Library.get_hyperlink(library, email_types[email])
         if not hyperlink or not hyperlink.resource or isinstance(hyperlink, ProblemDetail):
             return INVALID_CONTACT_URI.detailed(
                 "The contact URI for this library is missing or invalid"
