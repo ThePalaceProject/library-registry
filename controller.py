@@ -340,7 +340,7 @@ class LibraryRegistryController(BaseController):
             "copyright_email": Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL
         }
         hyperlink = None
-        if email_types[email]:
+        if email_types.get(email):
             hyperlink = Library.get_hyperlink(library, email_types[email])
         if not hyperlink or not hyperlink.resource or isinstance(hyperlink, ProblemDetail):
             return INVALID_CONTACT_URI.detailed(
