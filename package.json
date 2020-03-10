@@ -10,7 +10,7 @@
   "author": "NYPL",
   "license": "Apache-2.0",
   "dependencies": {
-    "simplified-registry-admin": "1.4.8"
+    "simplified-registry-admin": "1.4.9"
   },
   "homepage": "https://github.com/NYPL-Simplified/library_registry#readme"
 }
