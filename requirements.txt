@@ -2,6 +2,7 @@ feedparser
 flask
 flask-bcrypt
 flask-sqlalchemy-session
+Flask-Babel
 geoalchemy2
 pyjwt
 loggly-python-handler
