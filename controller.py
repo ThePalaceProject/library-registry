@@ -1,4 +1,5 @@
 from nose.tools import set_trace
+import datetime
 import logging
 import flask
 from flask_babel import lazy_gettext as _
@@ -172,6 +173,7 @@ class LibraryRegistryController(BaseController):
         super(LibraryRegistryController, self).__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
+        self.library_list_cache = dict()
         emailer = None
         try:
             emailer = emailer_class.from_sitewide_integration(self._db)
@@ -232,9 +234,26 @@ class LibraryRegistryController(BaseController):
             )
             return Response(body, 200, headers)
 
+    # We will cache each library list _internally_ for this amount
+    # of time.
+    #
+    # This is one part of an overall caching strategy; the goal of
+    # this server-side piece is to reduce the amount of time we spend
+    # constructing OPDS feeds.
+    CACHE_LIBRARY_LIST_FOR = datetime.timedelta(minutes=15)
+
     def libraries(self, live=True):
         # Return a specific set of information about all libraries in production; this generates the library list in the admin interface.
         # If :param live is set to False, libraries in testing will also be shown.
+
+        cache_for = self.CACHE_LIBRARY_LIST_FOR
+        if live in self.library_list_cache:
+            data, cached_at = self.library_list_cache[live]
+            now = datetime.datetime.utcnow()
+            expires = cached_at + cache_for
+            if now <= expires:
+                return data
+
         result = []
         libraries = self._db.query(Library).order_by(Library.name)
 
@@ -245,7 +264,10 @@ class LibraryRegistryController(BaseController):
             uuid = library.internal_urn.split("uuid:")[1]
             result += [self.library_details(uuid, library)]
 
-        return dict(libraries=result)
+        data = dict(libraries=result)
+        now = datetime.datetime.utcnow()
+        self.library_list_cache[live] = (data, now)
+        return data
 
     def libraries_opds(self, live=True):
         """Return all the libraries in OPDS format"""
