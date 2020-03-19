@@ -234,9 +234,11 @@ class LibraryRegistryController(BaseController):
             )
             return Response(body, 200, headers)
 
-    # We will cache each library list _internally_ for one hour.
-    # This is one part of an overall caching strategy; the goal
-    # of this piece is to reduce the amount of time we spend
+    # We will cache each library list _internally_ for this amount
+    # of time.
+    #
+    # This is one part of an overall caching strategy; the goal of
+    # this server-side piece is to reduce the amount of time we spend
     # constructing OPDS feeds.
     CACHE_LIBRARY_LIST_FOR = datetime.timedelta(minutes=15)
 
