@@ -65,7 +65,6 @@ def compressible(f):
     def compressor(*args, **kwargs):
         @flask.after_this_request
         def compress(response):
-            set_trace()
             if (response.status_code < 200 or
                 response.status_code >= 300 or
                 'Content-Encoding' in response.headers):

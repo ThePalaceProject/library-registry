@@ -70,36 +70,49 @@ class TestAppHelpers(ControllerTest):
         # Spot-check the compressed value
         assert '-(J-.V' in compressed
 
-        @contextlib.contextmanager
-        def header(value, name='Accept-Encoding'):
-            headers = dict(name=value)
-            with self.app.test_request_context(headers=headers):
-                yield
-
         # This compressible controller function always returns the
         # same value.
         @compressible
         def function():
             return value
 
+        def ask_for_compression(compression, header='Accept-Encoding'):
+            """This context manager simulates the entire Flask
+            request-response cycle, including a call to
+            process_response(), which triggers the @after_this_request
+            hooks.
+
+            :return: The Response object.
+            """
+            headers = {}
+            if compression:
+                headers[header] = compression
+            with self.app.test_request_context(headers=headers):
+                response = flask.Response(function())
+                self.app.process_response(response)
+                return response
+
         # If the client asks for gzip through Accept-Encoding, the
         # representation is compressed.
-        with header('gzip'):
-            eq_(compressed, function())
+        response = ask_for_compression("gzip")
+        eq_(compressed, response.data)
+        eq_("gzip", response.headers['Content-Encoding'])
 
         # If the client doesn't ask for compression, the value is
         # passed through unchanged.
-        with self.app.test_request_context():
-            eq_(value, function())
+        response = ask_for_compression(None)
+        eq_(value, response.data)
+        assert 'Content-Encoding' not in response.headers
 
         # Similarly if the client asks for an unsupported compression
         # mechanism.
-        with header('compress'):
-            eq_(value, function())
+        response = ask_for_compression('compress')
+        eq_(value, response.data)
+        assert 'Content-Encoding' not in response.headers
 
         # Or if the client asks for a compression mechanism through
         # Accept-Transfer-Encoding, which is currently unsupported.
-        with header('gzip', 'Accept-Transfer-Encoding'):
-            eq_(value, function())
-
+        response = ask_for_compression("gzip", "Accept-Transfer-Encoding")
+        eq_(value, response.data)
+        assert 'Content-Encoding' not in response.headers
 
