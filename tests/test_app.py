@@ -1,5 +1,9 @@
+from io import BytesIO
+import contextlib
 import flask
+import gzip
 from app_helpers import (
+    compressible,
     has_library_factory,
     uses_location_factory,
 )
@@ -52,3 +56,50 @@ class TestAppHelpers(ControllerTest):
         with self.app.test_request_context("/?_location=-10,10"):
             eq_("Called with location SRID=4326;POINT (10.0 -10.0)",
                 route_function())
+
+    def test_compressible(self):
+        # Prepare a value and a gzipped version of the value.
+        value = "Compress me! (Or not.)"
+
+        buffer = BytesIO()
+        gzipped = gzip.GzipFile(mode='wb', fileobj=buffer)
+        gzipped.write(value)
+        gzipped.close()
+        compressed = buffer.getvalue()
+
+        # Spot-check the compressed value
+        assert '-(J-.V' in compressed
+
+        @contextlib.contextmanager
+        def header(value, name='Accept-Encoding'):
+            headers = dict(name=value)
+            with self.app.test_request_context(headers=headers):
+                yield
+
+        # This compressible controller function always returns the
+        # same value.
+        @compressible
+        def function():
+            return value
+
+        # If the client asks for gzip through Accept-Encoding, the
+        # representation is compressed.
+        with header('gzip'):
+            eq_(compressed, function())
+
+        # If the client doesn't ask for compression, the value is
+        # passed through unchanged.
+        with self.app.test_request_context():
+            eq_(value, function())
+
+        # Similarly if the client asks for an unsupported compression
+        # mechanism.
+        with header('compress'):
+            eq_(value, function())
+
+        # Or if the client asks for a compression mechanism through
+        # Accept-Transfer-Encoding, which is currently unsupported.
+        with header('gzip', 'Accept-Transfer-Encoding'):
+            eq_(value, function())
+
+

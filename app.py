@@ -14,6 +14,7 @@ from model import SessionManager, ConfigurationSetting
 from nose.tools import set_trace
 from util.app_server import returns_problem_detail, returns_json_or_response_or_problem_detail
 from app_helpers import (
+    compressible,
     has_library_factory,
     uses_location_factory,
 )
@@ -106,11 +107,13 @@ def confirm_resource(resource_id, secret):
     )
 
 @app.route('/libraries')
+@compressible
 @returns_problem_detail
 def libraries_opds():
     return app.library_registry.registry_controller.libraries_opds()
 
 @app.route('/libraries/qa')
+@compressible
 @returns_problem_detail
 def libraries_qa():
     return app.library_registry.registry_controller.libraries_opds(live=False)
