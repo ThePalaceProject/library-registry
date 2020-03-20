@@ -77,12 +77,13 @@ def compressible(f):
             if not 'gzip' in accept_encoding.lower():
                 return response
 
-            # At this point we know we'ree going to be changing the
+            # At this point we know we're going to be changing the
             # outgoing response.
 
             # TODO: I understand what direct_passthrough does, but am
-            # not sure what it has to do with this. This is pure
-            # copy-and-paste magic.
+            # not sure what it has to do with this, and commenting it
+            # out doesn't change the results or cause tests to
+            # fail. This is pure copy-and-paste magic.
             response.direct_passthrough = False
 
             buffer = BytesIO()
