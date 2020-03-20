@@ -53,6 +53,41 @@ class TestOPDSCatalog(DatabaseTest):
         # Each library became a catalog in the catalogs collection.
         eq_([l1.name, l2.name], [x['metadata']['title'] for x in parsed['catalogs']])
 
+    def test_large_feeds_treated_differently(self):
+        # The libraries in large feeds are converted to JSON in ways
+        # that omit large chunks of data such as inline logos.
+
+        # In this test, a feed with 2 or more items is considered
+        # 'large'. Any smaller feed is considered 'small'.
+        setting = ConfigurationSetting.sitewide(
+            self._db, Configuration.LARGE_FEED_SIZE
+        )
+        setting.value = 2
+
+        class Mock(OPDSCatalog):
+            def library_catalog(*args, **kwargs):
+                # Every time library_catalog is called, record whether
+                # we were asked to include a logo.
+                return kwargs['include_logo']
+
+        # Every item in the large feed resulted in a call with
+        # include_logo=False.
+        large_feed = Mock(self._db, "title", "url", ["it's", "large"])
+        large_catalog = large_feed.catalog['catalogs']
+        eq_([False, False], large_catalog)
+
+        # Every item in the large feed resulted in a call with
+        # include_logo=True.
+        small_feed = Mock(self._db, "title", "url", ["small"])
+        small_catalog = small_feed.catalog['catalogs']
+        eq_([True], small_catalog)
+
+        # Make it so even a feed with one item is 'large'.
+        setting.value = 1
+        small_feed = Mock(self._db, "title", "url", ["small"])
+        small_catalog = small_feed.catalog['catalogs']
+        eq_([False], small_catalog)
+
     def test_library_catalog(self):
 
         class Mock(OPDSCatalog):
