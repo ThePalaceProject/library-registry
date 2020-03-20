@@ -2,6 +2,7 @@ from nose.tools import set_trace
 import json
 
 import flask
+from sqlalchemy.orm import Query
 
 from model import (
     ConfigurationSetting,
@@ -83,7 +84,8 @@ class OPDSCatalog(object):
             )
         annotator.annotate_catalog(self, live=live)
 
-    def _feed_is_large(self, _db, libraries):
+    @classmethod
+    def _feed_is_large(cls, _db, libraries):
         """Determine whether a prospective feed is 'large' per a sitewide setting.
 
         :param _db: A database session
@@ -96,7 +98,13 @@ class OPDSCatalog(object):
         if large_feed_size is None:
             # No limit
             return False
-        return len(libraries) >= large_feed_size 
+        if isinstance(libraries, Query):
+            # This is a SQLAlchemy query.
+            size = libraries.count()
+        else:
+            # This is something like a normal Python list.
+            size = len(libraries)
+        return size >= large_feed_size
 
     @classmethod
     def library_catalog(cls, library, distance=None,
