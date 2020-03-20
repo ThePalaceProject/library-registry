@@ -63,6 +63,11 @@ class Configuration(object):
     # nation, we assume that they're talking about this nation.
     DEFAULT_NATION_ABBREVIATION = "default_nation_abbreviation"
 
+    # For performance reasons, a registry may want to omit certain
+    # pieces of information from large feeds. This sitewide setting
+    # controls how big a feed must be to be considered 'large'.
+    LARGE_FEED_SIZE = "large_feed_size"
+
     # The name of the sitewide secret used for admin login.
     SECRET_KEY = u"secret_key"
 

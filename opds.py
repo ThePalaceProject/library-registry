@@ -65,6 +65,9 @@ class OPDSCatalog(object):
         if not annotator:
             annotator = Annotator()
 
+        # To save bandwidth, omit logos from large feeds. What 'large'
+        # means is customizable.
+        include_logos = not (self._feed_is_large(_db, libraries))
         self.catalog = dict(metadata=dict(title=title), catalogs=[])
 
         self.add_link_to_catalog(self.catalog, rel="self",
@@ -73,13 +76,32 @@ class OPDSCatalog(object):
             if not isinstance(library, tuple):
                 library = (library,)
             self.catalog["catalogs"].append(
-                self.library_catalog(*library, url_for=url_for)
+                self.library_catalog(
+                    *library, url_for=url_for,
+                    include_logo=include_logos
+                )
             )
         annotator.annotate_catalog(self, live=live)
+
+    def _feed_is_large(self, _db, libraries):
+        """Determine whether a prospective feed is 'large' per a sitewide setting.
+
+        :param _db: A database session
+        :param libraries: A list of libraries (or anything else that might be
+            going into a feed).
+        """
+        large_feed_size = ConfigurationSetting.sitewide(
+            _db, Configuration.LARGE_FEED_SIZE
+        ).int_value
+        if large_feed_size is None:
+            # No limit
+            return False
+        return len(libraries) >= large_feed_size 
 
     @classmethod
     def library_catalog(cls, library, distance=None,
                         include_private_information=False,
+                        include_logo=True,
                         url_for=None):
 
         """Create an OPDS catalog for a library.
@@ -119,7 +141,7 @@ class OPDSCatalog(object):
                                     href=library.web_url,
                                     type="text/html")
 
-        if library.logo:
+        if library.logo and include_logo:
             cls.add_image_to_catalog(catalog, rel=cls.THUMBNAIL_REL,
                                      href=library.logo,
                                      type="image/png")

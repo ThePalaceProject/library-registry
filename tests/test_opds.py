@@ -146,6 +146,17 @@ class TestOPDSCatalog(DatabaseTest):
         )
         eq_(set([public_hyperlink, private_hyperlink]), set(Mock.hyperlinks))
 
+        # If library_catalog is passed with include_logo=False,
+        # the (potentially large) inline logo is omitted, 
+        # even though it was included before.
+        catalog = Mock.library_catalog(
+            library, include_logo=False, 
+            url_for=self.mock_url_for
+        )
+        relations = [x.get('rel') for x in catalog['links']]
+        assert OPDSCatalog.THUMBNAIL_REL not in relations
+
+
     def test__hyperlink_args(self):
         """Verify that _hyperlink_args generates arguments appropriate
         for an OPDS 2 link.
