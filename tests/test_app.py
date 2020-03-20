@@ -1,5 +1,9 @@
+from io import BytesIO
+import contextlib
 import flask
+import gzip
 from app_helpers import (
+    compressible,
     has_library_factory,
     uses_location_factory,
 )
@@ -52,3 +56,63 @@ class TestAppHelpers(ControllerTest):
         with self.app.test_request_context("/?_location=-10,10"):
             eq_("Called with location SRID=4326;POINT (10.0 -10.0)",
                 route_function())
+
+    def test_compressible(self):
+        # Prepare a value and a gzipped version of the value.
+        value = "Compress me! (Or not.)"
+
+        buffer = BytesIO()
+        gzipped = gzip.GzipFile(mode='wb', fileobj=buffer)
+        gzipped.write(value)
+        gzipped.close()
+        compressed = buffer.getvalue()
+
+        # Spot-check the compressed value
+        assert '-(J-.V' in compressed
+
+        # This compressible controller function always returns the
+        # same value.
+        @compressible
+        def function():
+            return value
+
+        def ask_for_compression(compression, header='Accept-Encoding'):
+            """This context manager simulates the entire Flask
+            request-response cycle, including a call to
+            process_response(), which triggers the @after_this_request
+            hooks.
+
+            :return: The Response object.
+            """
+            headers = {}
+            if compression:
+                headers[header] = compression
+            with self.app.test_request_context(headers=headers):
+                response = flask.Response(function())
+                self.app.process_response(response)
+                return response
+
+        # If the client asks for gzip through Accept-Encoding, the
+        # representation is compressed.
+        response = ask_for_compression("gzip")
+        eq_(compressed, response.data)
+        eq_("gzip", response.headers['Content-Encoding'])
+
+        # If the client doesn't ask for compression, the value is
+        # passed through unchanged.
+        response = ask_for_compression(None)
+        eq_(value, response.data)
+        assert 'Content-Encoding' not in response.headers
+
+        # Similarly if the client asks for an unsupported compression
+        # mechanism.
+        response = ask_for_compression('compress')
+        eq_(value, response.data)
+        assert 'Content-Encoding' not in response.headers
+
+        # Or if the client asks for a compression mechanism through
+        # Accept-Transfer-Encoding, which is currently unsupported.
+        response = ask_for_compression("gzip", "Accept-Transfer-Encoding")
+        eq_(value, response.data)
+        assert 'Content-Encoding' not in response.headers
+
