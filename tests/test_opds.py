@@ -15,6 +15,7 @@ from model import (
     create,
     ConfigurationSetting,
     Hyperlink,
+    Library,
     Validation,
 )
 from opds import OPDSCatalog
@@ -87,6 +88,34 @@ class TestOPDSCatalog(DatabaseTest):
         small_feed = Mock(self._db, "title", "url", ["small"])
         small_catalog = small_feed.catalog['catalogs']
         eq_([False], small_catalog)
+
+        # Try it with a query that returns no results. No catalogs
+        # are included at all.
+        small_feed = Mock(self._db, "title", "url", self._db.query(Library))
+        small_catalog = small_feed.catalog['catalogs']
+        eq_([], small_catalog)
+
+    def test_feed_is_large(self):
+        # Verify that the _feed_is_large helper method
+        # works whether it's given a Python list or a SQLAlchemy query.
+        setting = ConfigurationSetting.sitewide(
+            self._db, Configuration.LARGE_FEED_SIZE
+        )
+        setting.value = 2
+        m = OPDSCatalog._feed_is_large
+        query = self._db.query(Library)
+
+        # There are no libraries, and the limit is 2, so a feed of libraries would not be large.
+        eq_(0, query.count())
+        eq_(False, m(self._db, query))
+
+        # Make some libraries, and the feed becomes large.
+        [self._library() for x in range(2)]
+        eq_(True, m(self._db, query))
+
+        # It also works with a list.
+        eq_(True, m(self._db, [1,2]))
+        eq_(False, m(self._db, [1]))
 
     def test_library_catalog(self):
 
