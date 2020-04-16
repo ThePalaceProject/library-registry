@@ -108,15 +108,17 @@ def confirm_resource(resource_id, secret):
 
 @app.route('/libraries')
 @compressible
+@has_location
 @returns_problem_detail
 def libraries_opds():
-    return app.library_registry.registry_controller.libraries_opds()
+    return app.library_registry.registry_controller.libraries_opds(location=_location)
 
 @app.route('/libraries/qa')
 @compressible
+@has_location
 @returns_problem_detail
 def libraries_qa():
-    return app.library_registry.registry_controller.libraries_opds(live=False)
+    return app.library_registry.registry_controller.libraries_opds(location=_location, live=False)
 
 @app.route('/admin/log_in', methods=["POST"])
 @returns_problem_detail
