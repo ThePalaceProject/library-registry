@@ -10,6 +10,10 @@ from flask import (
     session,
 )
 import requests
+from sqlalchemy.orm import (
+    defer,
+    joinedload,
+)
 from smtplib import SMTPException
 import json
 from Crypto.PublicKey import RSA
@@ -250,13 +254,48 @@ class LibraryRegistryController(BaseController):
         now = datetime.datetime.utcnow()
         return data
 
-    def libraries_opds(self, live=True):
-        """Return all the libraries in OPDS format"""
+    def libraries_opds(self, live=True, location=None):
+        """Return all the libraries in OPDS format
 
-        libraries = self._db.query(Library).order_by(Library.name)
+        :param live: If this is True, then only production libraries are shown.
+        :param location: If this is set, then libraries near this point will be
+           promoted out of the alphabetical list.
+        """
+        alphabetical = self._db.query(Library).order_by(Library.name)
+
         # We always want to filter out cancelled libraries.  If live, we also filter out
         # libraries that are in the testing stage, i.e. only show production libraries.
-        libraries = libraries.filter(Library._feed_restriction(production=live))
+        alphabetical = alphabetical.filter(Library._feed_restriction(production=live))
+
+        # Pick up each library's hyperlinks and validation
+        # information; this will save database queries when building
+        # the feed.
+        alphabetical = alphabetical.options(
+            joinedload('hyperlinks'),
+            joinedload('hyperlinks', 'resource'),
+            joinedload('hyperlinks', 'resource', 'validation'),
+        )
+        if location is None:
+            # No location data is available. Use the alphabetical list as
+            # the list of libraries.
+            libraries = alphabetical
+        else:
+            # Location data is available. Get the list of nearby libraries, then get
+            # the rest of the list in alphabetical order.
+
+            # We can't easily do the joindeload() thing for this
+            # query, because it doesn't simply return Library objects,
+            # but it won't return more than five results.
+            nearby_libraries = Library.nearby(
+                self._db, location, production=live
+            ).limit(5).all()
+
+            # Exclude nearby libraries from the alphabetical query
+            # to get a list of faraway libraries.
+            faraway_libraries = alphabetical.filter(
+                ~Library.id.in_([x.id for x, distance in nearby_libraries])
+            )
+            libraries = nearby_libraries + faraway_libraries.all()
 
         url = self.app.url_for("libraries_opds")
         catalog = OPDSCatalog(
