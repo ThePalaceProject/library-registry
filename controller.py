@@ -10,6 +10,7 @@ from flask import (
     session,
 )
 import requests
+from sqlalchemy.orm import joinedload
 from smtplib import SMTPException
 import json
 from Crypto.PublicKey import RSA
@@ -173,7 +174,6 @@ class LibraryRegistryController(BaseController):
         super(LibraryRegistryController, self).__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
-        self.library_list_cache = dict()
         emailer = None
         try:
             emailer = emailer_class.from_sitewide_integration(self._db)
@@ -234,26 +234,9 @@ class LibraryRegistryController(BaseController):
             )
             return Response(body, 200, headers)
 
-    # We will cache each library list _internally_ for this amount
-    # of time.
-    #
-    # This is one part of an overall caching strategy; the goal of
-    # this server-side piece is to reduce the amount of time we spend
-    # constructing OPDS feeds.
-    CACHE_LIBRARY_LIST_FOR = datetime.timedelta(minutes=15)
-
     def libraries(self, live=True):
         # Return a specific set of information about all libraries in production; this generates the library list in the admin interface.
         # If :param live is set to False, libraries in testing will also be shown.
-
-        cache_for = self.CACHE_LIBRARY_LIST_FOR
-        if live in self.library_list_cache:
-            data, cached_at = self.library_list_cache[live]
-            now = datetime.datetime.utcnow()
-            expires = cached_at + cache_for
-            if now <= expires:
-                return data
-
         result = []
         libraries = self._db.query(Library).order_by(Library.name)
 
@@ -266,16 +249,50 @@ class LibraryRegistryController(BaseController):
 
         data = dict(libraries=result)
         now = datetime.datetime.utcnow()
-        self.library_list_cache[live] = (data, now)
         return data
 
-    def libraries_opds(self, live=True):
-        """Return all the libraries in OPDS format"""
+    def libraries_opds(self, live=True, location=None):
+        """Return all the libraries in OPDS format
 
-        libraries = self._db.query(Library).order_by(Library.name)
+        :param live: If this is True, then only production libraries are shown.
+        :param location: If this is set, then libraries near this point will be
+           promoted out of the alphabetical list.
+        """
+        alphabetical = self._db.query(Library).order_by(Library.name)
+
         # We always want to filter out cancelled libraries.  If live, we also filter out
         # libraries that are in the testing stage, i.e. only show production libraries.
-        libraries = libraries.filter(Library._feed_restriction(production=live))
+        alphabetical = alphabetical.filter(Library._feed_restriction(production=live))
+
+        # Pick up each library's hyperlinks and validation
+        # information; this will save database queries when building
+        # the feed.
+        alphabetical = alphabetical.options(
+            joinedload('hyperlinks'),
+            joinedload('hyperlinks', 'resource'),
+            joinedload('hyperlinks', 'resource', 'validation'),
+        )
+        if location is None:
+            # No location data is available. Use the alphabetical list as
+            # the list of libraries.
+            libraries = alphabetical
+        else:
+            # Location data is available. Get the list of nearby libraries, then get
+            # the rest of the list in alphabetical order.
+
+            # We can't easily do the joindeload() thing for this
+            # query, because it doesn't simply return Library objects,
+            # but it won't return more than five results.
+            nearby_libraries = Library.nearby(
+                self._db, location, production=live
+            ).limit(5).all()
+
+            # Exclude nearby libraries from the alphabetical query
+            # to get a list of faraway libraries.
+            faraway_libraries = alphabetical.filter(
+                ~Library.id.in_([x.id for x, distance in nearby_libraries])
+            )
+            libraries = nearby_libraries + faraway_libraries.all()
 
         url = self.app.url_for("libraries_opds")
         catalog = OPDSCatalog(

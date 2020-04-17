@@ -316,45 +316,6 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(ks, libraries[1])
         self._is_library(nypl, libraries[2])
 
-    def test_library_cache(self):
-        now = datetime.datetime.utcnow()
-        cache_for = self.controller.CACHE_LIBRARY_LIST_FOR
-        stale = now - cache_for - cache_for
-        fresh = now - cache_for + datetime.timedelta(minutes=2)
-
-        cache = self.controller.library_list_cache
-
-        cache[True] = ("stale list", stale)
-        cache[False] = ("fresh list", fresh)
-
-        # If we ask for live libraries, we get a list that's stale, so a new list
-        # is generated.
-        response = self.controller.libraries(live=True)
-        libraries = response.get("libraries")
-        eq_(3, len(libraries))
-
-        # The cache has been updated...
-        eq_(response, cache[True][0])
-
-        # with an updated timestamp.
-        new_timestamp = cache[True][1]
-        assert new_timestamp > now
-
-        # The same thing happens if we ask for a list that's not cached at all.
-        del cache[True]
-        response2 = self.controller.libraries(live=True)
-        eq_(response, response2)
-        eq_(response, cache[True][0])
-        newer_timestamp = cache[True][1]
-        assert newer_timestamp > new_timestamp
-
-        # If we ask for QA libraries, we get a list that's fresh from the
-        # cache.
-        eq_("fresh list", self.controller.libraries(live=False))
-
-        # The cache is unaffected.
-        eq_(("fresh list", fresh), cache[False])
-
     def test_libraries_qa_admin(self):
         # Test that the controller returns a specific set of information for each library.
         ct = self.connecticut_state_library
@@ -407,6 +368,7 @@ class TestLibraryRegistryController(ControllerTest):
             # The cancelled library got filtered out.
             eq_(len(catalog['catalogs']), 3)
 
+            # The other libraries are in alphabetical order.
             [ct, ks, nypl] = catalog['catalogs']
             eq_("Connecticut State Library", ct['metadata']['title'])
             eq_(self.connecticut_state_library.internal_urn, ct['metadata']['id'])
@@ -425,6 +387,26 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("libraries_opds"), self_link['href'])
             eq_("self", self_link['rel'])
             eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
+
+            # Try again with a location in Kansas.
+            #
+            # See test_app_server.py to verify that @uses_location
+            # converts normal-looking latitude/longitude into this
+            # format.
+            with self.app.test_request_context("/libraries"):
+                response = self.controller.libraries_opds(
+                    False, location="SRID=4326;POINT(-98 39)"
+                )
+            catalog = json.loads(response.data)
+            titles = [x['metadata']['title'] for x in catalog['catalogs']]
+
+            # The nearby library is promoted to the top of the list.
+            # The other libraries are still in alphabetical order.
+            eq_(
+                [u'Kansas State Library', u'Connecticut State Library',
+                 u'NYPL'],
+                titles
+            )
 
     def test_libraries_opds(self):
         library = self._library(
@@ -471,6 +453,25 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("self", self_link['rel'])
             eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
 
+            # Try again with a location in Kansas.
+            #
+            # See test_app_server.py to verify that @uses_location
+            # converts normal-looking latitude/longitude into this
+            # format.
+            with self.app.test_request_context("/libraries"):
+                response = self.controller.libraries_opds(
+                    location="SRID=4326;POINT(-98 39)"
+                )
+            catalog = json.loads(response.data)
+            titles = [x['metadata']['title'] for x in catalog['catalogs']]
+
+            # The nearby library is promoted to the top of the list.
+            # The other libraries are still in alphabetical order.
+            eq_(
+                [u'Kansas State Library', u'Connecticut State Library',
+                 u'NYPL'],
+                titles
+            )
 
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.

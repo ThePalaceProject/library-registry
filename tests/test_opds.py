@@ -35,6 +35,13 @@ class TestOPDSCatalog(DatabaseTest):
             def annotate_catalog(self, catalog_obj, live=True):
                 catalog_obj.catalog['metadata']['random'] = "Random text inserted by annotator."
 
+        # This template will be used to construct a web client link
+        # for each library.
+        template = "http://web/{uuid}"
+        ConfigurationSetting.sitewide(
+            self._db, Configuration.WEB_CLIENT_URL
+        ).value = template
+
         catalog = OPDSCatalog(
             self._db, "A Catalog!", "http://url/", [l1, l2],
             TestAnnotator(), url_for=self.mock_url_for
@@ -53,6 +60,18 @@ class TestOPDSCatalog(DatabaseTest):
 
         # Each library became a catalog in the catalogs collection.
         eq_([l1.name, l2.name], [x['metadata']['title'] for x in parsed['catalogs']])
+
+        # Each library has a link to its web catalog.
+        l1_links, l2_links = [
+            library['links'] for library in parsed['catalogs']
+        ]
+        [l1_web] = [link['href'] for link in l1_links
+                    if link['type'] == 'text/html']
+        eq_(l1_web, template.replace("{uuid}", l1.internal_urn))
+
+        [l2_web] = [link['href'] for link in l2_links
+                    if link['type'] == 'text/html']
+        eq_(l2_web, template.replace("{uuid}", l2.internal_urn))
 
     def test_large_feeds_treated_differently(self):
         # The libraries in large feeds are converted to JSON in ways
@@ -149,10 +168,10 @@ class TestOPDSCatalog(DatabaseTest):
             "mailto:help@library.org"
         )
 
-        ConfigurationSetting.sitewide(
-            self._db, Configuration.WEB_CLIENT_URL).value = "http://web/{uuid}"
-
-        catalog = Mock.library_catalog(library, url_for=self.mock_url_for)
+        catalog = Mock.library_catalog(
+            library, url_for=self.mock_url_for,
+            web_client_uri_template="http://web/{uuid}"
+        )
         metadata = catalog['metadata']
         eq_(library.name, metadata['title'])
         eq_(library.internal_urn, metadata['id'])
