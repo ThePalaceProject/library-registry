@@ -10,10 +10,7 @@ from flask import (
     session,
 )
 import requests
-from sqlalchemy.orm import (
-    defer,
-    joinedload,
-)
+from sqlalchemy.orm import joinedload
 from smtplib import SMTPException
 import json
 from Crypto.PublicKey import RSA
