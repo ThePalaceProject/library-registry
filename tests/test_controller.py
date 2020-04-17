@@ -316,45 +316,6 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(ks, libraries[1])
         self._is_library(nypl, libraries[2])
 
-    def test_library_cache(self):
-        now = datetime.datetime.utcnow()
-        cache_for = self.controller.CACHE_LIBRARY_LIST_FOR
-        stale = now - cache_for - cache_for
-        fresh = now - cache_for + datetime.timedelta(minutes=2)
-
-        cache = self.controller.library_list_cache
-
-        cache[True] = ("stale list", stale)
-        cache[False] = ("fresh list", fresh)
-
-        # If we ask for live libraries, we get a list that's stale, so a new list
-        # is generated.
-        response = self.controller.libraries(live=True)
-        libraries = response.get("libraries")
-        eq_(3, len(libraries))
-
-        # The cache has been updated...
-        eq_(response, cache[True][0])
-
-        # with an updated timestamp.
-        new_timestamp = cache[True][1]
-        assert new_timestamp > now
-
-        # The same thing happens if we ask for a list that's not cached at all.
-        del cache[True]
-        response2 = self.controller.libraries(live=True)
-        eq_(response, response2)
-        eq_(response, cache[True][0])
-        newer_timestamp = cache[True][1]
-        assert newer_timestamp > new_timestamp
-
-        # If we ask for QA libraries, we get a list that's fresh from the
-        # cache.
-        eq_("fresh list", self.controller.libraries(live=False))
-
-        # The cache is unaffected.
-        eq_(("fresh list", fresh), cache[False])
-
     def test_libraries_qa_admin(self):
         # Test that the controller returns a specific set of information for each library.
         ct = self.connecticut_state_library

@@ -152,7 +152,10 @@ class TestOPDSCatalog(DatabaseTest):
         ConfigurationSetting.sitewide(
             self._db, Configuration.WEB_CLIENT_URL).value = "http://web/{uuid}"
 
-        catalog = Mock.library_catalog(library, url_for=self.mock_url_for)
+        catalog = Mock.library_catalog(
+            library, url_for=self.mock_url_for,
+            web_client_uri_template="http://web/{uuid}"
+        )
         metadata = catalog['metadata']
         eq_(library.name, metadata['title'])
         eq_(library.internal_urn, metadata['id'])
