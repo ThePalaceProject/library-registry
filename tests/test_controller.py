@@ -404,7 +404,7 @@ class TestLibraryRegistryController(ControllerTest):
             # The other libraries are still in alphabetical order.
             eq_(
                 [u'Kansas State Library', u'Connecticut State Library',
-                 u'NYPL'], 
+                 u'NYPL'],
                 titles
             )
 
@@ -469,10 +469,9 @@ class TestLibraryRegistryController(ControllerTest):
             # The other libraries are still in alphabetical order.
             eq_(
                 [u'Kansas State Library', u'Connecticut State Library',
-                 u'NYPL'], 
+                 u'NYPL'],
                 titles
             )
-
 
     def test_library_details(self):
         # Test that the controller can look up the complete information for one specific library.
