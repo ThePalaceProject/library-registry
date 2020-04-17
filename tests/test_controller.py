@@ -368,6 +368,7 @@ class TestLibraryRegistryController(ControllerTest):
             # The cancelled library got filtered out.
             eq_(len(catalog['catalogs']), 3)
 
+            # The other libraries are in alphabetical order.
             [ct, ks, nypl] = catalog['catalogs']
             eq_("Connecticut State Library", ct['metadata']['title'])
             eq_(self.connecticut_state_library.internal_urn, ct['metadata']['id'])
@@ -386,6 +387,22 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("libraries_opds"), self_link['href'])
             eq_("self", self_link['rel'])
             eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
+
+            # Try again with a location in Kansas.
+            with self.app.test_request_context("/libraries"):
+                response = self.controller.libraries_opds(
+                    False, location="SRID=4326;POINT(-98 39)"
+                )
+            catalog = json.loads(response.data)
+            titles = [x['metadata']['title'] for x in catalog['catalogs']]
+
+            # The nearby library is promoted to the top of the list.
+            # The other libraries are still in alphabetical order.
+            eq_(
+                [u'Kansas State Library', u'Connecticut State Library',
+                 u'NYPL'], 
+                titles
+            )
 
     def test_libraries_opds(self):
         library = self._library(
@@ -431,6 +448,22 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(url_for("libraries_opds"), self_link['href'])
             eq_("self", self_link['rel'])
             eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
+
+            # Try again with a location in Kansas.
+            with self.app.test_request_context("/libraries"):
+                response = self.controller.libraries_opds(
+                    location="SRID=4326;POINT(-98 39)"
+                )
+            catalog = json.loads(response.data)
+            titles = [x['metadata']['title'] for x in catalog['catalogs']]
+
+            # The nearby library is promoted to the top of the list.
+            # The other libraries are still in alphabetical order.
+            eq_(
+                [u'Kansas State Library', u'Connecticut State Library',
+                 u'NYPL'], 
+                titles
+            )
 
 
     def test_library_details(self):
