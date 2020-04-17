@@ -389,6 +389,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
 
             # Try again with a location in Kansas.
+            #
+            # See test_app_server.py to verify that @uses_location
+            # converts normal-looking latitude/longitude into this
+            # format.
             with self.app.test_request_context("/libraries"):
                 response = self.controller.libraries_opds(
                     False, location="SRID=4326;POINT(-98 39)"
@@ -450,6 +454,10 @@ class TestLibraryRegistryController(ControllerTest):
             eq_(OPDSCatalog.OPDS_TYPE, self_link['type'])
 
             # Try again with a location in Kansas.
+            #
+            # See test_app_server.py to verify that @uses_location
+            # converts normal-looking latitude/longitude into this
+            # format.
             with self.app.test_request_context("/libraries"):
                 response = self.controller.libraries_opds(
                     location="SRID=4326;POINT(-98 39)"
