@@ -8,7 +8,7 @@ import os
 import json
 import random
 from smtplib import SMTPException
-from urllib import unquote
+from urllib.parse import unquote
 
 from contextlib import contextmanager
 from controller import (
@@ -239,7 +239,7 @@ class TestLibraryRegistryController(ControllerTest):
         # Getting rid of the "uuid" key before populating flattened, because its value is just a string, not a subdictionary.
         # The UUID information is still being checked elsewhere.
         del actual["uuid"]
-        for subdictionary in actual.values():
+        for subdictionary in list(actual.values()):
             flattened.update(subdictionary)
 
         for k in flattened:
@@ -363,7 +363,7 @@ class TestLibraryRegistryController(ControllerTest):
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
 
-            catalog = json.loads(response.data)
+            catalog = response.json
 
             # The cancelled library got filtered out.
             eq_(len(catalog['catalogs']), 3)
@@ -397,14 +397,14 @@ class TestLibraryRegistryController(ControllerTest):
                 response = self.controller.libraries_opds(
                     False, location="SRID=4326;POINT(-98 39)"
                 )
-            catalog = json.loads(response.data)
+            catalog = response.json
             titles = [x['metadata']['title'] for x in catalog['catalogs']]
 
             # The nearby library is promoted to the top of the list.
             # The other libraries are still in alphabetical order.
             eq_(
-                [u'Kansas State Library', u'Connecticut State Library',
-                 u'NYPL'],
+                ['Kansas State Library', 'Connecticut State Library',
+                 'NYPL'],
                 titles
             )
 
@@ -426,8 +426,10 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
-
-            catalog = json.loads(response.data)
+            print("######################################")
+            print(response.data)
+            print("######################################")
+            catalog = response.json
 
             # In the OPDS response, instead of getting four libraries like
             # libraries_qa() returns, we should only get three back because
@@ -462,14 +464,14 @@ class TestLibraryRegistryController(ControllerTest):
                 response = self.controller.libraries_opds(
                     location="SRID=4326;POINT(-98 39)"
                 )
-            catalog = json.loads(response.data)
+            catalog = response.json
             titles = [x['metadata']['title'] for x in catalog['catalogs']]
 
             # The nearby library is promoted to the top of the list.
             # The other libraries are still in alphabetical order.
             eq_(
-                [u'Kansas State Library', u'Connecticut State Library',
-                 u'NYPL'],
+                ['Kansas State Library', 'Connecticut State Library',
+                 'NYPL'],
                 titles
             )
 
@@ -760,7 +762,7 @@ class TestLibraryRegistryController(ControllerTest):
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
-            catalog = json.loads(response.data)
+            catalog = response.json
 
             # The catalog can be cached for a while, since the list of libraries
             # doesn't change very quickly.
@@ -808,13 +810,13 @@ class TestLibraryRegistryController(ControllerTest):
             library.registry_stage = Library.TESTING_STAGE
         with self.app.test_request_context("/"):
             response = self.controller.nearby(self.manhattan, live=True)
-            catalogs = json.loads(response.data)
+            catalogs = response.json
             eq_([], catalogs['catalogs'])
 
         # However, they will show up in the QA feed.
         with self.app.test_request_context("/"):
             response = self.controller.nearby(self.manhattan, live=False)
-            catalogs = json.loads(response.data)
+            catalogs = response.json
             eq_(2, len(catalogs['catalogs']))
             [catalog] = [
                 x for x in catalogs['catalogs']
@@ -851,7 +853,7 @@ class TestLibraryRegistryController(ControllerTest):
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
-            catalogs = json.loads(response.data)
+            catalogs = response.json
 
             # We found no nearby libraries, because we had no location to
             # start with.
@@ -863,7 +865,7 @@ class TestLibraryRegistryController(ControllerTest):
             assert isinstance(response, Response)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
-            catalog = json.loads(response.data)
+            catalog = response.json
 
             # We found no nearby libraries, because we were across the
             # country from the only ones in the registry.
@@ -900,7 +902,7 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.search(self.manhattan)
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
-            catalog = json.loads(response.data)
+            catalog = response.json
             # We found the two matching results.
             [nypl, ks] = catalog['catalogs']
             eq_("NYPL", nypl['metadata']['title'])
@@ -946,7 +948,7 @@ class TestLibraryRegistryController(ControllerTest):
             l.registry_stage = Library.CANCELLED_STAGE
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search(self.manhattan, live=True)
-            catalog = json.loads(response.data)
+            catalog = response.json
             eq_([], catalog['catalogs'])
 
         # If we move one of the libraries back into the PRODUCTION
@@ -954,7 +956,7 @@ class TestLibraryRegistryController(ControllerTest):
         self.kansas_state_library.registry_stage = Library.PRODUCTION_STAGE
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search(self.manhattan, live=True)
-            catalog = json.loads(response.data)
+            catalog = response.json
             [catalog] = catalog['catalogs']
             eq_('Kansas State Library', catalog['metadata']['title'])
 
@@ -962,7 +964,7 @@ class TestLibraryRegistryController(ControllerTest):
         nypl = self.nypl
         with self.request_context_with_library("/", library=nypl):
             response = self.controller.library()
-        [catalog_entry] = json.loads(response.data).get("catalogs")
+        [catalog_entry] = response.json.get("catalogs")
         eq_(nypl.name, catalog_entry.get("metadata").get("title"))
         eq_(nypl.internal_urn, catalog_entry.get("metadata").get("id"))
 
@@ -1020,7 +1022,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="GET"):
             response = self.controller.register()
             eq_(200, response.status_code)
-            eq_({}, json.loads(response.data))
+            eq_({}, response.json)
 
         # Set a terms-of-service link.
         tos = "http://terms.com/service.html"
@@ -1041,7 +1043,7 @@ class TestLibraryRegistryController(ControllerTest):
         with self.app.test_request_context("/", method="GET"):
             response = self.controller.register()
             eq_(200, response.status_code)
-            data = json.loads(response.data)
+            data = response.json
 
             # Both links have the same rel and type.
             for link in data['links']:
@@ -1391,10 +1393,7 @@ class TestLibraryRegistryController(ControllerTest):
             auth_document = self._auth_document()
 
             # Remove the crucial link.
-            auth_document['links'] = filter(
-            lambda x: x['rel'] != rel or not x['href'].startswith("mailto:"),
-                auth_document['links']
-            )
+            auth_document['links'] = [x for x in auth_document['links'] if x['rel'] != rel or not x['href'].startswith("mailto:")]
 
             def _request_fails():
                 self.http_client.queue_response(
@@ -1508,7 +1507,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             # And the document we queued up was fed into the library
             # registry.
-            catalog = json.loads(response.data)
+            catalog = response.json
             eq_("A Library", catalog['metadata']['title'])
             eq_('Description', catalog['metadata']['description'])
 
@@ -1523,7 +1522,7 @@ class TestLibraryRegistryController(ControllerTest):
             # cryptography which ignore seed(). But we do know how
             # long it is.
             # TODO PYTHON3 expect = 'UDAXIH'
-            expect = u'QAHFTR'
+            expect = 'QAHFTR'
             eq_(expect, library.short_name)
             eq_(48, len(library.shared_secret))
 
@@ -1611,7 +1610,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             # The data sent in the response includes the library's new
             # data.
-            catalog = json.loads(response.data)
+            catalog = response.json
             eq_("A Library", catalog['metadata']['title'])
             eq_('New and improved', catalog['metadata']['description'])
 
@@ -1684,7 +1683,7 @@ class TestLibraryRegistryController(ControllerTest):
             ("contact", "mailto:me@library.org")
         ])
         form_args_with_reset = ImmutableMultiDict(
-            form_args_no_reset.items() + [
+            list(form_args_no_reset.items()) + [
                 ("reset_shared_secret", "y")
             ]
         )
@@ -1699,7 +1698,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             response = self.controller.register(do_get=self.http_client.do_get)
             eq_(200, response.status_code)
-            catalog = json.loads(response.data)
+            catalog = response.json
             assert library.shared_secret != old_secret
 
             # The registry encrypted the new secret with the public key, and
@@ -1886,7 +1885,7 @@ class TestCoverageController(ControllerTest):
 
         # The response is always GeoJSON.
         eq_("application/geo+json", response.headers['Content-Type'])
-        geojson = json.loads(response.data)
+        geojson = response.json
 
         # Unknown or ambiguous places will be mentioned in
         # these extra fields.

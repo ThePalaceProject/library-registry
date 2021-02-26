@@ -1,7 +1,7 @@
 """Library registry web application."""
 import os
 import sys
-import urlparse
+import urllib.parse
 
 from flask import Flask, url_for, redirect, Response, request
 from flask_babel import Babel
@@ -243,8 +243,8 @@ if __name__ == '__main__':
         url = sys.argv[1]
     else:
         url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
-    url = url or u'http://localhost:7000/'
-    scheme, netloc, path, parameters, query, fragment = urlparse.urlparse(url)
+    url = url or 'http://localhost:7000/'
+    scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(url)
     if ':' in netloc:
         host, port = netloc.split(':')
         port = int(port)

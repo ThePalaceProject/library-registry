@@ -1,6 +1,6 @@
 from nose.tools import set_trace
 from lxml import etree
-from StringIO import StringIO
+from io import StringIO
 
 class XMLParser(object):
 
@@ -32,10 +32,10 @@ class XMLParser(object):
         if tag is None or tag.text is None:
             return None
         else:
-            return unicode(tag.text)
+            return str(tag.text)
       
     def text_of_subtag(self, tag, name, namespaces=None):
-        return unicode(tag.xpath(name, namespaces=namespaces)[0].text)
+        return str(tag.xpath(name, namespaces=namespaces)[0].text)
 
     def int_of_subtag(self, tag, name, namespaces=None):
         return int(self.text_of_subtag(tag, name, namespaces=namespaces))
@@ -51,7 +51,7 @@ class XMLParser(object):
             parser = etree.XMLParser()
         if not handler:
             handler = self.process_one
-        if isinstance(xml, basestring):
+        if isinstance(xml, str):
             root = etree.parse(StringIO(xml), parser)
         else:
             root = xml

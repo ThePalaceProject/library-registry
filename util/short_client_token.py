@@ -17,18 +17,18 @@ class ShortClientTokenTool(object):
         with :. We also replace / (another "suspicious" character)
         with ;. and strip newlines.
         """
-        if isinstance(to_encode, unicode):
+        if isinstance(to_encode, str):
             to_encode = to_encode.encode("utf8")
-        encoded = base64.encodestring(to_encode)
+        encoded = base64.encodebytes(to_encode)
         return encoded.replace(b"+", b":").replace(b"/", b";").replace(b"=", b"@").strip()
 
     @classmethod
     def adobe_base64_decode(cls, to_decode):
         """Undoes adobe_base64_encode."""
-        if isinstance(to_decode, unicode):
+        if isinstance(to_decode, str):
             to_decode = to_decode.encode("utf8")        
         to_decode = to_decode.replace(b":", b"+").replace(b";", b"/").replace(b"@", b"=")
-        return base64.decodestring(to_decode)
+        return base64.decodebytes(to_decode)
 
     # The JWT spec takes January 1 1970 as the epoch.
     JWT_EPOCH = datetime.datetime(1970, 1, 1)

@@ -154,12 +154,12 @@ The link will expire in about a day. If the link expires, just re-register your 
         test_template_values = dict(
             (key, "value") for key in self.KNOWN_TEMPLATE_KEYS
         )
-        for template in self.templates.values():
+        for template in list(self.templates.values()):
             try:
                 test_body = template.body(
                     "from address", "to address", **test_template_values
                 )
-            except Exception, e:
+            except Exception as e:
                 raise CannotLoadConfiguration(
                     "Template %r/%r contains unrecognized key: %r" % (
                         template.subject_template, template.body_template, e

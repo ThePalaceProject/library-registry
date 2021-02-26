@@ -6,7 +6,7 @@ import logging
 from nose.tools import set_trace
 from PIL import Image
 from io import BytesIO
-from urlparse import urljoin
+from urllib.parse import urljoin
 
 from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
@@ -89,7 +89,7 @@ class LibraryRegistrar(object):
             return auth_response
         try:
             auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
-        except Exception, e:
+        except Exception as e:
             self.log.error(
                 "Registration of %s failed: invalid auth document.",
                 auth_url, exc_info=e
@@ -169,7 +169,7 @@ class LibraryRegistrar(object):
 
         try:
             library.library_stage = library_stage
-        except ValueError, e:
+        except ValueError as e:
             return LIBRARY_ALREADY_IN_PRODUCTION
         library.name = auth_document.title
         if auth_document.website:
@@ -189,7 +189,7 @@ class LibraryRegistrar(object):
             logo_response = self.do_get(url, stream=True)
             try:
                 image = Image.open(logo_response.raw)
-            except Exception, e:
+            except Exception as e:
                 image_url = auth_document.logo_link.get("href")
                 self.log.error(
                     "Registration of %s failed: could not read logo image %s",
@@ -240,13 +240,13 @@ class LibraryRegistrar(object):
                     _("%(url)s is behind an authentication gateway",
                       url=url)
                 )
-        except RequestTimedOut, e:
+        except RequestTimedOut as e:
             self.log.error(
                 "Registration of %s failed: timeout retrieving %s",
                 registration_url, url, exc_info=e
             )
             return TIMEOUT.detailed(on_timeout)
-        except Exception, e:
+        except Exception as e:
             self.log.error(
                 "Registration of %s failed: error retrieving %s",
                 registration_url, url, exc_info=e
@@ -269,7 +269,7 @@ class LibraryRegistrar(object):
             # Parse as OPDS 2.
             catalog = json.loads(response.content)
             links = []
-            for k,v in catalog.get("links", {}).iteritems():
+            for k,v in catalog.get("links", {}).items():
                 if k == rel:
                     links.append(v.get("href"))
         elif media_type == OPDSCatalog.OPDS_1_TYPE:
@@ -297,7 +297,7 @@ class LibraryRegistrar(object):
             links = cls.opds_response_links(
                 opds_response, AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
             )
-        except ValueError, e:
+        except ValueError as e:
             # The response itself is malformed.
             return False
         return auth_url in links
@@ -321,7 +321,7 @@ class LibraryRegistrar(object):
                 continue
             uri = link.get('href')
             value = cls._required_email_address(uri, problem_title)
-            if isinstance(value, basestring):
+            if isinstance(value, str):
                 candidates.append(value)
 
         # There were no relevant links.

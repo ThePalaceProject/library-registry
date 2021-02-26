@@ -14,7 +14,7 @@ from nose.tools import (
 from problem_details import (
     LIBRARY_NOT_FOUND
 )
-from test_controller import ControllerTest
+from .test_controller import ControllerTest
 from testing import DatabaseTest
 
 class TestAppHelpers(ControllerTest):
@@ -59,7 +59,7 @@ class TestAppHelpers(ControllerTest):
 
     def test_compressible(self):
         # Prepare a value and a gzipped version of the value.
-        value = "Compress me! (Or not.)"
+        value = b"Compress me! (Or not.)"
 
         buffer = BytesIO()
         gzipped = gzip.GzipFile(mode='wb', fileobj=buffer)
@@ -68,7 +68,7 @@ class TestAppHelpers(ControllerTest):
         compressed = buffer.getvalue()
 
         # Spot-check the compressed value
-        assert '-(J-.V' in compressed
+        assert b'-(J-.V' in compressed
 
         # This compressible controller function always returns the
         # same value.

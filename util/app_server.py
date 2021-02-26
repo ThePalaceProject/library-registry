@@ -26,8 +26,8 @@ def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):
 def _make_response(content, content_type, cache_for):
     if isinstance(content, etree._Element):
         content = etree.tostring(content)
-    elif not isinstance(content, basestring):
-        content = unicode(content)
+    elif not isinstance(content, str):
+        content = str(content)
 
     if isinstance(cache_for, int):
         # A CDN should hold on to the cached representation only half
@@ -118,7 +118,7 @@ class ErrorHandler(object):
                 body = tb
             else:
                 body = _('An internal error occured')
-            response = make_response(unicode(body), 500, {"Content-Type": "text/plain"})
+            response = make_response(str(body), 500, {"Content-Type": "text/plain"})
 
         log_method("Exception in web app: %s", exception, exc_info=exception)
         return response

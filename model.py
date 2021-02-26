@@ -153,7 +153,7 @@ def get_one(db, model, on_multiple='error', **kwargs):
     q = db.query(model).filter_by(**kwargs)
     try:
         return q.one()
-    except MultipleResultsFound, e:
+    except MultipleResultsFound as e:
         if on_multiple == 'error':
             raise e
         elif on_multiple == 'interchangeable':
@@ -174,8 +174,8 @@ def dump_query(query):
     comp.compile()
     enc = dialect.encoding
     params = {}
-    for k,v in comp.params.iteritems():
-        if isinstance(v, unicode):
+    for k,v in comp.params.items():
+        if isinstance(v, str):
             v = v.encode(enc)
         params[k] = sqlescape(v)
     return (comp.string.encode(enc) % params).decode(enc)
@@ -195,7 +195,7 @@ def get_one_or_create(db, model, create_method='',
             obj = create(db, model, create_method, create_method_kwargs, **kwargs)
             __transaction.commit()
             return obj
-        except IntegrityError, e:
+        except IntegrityError as e:
             logging.info(
                 "INTEGRITY ERROR on %r %r, %r: %r", model, create_method_kwargs,
                 kwargs, e)
@@ -687,7 +687,7 @@ class Library(Base):
         result = _db.execute(library_id_and_score)
         library_ids_and_scores = {r[0]: r[1] for r in result}
         # Look up the Library objects and return them with the scores.
-        libraries = _db.query(Library).filter(Library.id.in_(library_ids_and_scores.keys()))
+        libraries = _db.query(Library).filter(Library.id.in_(list(library_ids_and_scores.keys())))
         c = Counter()
         for library in libraries:
             c[library] = library_ids_and_scores[library.id]
@@ -1440,7 +1440,7 @@ class Place(Base):
             abbr = "abbr=%s " % self.abbreviated_name
         else:
             abbr = ''
-        output = u"<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
+        output = "<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
             self.external_name, self.type, abbr, self.external_id, parent
         )
         return native_string(output)
@@ -1765,7 +1765,7 @@ class DelegatedPatronIdentifier(Base):
 
     This is probably an Adobe Account ID.
     """
-    ADOBE_ACCOUNT_ID = u'Adobe Account ID'
+    ADOBE_ACCOUNT_ID = 'Adobe Account ID'
 
     __tablename__ = 'delegatedpatronidentifiers'
     id = Column(Integer, primary_key=True)
@@ -1850,7 +1850,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
     def __init__(self, node_value, delegates):
         super(ShortClientTokenDecoder, self).__init__()
-        if isinstance(node_value, basestring):
+        if isinstance(node_value, str):
             # The node value may be stored in hex form (that's how
             # Adobe gives it out) or as the equivalent decimal number.
             if node_value.startswith('0x'):
@@ -1902,7 +1902,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 account_id, label, content = delegate.sign_in_standard(
                     username, password
                 )
-            except Exception, e:
+            except Exception as e:
                 # This delegate couldn't help us.
                 pass
             if account_id:
@@ -1914,7 +1914,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             # ourselves.
             try:
                 signature = self.adobe_base64_decode(password)
-            except Exception, e:
+            except Exception as e:
                 raise ValueError("Invalid password: %s" % password)
 
             patron_identifier, account_id = self._decode(
@@ -2016,35 +2016,35 @@ class ExternalIntegration(Base):
 
     # These integrations are associated with external services such as
     # Adobe Vendor ID, which manage access to DRM-dependent content.
-    DRM_GOAL = u'drm'
+    DRM_GOAL = 'drm'
 
     # Integrations with DRM_GOAL
-    ADOBE_VENDOR_ID = u'Adobe Vendor ID'
+    ADOBE_VENDOR_ID = 'Adobe Vendor ID'
 
     # These integrations are associated with external services that
     # collect logs of server-side events.
-    LOGGING_GOAL = u'logging'
+    LOGGING_GOAL = 'logging'
 
     # Integrations with LOGGING_GOAL
-    INTERNAL_LOGGING = u'Internal logging'
-    LOGGLY = u'Loggly'
+    INTERNAL_LOGGING = 'Internal logging'
+    LOGGLY = 'Loggly'
 
     # These integrations are for sending email.
-    EMAIL_GOAL = u'email'
+    EMAIL_GOAL = 'email'
 
     # Integrations with EMAIL_GOAL
-    SMTP = u'SMTP'
+    SMTP = 'SMTP'
 
     # If there is a special URL to use for access to this API,
     # put it here.
-    URL = u"url"
+    URL = "url"
 
     # If access requires authentication, these settings represent the
     # username/password or key/secret combination necessary to
     # authenticate. If there's a secret but no key, it's stored in
     # 'password'.
-    USERNAME = u"username"
-    PASSWORD = u"password"
+    USERNAME = "username"
+    PASSWORD = "password"
 
     __tablename__ = 'externalintegrations'
     id = Column(Integer, primary_key=True)
@@ -2069,7 +2069,7 @@ class ExternalIntegration(Base):
     )
 
     def __repr__(self):
-        return u"<ExternalIntegration: protocol=%s goal='%s' settings=%d ID=%d>" % (
+        return "<ExternalIntegration: protocol=%s goal='%s' settings=%d ID=%d>" % (
             self.protocol, self.goal, len(self.settings), self.id)
 
     @classmethod
@@ -2194,7 +2194,7 @@ class ConfigurationSetting(Base):
     )
 
     def __repr__(self):
-        return u'<ConfigurationSetting: key=%s, ID=%d>' % (
+        return '<ConfigurationSetting: key=%s, ID=%d>' % (
             self.key, self.id)
 
     @classmethod
@@ -2432,4 +2432,4 @@ class Admin(Base):
         return None
 
     def __repr__(self):
-        return u"<Admin: username=%s>" % self.username
+        return "<Admin: username=%s>" % self.username

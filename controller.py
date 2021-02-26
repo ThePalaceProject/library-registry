@@ -16,7 +16,7 @@ import json
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import os
-from urllib import unquote
+from urllib.parse import unquote
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
@@ -177,7 +177,7 @@ class LibraryRegistryController(BaseController):
         emailer = None
         try:
             emailer = emailer_class.from_sitewide_integration(self._db)
-        except CannotLoadConfiguration, e:
+        except CannotLoadConfiguration as e:
             self.log.error(
                 "Cannot load email configuration. Will not be sending any emails.",
                 exc_info=e
@@ -193,7 +193,7 @@ class LibraryRegistryController(BaseController):
             nearby_controller = 'nearby_qa'
         this_url = self.app.url_for(nearby_controller)
         catalog = OPDSCatalog(
-            self._db, unicode(_("Libraries near you")), this_url, qu,
+            self._db, str(_("Libraries near you")), this_url, qu,
             annotator=self.annotator, live=live
         )
         return catalog_response(catalog)
@@ -214,7 +214,7 @@ class LibraryRegistryController(BaseController):
                 search_controller, q=query
             )
             catalog = OPDSCatalog(
-                self._db, unicode(_('Search results for "%s"')) % query,
+                self._db, str(_('Search results for "%s"')) % query,
                 this_url, results,
                 annotator=self.annotator, live=live
             )
@@ -346,7 +346,7 @@ class LibraryRegistryController(BaseController):
     def _areas(self, areas):
         result = {}
         for (a, b) in [(ServiceArea.FOCUS, "focus"), (ServiceArea.ELIGIBILITY, "service")]:
-            filtered = filter(lambda place: (place.type == a), areas)
+            filtered = [place for place in areas if (place.type == a)]
             result[b] = [self._format_place_name(item.place) for item in filtered]
         return result
 
@@ -402,7 +402,7 @@ class LibraryRegistryController(BaseController):
 
         library._library_stage = library_stage
         library.registry_stage = registry_stage
-        return Response(unicode(library.internal_urn), 200)
+        return Response(str(library.internal_urn), 200)
 
     def add_or_edit_pls_id(self):
         uuid = flask.request.form.get("uuid")
@@ -411,7 +411,7 @@ class LibraryRegistryController(BaseController):
             return library
         pls_id = flask.request.form.get(Library.PLS_ID)
         library.pls_id.value = pls_id
-        return Response(unicode(library.internal_urn), 200)
+        return Response(str(library.internal_urn), 200)
 
     def log_in(self):
         username = flask.request.form.get("username")
@@ -493,7 +493,7 @@ class LibraryRegistryController(BaseController):
 
     def catalog_response(self, document, status=200):
         """Serve an OPDS 2.0 catalog."""
-        if not isinstance(document, (bytes, unicode)):
+        if not isinstance(document, (bytes, str)):
             document = json.dumps(document)
         headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
         return Response(document, status, headers=headers)
@@ -512,7 +512,7 @@ class LibraryRegistryController(BaseController):
         integration_contact_email = integration_contact_uri
         shared_secret = None
         auth_header = flask.request.headers.get('Authorization')
-        if auth_header and isinstance(auth_header, basestring) and "bearer" in auth_header.lower():
+        if auth_header and isinstance(auth_header, str) and "bearer" in auth_header.lower():
             shared_secret = auth_header.split(' ', 1)[1]
             self.log.info("Incoming shared secret: %s...", shared_secret[:4])
 
@@ -636,7 +636,7 @@ class LibraryRegistryController(BaseController):
                 # them a new library is using their address.
                 try:
                     hyperlink.notify(self.emailer, self.app.url_for)
-                except SMTPException, e:
+                except SMTPException as e:
                     # We were unable to send the email.
                     return INTEGRATION_ERROR.detailed(
                         _("SMTP error while sending email to %(address)s",
@@ -763,7 +763,7 @@ class CoverageController(BaseController):
         coverage = flask.request.args.get('coverage')
         try:
             coverage = json.loads(coverage)
-        except ValueError, e:
+        except ValueError as e:
             pass
         places, unknown, ambiguous = AuthenticationDocument.parse_coverage(
             self._db, coverage

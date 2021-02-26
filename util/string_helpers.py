@@ -50,8 +50,8 @@ class UnicodeAwareBase64(object):
     urlsafe_b64decode = wrap(stdlib_base64.urlsafe_b64decode)
 
     # These are deprecated in base64 and we should stop using them.
-    encodestring = wrap(stdlib_base64.encodestring)
-    decodestring = wrap(stdlib_base64.decodestring)
+    encodestring = wrap(stdlib_base64.encodebytes)
+    decodestring = wrap(stdlib_base64.decodebytes)
     
 # If you're okay with a Unicode strings being converted to/from UTF-8
 # when you try to encode/decode them, you can use this object instead of
