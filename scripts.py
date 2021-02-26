@@ -77,7 +77,7 @@ class Script(object):
     def run(self):
         try:
             self.do_run()
-        except Exception, e:
+        except Exception as e:
             logging.error(
                 "Fatal exception while running script: %s", e,
                 exc_info=e
@@ -148,7 +148,7 @@ class LoadPlacesScript(Script):
                 what = 'NEW'
             else:
                 what = 'UPD'
-            print what, place
+            print(what, place)
             a += 1
             if not a % 1000:
                 self._db.commit()
@@ -295,11 +295,11 @@ class SetCoverageAreaScript(LibraryScript):
         # string will be interpreted as a single place name.
         try:
             service_area = json.loads(service_area)
-        except (ValueError, TypeError), e:
+        except (ValueError, TypeError) as e:
             pass
         try:
             focus_area = json.loads(focus_area)
-        except (ValueError, TypeError), e:
+        except (ValueError, TypeError) as e:
             pass
 
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
@@ -307,9 +307,9 @@ class SetCoverageAreaScript(LibraryScript):
         )
         for (valid, unknown, ambiguous) in [service_area, focus_area]:
             if unknown:
-                raise ValueError("Unknown places: %r" % unknown.items())
+                raise ValueError("Unknown places: %r" % list(unknown.items()))
             if ambiguous:
-                raise ValueError("Ambiguous places: %r" % unknown.items())
+                raise ValueError("Ambiguous places: %r" % list(unknown.items()))
 
         AuthenticationDocument.set_service_areas(
             library, service_area, focus_area
@@ -381,32 +381,32 @@ class AdobeVendorIDAcceptanceTestScript(Script):
 
         client = AdobeVendorIDClient(base_url)
 
-        print "1. Checking status: %s" % client.status_url
+        print("1. Checking status: %s" % client.status_url)
         response = client.status()
         # status() will raise an exception if anything is wrong.
-        print 'OK Service is up and running.'
+        print('OK Service is up and running.')
 
-        print "2. Passing token into SignIn as authdata: %s" % client.signin_url
+        print("2. Passing token into SignIn as authdata: %s" % client.signin_url)
         identifier, label, content = client.sign_in_authdata(token)
-        print "OK Found user identifier and label."
-        print "   User identifier: %s" % identifier
-        print "   Label: %s" % label
-        print "   Full content: %s" % content
+        print("OK Found user identifier and label.")
+        print("   User identifier: %s" % identifier)
+        print("   Label: %s" % label)
+        print("   Full content: %s" % content)
 
-        print
-        print "3. Passing token into SignIn as username/password."
+        print()
+        print("3. Passing token into SignIn as username/password.")
         username, password = token.rsplit('|', 1)
         identifier, label, content = client.sign_in_standard(username, password)
-        print "OK Found user identifier and label."
-        print "   User identifier: %s" % identifier
-        print "   Label: %s" % label
-        print "   Full content: %s" % content
+        print("OK Found user identifier and label.")
+        print("   User identifier: %s" % identifier)
+        print("   Label: %s" % label)
+        print("   Full content: %s" % content)
 
-        print
-        print "4. Passing identifier into UserInfo to get user info: %s" % client.accountinfo_url
+        print()
+        print("4. Passing identifier into UserInfo to get user info: %s" % client.accountinfo_url)
         user_info, content = client.user_info(identifier)
-        print "OK Found user info: %s" % user_info
-        print "   Full content: %s" % content
+        print("OK Found user info: %s" % user_info)
+        print("   Full content: %s" % content)
 
 class ConfigurationSettingScript(Script):
 

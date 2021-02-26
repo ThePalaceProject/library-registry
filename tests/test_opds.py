@@ -46,7 +46,7 @@ class TestOPDSCatalog(DatabaseTest):
             self._db, "A Catalog!", "http://url/", [l1, l2],
             TestAnnotator(), url_for=self.mock_url_for
         )
-        catalog = unicode(catalog)
+        catalog = str(catalog)
         parsed = json.loads(catalog)
 
         # The catalog is labeled appropriately.

@@ -1,4 +1,4 @@
-from StringIO import StringIO
+from io import StringIO
 from nose.tools import (
     eq_,
     set_trace,
@@ -50,7 +50,7 @@ class TestGeometryLoader(DatabaseTest):
 
         # We can measure the distance in kilometers between New York
         # and Texas.
-        distance_func = func.ST_Distance_Sphere(new_york.geometry, texas_zip.geometry)
+        distance_func = func.ST_DistanceSphere(new_york.geometry, texas_zip.geometry)
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
         eq_(2510, int(distance/1000))
@@ -67,7 +67,7 @@ class TestGeometryLoader(DatabaseTest):
         eq_(new_york, new_york_2)
 
         # This changes the distance between the two points.
-        distance_func = func.ST_Distance_Sphere(new_york_2.geometry, texas_zip.geometry)
+        distance_func = func.ST_DistanceSphere(new_york_2.geometry, texas_zip.geometry)
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
         eq_(2637, int(distance/1000))
@@ -125,7 +125,7 @@ class TestGeometryLoader(DatabaseTest):
         # We can measure the distance in kilometers between the point
         # chosen to represent 'Montgomery' and the point chosen to
         # represent 'Alabama'.
-        distance_func = func.ST_Distance_Sphere(montgomery.geometry, alabama.geometry)
+        distance_func = func.ST_DistanceSphere(montgomery.geometry, alabama.geometry)
         [[distance]] = self._db.query().add_columns(distance_func).all()
-        print distance
+        print(distance)
         eq_(276, int(distance/1000))

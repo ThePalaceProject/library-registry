@@ -622,7 +622,7 @@ class Library(Base):
             return func.min(
                 case(
                     [(subquery.c.type==Place.EVERYWHERE, literal_column(str(0)))],
-                    else_=func.ST_Distance_Sphere(target, subquery.c.geometry)
+                    else_=func.ST_DistanceSphere(target, subquery.c.geometry)
                 )
             ) / 1000
 
@@ -736,7 +736,7 @@ class Library(Base):
         # For each library served by such a place, calculate the
         # minimum distance between the library's service area and
         # Point A in meters.
-        min_distance = func.min(func.ST_Distance_Sphere(target, Place.geometry))
+        min_distance = func.min(func.ST_DistanceSphere(target, Place.geometry))
 
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place)
@@ -853,7 +853,7 @@ class Library(Base):
         if type:
             qu = qu.filter(named_place.type==type)
         if here:
-            min_distance = func.min(func.ST_Distance_Sphere(here, named_place.geometry))
+            min_distance = func.min(func.ST_DistanceSphere(here, named_place.geometry))
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
@@ -874,7 +874,7 @@ class Library(Base):
             # Order by the minimum distance between one of the
             # library's service areas and the current location.
             min_distance = func.min(
-                func.ST_Distance_Sphere(here, Place.geometry)
+                func.ST_DistanceSphere(here, Place.geometry)
             )
             qu = qu.add_column(min_distance)
             qu = qu.group_by(Library.id)

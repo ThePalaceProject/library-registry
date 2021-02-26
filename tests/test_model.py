@@ -82,7 +82,7 @@ class TestPlace(DatabaseTest):
 
         # Query the database to find states ordered by distance from
         # Lake Placid.
-        distance = func.ST_Distance_Sphere(
+        distance = func.ST_DistanceSphere(
             lake_placid.geometry, Place.geometry
         )
         places = self._db.query(Place).filter(
@@ -422,9 +422,9 @@ class TestLibrary(DatabaseTest):
         try:
             lib.short_name = 'ab|cd'
             raise Error("Expected exception not raised.")
-        except ValueError, e:
+        except ValueError as e:
             eq_('Short name cannot contain the pipe character.',
-                unicode(e))
+                str(e))
 
     def test_for_short_name(self):
         eq_(None, Library.for_short_name(self._db, 'ABCD'))

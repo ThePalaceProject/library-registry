@@ -32,7 +32,7 @@ class TestShortClientTokenEncoder(object):
         # newline stripped.
         eq_(
             encoded.replace(b":", b"+").replace(b";", b"/").replace(b"@", b"=") + b"\n",
-            base64.encodestring(value)
+            base64.encodebytes(value)
         )
 
         # We can reverse the encoding to get the original value.

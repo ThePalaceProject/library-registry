@@ -426,9 +426,7 @@ class TestLibraryRegistryController(ControllerTest):
 
             eq_("200 OK", response.status)
             eq_(OPDSCatalog.OPDS_TYPE, response.headers['Content-Type'])
-            print("######################################")
-            print(response.data)
-            print("######################################")
+            
             catalog = response.json
 
             # In the OPDS response, instead of getting four libraries like

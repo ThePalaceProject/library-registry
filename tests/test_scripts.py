@@ -4,7 +4,7 @@ from nose.tools import (
     set_trace,
     eq_,
 )
-from StringIO import StringIO
+from io import StringIO
 
 from config import Configuration
 from emailer import Emailer
@@ -139,14 +139,14 @@ class TestAddLibraryScript(DatabaseTest):
         # A library was created with the given specs.
         [library] = self._db.query(Library).all()
 
-        eq_(u"The New York Public Library", library.name)
+        eq_("The New York Public Library", library.name)
         assert library.internal_urn.startswith("urn:uuid")
-        eq_(u"https://circulation.librarysimplified.org/NYNYPL/authentication_document", library.authentication_url)
-        eq_(u"https://nypl.org/", library.web_url)
-        eq_(u"https://circulation.librarysimplified.org/", library.opds_url)
-        eq_(u"Serving the five boroughs of New York, NY.", library.description)
-        eq_(u"NYNYPL", library.short_name)
-        eq_(u"12345", library.shared_secret)
+        eq_("https://circulation.librarysimplified.org/NYNYPL/authentication_document", library.authentication_url)
+        eq_("https://nypl.org/", library.web_url)
+        eq_("https://circulation.librarysimplified.org/", library.opds_url)
+        eq_("Serving the five boroughs of New York, NY.", library.description)
+        eq_("NYNYPL", library.short_name)
+        eq_("12345", library.shared_secret)
 
         [alias] = library.aliases
         eq_("NYPL", alias.name)

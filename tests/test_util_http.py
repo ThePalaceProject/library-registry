@@ -125,7 +125,7 @@ class TestHTTP(object):
         try:
             m(url, fake_200_response,
               disallowed_response_codes=["2xx"])
-        except Exception, e:
+        except Exception as e:
             exception = e
         assert exception is not None
 
@@ -161,8 +161,8 @@ class TestHTTP(object):
         url = "http://foo"
         response = HTTP._request_with_timeout(
             url, generator.response, url, "POST",
-            headers = { u"unicode header": u"unicode value"},
-            data=u"unicode data"
+            headers = { "unicode header": "unicode value"},
+            data="unicode data"
         )
         [(args, kwargs)] = generator.requests
         url, method = args
@@ -171,7 +171,7 @@ class TestHTTP(object):
 
         # All the Unicode data was converted to bytes before being sent
         # "over the wire".
-        for k,v in headers.items():
+        for k,v in list(headers.items()):
             assert isinstance(k, bytes)
             assert isinstance(v, bytes)
         assert isinstance(data, bytes)
@@ -184,8 +184,8 @@ class TestRemoteIntegrationException(object):
         name.
         """
         exc = RemoteIntegrationException(
-            u"Unreliable Service",
-            u"I just can't handle your request right now."
+            "Unreliable Service",
+            "I just can't handle your request right now."
         )
 
         # Since only the service name is provided, there are no details to
@@ -194,7 +194,7 @@ class TestRemoteIntegrationException(object):
         other_detail = exc.document_detail(debug=False)
         eq_(debug_detail, other_detail)
 
-        eq_(u'The server tried to access Unreliable Service but the third-party service experienced an error.',
+        eq_('The server tried to access Unreliable Service but the third-party service experienced an error.',
             debug_detail
         )
 
@@ -214,7 +214,7 @@ class TestBadResponseException(object):
         eq_('Bad response', doc['title'])
         eq_('The server made a request to http://url/, and got an unexpected or invalid response.', doc['detail'])
         eq_(
-            u'Bad response from http://url/: Terrible response, just terrible\n\nStatus code: 102\nContent: nonsense',
+            'Bad response from http://url/: Terrible response, just terrible\n\nStatus code: 102\nContent: nonsense',
             doc['debug_message']
         )
 

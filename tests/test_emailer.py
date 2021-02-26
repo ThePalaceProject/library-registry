@@ -50,10 +50,10 @@ class TestEmailTemplate(object):
     def test_unicode_quoted_printable(self):
         # Create an email message that includes Unicode characters in
         # its subject and body.
-        snowman = u"\N{SNOWMAN}"
+        snowman = "\N{SNOWMAN}"
         template = EmailTemplate(
-            u"A snowman for you! %s" % snowman,
-            u"Here he is: %s" % snowman
+            "A snowman for you! %s" % snowman,
+            "Here he is: %s" % snowman
         )
         body = template.body("me@example.com", "you@example.com")
         # The SNOWMAN character is encoded as quoted-printable in both
@@ -308,7 +308,7 @@ The link will expire in about a day. If the link expires, just re-register your 
             "subject Value".replace(" ", "_"), # Part of the encoding process.
             "Hello, you@library, this is me@registry."
         ]:
-            print phrase
+            print(phrase)
             assert phrase in body
         eq_(mock_smtp, smtp)
 
