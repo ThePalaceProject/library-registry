@@ -38,7 +38,7 @@ class GeometryUtility(object):
         for i in s.split(',', 1):
             try:
                 i = float(i.strip())
-            except ValueError, e:
+            except ValueError as e:
                 return None
             parts.append(i)
         if any(abs(x) > 180 for x in parts):
