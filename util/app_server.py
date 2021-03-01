@@ -1,27 +1,23 @@
 """Implement logic common to more than one of the Simplified applications."""
-from nose.tools import set_trace
-from psycopg2 import DatabaseError
-import flask
-import json
 import sys
-from lxml import etree
 from functools import wraps
-from flask import make_response
-from flask_babel import lazy_gettext as _
-from util.flask_util import problem
-from util.problem_detail import ProblemDetail
 import traceback
 import logging
+
+from psycopg2 import DatabaseError
+import flask
+from lxml import etree
+from flask import make_response
+from flask_babel import lazy_gettext as _
+
+from util.problem_detail import ProblemDetail
 from opds import OPDSCatalog
 
-from sqlalchemy.orm.session import Session
-from sqlalchemy.orm.exc import (
-    NoResultFound,
-)
 
 def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):
     content_type = OPDSCatalog.OPDS_TYPE
     return _make_response(catalog, content_type, cache_for)
+
 
 def _make_response(content, content_type, cache_for):
     if isinstance(content, etree._Element):
@@ -42,6 +38,7 @@ def _make_response(content, content_type, cache_for):
     return make_response(content, 200, {"Content-Type": content_type,
                                         "Cache-Control": cache_control})
 
+
 def returns_problem_detail(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -50,6 +47,7 @@ def returns_problem_detail(f):
             return v.response
         return v
     return decorated
+
 
 def returns_json_or_response_or_problem_detail(f):
     @wraps(f)
@@ -62,7 +60,8 @@ def returns_json_or_response_or_problem_detail(f):
         return flask.jsonify(**v)
     return decorated
 
-class ErrorHandler(object):
+
+class ErrorHandler():
     def __init__(self, app, debug):
         self.app = app
         self.debug = debug

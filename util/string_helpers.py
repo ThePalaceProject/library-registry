@@ -7,7 +7,8 @@ import binascii
 import os
 import sys
 
-class UnicodeAwareBase64(object):
+
+class UnicodeAwareBase64():
     """Simulate the interface of the base64 module, but make it look as
     though base64-encoding and -decoding works on Unicode strings.
 
@@ -52,11 +53,13 @@ class UnicodeAwareBase64(object):
     # These are deprecated in base64 and we should stop using them.
     encodestring = wrap(stdlib_base64.encodebytes)
     decodestring = wrap(stdlib_base64.decodebytes)
-    
+
+
 # If you're okay with a Unicode strings being converted to/from UTF-8
 # when you try to encode/decode them, you can use this object instead of
 # the standard 'base64' module.
 base64 = UnicodeAwareBase64("utf8")
+
 
 def random_string(size):
     """Generate a random string of binary, encoded as hex digits.

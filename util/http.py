@@ -1,8 +1,9 @@
 import logging
-from nose.tools import set_trace
 import requests
 import urllib.parse
+
 from flask_babel import lazy_gettext as _
+
 from .problem_detail import (
     ProblemDetail as pd,
     JSON_MEDIA_TYPE as PROBLEM_DETAIL_JSON_MEDIA_TYPE,
@@ -14,6 +15,7 @@ INTEGRATION_ERROR = pd(
       _("Third-party service failed."),
       _("A third-party service has failed."),
 )
+
 
 class IntegrationException(Exception):
     """An exception that happens when the site's connection to a
@@ -58,8 +60,7 @@ class RemoteIntegrationException(IntegrationException):
         `param url_or_service` The name of the service that failed
            (e.g. "Overdrive"), or the specific URL that had the problem.
         """
-        if (url_or_service and
-            any(url_or_service.startswith(x) for x in ('http:', 'https:'))):
+        if (url_or_service and any(url_or_service.startswith(x) for x in ('http:', 'https:'))):
             self.url = url_or_service
             self.service = urllib.parse.urlparse(url_or_service).netloc
         else:
@@ -87,6 +88,7 @@ class RemoteIntegrationException(IntegrationException):
             detail=self.document_detail(debug), title=self.title,
             debug_message=self.document_debug_message(debug)
         )
+
 
 class BadResponseException(RemoteIntegrationException):
     """The request seemingly went okay, but we got a bad response."""
@@ -215,7 +217,7 @@ class HTTP(object):
         disallowed_response_codes = kwargs.pop('disallowed_response_codes', [])
         verbose = kwargs.pop('verbose', False)
 
-        if not 'timeout' in kwargs:
+        if 'timeout' not in kwargs:
             kwargs['timeout'] = 20
 
         # Unicode data can't be sent over the wire. Convert it
@@ -235,8 +237,7 @@ class HTTP(object):
 
         try:
             if verbose:
-                logging.info("Sending %s request to %s: kwargs %r",
-                             http_method, url, kwargs)
+                logging.info("Sending %s request to %s: kwargs %r", url, kwargs)
             if len(args) == 1:
                 # requests.request takes two positional arguments,
                 # an HTTP method and a URL. In most cases, the URL
@@ -299,11 +300,8 @@ class HTTP(object):
             return response
 
         error_message = None
-        if (series == '5xx' or code in disallowed_response_codes
-            or series in disallowed_response_codes
-        ):
-            # Unless explicitly allowed, the 5xx series always results in
-            # an exception.
+        if (series == '5xx' or code in disallowed_response_codes or series in disallowed_response_codes):
+            # Unless explicitly allowed, the 5xx series always results in an exception.
             error_message = BadResponseException.BAD_STATUS_CODE_MESSAGE
         elif (allowed_response_codes and not (
                 code in allowed_response_codes

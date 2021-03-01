@@ -1,7 +1,8 @@
-# encoding: utf-8
+import os
 from collections import defaultdict
 
-class LanguageCodes(object):
+
+class LanguageCodes():
     """Convert between ISO-639-2 and ISO-693-1 language codes.
 
     The data file comes from
@@ -501,19 +502,19 @@ zun|||Zuni|zuni
 zxx|||No linguistic content; Not applicable|pas de contenu linguistique; non applicable
 zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki; kirmanjki; zazaki"""
 
-    NATIVE_NAMES_RAW_DATA =  [
-        {"code":"en","name":"English","nativeName":"English"},
-        {"code":"fr","name":"French","nativeName":"français"},
-        {"code":"de","name":"German","nativeName":"Deutsch"},
-        {"code":"el","name":"Greek, Modern","nativeName":"Ελληνικά"},
-        {"code":"hu","name":"Hungarian","nativeName":"Magyar"},
-        {"code":"it","name":"Italian","nativeName":"Italiano"},
-        {"code":"no","name":"Norwegian","nativeName":"Norsk"},
-        {"code":"pl","name":"Polish","nativeName":"polski"},
-        {"code":"pt","name":"Portuguese","nativeName":"Português"},
-        {"code":"ru","name":"Russian","nativeName":"русский"},
-        {"code":"es","name":"Spanish, Castilian","nativeName":"español, castellano"},
-        {"code":"sv","name":"Swedish","nativeName":"svenska"},
+    NATIVE_NAMES_RAW_DATA = [
+        {"code": "en", "name": "English", "nativeName": "English"},
+        {"code": "fr", "name": "French", "nativeName": "français"},
+        {"code": "de", "name": "German", "nativeName": "Deutsch"},
+        {"code": "el", "name": "Greek, Modern", "nativeName": "Ελληνικά"},
+        {"code": "hu", "name": "Hungarian", "nativeName": "Magyar"},
+        {"code": "it", "name": "Italian", "nativeName": "Italiano"},
+        {"code": "no", "name": "Norwegian", "nativeName": "Norsk"},
+        {"code": "pl", "name": "Polish", "nativeName": "polski"},
+        {"code": "pt", "name": "Portuguese", "nativeName": "Português"},
+        {"code": "ru", "name": "Russian", "nativeName": "русский"},
+        {"code": "es", "name": "Spanish, Castilian", "nativeName": "español, castellano"},
+        {"code": "sv", "name": "Swedish", "nativeName": "svenska"},
     ]
 
     for i in RAW_DATA.split("\n"):
@@ -540,7 +541,7 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
     def iso_639_2_for_locale(cls, locale):
         """Turn a locale code into an ISO-639-2 alpha-3 language code."""
         if '-' in locale:
-            language, place = locale.lower().split("-",1)
+            language, place = locale.lower().split("-", 1)
         else:
             language = locale
         if cls.two_to_three[language]:
@@ -579,19 +580,20 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
         all_names = []
         if not languages:
             return ""
-        for l in languages:
-            normalized = cls.string_to_alpha_3(l)
+        for lang in languages:
+            normalized = cls.string_to_alpha_3(lang)
             native_names = cls.native_names.get(normalized, [])
             if native_names:
                 all_names.append(native_names[0])
             else:
                 names = cls.english_names.get(normalized, [])
                 if not names:
-                    raise ValueError("No native or English name for %s" % l)
+                    raise ValueError("No native or English name for %s" % lang)
                 all_names.append(names[0])
         if len(all_names) == 1:
             return all_names[0]
         return "/".join(all_names)
+
 
 def languages_from_accept(accept_languages):
     """Turn a list of (locale, quality) 2-tuples into a list of language codes."""

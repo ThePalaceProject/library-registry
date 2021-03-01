@@ -3,7 +3,8 @@ import datetime
 import logging
 from jwt.algorithms import HMACAlgorithm
 
-class ShortClientTokenTool(object):
+
+class ShortClientTokenTool():
 
     ALGORITHM = 'HS256'
     signer = HMACAlgorithm(HMACAlgorithm.SHA256)
@@ -26,7 +27,7 @@ class ShortClientTokenTool(object):
     def adobe_base64_decode(cls, to_decode):
         """Undoes adobe_base64_encode."""
         if isinstance(to_decode, str):
-            to_decode = to_decode.encode("utf8")        
+            to_decode = to_decode.encode("utf8")
         to_decode = to_decode.replace(b":", b"+").replace(b";", b"/").replace(b"@", b"=")
         return base64.decodebytes(to_decode)
 
@@ -49,7 +50,7 @@ class ShortClientTokenTool(object):
     def jwt_numericdate(cls, d):
         """Turn a datetime object into a NumericDate as per RFC 7519."""
         return (d-cls.JWT_EPOCH).total_seconds()
-    
+
 
 class ShortClientTokenEncoder(ShortClientTokenTool):
 
@@ -60,10 +61,10 @@ class ShortClientTokenEncoder(ShortClientTokenTool):
     Used by the circulation manager. Only used by the library registry
     in tests.
     """
-      
+
     def __init__(self):
         self.log = logging.getLogger("Short client token encoder")
-    
+
     def encode(self, library_short_name, library_secret, patron_identifier):
         """Generate a short client token suitable for putting in an OPDS feed,
         where it can be picked up by a client and sent to a library
@@ -78,16 +79,16 @@ class ShortClientTokenEncoder(ShortClientTokenTool):
 
         if not patron_identifier:
             raise ValueError("No patron identifier specified.")
-        
+
         now = datetime.datetime.utcnow()
         expires = int(self.sct_numericdate(now + datetime.timedelta(minutes=60)))
         return self._encode(library_short_name, library_secret,
                             patron_identifier, expires)
-    
+
     def _encode(self, library_short_name, library_secret, patron_identifier,
                 expires):
         short_token_signing_key = self.signer.prepare_key(library_secret)
-        
+
         base = library_short_name + "|" + str(expires) + "|" + patron_identifier
         base_bytestring = base.encode("utf8")
         signature = self.signer.sign(base_bytestring, short_token_signing_key)
