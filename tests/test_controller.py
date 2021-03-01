@@ -1056,8 +1056,8 @@ class TestLibraryRegistryController(ControllerTest):
             # header and decode it.
             header, encoded = data_link['href'].split(",", 1)
             eq_("data:text/html;base64", header)
-
-            decoded = base64.b64decode(encoded)
+            
+            decoded = base64.b64decode(encoded).decode('utf-8')
             eq_(html, decoded)
 
     def test_register_fails_when_no_auth_document_url_provided(self):
@@ -1520,7 +1520,7 @@ class TestLibraryRegistryController(ControllerTest):
             # cryptography which ignore seed(). But we do know how
             # long it is.
             # TODO PYTHON3 expect = 'UDAXIH'
-            expect = 'QAHFTR'
+            expect = 'UDAXIH'
             eq_(expect, library.short_name)
             eq_(48, len(library.shared_secret))
 

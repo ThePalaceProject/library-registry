@@ -222,7 +222,7 @@ class OPDSCatalog(object):
         return args
 
     # TODO PYTHON3 rename to __str__
-    def __unicode__(self):
+    def __str__(self):
         if self.catalog is None:
             return None
 

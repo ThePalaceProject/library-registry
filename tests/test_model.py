@@ -443,7 +443,7 @@ class TestLibrary(DatabaseTest):
         name = Library.random_short_name()
 
         # TODO PYTHON3 expect = "UDAXIH"
-        expect = 'QAHFTR'
+        expect = 'UDAXIH'
         eq_(expect, name)
 
         # Reset the random seed so the same name will be generated again.
@@ -459,7 +459,7 @@ class TestLibrary(DatabaseTest):
         # which passes the already_used test.
 
         # TODO PYTHON3 expect_next = "HEXDVX"
-        expect_next = "XCKAFN"
+        expect_next = "HEXDVX"
         eq_(expect_next, name)
 
         # To avoid an infinite loop, we will stop trying and raise an
