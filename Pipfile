@@ -22,9 +22,13 @@ PyJWT = "*"
 SQLAlchemy = "*"
 uWSGI = "*"
 Pillow = "*"
-future = "*"
 
 [dev-packages]
+future = "*"
+coverage = "*"
+pep8 = "*"
+pycodestyle = "*"
+flake8 = "*"
 
 [requires]
 python_version = "3.9"
