@@ -1,11 +1,13 @@
-import flask
 import gzip
 from io import BytesIO
 from functools import wraps
-from nose.tools import set_trace
-from util import GeometryUtility
-from util.problem_detail import ProblemDetail
-from util.flask_util import originating_ip
+
+import flask
+
+from .util import GeometryUtility
+from .util.problem_detail import ProblemDetail
+from .util.flask_util import originating_ip
+
 
 def has_library_factory(app):
     """Create a decorator that extracts a library uuid from request arguments.
@@ -29,6 +31,7 @@ def has_library_factory(app):
                 return f(*args, **kwargs)
         return decorated
     return factory
+
 
 def uses_location_factory(app):
     """Create a decorator that guesses at a location for the client.
@@ -65,16 +68,14 @@ def compressible(f):
     def compressor(*args, **kwargs):
         @flask.after_this_request
         def compress(response):
-            if (response.status_code < 200 or
-                response.status_code >= 300 or
-                'Content-Encoding' in response.headers):
+            if (response.status_code < 200 or response.status_code >= 300 or 'Content-Encoding' in response.headers):
                 # Don't encode anything other than a 2xx response
                 # code. Don't encode a response that's
                 # already been encoded.
                 return response
 
             accept_encoding = flask.request.headers.get('Accept-Encoding', '')
-            if not 'gzip' in accept_encoding.lower():
+            if 'gzip' not in accept_encoding.lower():
                 return response
 
             # At this point we know we're going to be changing the

@@ -1,4 +1,3 @@
-from nose.tools import set_trace
 import json
 
 import flask
@@ -7,17 +6,18 @@ from sqlalchemy.orm import Query
 from model import (
     ConfigurationSetting,
     Hyperlink,
-    Session,
     Validation,
 )
 
 from authentication_document import AuthenticationDocument
 from config import Configuration
 
+
 class Annotator(object):
 
     def annotate_catalog(self, catalog, live=True):
         pass
+
 
 class OPDSCatalog(object):
     """Represents an OPDS 2 Catalog Document.

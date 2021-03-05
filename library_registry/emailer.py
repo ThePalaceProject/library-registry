@@ -1,20 +1,18 @@
-from nose.tools import set_trace
+import smtplib
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email import charset
-import email
-import smtplib
+
+from .config import (
+    CannotLoadConfiguration,
+)
 
 # Set up an encoding/decoding between UTF-8 and quoted-printable.
 # Otherwise, the bodies of email messages will be encoded with base64
 # and they'll be hard to read. This way, only the non-ASCII characters
 # need to be encoded.
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
-
-from config import (
-    CannotLoadConfiguration,
-)
 
 
 class Emailer(object):
@@ -37,26 +35,36 @@ class Emailer(object):
     DEFAULT_ADDRESS_DESIGNATED_SUBJECT = "This address designated as the %(rel_desc)s for %(library)s"
     DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT = "Confirm the %(rel_desc)s for %(library)s"
 
-    DEFAULT_ADDRESS_DESIGNATED_TEMPLATE = """This email address, %(to_address)s, has been registered with the Library Simplified library registry as the %(rel_desc)s for the library %(library)s (%(library_web_url)s).
+    DEFAULT_ADDRESS_DESIGNATED_TEMPLATE = (
+        "This email address, %(to_address)s, has been registered with the Library Simplified library registry as the "
+        "%(rel_desc)s for the library %(library)s (%(library_web_url)s)."
+        "\n"
+        "If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies "
+        "and contact the Library Simplified support address at %(from_address)s -- something has gone wrong."
+        "\n"
+        "If you do work at a public library, but you're not sure what this means, please speak to a technical point "
+        "of contact at your library, or contact the Library Simplified support address at %(from_address)s."
+    )
 
-If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at %(from_address)s -- something has gone wrong.
-
-If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at %(from_address)s."""
-
-    NEEDS_CONFIRMATION_ADDITION = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link:
-
-%(confirmation_link)s
-
-The link will expire in about a day. If the link expires, just re-register your library with the library registry, and a fresh confirmation email like this will be sent out."""
+    NEEDS_CONFIRMATION_ADDITION = (
+        "If you do know what this means, you should also know that you're not quite done. We need to confirm that "
+        "you actually meant to use this email address for this purpose. If everything looks right, please visit "
+        "this link:"
+        "\n"
+        "%(confirmation_link)s"
+        "\n"
+        "The link will expire in about a day. If the link expires, just re-register your library with the library "
+        "registry, and a fresh confirmation email like this will be sent out."
+    )
 
     BODIES = {
-        ADDRESS_DESIGNATED : DEFAULT_ADDRESS_DESIGNATED_TEMPLATE,
-        ADDRESS_NEEDS_CONFIRMATION : DEFAULT_ADDRESS_DESIGNATED_TEMPLATE + "\n\n" + NEEDS_CONFIRMATION_ADDITION
+        ADDRESS_DESIGNATED: DEFAULT_ADDRESS_DESIGNATED_TEMPLATE,
+        ADDRESS_NEEDS_CONFIRMATION: DEFAULT_ADDRESS_DESIGNATED_TEMPLATE + "\n\n" + NEEDS_CONFIRMATION_ADDITION
     }
 
     SUBJECTS = {
         ADDRESS_DESIGNATED: DEFAULT_ADDRESS_DESIGNATED_SUBJECT,
-        ADDRESS_NEEDS_CONFIRMATION : DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT,
+        ADDRESS_NEEDS_CONFIRMATION: DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT,
     }
 
     # We use this to catch templates that contain variables we won't
@@ -107,7 +115,7 @@ The link will expire in about a day. If the link expires, just re-register your 
         """Find the ExternalIntegration for the emailer."""
         from model import ExternalIntegration
         qu = _db.query(ExternalIntegration).filter(
-            ExternalIntegration.goal==cls.GOAL
+            ExternalIntegration.goal == cls.GOAL
         )
         integrations = qu.all()
         if not integrations:
@@ -156,16 +164,13 @@ The link will expire in about a day. If the link expires, just re-register your 
         )
         for template in list(self.templates.values()):
             try:
-                test_body = template.body(
-                    "from address", "to address", **test_template_values
-                )
+                template.body("from address", "to address", **test_template_values)
             except Exception as e:
                 raise CannotLoadConfiguration(
                     "Template %r/%r contains unrecognized key: %r" % (
                         template.subject_template, template.body_template, e
                     )
                 )
-
 
     def send(self, email_type, to_address, smtp=None, **kwargs):
         """Generate an email from a template and send it.
@@ -177,7 +182,7 @@ The link will expire in about a day. If the link expires, just re-register your 
         :param kwargs: Arguments to use when generating the email from
             a template.
         """
-        if not email_type in self.templates:
+        if email_type not in self.templates:
             raise ValueError("No such email template: %s" % email_type)
         template = self.templates[email_type]
         from_header = '%s <%s>' % (self.from_name, self.from_address)
@@ -221,7 +226,7 @@ class EmailTemplate(object):
         # might look like '"Name" <email>', but it's better than
         # nothing.
         for k, v in (('to_address', to_header), ('from_address', from_header)):
-            if not k in kwargs:
+            if k not in kwargs:
                 kwargs[k] = v
         payload = self.body_template % kwargs
         text_part = MIMEText(payload, 'plain', 'utf-8')

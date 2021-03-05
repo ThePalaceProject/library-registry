@@ -1,6 +1,10 @@
-from nose.tools import set_trace
-import datetime
+import json
 import logging
+from smtplib import SMTPException
+from urllib.parse import unquote
+
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 import flask
 from flask_babel import lazy_gettext as _
 from flask import (
@@ -9,19 +13,12 @@ from flask import (
     url_for,
     session,
 )
-import requests
 from sqlalchemy.orm import joinedload
-from smtplib import SMTPException
-import json
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-import os
-from urllib.parse import unquote
 
-from adobe_vendor_id import AdobeVendorIDController
-from authentication_document import AuthenticationDocument
-from emailer import Emailer
-from model import (
+from .adobe_vendor_id import AdobeVendorIDController
+from .authentication_document import AuthenticationDocument
+from .emailer import Emailer
+from .model import (
     Admin,
     ConfigurationSetting,
     Hyperlink,
@@ -34,33 +31,42 @@ from model import (
     get_one_or_create,
     production_session,
 )
-from config import (
+from .config import (
     Configuration,
     CannotLoadConfiguration,
 )
-from opds import (
+from .opds import (
     Annotator,
     OPDSCatalog,
 )
-from registrar import LibraryRegistrar
-from templates import admin as admin_template
-from util import GeometryUtility
-from util.app_server import (
+from .registrar import LibraryRegistrar
+from .templates import admin as admin_template
+from .util.app_server import (
     HeartbeatController,
     catalog_response,
 )
-from util.http import (
+from .util.http import (
     HTTP,
 )
-from util.problem_detail import ProblemDetail
-from util.string_helpers import (
+from .util.problem_detail import ProblemDetail
+from .util.string_helpers import (
     base64,
     random_string,
 )
-from problem_details import *
+from .problem_details import (
+    AUTHENTICATION_FAILURE,
+    INTEGRATION_ERROR,
+    INVALID_CONTACT_URI,
+    INVALID_CREDENTIALS,
+    LIBRARY_NOT_FOUND,
+    NO_AUTH_URL,
+)
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
-OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
+OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = (
+    "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
+)
+
 
 class LibraryRegistry(object):
 
@@ -122,11 +128,13 @@ class LibraryRegistryAnnotator(Annotator):
 
         # Add a templated link for getting a single library's entry.
         library_url = unquote(self.app.url_for("library", uuid="{uuid}"))
-        catalog.add_link_to_catalog(
-            catalog.catalog, href=library_url, rel="http://librarysimplified.org/rel/registry/library", type=OPDSCatalog.OPDS_TYPE, templated=True)
+        catalog.add_link_to_catalog(catalog.catalog, href=library_url,
+                                    rel="http://librarysimplified.org/rel/registry/library",
+                                    type=OPDSCatalog.OPDS_TYPE, templated=True)
 
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
+
 
 class BaseController(object):
 
@@ -146,6 +154,7 @@ class BaseController(object):
         flask.request.library = library
         return library
 
+
 class StaticFileController(BaseController):
     def static_file(self, directory, filename):
         return flask.send_from_directory(directory, filename, cache_timeout=None)
@@ -159,6 +168,7 @@ class ViewController(BaseController):
             username=username
         ))
         return response
+
 
 class LibraryRegistryController(BaseController):
 
@@ -225,7 +235,7 @@ class LibraryRegistryController(BaseController):
                 name=_("Find your library"),
                 description=_("Search by ZIP code, city or library name."),
                 tags="",
-                url_template = self.app.url_for(search_controller) + "?q={searchTerms}"
+                url_template=self.app.url_for(search_controller) + "?q={searchTerms}"
             )
             headers = {}
             headers['Content-Type'] = OPENSEARCH_MEDIA_TYPE
@@ -235,20 +245,20 @@ class LibraryRegistryController(BaseController):
             return Response(body, 200, headers)
 
     def libraries(self, live=True):
-        # Return a specific set of information about all libraries in production; this generates the library list in the admin interface.
+        # Return a specific set of information about all libraries in production;
+        # this generates the library list in the admin interface.
         # If :param live is set to False, libraries in testing will also be shown.
         result = []
         libraries = self._db.query(Library).order_by(Library.name)
 
         if live:
-            libraries = libraries.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
+            libraries = libraries.filter(Library.registry_stage == Library.PRODUCTION_STAGE)
 
         for library in libraries:
             uuid = library.internal_urn.split("uuid:")[1]
             result += [self.library_details(uuid, library)]
 
         data = dict(libraries=result)
-        now = datetime.datetime.utcnow()
         return data
 
     def libraries_opds(self, live=True, location=None):
@@ -309,10 +319,16 @@ class LibraryRegistryController(BaseController):
         if isinstance(library, ProblemDetail):
             return library
 
-        hyperlink_types = [Hyperlink.INTEGRATION_CONTACT_REL, Hyperlink.HELP_REL, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL]
+        hyperlink_types = [
+            Hyperlink.INTEGRATION_CONTACT_REL,
+            Hyperlink.HELP_REL,
+            Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL
+        ]
         hyperlinks = [Library.get_hyperlink(library, x) for x in hyperlink_types]
         contact_email, help_email, copyright_email = [self._get_email(x) for x in hyperlinks]
-        contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [self._validated_at(x) for x in hyperlinks]
+        contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [
+            self._validated_at(x) for x in hyperlinks
+        ]
         contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = hyperlinks
 
         basic_info = dict(
@@ -352,7 +368,7 @@ class LibraryRegistryController(BaseController):
 
     def _format_place_name(self, place):
         parent_name = (place.parent.abbreviated_name or place.parent.external_name) if place.parent else "unknown"
-        return "%s (%s)" %(place.external_name, parent_name)
+        return "%s (%s)" % (place.external_name, parent_name)
 
     def _get_email(self, hyperlink):
         if hyperlink and hyperlink.resource and hyperlink.resource.href:
@@ -392,7 +408,8 @@ class LibraryRegistryController(BaseController):
         return self.library_details(uuid)
 
     def edit_registration(self):
-        # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
+        # Edit a specific library's registry_stage and library_stage based on
+        # information which an admin has submitted in the interface.
         uuid = flask.request.form.get("uuid")
         library = self.library_for_request(uuid)
         if isinstance(library, ProblemDetail):
@@ -423,7 +440,7 @@ class LibraryRegistryController(BaseController):
             return INVALID_CREDENTIALS
 
     def log_out(self):
-        session["username"] = "";
+        session["username"] = ""
         return redirect(url_for('admin_view'))
 
     def search_details(self):
@@ -495,7 +512,7 @@ class LibraryRegistryController(BaseController):
         """Serve an OPDS 2.0 catalog."""
         if not isinstance(document, (bytes, str)):
             document = json.dumps(document)
-        headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
+        headers = {"Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE}
         return Response(document, status, headers=headers)
 
     def register(self, do_get=HTTP.debuggable_get):
@@ -529,10 +546,11 @@ class LibraryRegistryController(BaseController):
         # every new library to be on a circulation manager that can meet
         # this requirement.
         #
-        #integration_contact_email = self._required_email_address(
-        #    integration_contact_uri,
-        #    "Invalid or missing configuration contact email address"
-        #)
+        # integration_contact_email = self._required_email_address(
+        #     integration_contact_uri,
+        #     "Invalid or missing configuration contact email address"
+        # )
+
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
 
@@ -636,7 +654,7 @@ class LibraryRegistryController(BaseController):
                 # them a new library is using their address.
                 try:
                     hyperlink.notify(self.emailer, self.app.url_for)
-                except SMTPException as e:
+                except SMTPException:
                     # We were unable to send the email.
                     return INTEGRATION_ERROR.detailed(
                         _("SMTP error while sending email to %(address)s",
@@ -726,9 +744,7 @@ class ValidationController(BaseController):
             if resource and resource.validation and resource.validation.success:
                 return self.html_response(200, _("This URI has already been validated."))
 
-        if (not validation
-            or not validation.resource
-            or validation.resource.id != resource_id):
+        if (not validation or not validation.resource or validation.resource.id != resource_id):
             # For whatever reason the resource ID and secret don't match.
             # A generic error that doesn't reveal information is appropriate
             # in all cases.
@@ -763,7 +779,7 @@ class CoverageController(BaseController):
         coverage = flask.request.args.get('coverage')
         try:
             coverage = json.loads(coverage)
-        except ValueError as e:
+        except ValueError:
             pass
         places, unknown, ambiguous = AuthenticationDocument.parse_coverage(
             self._db, coverage
@@ -783,8 +799,7 @@ class CoverageController(BaseController):
         """Serve a GeoJSON document describing some subset of the active
         library's service areas.
         """
-        areas = [x.place for x in flask.request.library.service_areas
-                 if x.type==service_type]
+        areas = [x.place for x in flask.request.library.service_areas if x.type == service_type]
         return self.geojson_response(Place.to_geojson(self._db, *areas))
 
     def eligibility_for_library(self):

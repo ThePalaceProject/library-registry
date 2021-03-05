@@ -1,22 +1,21 @@
 from collections import defaultdict
 import json
-from nose.tools import set_trace
+
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm.exc import (
     MultipleResultsFound,
     NoResultFound,
 )
+from sqlalchemy.orm.session import Session
 
-from model import (
+from .model import (
     get_one_or_create,
     Audience,
     CollectionSummary,
     Place,
     ServiceArea,
 )
-
-from problem_details import INVALID_INTEGRATION_DOCUMENT
-from sqlalchemy.orm.session import Session
+from .problem_details import INVALID_INTEGRATION_DOCUMENT
 
 
 class AuthenticationDocument(object):
@@ -170,20 +169,20 @@ class AuthenticationDocument(object):
             # This library covers the entire universe! No need to
             # parse anything.
             place_objs.append(place_class.everywhere(_db))
-            coverage = dict() # Do no more processing
+            coverage = dict()  # Do no more processing
 
         elif not isinstance(coverage, dict):
             # The coverage is not in { nation: place } format.
             # Convert it into that format using the default nation.
             default_nation = place_class.default_nation(_db)
             if default_nation:
-                coverage = {default_nation.abbreviated_name : coverage }
+                coverage = {default_nation.abbreviated_name: coverage}
             else:
                 # Oops, that's not going to work. We don't know which
                 # nation this place is in. Return a coverage object
                 # that makes it semi-clear what the problem is.
                 unknown["??"] = coverage
-                coverage = dict() # Do no more processing
+                coverage = dict()  # Do no more processing
 
         for nation, places in list(coverage.items()):
             try:
@@ -209,13 +208,13 @@ class AuthenticationDocument(object):
                             else:
                                 # We couldn't find any place with this name.
                                 unknown[nation].append(place)
-                        except MultipleResultsFound as e:
+                        except MultipleResultsFound:
                             # The place was ambiguously named.
                             ambiguous[nation].append(place)
-            except MultipleResultsFound as e:
+            except MultipleResultsFound:
                 # A nation was ambiguously named -- not very likely.
                 ambiguous[nation] = places
-            except NoResultFound as e:
+            except NoResultFound:
                 # Either this isn't a recognized nation
                 # or we don't have a geography for it.
                 unknown[nation] = places
@@ -247,8 +246,7 @@ class AuthenticationDocument(object):
             type = link.get('type', '')
 
             if type:
-                if (require_type and type.startswith(require_type)
-                    or prefer_type and type.startswith(prefer_type)):
+                if (require_type and type.startswith(require_type) or prefer_type and type.startswith(prefer_type)):
                     # If we have a require_type, this means we have
                     # met the requirement. If we have a prefer_type,
                     # we will not find a better link than this
@@ -355,7 +353,7 @@ class AuthenticationDocument(object):
 
         # What service_area or focus_area looks like when
         # no input was specified.
-        empty = [[],{},{}]
+        empty = [[], {}, {}]
 
         if focus_area == empty and service_area == empty:
             # A library can't lose its entire coverage area -- it's
@@ -365,8 +363,7 @@ class AuthenticationDocument(object):
             # Do nothing.
             return
 
-        if (focus_area == empty and service_area != empty
-            or service_area == focus_area):
+        if (focus_area == empty and service_area != empty or service_area == focus_area):
             # Service area and focus area are the same, either because
             # they were defined that way explicitly or because focus
             # area was not specified.
@@ -437,7 +434,7 @@ class AuthenticationDocument(object):
     def _update_collection_size(self, library, sizes):
         if isinstance(sizes, str) or isinstance(sizes, int):
             # A single collection with no known language.
-            sizes = { None: sizes }
+            sizes = {None: sizes}
         if sizes is None:
             # No collections are specified.
             sizes = {}

@@ -1,19 +1,20 @@
-from nose.tools import set_trace
 import datetime
 import logging
 import json
-import os
 import socket
-from config import Configuration
-from io import StringIO
+
 from loggly.handlers import HTTPSHandler as LogglyHandler
-from util.string_helpers import native_string
+
+from .config import CannotLoadConfiguration
+from .util.string_helpers import native_string
+
 
 class JSONFormatter(logging.Formatter):
     hostname = socket.gethostname()
     fqdn = socket.getfqdn()
     if len(fqdn) > len(hostname):
         hostname = fqdn
+
     def format(self, record):
         message = record.msg
         if record.args:
@@ -37,7 +38,7 @@ class JSONFormatter(logging.Formatter):
 
 class StringFormatter(logging.Formatter):
     """Encode all output as a string.
-    
+
     In Python 2, this means a UTF-8 bytestring. In Python 3, it means a
     Unicode string.
     """
@@ -198,8 +199,7 @@ class LogConfiguration(object):
         """Tell the given `handler` to format its log messages in a
         certain way.
         """
-        if (log_format==cls.JSON_LOG_FORMAT
-            or isinstance(handler, LogglyHandler)):
+        if (log_format == cls.JSON_LOG_FORMAT or isinstance(handler, LogglyHandler)):
             formatter = JSONFormatter()
         else:
             formatter = StringFormatter(message_template)
@@ -217,8 +217,8 @@ class LogConfiguration(object):
             )
         try:
             url = cls._interpolate_loggly_url(url, token)
-        except (TypeError, KeyError) as e:
-            raise CannotLoadConfiguraiton(
+        except (TypeError, KeyError):
+            raise CannotLoadConfiguration(
                 "Cannot interpolate token %s into loggly URL %s" % (
                     token, url,
                 )
@@ -234,4 +234,3 @@ class LogConfiguration(object):
 
         # Assume the token is already in the URL.
         return url
-

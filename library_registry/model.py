@@ -1,13 +1,5 @@
-from config import Configuration
-from flask_babel import lazy_gettext as _
-from flask_bcrypt import (
-    check_password_hash,
-    generate_password_hash
-)
 import datetime
 import logging
-from nose.tools import set_trace
-import os
 import re
 import json
 import random
@@ -16,9 +8,14 @@ import uszipcode
 import uuid
 import warnings
 from collections import Counter
+
+from flask_babel import lazy_gettext as _
+from flask_bcrypt import (
+    check_password_hash,
+    generate_password_hash
+)
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
-    Binary,
     Boolean,
     Column,
     DateTime,
@@ -34,7 +31,6 @@ from sqlalchemy import (
     create_engine,
     exc as sa_exc,
     func,
-    or_,
     UniqueConstraint,
 )
 from sqlalchemy.exc import (
@@ -42,9 +38,6 @@ from sqlalchemy.exc import (
 )
 from sqlalchemy.ext.declarative import (
     declarative_base
-)
-from sqlalchemy.ext.hybrid import (
-    hybrid_property,
 )
 from sqlalchemy.orm import (
     aliased,
@@ -70,19 +63,18 @@ from sqlalchemy.sql.expression import (
     outerjoin,
 )
 from sqlalchemy.ext.hybrid import hybrid_property
-
 from geoalchemy2 import Geography, Geometry
 
-from emailer import Emailer
-from util.language import LanguageCodes
-from util import (
-    GeometryUtility,
-)
-from util.short_client_token import ShortClientTokenTool
-from util.string_helpers import (
+from .config import Configuration
+from .emailer import Emailer
+from .util.language import LanguageCodes
+from .util import GeometryUtility
+from .util.short_client_token import ShortClientTokenTool
+from .util.string_helpers import (
     native_string,
     random_string,
 )
+
 
 def production_session():
     url = Configuration.database_url()
@@ -100,13 +92,16 @@ def production_session():
     LogConfiguration.initialize(_db)
     return _db
 
+
 DEBUG = False
+
 
 def generate_secret():
     """Generate a random secret."""
     return random_string(24)
 
-class SessionManager(object):
+
+class SessionManager():
 
     engine_for_url = {}
 
@@ -130,7 +125,6 @@ class SessionManager(object):
 
         Base.metadata.create_all(engine)
 
-
         cls.engine_for_url[url] = engine
         return engine, engine.connect()
 
@@ -148,6 +142,7 @@ class SessionManager(object):
     @classmethod
     def initialize_data(cls, session):
         pass
+
 
 def get_one(db, model, on_multiple='error', **kwargs):
     q = db.query(model).filter_by(**kwargs)
@@ -167,6 +162,7 @@ def get_one(db, model, on_multiple='error', **kwargs):
     except NoResultFound:
         return None
 
+
 def dump_query(query):
     dialect = query.session.bind.dialect
     statement = query.statement
@@ -174,11 +170,12 @@ def dump_query(query):
     comp.compile()
     enc = dialect.encoding
     params = {}
-    for k,v in comp.params.items():
+    for k, v in comp.params.items():
         if isinstance(v, str):
             v = v.encode(enc)
         params[k] = sqlescape(v)
     return (comp.string.encode(enc) % params).decode(enc)
+
 
 def get_one_or_create(db, model, create_method='',
                       create_method_kwargs=None,
@@ -202,6 +199,7 @@ def get_one_or_create(db, model, create_method='',
             __transaction.rollback()
             return db.query(model).filter_by(**kwargs).one(), False
 
+
 def create(db, model, create_method='',
            create_method_kwargs=None,
            **kwargs):
@@ -211,7 +209,9 @@ def create(db, model, create_method='',
     db.flush()
     return created, True
 
+
 Base = declarative_base()
+
 
 class Library(Base):
     """An entry in this table corresponds more or less to an OPDS server.
@@ -276,8 +276,8 @@ class Library(Base):
     # TESTING_STAGE.
     #
     # Otherwise, the library is in PRODUCTION_STAGE.
-    TESTING_STAGE = 'testing'       # Library should show up in test feed
-    PRODUCTION_STAGE = 'production' # Library should show up in production feed
+    TESTING_STAGE = 'testing'        # Library should show up in test feed
+    PRODUCTION_STAGE = 'production'  # Library should show up in production feed
     CANCELLED_STAGE = 'cancelled'   # Library should not show up in any feed
     stage_enum = Enum(
         TESTING_STAGE, PRODUCTION_STAGE, CANCELLED_STAGE, name='library_stage'
@@ -323,8 +323,7 @@ class Library(Base):
     service_areas = relationship('ServiceArea', backref='library')
 
     # A library may serve one or more specific audiences.
-    audiences = relationship('Audience', secondary='libraries_audiences',
-                            back_populates="libraries")
+    audiences = relationship('Audience', secondary='libraries_audiences', back_populates="libraries")
 
     # The registry may have information about the library's
     # collections of materials. The registry doesn't need to know
@@ -426,8 +425,8 @@ class Library(Base):
         if not self.in_production:
             return 0
         query = db.query(DelegatedPatronIdentifier).filter(
-            DelegatedPatronIdentifier.type==DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
-            DelegatedPatronIdentifier.library_id==self.id
+            DelegatedPatronIdentifier.type == DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            DelegatedPatronIdentifier.library_id == self.id
         )
         return query.count()
 
@@ -465,7 +464,7 @@ class Library(Base):
         if production:
             # Both parties must agree that this library is
             # production-ready.
-            return and_(library_field==prod, registry_field==prod)
+            return and_(library_field == prod, registry_field == prod)
         else:
             # Both parties must agree that this library is _either_
             # in the production stage or the testing stage.
@@ -513,7 +512,7 @@ class Library(Base):
         # Set up an alias for libraries and collection summaries for use in subqueries.
         libraries_collections = outerjoin(
             Library, CollectionSummary,
-            Library.id==CollectionSummary.library_id
+            Library.id == CollectionSummary.library_id
         ).alias("libraries_collections")
 
         # Check if each library has a public audience.
@@ -521,8 +520,8 @@ class Library(Base):
             [func.count()]
         ).where(
             and_(
-                Audience.name==Audience.PUBLIC,
-                libraries_audiences.c.library_id==libraries_collections.c.libraries_id,
+                Audience.name == Audience.PUBLIC,
+                libraries_audiences.c.library_id == libraries_collections.c.libraries_id,
             )
         ).select_from(
             libraries_audiences.join(Audience)
@@ -534,9 +533,9 @@ class Library(Base):
             [func.count()]
         ).where(
             and_(
-                Audience.name!=Audience.PUBLIC,
+                Audience.name != Audience.PUBLIC,
                 Audience.name.in_(audiences),
-                libraries_audiences.c.library_id==libraries_collections.c.libraries_id,
+                libraries_audiences.c.library_id == libraries_collections.c.libraries_id,
             )
         ).select_from(
             libraries_audiences.join(Audience)
@@ -547,10 +546,10 @@ class Library(Base):
         score = case(
             [
              # Audience match other than public.
-             (non_public_audiences_subquery!=literal_column(str(0)),
+             (non_public_audiences_subquery != literal_column(str(0)),
               literal_column(str(base_score * audience_factor))),
              # Public audience.
-             (public_audiences_subquery!=literal_column(str(0)),
+             (public_audiences_subquery != literal_column(str(0)),
               literal_column(str(base_score)))
             ],
             # No match.
@@ -570,7 +569,7 @@ class Library(Base):
 
         # Get the maximum collection size for the user's language.
         collections_by_size = _db.query(CollectionSummary).filter(
-            CollectionSummary.language==language_code).order_by(
+            CollectionSummary.language == language_code).order_by(
             CollectionSummary.size.desc())
 
         if collections_by_size.count() == 0:
@@ -587,7 +586,7 @@ class Library(Base):
             # Maybe this should be larger, or should consider languages other than
             # the user's language.
             estimated_size = case(
-                [(libraries_collections.c.collectionsummaries_id==None, literal_column("1"))],
+                [(libraries_collections.c.collectionsummaries_id == None, literal_column("1"))],
                 else_=libraries_collections.c.collectionsummaries_size
             )
             score_multiplier = (1 - exponential_decrease(1.0 * collection_size_factor * estimated_size / max))
@@ -599,13 +598,13 @@ class Library(Base):
                 [Place.geometry, Place.type]
             ).where(
                 and_(
-                    ServiceArea.library_id==libraries_collections.c.libraries_id,
-                    ServiceArea.type==type,
+                    ServiceArea.library_id == libraries_collections.c.libraries_id,
+                    ServiceArea.type == type,
                 )
             ).select_from(
                 join(
                     ServiceArea, Place,
-                    ServiceArea.place_id==Place.id
+                    ServiceArea.place_id == Place.id
                 )
             ).lateral()
 
@@ -621,7 +620,7 @@ class Library(Base):
         def min_distance(subquery):
             return func.min(
                 case(
-                    [(subquery.c.type==Place.EVERYWHERE, literal_column(str(0)))],
+                    [(subquery.c.type == Place.EVERYWHERE, literal_column(str(0)))],
                     else_=func.ST_DistanceSphere(target, subquery.c.geometry)
                 )
             ) / 1000
@@ -643,7 +642,7 @@ class Library(Base):
         # If a focus area is "everywhere", the size is the area of Earth (510 million km^2).
         focus_area_size = func.sum(
             case(
-                [(focus_areas_subquery.c.type==Place.EVERYWHERE, literal_column(str(510000000000000)))],
+                [(focus_areas_subquery.c.type == Place.EVERYWHERE, literal_column(str(510000000000000)))],
                 else_=func.ST_Area(focus_areas_subquery.c.geometry)
             )
         ) / 1000000
@@ -652,9 +651,7 @@ class Library(Base):
         # Rank the libraries by score, and remove any libraries
         # that are below the score threshold.
         library_id_and_score = select(
-            [libraries_collections.c.libraries_id,
-             score.label("score"),
-            ]
+            [libraries_collections.c.libraries_id, score.label("score")]
         ).having(
             score > literal_column(str(score_threshold))
         ).where(
@@ -670,8 +667,8 @@ class Library(Base):
                 # language. If a library has no collection for the
                 # language, it's still included.
                 or_(
-                    libraries_collections.c.collectionsummaries_language==language_code,
-                    libraries_collections.c.collectionsummaries_language==None
+                    libraries_collections.c.collectionsummaries_language == language_code,
+                    libraries_collections.c.collectionsummaries_language == None
                 )
             )
         ).select_from(
@@ -800,7 +797,7 @@ class Library(Base):
             # Filter out any libraries that show up in both lists.
             for_name = set(libraries_for_name)
             libraries_for_location = [
-                x for x in libraries_for_location if not x in for_name
+                x for x in libraries_for_location if x not in for_name
             ]
 
         # A lot of libraries list their locations only within their description, so it's worth
@@ -851,7 +848,7 @@ class Library(Base):
         alias_match = cls.fuzzy_match(PlaceAlias.name, query)
         qu = qu.filter(or_(name_match, alias_match))
         if type:
-            qu = qu.filter(named_place.type==type)
+            qu = qu.filter(named_place.type == type)
         if here:
             min_distance = func.min(func.ST_DistanceSphere(here, named_place.geometry))
             qu = qu.add_column(min_distance)
@@ -1008,8 +1005,8 @@ class Library(Base):
         if len(link) > 0:
             return link[0]
 
-class LibraryAlias(Base):
 
+class LibraryAlias(Base):
     """An alternate name for a library."""
     __tablename__ = 'libraryalias'
 
@@ -1099,7 +1096,7 @@ class Place(Base):
 
     children = relationship(
         "Place",
-        backref=backref("parent", remote_side = [id]),
+        backref=backref("parent", remote_side=[id]),
         lazy="joined"
     )
 
@@ -1136,7 +1133,7 @@ class Place(Base):
         :return: The default nation, if one can be found. Otherwise, None.
         """
         default_nation = None
-        abbreviation=ConfigurationSetting.sitewide(
+        abbreviation = ConfigurationSetting.sitewide(
             _db, Configuration.DEFAULT_NATION_ABBREVIATION
         ).value
         if abbreviation:
@@ -1236,8 +1233,7 @@ class Place(Base):
 
         # We have either more or less than one valid item.
         # In either case, a GeometryCollection is appropriate.
-        body = { "type": "GeometryCollection",
-                 "geometries" : [json.loads(x) for x in results] }
+        body = {"type": "GeometryCollection", "geometries": [json.loads(x) for x in results]}
         return body
 
     @classmethod
@@ -1267,7 +1263,7 @@ class Place(Base):
         """
         intersects = Place.geometry.intersects(self.geometry)
         touches = func.ST_Touches(Place.geometry, self.geometry)
-        return qu.filter(intersects).filter(touches==False)
+        return qu.filter(intersects).filter(touches == False)
 
     def lookup_inside(self, name, using_overlap=False, using_external_source=True):
         """Look up a named Place that is geographically 'inside' this Place.
@@ -1501,6 +1497,7 @@ class Audience(Base):
         audience, is_new = get_one_or_create(_db, Audience, name=name)
         return audience
 
+
 class CollectionSummary(Base):
     """A summary of a collection held by a library.
 
@@ -1539,6 +1536,7 @@ class CollectionSummary(Base):
         )
         summary.size = size
         return summary
+
 
 Index("ix_collectionsummary_language_size", CollectionSummary.language, CollectionSummary.size)
 
@@ -1718,7 +1716,6 @@ class Validation(Base):
         "Resource", backref=backref("validation", uselist=False), uselist=False
     )
 
-
     def restart(self):
         """Start a new validation attempt, cancelling any previous attempt.
 
@@ -1826,7 +1823,7 @@ class DelegatedPatronIdentifier(Base):
                 # We haven't heard of this patron before, but some
                 # other server does know about them, and they told us
                 # this is the delegated identifier.
-                delegated_identifier=identifier_or_identifier_factory
+                delegated_identifier = identifier_or_identifier_factory
             identifier.delegated_identifier = delegated_identifier
         return identifier, is_new
 
@@ -1902,7 +1899,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 account_id, label, content = delegate.sign_in_standard(
                     username, password
                 )
-            except Exception as e:
+            except Exception:
                 # This delegate couldn't help us.
                 pass
             if account_id:
@@ -1914,7 +1911,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             # ourselves.
             try:
                 signature = self.adobe_base64_decode(password)
-            except Exception as e:
+            except Exception:
                 raise ValueError("Invalid password: %s" % password)
 
             patron_identifier, account_id = self._decode(
@@ -2005,6 +2002,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # We have a Library, and a patron identifier which we know is valid.
         # Find or create a DelegatedPatronIdentifier for this person.
         return patron_identifier, self.uuid
+
 
 class ExternalIntegration(Base):
 
