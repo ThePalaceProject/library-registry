@@ -96,7 +96,7 @@ class Configuration(object):
 
         :return: a 3-tuple (vendor ID, node value, [delegates])
         """
-        from model import ExternalIntegration
+        from library_registry.model import ExternalIntegration
 
         integration = ExternalIntegration.lookup(
             _db, ExternalIntegration.ADOBE_VENDOR_ID,
