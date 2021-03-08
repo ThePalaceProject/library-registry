@@ -123,17 +123,17 @@ class TestLogConfiguration(DatabaseTest):
         handler = LogConfiguration.loggly_handler(integration)
         expected = LogConfiguration.DEFAULT_LOGGLY_URL % dict(token="a_token")
         assert handler.url == expected
-        
+
     def test_interpolate_loggly_url(self):
         m = LogConfiguration._interpolate_loggly_url
 
         # We support two string interpolation techniques for combining a token with a URL.
         assert m("http://foo/%s/bar/", "token") == "http://foo/token/bar/"
         assert m("http://foo/%(token)s/bar/", "token") == "http://foo/token/bar/"
-        
+
         # If the URL contains no string interpolation, we assume the token's already in there.
         assert m("http://foo/othertoken/bar/", "token") == "http://foo/othertoken/bar/"
-        
+
         # Anything that doesn't fall under one of these cases will raise an exception.
         with pytest.raises(TypeError):
             m("http://%s/%s", "token")
