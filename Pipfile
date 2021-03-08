@@ -22,6 +22,8 @@ PyJWT = "*"
 SQLAlchemy = "*"
 uWSGI = "*"
 Pillow = "*"
+pytest = "*"
+pytest-datadir = "*"
 
 [dev-packages]
 future = "*"
