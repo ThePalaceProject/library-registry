@@ -5,8 +5,8 @@ import socket
 
 from loggly.handlers import HTTPSHandler as LogglyHandler
 
-from .config import CannotLoadConfiguration
-from .util.string_helpers import native_string
+from library_registry.config import CannotLoadConfiguration
+from library_registry.util.string_helpers import native_string
 
 
 class JSONFormatter(logging.Formatter):
@@ -140,7 +140,7 @@ class LogConfiguration(object):
          message_template) = cls._defaults(testing)
 
         handlers = []
-        from model import ExternalIntegration
+        from library_registry.model import ExternalIntegration
         if _db and not testing:
             goal = ExternalIntegration.LOGGING_GOAL
             internal = ExternalIntegration.lookup(
