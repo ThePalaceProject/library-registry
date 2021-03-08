@@ -8,14 +8,14 @@ from sqlalchemy.orm.exc import (
 )
 from sqlalchemy.orm.session import Session
 
-from .model import (
+from library_registry.model import (
     get_one_or_create,
     Audience,
     CollectionSummary,
     Place,
     ServiceArea,
 )
-from .problem_details import INVALID_INTEGRATION_DOCUMENT
+from library_registry.problem_details import INVALID_INTEGRATION_DOCUMENT
 
 
 class AuthenticationDocument(object):
