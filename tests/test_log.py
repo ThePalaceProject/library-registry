@@ -130,14 +130,10 @@ class TestLogConfiguration(DatabaseTest):
         # We support two string interpolation techniques for combining a token with a URL.
         assert m("http://foo/%s/bar/", "token") == "http://foo/token/bar/"
         assert m("http://foo/%(token)s/bar/", "token") == "http://foo/token/bar/"
-        #eq_("http://foo/token/bar/", m("http://foo/%s/bar/", "token"))
-        #eq_("http://foo/token/bar/", m("http://foo/%(token)s/bar/", "token"))
-
-        # If the URL contains no string interpolation, we assume the token's
-        # already in there.
+        
+        # If the URL contains no string interpolation, we assume the token's already in there.
         assert m("http://foo/othertoken/bar/", "token") == "http://foo/othertoken/bar/"
-        #eq_("http://foo/othertoken/bar/", m("http://foo/othertoken/bar/", "token"))
-
+        
         # Anything that doesn't fall under one of these cases will raise an exception.
         with pytest.raises(TypeError):
             m("http://%s/%s", "token")
