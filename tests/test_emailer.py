@@ -1,20 +1,17 @@
-from nose.tools import (
-    assert_raises_regexp,
-    eq_,
-    set_trace,
-)
-from . import DatabaseTest
 from email.mime.text import MIMEText
 
-from config import CannotLoadConfiguration
-from emailer import (
+import quopri
+import pytest
+
+from library_registry.config import CannotLoadConfiguration
+from library_registry.emailer import (
     Emailer,
     EmailTemplate,
 )
-import quopri
+from . import DatabaseTest
 
 
-class TestEmailTemplate(object):
+class TestEmailTemplate:
     """Test the ability to generate email messages."""
 
     def test_body(self):
@@ -22,9 +19,7 @@ class TestEmailTemplate(object):
             "A %(color)s subject",
             "The subject is %(color)s but the body is %(number)d"
         )
-        body = template.body("me@example.com", "you@example.com",
-                      color="red", number=22
-        )
+        body = template.body("me@example.com", "you@example.com", color="red", number=22)
 
         # We always generate a MIME multipart message because
         # that's how we handle non-ASCII characters.
@@ -46,7 +41,6 @@ class TestEmailTemplate(object):
         ):
             assert expect in body
 
-
     def test_unicode_quoted_printable(self):
         # Create an email message that includes Unicode characters in
         # its subject and body.
@@ -58,9 +52,8 @@ class TestEmailTemplate(object):
         body = template.body("me@example.com", "you@example.com")
         # The SNOWMAN character is encoded as quoted-printable in both
         # the subject and the message contents.
-        quoted_printable_snowman = quopri.encodestring(
-            snowman.encode("utf8")
-        ).decode("utf8")
+        quoted_printable_snowman = quopri.encodestring(snowman.encode("utf8")).decode("utf8")
+
         for template in (
             "Subject: =?utf-8?q?A_snowman_for_you!_%(snowman)s?=",
             "\n\nHere he is: %(snowman)s"
@@ -86,6 +79,7 @@ class MockSMTP(object):
 class MockEmailer(Emailer):
     """Store outgoing emails in a list."""
     emails = []
+
     def _send_email(self, to_address, body, smtp):
         self.emails.append((to_address, body, smtp))
 
@@ -111,24 +105,18 @@ class TestEmailer(DatabaseTest):
         m = Emailer._sitewide_integration
         # If there's no integration with goal=Emailer.GOAL,
         # _sitewide_integration raises an exception.
-        assert_raises_regexp(
-            CannotLoadConfiguration,
-            'No email integration is configured',
-            m, self._db
-        )
+        with pytest.raises(CannotLoadConfiguration):
+            m(self._db)
 
         # If there's only one, _sitewide_integration finds it.
         integration = self._integration()
-        eq_(integration, m(self._db))
+        assert m(self._db) == integration
 
         # If there are multiple integrations with goal=Emailer.GOAL, no
         # sitewide configuration can be determined.
-        duplicate = self._integration()
-        assert_raises_regexp(
-            CannotLoadConfiguration,
-            'Multiple email integrations are configured',
-            m, self._db
-        )
+        self._integration()
+        with pytest.raises(CannotLoadConfiguration):
+            m(self._db)
 
     def test_from_sitewide_integration(self):
         """Test the ability to load an Emailer from a sitewide integration."""
@@ -136,36 +124,32 @@ class TestEmailer(DatabaseTest):
         emailer = Emailer.from_sitewide_integration(self._db)
 
         # The Emailer's configuration is based on the sitewide integration.
-        eq_("smtp_username", emailer.smtp_username)
-        eq_("smtp_password", emailer.smtp_password)
-        eq_("smtp_host", emailer.smtp_host)
-        eq_("me@registry", emailer.from_address)
+        assert emailer.smtp_username == "smtp_username"
+        assert emailer.smtp_password == "smtp_password"
+        assert emailer.smtp_host == "smtp_host"
+        assert emailer.from_address == "me@registry"
 
         # Default EmailTemplates have been created for all known email types.
         for email_type in Emailer.EMAIL_TYPES:
             template = emailer.templates[email_type]
-            eq_(Emailer.SUBJECTS[email_type], template.subject_template)
-            eq_(Emailer.BODIES[email_type], template.body_template)
+            assert template.subject_template == Emailer.SUBJECTS[email_type]
+            assert template.body_template == Emailer.BODIES[email_type]
 
         # Configure custom subject lines and body templates for the
         # known email types, and build another Emailer.
         for email_type in Emailer.EMAIL_TYPES:
-            integration.setting(email_type + "_subject").value = (
-                "subject %s" % email_type
-            )
-            integration.setting(email_type + "_body").value = (
-                "body %s" % email_type
-            )
+            integration.setting(email_type + "_subject").value = ("subject %s" % email_type)
+            integration.setting(email_type + "_body").value = ("body %s" % email_type)
+
         emailer = Emailer.from_sitewide_integration(self._db)
+
         for email_type in Emailer.EMAIL_TYPES:
             template = emailer.templates[email_type]
-            eq_("subject %s" % email_type, template.subject_template)
-            eq_("body %s" % email_type, template.body_template)
+            assert template.subject_template == "subject %s" % email_type
+            assert template.body_template == "body %s" % email_type
 
     def test_constructor(self):
-        """Verify the exceptions raised when required constructor
-        arguments are missing.
-        """
+        """Verify the exceptions raised when required constructor arguments are missing"""
         args = dict(
             [(x, None) for x in (
                 'smtp_username', 'smtp_password', 'smtp_host', 'smtp_port',
@@ -175,99 +159,102 @@ class TestEmailer(DatabaseTest):
         args['templates'] = {}
 
         m = Emailer
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP username specified", m, **args
-        )
+
+        with pytest.raises(CannotLoadConfiguration) as e:
+            m(**args)
+        assert "No SMTP username specified" in str(e.value)
+
         args['smtp_username'] = 'user'
+        with pytest.raises(CannotLoadConfiguration) as e:
+            m(**args)
+        assert "No SMTP password specified" in str(e.value)
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP password specified", m, **args
-        )
         args['smtp_password'] = 'password'
+        with pytest.raises(CannotLoadConfiguration) as e:
+            m(**args)
+        assert "No SMTP host specified" in str(e.value)
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP host specified", m, **args
-        )
         args['smtp_host'] = 'host'
+        with pytest.raises(CannotLoadConfiguration) as e:
+            m(**args)
+        assert "No SMTP port specified" in str(e.value)
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP port specified", m, **args
-        )
         args['smtp_port'] = 'port'
+        with pytest.raises(CannotLoadConfiguration) as e:
+            m(**args)
+        assert "No From: name specified" in str(e.value)
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No From: name specified", m, **args
-        )
         args['from_name'] = 'Email Sender'
+        with pytest.raises(CannotLoadConfiguration) as e:
+            m(**args)
+        assert "No From: address specified" in str(e.value)
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No From: address specified", m, **args
-        )
         args['from_address'] = 'from@library.org'
-
-        # With all the arguments specified, it works.
-        emailer = m(**args)
-
+        emailer = m(**args)     # all parts specified, should work now
+        
         # If one of the templates can't be used, it doesn't work.
         args['templates']['key'] = EmailTemplate("%(nope)s", "email body")
-        assert_raises_regexp(
-            CannotLoadConfiguration,
-            "Template '%\(nope\)s'/'email body' contains unrecognized key",
-            m, **args
-        )
+        
+        with pytest.raises(CannotLoadConfiguration) as e:
+            m(**args)
+        assert r"Template '%(nope)s'/'email body' contains unrecognized key: KeyError('nope')" in str(e.value)
 
     def test_templates(self):
         """Test the emails generated by the default templates."""
-        integration = self._integration()
+        self._integration()
         emailer = Emailer.from_sitewide_integration(self._db)
 
         # Start with arguments common to both email templates.
-        args = dict(
-            rel_desc="support address",
-            library="My Public Library",
-            library_web_url="https://library/",
-        )
+        args = {
+            "rel_desc": "support address",
+            "library": "My Public Library",
+            "library_web_url": "https://library/",
+        }
 
         # Generate the address-designation template.
         designation_template = emailer.templates[Emailer.ADDRESS_DESIGNATED]
-        body = designation_template.body(
-            "me@registry", "you@library", **args
-        )
+        body = designation_template.body("me@registry", "you@library", **args)
 
         # Verify that the headers were set correctly.
         for phrase in [
             "From: me@registry",
             "To: you@library",
-            "This address designated as the support address for My Public".replace(" ", "_"), # Part of the encoding process
+            # vvv part of the encoding process vvv
+            "This address designated as the support address for My Public".replace(" ", "_"),
         ]:
             assert phrase in body
 
         # Verify that the body was set correctly.
-        expect = """This email address, you@library, has been registered with the Library Simplified library registry as the support address for the library My Public Library (https://library/).
-
-If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at me@registry -- something has gone wrong.
-
-If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at me@registry."""
-        text_part = MIMEText(expect, 'plain', 'utf-8')
+        expected = (
+            "This email address, you@library, has been registered with the Library Simplified library registry "
+            "as the support address for the library My Public Library (https://library/)."
+            "\n"
+            "If this is obviously wrong (for instance, you don't work at a public library), please accept our "
+            "apologies and contact the Library Simplified support address at me@registry -- something has gone wrong."
+            "\n"
+            "If you do work at a public library, but you're not sure what this means, please speak to a technical "
+            "point of contact at your library, or contact the Library Simplified support address at me@registry."
+        )
+        text_part = MIMEText(expected, 'plain', 'utf-8')
         assert text_part.get_payload() in body
 
-        # The confirmation template has a couple extra fields that need
-        # filling in.
+        # The confirmation template has a couple extra fields that need filling in.
         confirmation_template = emailer.templates[Emailer.ADDRESS_NEEDS_CONFIRMATION]
         args['confirmation_link'] = "http://registry/confirm"
-        body2 = confirmation_template.body(
-            "me@registry", "you@library", **args
+        body2 = confirmation_template.body("me@registry", "you@library", **args)
+
+        # The address confirmation template is the address designation template with 
+        # a couple extra paragraphs and a different subject line.
+        extra = (
+            "If you do know what this means, you should also know that you're not quite done. We need to confirm "
+            "that you actually meant to use this email address for this purpose. If everything looks right, "
+            "please visit this link:"
+            "\n"
+            "http://registry/confirm"
+            "\n"
+            "The link will expire in about a day. If the link expires, just re-register your library with the "
+            "library registry, and a fresh confirmation email like this will be sent out."
         )
-
-        # The address confirmation template is the address designation
-        # template with a couple extra paragraphs and a different
-        # subject line.
-        extra = """If you do know what this means, you should also know that you
-'re not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link:
-
-http://registry/confirm
-
-The link will expire in about a day. If the link expires, just re-register your library with the library registry, and a fresh confirmation email like this will be sent out."""
 
         # Verify the subject line
         assert "Confirm_the_" in body2
@@ -276,7 +263,9 @@ The link will expire in about a day. If the link expires, just re-register your 
         # to check the whole thing because expect2 parses into a
         # slightly different Message object than is generated by
         # Emailer.)
-        expect2 = expect + "\n\n" + extra
+        #
+        # expect2 = expected + "\n\n" + extra
+
         for phrase in [
                 "\nhttp://registry/confirm\n",
                 "The link will expire"
@@ -301,7 +290,8 @@ The link will expire in about a day. If the link expires, just re-register your 
         # The template was filled out and passed into our mocked-up
         # _send_email implementation.
         (to, body, smtp) = emailer.emails.pop()
-        eq_("you@library", to)
+        assert to == "you@library"
+
         for phrase in [
             "From: Me <me@registry>",
             "To: you@library",
@@ -310,35 +300,19 @@ The link will expire in about a day. If the link expires, just re-register your 
         ]:
             print(phrase)
             assert phrase in body
-        eq_(mock_smtp, smtp)
+        assert smtp == mock_smtp
 
     def test__send_email(self):
         """Verify that send_email calls certain methods on smtplib.SMTP."""
-        integration = self._integration()
+        self._integration()
         emailer = Emailer.from_sitewide_integration(self._db)
         mock = MockSMTP()
         emailer._send_email("you@library", "email body", mock)
 
         # Five smtplib.SMTP methods were called.
         connect, starttls, login, sendmail, quit = mock.calls
-        eq_(
-            ('connect', (emailer.smtp_host, emailer.smtp_port), {}),
-            connect
-        )
-
-        eq_(
-            ('starttls', (), {}),
-            starttls
-        )
-
-        eq_(
-            ('login', (emailer.smtp_username, emailer.smtp_password), {}),
-            login
-        )
-
-        eq_(
-            ('sendmail', (emailer.from_address, "you@library", "email body"), {}),
-            sendmail
-        )
-
-        eq_(("quit", (), {}), quit)
+        assert connect == ('connect', (emailer.smtp_host, emailer.smtp_port), {})
+        assert starttls == ('starttls', (), {})
+        assert login == ('login', (emailer.smtp_username, emailer.smtp_password), {})
+        assert sendmail == ('sendmail', (emailer.from_address, "you@library", "email body"), {})
+        assert quit == ("quit", (), {})

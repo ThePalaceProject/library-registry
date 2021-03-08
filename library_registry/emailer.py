@@ -4,9 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email import charset
 
-from .config import (
-    CannotLoadConfiguration,
-)
+from library_registry.config import CannotLoadConfiguration
 
 # Set up an encoding/decoding between UTF-8 and quoted-printable.
 # Otherwise, the bodies of email messages will be encoded with base64
@@ -113,7 +111,7 @@ class Emailer(object):
     @classmethod
     def _sitewide_integration(cls, _db):
         """Find the ExternalIntegration for the emailer."""
-        from model import ExternalIntegration
+        from library_registry.model import ExternalIntegration
         qu = _db.query(ExternalIntegration).filter(
             ExternalIntegration.goal == cls.GOAL
         )
