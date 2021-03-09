@@ -10,8 +10,8 @@ from lxml import etree
 from flask import make_response
 from flask_babel import lazy_gettext as _
 
-from util.problem_detail import ProblemDetail
-from opds import OPDSCatalog
+from library_registry.util.problem_detail import ProblemDetail
+from library_registry.opds import OPDSCatalog
 
 
 def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):

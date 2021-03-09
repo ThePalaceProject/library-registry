@@ -3,25 +3,24 @@ import feedparser
 from flask_babel import lazy_gettext as _
 import json
 import logging
-from nose.tools import set_trace
 from PIL import Image
 from io import BytesIO
 from urllib.parse import urljoin
 
-from authentication_document import AuthenticationDocument
-from opds import OPDSCatalog
-from model import (
+from library_registry.authentication_document import AuthenticationDocument
+from library_registry.opds import OPDSCatalog
+from library_registry.model import (
     get_one,
     get_one_or_create,
     Hyperlink,
     Library,
 )
-from problem_details import *
-from util.http import (
+from library_registry.problem_details import *
+from library_registry.util.http import (
     HTTP,
     RequestTimedOut,
 )
-from util.problem_detail import ProblemDetail
+from library_registry.util.problem_detail import ProblemDetail
 
 
 class LibraryRegistrar(object):

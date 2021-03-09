@@ -1,24 +1,19 @@
 from io import BytesIO
-import contextlib
-import flask
 import gzip
-from app_helpers import (
+
+import flask
+import pytest
+
+from library_registry.app_helpers import (
     compressible,
     has_library_factory,
     uses_location_factory,
 )
-from nose.tools import (
-    eq_,
-    set_trace,
-)
-from problem_details import (
-    LIBRARY_NOT_FOUND
-)
+from library_registry.problem_details import LIBRARY_NOT_FOUND
 from .test_controller import ControllerTest
-from testing import DatabaseTest
+
 
 class TestAppHelpers(ControllerTest):
-
     def test_has_library(self):
         has_library = has_library_factory(self.app)
 
@@ -28,7 +23,7 @@ class TestAppHelpers(ControllerTest):
 
         def assert_not_found(uuid):
             response = route_function(uuid)
-            eq_(LIBRARY_NOT_FOUND.response, response)
+            assert response == LIBRARY_NOT_FOUND.response
 
         assert_not_found(uuid=None)
         assert_not_found(uuid="no such library")
@@ -41,7 +36,7 @@ class TestAppHelpers(ControllerTest):
         for urn in urns:
             with self.app.test_request_context():
                 response = route_function(uuid=urn)
-                eq_("Called with library NYPL", response)
+                assert response == "Called with library NYPL"
 
     def test_uses_location(self):
         uses_location = uses_location_factory(self.app)
@@ -51,11 +46,10 @@ class TestAppHelpers(ControllerTest):
             return "Called with location %s" % _location
 
         with self.app.test_request_context():
-            eq_("Called with location None", route_function())
+            assert route_function() == "Called with location None"
 
         with self.app.test_request_context("/?_location=-10,10"):
-            eq_("Called with location SRID=4326;POINT (10.0 -10.0)",
-                route_function())
+            assert route_function() == "Called with location SRID=4326;POINT (10.0 -10.0)"
 
     def test_compressible(self):
         # Prepare a value and a gzipped version of the value.
@@ -95,24 +89,23 @@ class TestAppHelpers(ControllerTest):
         # If the client asks for gzip through Accept-Encoding, the
         # representation is compressed.
         response = ask_for_compression("gzip")
-        eq_(compressed, response.data)
-        eq_("gzip", response.headers['Content-Encoding'])
+        assert response.data == compressed
+        assert response.headers['Content-Encoding'] == "gzip"
 
         # If the client doesn't ask for compression, the value is
         # passed through unchanged.
         response = ask_for_compression(None)
-        eq_(value, response.data)
+        assert response.data == value
         assert 'Content-Encoding' not in response.headers
 
         # Similarly if the client asks for an unsupported compression
         # mechanism.
         response = ask_for_compression('compress')
-        eq_(value, response.data)
+        assert response.data == value
         assert 'Content-Encoding' not in response.headers
 
         # Or if the client asks for a compression mechanism through
         # Accept-Transfer-Encoding, which is currently unsupported.
         response = ask_for_compression("gzip", "Accept-Transfer-Encoding")
-        eq_(value, response.data)
+        assert response.data == value
         assert 'Content-Encoding' not in response.headers
-
