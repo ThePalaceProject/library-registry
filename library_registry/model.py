@@ -739,7 +739,7 @@ class Library(Base):
             ServiceArea.place)
         qu = qu.filter(cls._feed_restriction(production))
         qu = qu.filter(nearby)
-        qu = qu.add_column(
+        qu = qu.add_columns(
                 min_distance).group_by(Library.id).order_by(
                 min_distance.asc())
         return qu
@@ -851,7 +851,7 @@ class Library(Base):
             qu = qu.filter(named_place.type == type)
         if here:
             min_distance = func.min(func.ST_DistanceSphere(here, named_place.geometry))
-            qu = qu.add_column(min_distance)
+            qu = qu.add_columns(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
         return qu
@@ -873,7 +873,7 @@ class Library(Base):
             min_distance = func.min(
                 func.ST_DistanceSphere(here, Place.geometry)
             )
-            qu = qu.add_column(min_distance)
+            qu = qu.add_columns(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
         return qu
