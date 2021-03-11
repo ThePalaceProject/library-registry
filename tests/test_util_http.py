@@ -1,67 +1,54 @@
 import requests
 import json
-from util.http import (
+
+import pytest
+
+from library_registry.util.http import (
     HTTP,
     BadResponseException,
     RemoteIntegrationException,
     RequestNetworkException,
     RequestTimedOut,
 )
-from nose.tools import (
-    assert_raises_regexp,
-    eq_,
-    set_trace
-)
-from testing import MockRequestsResponse
+from . import MockRequestsResponse
 
-class TestHTTP(object):
 
+class TestHTTP:
     def test_request_with_timeout_success(self):
 
         def fake_200_response(*args, **kwargs):
             return MockRequestsResponse(200, content="Success!")
 
-        response = HTTP._request_with_timeout(
-            "the url", fake_200_response, "a", "b"
-        )
-        eq_(200, response.status_code)
-        eq_("Success!", response.content)
+        response = HTTP._request_with_timeout("the url", fake_200_response, "a", "b")
+        assert response.status_code == 200
+        assert response.content == "Success!"
 
     def test_request_with_timeout_failure(self):
 
         def immediately_timeout(*args, **kwargs):
             raise requests.exceptions.Timeout("I give up")
 
-        assert_raises_regexp(
-            RequestTimedOut,
-            "Timeout accessing http://url/: I give up",
-            HTTP._request_with_timeout, "http://url/", immediately_timeout,
-            "a", "b"
-        )
+        with pytest.raises(RequestTimedOut) as exc:
+            HTTP._request_with_timeout("http://url/", immediately_timeout, "a", "b")
+        assert "Timeout accessing http://url/: I give up" in str(exc.value)
 
     def test_request_with_network_failure(self):
 
         def immediately_fail(*args, **kwargs):
             raise requests.exceptions.ConnectionError("a disaster")
 
-        assert_raises_regexp(
-            RequestNetworkException,
-            "Network error contacting http://url/: a disaster",
-            HTTP._request_with_timeout, "http://url/", immediately_fail,
-            "a", "b"
-        )
+        with pytest.raises(RequestNetworkException) as exc:
+            HTTP._request_with_timeout("http://url/", immediately_fail, "a", "b")
+        assert "Network error contacting http://url/: a disaster" in str(exc.value)
 
     def test_request_with_response_indicative_of_failure(self):
 
         def fake_500_response(*args, **kwargs):
             return MockRequestsResponse(500, content="Failure!")
 
-        assert_raises_regexp(
-            BadResponseException,
-            "Bad response from http://url/: Got status code 500 from external server.",
-            HTTP._request_with_timeout, "http://url/", fake_500_response,
-            "a", "b"
-        )
+        with pytest.raises(BadResponseException) as exc:
+            HTTP._request_with_timeout("http://url/", fake_500_response, "a", "b")
+        assert "Bad response from http://url/: Got status code 500 from external server" in str(exc.value)
 
     def test_allowed_response_codes(self):
         # Test our ability to raise BadResponseException when
@@ -78,53 +65,37 @@ class TestHTTP(object):
 
         # By default, every code except for 5xx codes is allowed.
         response = m(url, fake_401_response)
-        eq_(401, response.status_code)
+        assert response.status_code == 401
 
-        # You can say that certain codes are specifically allowed, and
-        # all others are forbidden.
-        assert_raises_regexp(
-            BadResponseException,
-            "Bad response.*Got status code 401 from external server, but can only continue on: 200, 201.",
-            m, url, fake_401_response,
-            allowed_response_codes=[201, 200]
-        )
+        # You can say that certain codes are specifically allowed, and all others are forbidden.
+        with pytest.raises(BadResponseException) as exc:
+            m(url, fake_401_response, allowed_response_codes=[201, 200])
+        assert "Got status code 401 from external server, but can only continue on: 200, 201." in str(exc.value)
 
         response = m(url, fake_401_response, allowed_response_codes=[401])
         response = m(url, fake_401_response, allowed_response_codes=["4xx"])
 
         # In this way you can even raise an exception on a 200 response code.
-        assert_raises_regexp(
-            BadResponseException,
-            "Bad response.*Got status code 200 from external server, but can only continue on: 401.",
-            m, url, fake_200_response,
-            allowed_response_codes=[401]
-        )
+        with pytest.raises(BadResponseException) as exc:
+            m(url, fake_200_response, allowed_response_codes=[401])
+        assert "Got status code 200 from external server, but can only continue on: 401." in str(exc.value)
 
-        # You can say that certain codes are explicitly forbidden, and
-        # all others are allowed.
-        assert_raises_regexp(
-            BadResponseException,
-            "Bad response.*Got status code 401 from external server, cannot continue.",
-            m, url, fake_401_response,
-            disallowed_response_codes=[401]
-        )
+        # You can say that certain codes are explicitly forbidden, and all others are allowed.
+        with pytest.raises(BadResponseException) as exc:
+            m(url, fake_401_response, disallowed_response_codes=[401])
+        assert "Got status code 401 from external server, cannot continue." in str(exc.value)
 
-        assert_raises_regexp(
-            BadResponseException,
-            "Bad response.*Got status code 200 from external server, cannot continue.",
-            m, url, fake_200_response,
-            disallowed_response_codes=["2xx", 301]
-        )
+        with pytest.raises(BadResponseException) as exc:
+            m(url, fake_200_response, disallowed_response_codes=["2xx", 301])
+        assert "Got status code 200 from external server, cannot continue." in str(exc.value)
 
-        response = m(url, fake_401_response,
-                     disallowed_response_codes=["2xx"])
-        eq_(401, response.status_code)
+        response = m(url, fake_401_response, disallowed_response_codes=["2xx"])
+        assert response.status_code == 401
 
         # The exception can be turned into a useful problem detail document.
         exception = None
         try:
-            m(url, fake_200_response,
-              disallowed_response_codes=["2xx"])
+            m(url, fake_200_response, disallowed_response_codes=["2xx"])
         except Exception as e:
             exception = e
         assert exception is not None
@@ -134,21 +105,23 @@ class TestHTTP(object):
         # 502 is the status code to be returned if this integration error
         # interrupts the processing of an incoming HTTP request, not the
         # status code that caused the problem.
-        #
-        eq_(502, debug_doc.status_code)
-        eq_("Bad response", debug_doc.title)
-        eq_('The server made a request to http://url/, and got an unexpected or invalid response.', debug_doc.detail)
-        eq_('Bad response from http://url/: Got status code 200 from external server, cannot continue.\n\nResponse content: Hurray', debug_doc.debug_message)
+        assert debug_doc.status_code == 502
+        assert debug_doc.title == "Bad response"
+        expected_detail = 'The server made a request to http://url/, and got an unexpected or invalid response.'
+        assert debug_doc.detail == expected_detail
+        expected_debug_message = (
+            'Bad response from http://url/: Got status code 200 from external server, cannot continue.'
+            '\n\nResponse content: Hurray'
+        )
+        assert debug_doc.debug_message == expected_debug_message
 
         no_debug_doc = exception.as_problem_detail_document(debug=False)
-        eq_("Bad response", no_debug_doc.title)
-        eq_('The server made a request to url, and got an unexpected or invalid response.', no_debug_doc.detail)
-        eq_(None, no_debug_doc.debug_message)
+        assert no_debug_doc.title == "Bad response"
+        assert no_debug_doc.detail == 'The server made a request to url, and got an unexpected or invalid response.'
+        assert no_debug_doc.debug_message is None
 
     def test_unicode_converted_to_utf8(self):
-        """Any Unicode that sneaks into the URL, headers or body is
-        converted to UTF-8.
-        """
+        """Any Unicode that sneaks into the URL, headers or body is converted to UTF-8"""
         class ResponseGenerator(object):
             def __init__(self):
                 self.requests = []
@@ -159,29 +132,29 @@ class TestHTTP(object):
 
         generator = ResponseGenerator()
         url = "http://foo"
-        response = HTTP._request_with_timeout(
+        HTTP._request_with_timeout(
             url, generator.response, url, "POST",
-            headers = { "unicode header": "unicode value"},
+            headers={"unicode header": "unicode value"},
             data="unicode data"
         )
         [(args, kwargs)] = generator.requests
-        url, method = args
+        (url, method) = args
         headers = kwargs['headers']
         data = kwargs['data']
 
-        # All the Unicode data was converted to bytes before being sent
-        # "over the wire".
-        for k,v in list(headers.items()):
+        # All the Unicode data was converted to bytes before being sent "over the wire".
+        for k, v in list(headers.items()):
             assert isinstance(k, bytes)
             assert isinstance(v, bytes)
         assert isinstance(data, bytes)
 
+
 class TestRemoteIntegrationException(object):
 
     def test_with_service_name(self):
-        """You don't have to provide a URL when creating a
-        RemoteIntegrationException; you can just provide the service
-        name.
+        """
+        You don't have to provide a URL when creating a RemoteIntegrationException;
+        you can just provide the service name.
         """
         exc = RemoteIntegrationException(
             "Unreliable Service",
@@ -192,11 +165,12 @@ class TestRemoteIntegrationException(object):
         # elide in the non-debug version of a problem detail document.
         debug_detail = exc.document_detail(debug=True)
         other_detail = exc.document_detail(debug=False)
-        eq_(debug_detail, other_detail)
-
-        eq_('The server tried to access Unreliable Service but the third-party service experienced an error.',
-            debug_detail
+        assert other_detail == debug_detail
+        expected_debug_detail = (
+            'The server tried to access Unreliable Service but the third-party service experienced an error.'
         )
+        assert debug_detail == expected_debug_detail
+
 
 class TestBadResponseException(object):
 
@@ -211,11 +185,10 @@ class TestBadResponseException(object):
         doc, status_code, headers = exc.as_problem_detail_document(debug=True).response
         doc = json.loads(doc)
 
-        eq_('Bad response', doc['title'])
-        eq_('The server made a request to http://url/, and got an unexpected or invalid response.', doc['detail'])
-        eq_(
-            'Bad response from http://url/: Terrible response, just terrible\n\nStatus code: 102\nContent: nonsense',
-            doc['debug_message']
+        assert doc['title'] == 'Bad response'
+        assert doc['detail'] == 'The server made a request to http://url/, and got an unexpected or invalid response.'
+        assert doc['debug_message'] == (
+            'Bad response from http://url/: Terrible response, just terrible\n\nStatus code: 102\nContent: nonsense'
         )
 
         # Unless debug is turned off, in which case none of that
@@ -225,13 +198,10 @@ class TestBadResponseException(object):
 
     def test_bad_status_code_helper(object):
         response = MockRequestsResponse(500, content="Internal Server Error!")
-        exc = BadResponseException.bad_status_code(
-            "http://url/", response
-        )
+        exc = BadResponseException.bad_status_code("http://url/", response)
         doc, status_code, headers = exc.as_problem_detail_document(debug=True).response
         doc = json.loads(doc)
-
-        assert "Got status code 500 from external server, cannot continue." in  doc['debug_message']
+        assert "Got status code 500 from external server, cannot continue." in doc['debug_message']
 
     def test_as_problem_detail_document(self):
         exception = BadResponseException(
@@ -239,12 +209,12 @@ class TestBadResponseException(object):
             debug_message="some debug info"
         )
         document = exception.as_problem_detail_document(debug=True)
-        eq_(502, document.status_code)
-        eq_("Bad response", document.title)
-        eq_("The server made a request to http://url/, and got an unexpected or invalid response.",
-            document.detail
+        assert document.status_code == 502
+        assert document.title == "Bad response"
+        assert document.detail == (
+            "The server made a request to http://url/, and got an unexpected or invalid response."
         )
-        eq_("Bad response from http://url/: What even is this\n\nsome debug info", document.debug_message)
+        assert document.debug_message == "Bad response from http://url/: What even is this\n\nsome debug info"
 
 
 class TestRequestTimedOut(object):
@@ -253,17 +223,16 @@ class TestRequestTimedOut(object):
         exception = RequestTimedOut("http://url/", "I give up")
 
         debug_detail = exception.as_problem_detail_document(debug=True)
-        eq_("Timeout", debug_detail.title)
-        eq_('The server made a request to http://url/, and that request timed out.', debug_detail.detail)
+        assert debug_detail.title == "Timeout"
+        assert debug_detail.detail == 'The server made a request to http://url/, and that request timed out.'
 
-        # If we're not in debug mode, we hide the URL we accessed and just
-        # show the hostname.
+        # If we're not in debug mode, we hide the URL we accessed and just show the hostname.
         standard_detail = exception.as_problem_detail_document(debug=False)
-        eq_("The server made a request to url, and that request timed out.", standard_detail.detail)
+        assert standard_detail.detail == "The server made a request to url, and that request timed out."
 
         # The status code corresponding to an upstream timeout is 502.
         document, status_code, headers = standard_detail.response
-        eq_(502, status_code)
+        assert status_code == 502
 
 
 class TestRequestNetworkException(object):
@@ -272,14 +241,13 @@ class TestRequestNetworkException(object):
         exception = RequestNetworkException("http://url/", "Colossal failure")
 
         debug_detail = exception.as_problem_detail_document(debug=True)
-        eq_("Network failure contacting third-party service", debug_detail.title)
-        eq_('The server experienced a network error while contacting http://url/.', debug_detail.detail)
+        assert debug_detail.title == "Network failure contacting third-party service"
+        assert debug_detail.detail == 'The server experienced a network error while contacting http://url/.'
 
-        # If we're not in debug mode, we hide the URL we accessed and just
-        # show the hostname.
+        # If we're not in debug mode, we hide the URL we accessed and just show the hostname.
         standard_detail = exception.as_problem_detail_document(debug=False)
-        eq_("The server experienced a network error while contacting url.", standard_detail.detail)
+        assert standard_detail.detail == "The server experienced a network error while contacting url."
 
         # The status code corresponding to an upstream timeout is 502.
         document, status_code, headers = standard_detail.response
-        eq_(502, status_code)
+        assert status_code == 502
