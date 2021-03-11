@@ -89,7 +89,7 @@ class TestGeometryLoader(DatabaseTest):
         old_us_geography = old_us.geometry
 
         # Load a small NDJSON "file" containing information about three places.
-        test_ndjson = (shared_datadir / "test_ndjson_data.ndjson").read_text()
+        test_ndjson = (shared_datadir / "test_geometry_loader_ndjson.ndjson").read_text()
 
         input = StringIO(test_ndjson)
         [(us, ignore), (alabama, ignore), (montgomery, ignore)] = list(
