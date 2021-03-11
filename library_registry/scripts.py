@@ -1,15 +1,11 @@
-from nose.tools import set_trace
 import argparse
-import base64
 import json
 import logging
 import os
-import re
-import requests
 import sys
 
-from geometry_loader import GeometryLoader
-from model import (
+from library_registry.geometry_loader import GeometryLoader
+from library_registry.model import (
     get_one,
     get_one_or_create,
     production_session,
@@ -20,15 +16,16 @@ from model import (
     ConfigurationSetting,
     ExternalIntegration,
 )
-from config import Configuration
-from adobe_vendor_id import AdobeVendorIDClient
-from authentication_document import AuthenticationDocument
-from emailer import (
+from library_registry.config import Configuration
+from library_registry.adobe_vendor_id import AdobeVendorIDClient
+from library_registry.authentication_document import AuthenticationDocument
+from library_registry.emailer import (
     Emailer,
     EmailTemplate,
 )
-from registrar import LibraryRegistrar
-from util.problem_detail import ProblemDetail
+from library_registry.registrar import LibraryRegistrar
+from library_registry.util.problem_detail import ProblemDetail
+
 
 class Script(object):
 
@@ -271,11 +268,17 @@ class SetCoverageAreaScript(LibraryScript):
         parser = super(SetCoverageAreaScript, cls).arg_parser()
         parser.add_argument(
             '--service-area',
-            help="JSON document or string describing the library's service area. If no value is specified, it is assumed to be the same as --focus-area."
+            help=(
+                "JSON document or string describing the library's service area. If no value is specified, "
+                "it is assumed to be the same as --focus-area."
+            )
         )
         parser.add_argument(
             '--focus-area',
-            help="JSON document or string describing the library's focus area. If no value is specified, it is assumed to be the same as --service-area."
+            help=(
+                "JSON document or string describing the library's focus area. If no value is specified, "
+                "it is assumed to be the same as --service-area."
+            )
         )
         return parser
 
@@ -295,11 +298,11 @@ class SetCoverageAreaScript(LibraryScript):
         # string will be interpreted as a single place name.
         try:
             service_area = json.loads(service_area)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             pass
         try:
             focus_area = json.loads(focus_area)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             pass
 
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
@@ -336,7 +339,7 @@ class RegistrationRefreshScript(LibraryScript):
         for library in self.libraries(parsed.library):
             result = registrar.reregister(library)
             if isinstance(result, ProblemDetail):
-               self.log.error(
+                self.log.error(
                     "FAILURE %s (%s) uri=%s, title=%s, detail=%s, debug=%s",
                     library.name, library.authentication_url,
                     result.uri, result.title, result.detail, result.debug_message
@@ -408,12 +411,13 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         print("OK Found user info: %s" % user_info)
         print("   Full content: %s" % content)
 
+
 class ConfigurationSettingScript(Script):
 
     @classmethod
     def _parse_setting(self, setting):
         """Parse a command-line setting option into a key-value pair."""
-        if not '=' in setting:
+        if '=' not in setting:
             raise ValueError(
                 'Incorrect format for setting: "%s". Should be "key=value"'
                 % setting
@@ -475,10 +479,12 @@ class ConfigureSiteScript(ConfigurationSettingScript):
                 output.write("%s='%s'\n" % (setting.key, setting.value))
         _db.commit()
 
+
 class ShowIntegrationsScript(Script):
     """Show information about the external integrations on a server."""
 
     name = "List the external integrations on this server."
+
     @classmethod
     def arg_parser(cls):
         parser = argparse.ArgumentParser()
@@ -520,6 +526,7 @@ class ShowIntegrationsScript(Script):
                 )
             )
             output.write("\n")
+
 
 class ConfigureIntegrationScript(ConfigurationSettingScript):
     """Create a integration or change its settings."""
@@ -627,8 +634,7 @@ class ConfigureVendorIDScript(Script):
         )
         c = Configuration
 
-        # All node values are string representations of hexidecimal
-        # numbers.
+        # All node values are string representations of hexidecimal numbers.
         hex_node = int(parsed.node_value, 16)
 
         integration.setting(c.ADOBE_VENDOR_ID).value = parsed.vendor_id
