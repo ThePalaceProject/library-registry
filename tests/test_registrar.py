@@ -1,7 +1,5 @@
 import json
 
-import pytest
-
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.opds import OPDSCatalog
 from library_registry.problem_details import (
@@ -93,7 +91,7 @@ class TestRegistrar(DatabaseTest):
         assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is False
 
         # An OPDS 2 feed that has a link.
-        catalog = json.dumps({"links": {rel: { "href": auth_url }}})
+        catalog = json.dumps({"links": {rel: {"href": auth_url}}})
         response = DummyHTTPResponse(200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog)
         assert LibraryRegistrar.opds_response_links(response, rel) == [auth_url]
         assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is True
@@ -103,7 +101,7 @@ class TestRegistrar(DatabaseTest):
         response = DummyHTTPResponse(200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog)
         assert LibraryRegistrar.opds_response_links(response, rel) == []
         assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is False
-        
+
         # A malformed feed.
         response = DummyHTTPResponse(200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, "Not a real feed")
         assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is False
@@ -111,7 +109,7 @@ class TestRegistrar(DatabaseTest):
         # An Authentication For OPDS document.
         response = DummyHTTPResponse(
             200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE},
-            json.dumps({ "id": auth_url })
+            json.dumps({"id": auth_url})
         )
         assert LibraryRegistrar.opds_response_links(response, rel) == [auth_url]
         assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is True
@@ -159,10 +157,11 @@ class TestRegistrar(DatabaseTest):
         assert result.detail == "No valid mailto: links found with rel=rel0"
 
         # Links exist but none are valid and relevant.
-        links = [dict(rel="rel1", href="http://foo/"),
-                 dict(rel="rel1", href="http://bar/"),
-                 dict(rel="rel2", href="mailto:me@library.org"),
-                 dict(rel="rel2", href="mailto:me2@library.org"),
+        links = [
+            dict(rel="rel1", href="http://foo/"),
+            dict(rel="rel1", href="http://bar/"),
+            dict(rel="rel2", href="mailto:me@library.org"),
+            dict(rel="rel2", href="mailto:me2@library.org"),
         ]
         result = m("rel1", links, "a title")
         assert isinstance(result, ProblemDetail)

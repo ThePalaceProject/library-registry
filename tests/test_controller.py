@@ -8,7 +8,6 @@ from smtplib import SMTPException
 from urllib.parse import unquote
 
 import flask
-import pytest
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from flask import Response, session
