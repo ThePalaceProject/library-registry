@@ -70,10 +70,7 @@ from .emailer import Emailer
 from .util.language import LanguageCodes
 from .util import GeometryUtility
 from .util.short_client_token import ShortClientTokenTool
-from .util.string_helpers import (
-    native_string,
-    random_string,
-)
+from .util.string_helpers import random_string
 
 
 def production_session():
@@ -1439,7 +1436,7 @@ class Place(Base):
         output = "<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
             self.external_name, self.type, abbr, self.external_id, parent
         )
-        return native_string(output)
+        return str(output)
 
 
 class PlaceAlias(Base):

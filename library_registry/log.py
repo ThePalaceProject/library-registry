@@ -6,7 +6,6 @@ import socket
 from loggly.handlers import HTTPSHandler as LogglyHandler
 
 from library_registry.config import CannotLoadConfiguration
-from library_registry.util.string_helpers import native_string
 
 
 class JSONFormatter(logging.Formatter):
@@ -44,7 +43,7 @@ class StringFormatter(logging.Formatter):
     """
     def format(self, record):
         data = super(StringFormatter, self).format(record)
-        return native_string(data)
+        return str(data)
 
 
 class LogConfiguration(object):
