@@ -6,7 +6,7 @@ from . import (
     problem_detail,
 )
 
-from .language import languages_from_accept
+from library_registry.util.language import LanguageCodes
 
 
 def problem_raw(type, status, title, detail=None, instance=None, headers={}):
@@ -24,7 +24,7 @@ def problem(type, status, title, detail=None, instance=None, headers={}):
 
 
 def languages_for_request():
-    return languages_from_accept(flask.request.accept_languages)
+    return LanguageCodes.languages_from_accept(flask.request.accept_languages)
 
 
 def originating_ip():
