@@ -53,6 +53,20 @@ class LanguageCodes():
         native_names[alpha_2] = names
         native_names[alpha_3] = names
 
+    def languages_from_accept(accept_languages):
+        """Turn a list of (locale, quality) 2-tuples into a list of language codes."""
+        seen = set([])
+        languages = []
+        for locale, quality in accept_languages:
+            language = LanguageCodes.iso_639_2_for_locale(locale)
+            if language and language not in seen:
+                languages.append(language)
+                seen.add(language)
+        if not languages:
+            languages = os.environ.get('DEFAULT_LANGUAGES', 'eng')
+            languages = languages.split(',')
+        return languages
+
     @classmethod
     def iso_639_2_for_locale(cls, locale):
         """Turn a locale code into an ISO-639-2 alpha-3 language code."""
@@ -62,8 +76,7 @@ class LanguageCodes():
             language = locale
         if cls.two_to_three[language]:
             return cls.two_to_three[language]
-        elif cls.three_to_two[language]:
-            # It's already ISO-639-2.
+        elif cls.three_to_two[language]:            # It's already ISO-639-2.
             return language
         return None
 
@@ -73,18 +86,15 @@ class LanguageCodes():
         if not s:
             return None
         s = s.lower()
-        if s in cls.english_names_to_three:
-            # It's the English name of a language.
+        if s in cls.english_names_to_three:  # It's the English name of a language.
             return cls.english_names_to_three[s]
 
         if "-" in s:
             s = s.split("-")[0]
 
-        if s in cls.three_to_two:
-            # It's already an alpha-3.
+        if s in cls.three_to_two:       # It's already an alpha-3.
             return s
-        elif s in cls.two_to_three:
-            # It's an alpha-2.
+        elif s in cls.two_to_three:     # It's an alpha-2.
             return cls.two_to_three[s]
 
         return None
@@ -109,18 +119,3 @@ class LanguageCodes():
         if len(all_names) == 1:
             return all_names[0]
         return "/".join(all_names)
-
-
-def languages_from_accept(accept_languages):
-    """Turn a list of (locale, quality) 2-tuples into a list of language codes."""
-    seen = set([])
-    languages = []
-    for locale, quality in accept_languages:
-        language = LanguageCodes.iso_639_2_for_locale(locale)
-        if language and language not in seen:
-            languages.append(language)
-            seen.add(language)
-    if not languages:
-        languages = os.environ.get('DEFAULT_LANGUAGES', 'eng')
-        languages = languages.split(',')
-    return languages
