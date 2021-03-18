@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.opds import OPDSCatalog
 from library_registry.problem_details import (
@@ -8,20 +10,19 @@ from library_registry.problem_details import (
 )
 from library_registry.registrar import LibraryRegistrar
 from . import (
-    DatabaseTest,
     DummyHTTPResponse,
 )
 from library_registry.util.problem_detail import ProblemDetail
 
 
-class TestRegistrar(DatabaseTest):
+class TestRegistrar:
 
     # TODO: The core method, register(), is tested indirectly in
     # test_controller.py, because the LibraryRegistrar code was
     # originally part of LibraryRegistryController. This could be
     # refactored.
 
-    def test_reregister(self):
+    def test_reregister(self, db_session, create_test_library):
         class Mock(LibraryRegistrar):
             RETURN_VALUE = NO_AUTH_URL
 
@@ -29,7 +30,7 @@ class TestRegistrar(DatabaseTest):
                 self.called_with = (library, library_stage)
                 return self.RETURN_VALUE
 
-        library = self._library()
+        library = create_test_library(db_session)
         registrar = Mock(object(), object())
 
         # Test the case where register() returns a problem detail.
