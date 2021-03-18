@@ -4,61 +4,99 @@ from library_registry.util.language import LanguageCodes
 
 
 class TestLanguageCodes:
-    def test_lookups(self):
-        c = LanguageCodes
-        assert c.two_to_three['en'] == "eng"
-        assert "en" == c.three_to_two['eng']
-        assert ["English"] == c.english_names['en']
-        assert ["English"] == c.english_names['eng']
-        assert ["English"] == c.native_names['en']
-        assert ["English"] == c.native_names['eng']
+    @pytest.mark.parametrize(
+        "two_letter_code,three_letter_code", [
+            ("en", "eng"), ("es", "spa"), ("zh", "chi")
+        ]
+    )
+    def test_two_to_three(self, two_letter_code, three_letter_code):
+        """
+        GIVEN: A reference to the LanguageCodes class
+        WHEN:  The attribute 'two_to_three' is accessed as a dict with a two letter key
+        THEN:  The corresponding three letter language code will be returned
+        """
+        assert LanguageCodes.two_to_three[two_letter_code] == three_letter_code
+        assert LanguageCodes.two_to_three["nosuchlanguage"] is None
 
-        assert "spa" == c.two_to_three['es']
-        assert "es" == c.three_to_two['spa']
-        assert ['Spanish', 'Castilian'] == c.english_names['es']
-        assert ['Spanish', 'Castilian'] == c.english_names['spa']
-        assert ["español", "castellano"] == c.native_names['es']
-        assert ["español", "castellano"] == c.native_names['spa']
+    @pytest.mark.parametrize(
+        "two_letter_code,three_letter_code", [
+            ("en", "eng"), ("es", "spa"), ("zh", "chi")
+        ]
+    )
+    def test_three_to_two(self, two_letter_code, three_letter_code):
+        """
+        GIVEN: A reference to the LanguageCodes class
+        WHEN:  The attribute 'three_to_two' is accessed with a dict with a three letter key
+        THEN:  The corresponding two letter language code will be returned
+        """
+        assert LanguageCodes.three_to_two[three_letter_code] == two_letter_code
+        assert LanguageCodes.three_to_two["nosuchlanguage"] is None
 
-        assert "chi" == c.two_to_three['zh']
-        assert "zh" == c.three_to_two['chi']
-        assert ["Chinese"] == c.english_names['zh']
-        assert ["Chinese"] == c.english_names['chi']
-        # We don't have this translation yet.
-        assert [] == c.native_names['zh']
-        assert [] == c.native_names['chi']
+    @pytest.mark.parametrize(
+        "key_name,eng_name_value", [
+            ("en", ["English"]),
+            ("spa", ["Spanish", "Castilian"]),
+            ("es", ["Spanish", "Castilian"]),
+            ("zh", ["Chinese"]),
+            ("chi", ["Chinese"]),
+            ("nosuchlanguage", [])
+        ]
+    )
+    def test_english_names(self, key_name, eng_name_value):
+        """
+        GIVEN: A reference to the LanguageCodes class
+        WHEN:  The attribute 'english_names' is accessed as a dict with two or three letter keys
+        THEN:  The corresponding English name for the referenced language is returned
+        """
+        assert LanguageCodes.english_names[key_name] == eng_name_value
 
-        assert c.two_to_three['nosuchlanguage'] is None
-        assert c.three_to_two['nosuchlanguage'] is None
-        assert [] == c.english_names['nosuchlanguage']
-        assert [] == c.native_names['nosuchlanguage']
+    @pytest.mark.parametrize(
+        "key_name,native_name_value", [
+            ("en", ["English"]),
+            ("eng", ["English"]),
+            ("es", ["español", "castellano"]),
+            ("spa", ["español", "castellano"]),
+            ("zh", []),
+            ("chi", []),
+            ("nosuchlanguage", [])
+        ]
+    )
+    def test_native_names(self, key_name, native_name_value):
+        assert LanguageCodes.native_names[key_name] == native_name_value
 
-    def test_locale(self):
-        m = LanguageCodes.iso_639_2_for_locale
-        assert "eng" == m("en-US")
-        assert "eng" == m("en")
-        assert "eng" == m("en-GB")
-        assert m("nq-none") is None
+    @pytest.mark.parametrize("locale,expected", [("en-US", "eng"), ("en", "eng"), ("en-GB", "eng")])
+    def test_locale(self, locale, expected):
+        assert LanguageCodes.iso_639_2_for_locale(locale) == expected
+        assert LanguageCodes.iso_639_2_for_locale("nosuchlocale") is None
 
-    def test_string_to_alpha_3(self):
-        m = LanguageCodes.string_to_alpha_3
-        assert "eng" == m("en")
-        assert "eng" == m("eng")
-        assert "eng" == m("en-GB")
-        assert "eng" == m("English")
-        assert "eng" == m("ENGLISH")
-        assert "ssa" == m("Nilo-Saharan languages")
-        assert m("NO SUCH LANGUAGE") is None
+    @pytest.mark.parametrize(
+        "input_string,expected",
+        [
+            ("en", "eng"),
+            ("eng", "eng"),
+            ("en-GB", "eng"),
+            ("English", "eng"),
+            ("ENGLISH", "eng"),
+            ("Nilo-Saharan languages", "ssa"),
+        ]
+    )
+    def test_string_to_alpha_3(self, input_string, expected):
+        assert LanguageCodes.string_to_alpha_3(input_string) == expected
+        assert LanguageCodes.string_to_alpha_3("NO SUCH LANGUGE") is None
 
-    def test_name_for_languageset(self):
-        m = LanguageCodes.name_for_languageset
-        assert "" == m([])
-        assert "English" == m(["en"])
-        assert "English" == m(["eng"])
-        assert "español" == m(['es'])
-        assert "English/español" == m(["eng", "spa"])
-        assert "español/English" == m("spa,eng")
-        assert "español/English/Chinese" == m(["spa", "eng", "chi"])
+    @pytest.mark.parametrize(
+        "input,expected", [
+            (["en"], "English"),
+            (["eng"], "English"),
+            (["es"], "español"),
+            (["eng", "spa"], "English/español"),
+            ("spa,eng", "español/English"),
+            (["spa", "eng", "chi"], "español/English/Chinese"),
+            ([], "")
+        ]
+    )
+    def test_name_for_languageset(self, input, expected):
+        assert LanguageCodes.name_for_languageset(input) == expected
 
         with pytest.raises(ValueError):
-            m(["eng, nxx"])
+            LanguageCodes.name_for_languageset(["eng, nxx"])
