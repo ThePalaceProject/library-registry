@@ -12,14 +12,14 @@ from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration
 
 
-class Annotator(object):
-
+class Annotator:
     def annotate_catalog(self, catalog, live=True):
-        pass
+        ...
 
 
-class OPDSCatalog(object):
-    """Represents an OPDS 2 Catalog Document.
+class OPDSCatalog:
+    """
+    Represents an OPDS 2 Catalog Document.
     https://github.com/opds-community/opds-revision/blob/master/opds-2.0.md
 
     This document may stand on its own, or be contained within another
@@ -44,9 +44,7 @@ class OPDSCatalog(object):
 
     @classmethod
     def _strftime(cls, date):
-        """
-        Format a date the way Atom likes it (RFC3339?)
-        """
+        """Format a date the way Atom likes it (RFC3339?)"""
         return date.strftime(cls.TIME_FORMAT)
 
     @classmethod
@@ -59,22 +57,20 @@ class OPDSCatalog(object):
         image = dict(**kwargs)
         catalog.setdefault("images", []).append(image)
 
-    def __init__(self, _db, title, url, libraries, annotator=None,
-                 live=True, url_for=None):
-        """Turn a list of libraries into a catalog."""
+    def __init__(self, _db, title, url, libraries, annotator=None, live=True, url_for=None):
+        """Turn a list of libraries into a catalog"""
         if not annotator:
             annotator = Annotator()
 
-        # To save bandwidth, omit logos from large feeds. What 'large'
-        # means is customizable.
+        # To save bandwidth, omit logos from large feeds. What 'large' means is customizable.
         include_logos = not (self._feed_is_large(_db, libraries))
         self.catalog = dict(metadata=dict(title=title), catalogs=[])
 
-        self.add_link_to_catalog(self.catalog, rel="self",
-                                 href=url, type=self.OPDS_TYPE)
+        self.add_link_to_catalog(self.catalog, rel="self", href=url, type=self.OPDS_TYPE)
         web_client_uri_template = ConfigurationSetting.sitewide(
             _db, Configuration.WEB_CLIENT_URL
         ).value
+
         for library in libraries:
             if not isinstance(library, tuple):
                 library = (library,)
@@ -89,24 +85,22 @@ class OPDSCatalog(object):
 
     @classmethod
     def _feed_is_large(cls, _db, libraries):
-        """Determine whether a prospective feed is 'large' per a sitewide setting.
+        """
+        Determine whether a prospective feed is 'large' per a sitewide setting.
 
         :param _db: A database session
         :param libraries: A list of libraries (or anything else that might be
             going into a feed).
         """
-        large_feed_size = ConfigurationSetting.sitewide(
-            _db, Configuration.LARGE_FEED_SIZE
-        ).int_value
-        if large_feed_size is None:
-            # No limit
+        large_feed_size = ConfigurationSetting.sitewide(_db, Configuration.LARGE_FEED_SIZE).int_value
+
+        if large_feed_size is None:         # No limit
             return False
-        if isinstance(libraries, Query):
-            # This is a SQLAlchemy query.
+        if isinstance(libraries, Query):    # This is a SQLAlchemy query.
             size = libraries.count()
-        else:
-            # This is something like a normal Python list.
+        else:                               # This is something like a normal Python list.
             size = len(libraries)
+
         return size >= large_feed_size
 
     @classmethod
@@ -118,7 +112,8 @@ class OPDSCatalog(object):
             web_client_uri_template=None
     ):
 
-        """Create an OPDS catalog for a library.
+        """
+        Create an OPDS catalog for a library.
 
         :param include_private_information: If this is True, the
         consumer of this OPDS catalog is expected to be the library
@@ -127,16 +122,17 @@ class OPDSCatalog(object):
         normally wouldn't be.
         """
         url_for = url_for or flask.url_for
-        metadata = dict(
-            id=library.internal_urn,
-            title=library.name,
-            updated=cls._strftime(library.timestamp),
-        )
+        metadata = {
+            "id": library.internal_urn,
+            "title": library.name,
+            "updated": cls._strftime(library.timestamp),
+        }
         if distance is not None:
             metadata["distance"] = "%d km." % (distance/1000)
 
         if library.description:
             metadata["description"] = library.description
+
         catalog = dict(metadata=metadata)
 
         if library.opds_url:
@@ -160,8 +156,7 @@ class OPDSCatalog(object):
                                      href=library.logo,
                                      type="image/png")
 
-        # Add links that allow clients to discover the library's
-        # focus and eligibility area.
+        # Add links that allow clients to discover the library's focus and eligibility area.
         for rel, route in (
             (cls.ELIGIBILITY_REL, "library_eligibility"),
             (cls.FOCUS_REL, "library_focus"),
@@ -171,29 +166,22 @@ class OPDSCatalog(object):
                 catalog, rel=rel, href=url, type="application/geo+json"
             )
         for hyperlink in library.hyperlinks:
-            if (not include_private_information and hyperlink.rel in
-                Hyperlink.PRIVATE_RELS):
+            if (not include_private_information and hyperlink.rel in Hyperlink.PRIVATE_RELS):
                 continue
             args = cls._hyperlink_args(hyperlink)
             if not args:
-                # Not enough information to create a link.
-                continue
-            cls.add_link_to_catalog(
-                catalog, **args
-            )
+                continue                # Not enough information to create a link.
+            cls.add_link_to_catalog(catalog, **args)
+
         # Add a link for the registry's web client, if it has one.
         if web_client_uri_template:
             web_client_url = web_client_uri_template.replace('{uuid}', library.internal_urn)
-            cls.add_link_to_catalog(
-                catalog, href=web_client_url, rel="self", type="text/html"
-            )
+            cls.add_link_to_catalog(catalog, href=web_client_url, rel="self", type="text/html")
         return catalog
 
     @classmethod
     def _hyperlink_args(cls, hyperlink):
-        """Turn a Hyperlink into a dictionary of arguments that can
-        be turned into an OPDS 2 link.
-        """
+        """Turn a Hyperlink into a dictionary of arguments that can be turned into an OPDS 2 link"""
         if not hyperlink:
             return None
         resource = hyperlink.resource
@@ -202,10 +190,9 @@ class OPDSCatalog(object):
         href = resource.href
         if not href:
             return None
-        args = dict(rel=hyperlink.rel, href=href)
+        args = {"rel": hyperlink.rel, "href": href}
 
-        # If there was ever an attempt to validate this Hyperlink,
-        # explain the status of that attempt.
+        # If there was ever an attempt to validate this Hyperlink, explain the status of that attempt.
         properties = {}
         validation = resource.validation
         if validation:
