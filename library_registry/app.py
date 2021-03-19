@@ -7,18 +7,18 @@ from flask import Flask, Response
 from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
-from .config import Configuration
-from .controller import LibraryRegistry
-from .log import LogConfiguration
-from .model import (
+from library_registry.config import Configuration
+from library_registry.controller import LibraryRegistry
+from library_registry.log import LogConfiguration
+from library_registry.model import (
     ConfigurationSetting,
     SessionManager,
 )
-from .util.app_server import (
+from library_registry.util.app_server import (
     returns_json_or_response_or_problem_detail,
     returns_problem_detail,
 )
-from .app_helpers import (
+from library_registry.app_helpers import (
     compressible,
     has_library_factory,
     uses_location_factory,
@@ -45,9 +45,7 @@ app.debug = debug
 app._db = _db
 
 if os.environ.get('AUTOINITIALIZE') == 'False':
-    pass
-    # It's the responsibility of the importing code to set app.library_registry
-    # appropriately.
+    pass    # The importing code is responsible for setting app.library_registry appropriately.
 else:
     if getattr(app, 'library_registry', None) is None:
         app.library_registry = LibraryRegistry(_db)
@@ -61,9 +59,7 @@ def set_secret_key(_db=None):
 
 @app.teardown_request
 def shutdown_session(exception):
-    """Commit or rollback the database session associated with
-    the request.
-    """
+    """Commit or rollback the database session associated with the request"""
     if (hasattr(app, 'library_registry',) and hasattr(app.library_registry, '_db') and app.library_registry._db):
         if exception:
             app.library_registry._db.rollback()
@@ -275,8 +271,10 @@ if __name__ == '__main__':
         url = sys.argv[1]
     else:
         url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
+
     url = url or 'http://localhost:7000/'
     scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(url)
+
     if ':' in netloc:
         host, port = netloc.split(':')
         port = int(port)
@@ -284,5 +282,5 @@ if __name__ == '__main__':
         host = netloc
         port = 80
 
-    app.library_registry.log.info("Starting app on %s:%s", host, port)
+    app.library_registry.log.info(f"Starting app on {host}:{port}")
     app.run(debug=debug, host=host, port=port)

@@ -19,7 +19,8 @@ from library_registry.problem_details import INVALID_INTEGRATION_DOCUMENT
 
 
 class AuthenticationDocument(object):
-    """Parse an Authentication For OPDS document, including the
+    """
+    Parse an Authentication For OPDS document, including the
     Library Simplified-specific extensions, extracting all the information
     that's of interest to the library registry.
     """
@@ -31,14 +32,17 @@ class AuthenticationDocument(object):
     COVERAGE_EVERYWHERE = "everywhere"
 
     # The list of color schemes supported by SimplyE.
-    SIMPLYE_COLOR_SCHEMES = [
-        "red", "blue", "gray", "gold", "green", "teal", "purple",
-    ]
+    SIMPLYE_COLOR_SCHEMES = ["red", "blue", "gray", "gold", "green", "teal", "purple"]
 
     PUBLIC_AUDIENCE = 'public'
-    AUDIENCES = [PUBLIC_AUDIENCE, 'educational-primary',
-                 'educational-secondary', 'research', 'print-disability',
-                 'other']
+    AUDIENCES = [
+        PUBLIC_AUDIENCE,
+        'educational-primary',
+        'educational-secondary',
+        'research',
+        'print-disability',
+        'other',
+    ]
 
     def __init__(self, _db, id, title, authentication, service_description,
                  color_scheme, collection_size, public_key, audiences,
@@ -55,9 +59,7 @@ class AuthenticationDocument(object):
             _db, service_area, focus_area, place_class
         )
         self.links = links
-        self.website = self.extract_link(
-            rel="alternate", require_type="text/html"
-        )
+        self.website = self.extract_link(rel="alternate", require_type="text/html")
         self.online_registration = self.has_link(rel="register")
         self.root = self.extract_link(
             rel="start",
@@ -66,12 +68,14 @@ class AuthenticationDocument(object):
         logo = self.extract_link(rel="logo")
         self.logo = None
         self.logo_link = None
+
         if logo:
             data = logo.get('href', '')
             if data and data.startswith('data:'):
                 self.logo = data
             else:
                 self.logo_link = logo
+
         self.anonymous_access = False
         for flow in self.authentication_flows:
             if flow.get('type') == self.ANONYMOUS_ACCESS_REL:
@@ -83,40 +87,35 @@ class AuthenticationDocument(object):
         """Return all valid authentication flows in this document."""
         for i in self.authentication:
             if not isinstance(i, dict):
-                # Not a valid authentication flow.
-                continue
+                continue        # Not a valid authentication flow.
             yield i
 
     def extract_link(self, rel, require_type=None, prefer_type=None):
-        """Find a link with the given link relation in the main authentication
-        document.
+        """
+        Find a link with the given link relation in the main authentication document.
 
         Does not consider links found in the authentication flows.
 
         :param rel: The link must use this as the link relation.
         :param require_type: The link must have this as its type.
-        :param prefer_type: A link with this type is better than a link of
-            some other type.
+        :param prefer_type: A link with this type is better than a link of some other type.
         """
-        return self._extract_link(
-            self.links, rel, require_type, prefer_type
-        )
+        return self._extract_link(self.links, rel, require_type, prefer_type)
 
     def has_link(self, rel):
-        """Is there a link with this link relation anywhere in the document?
+        """
+        Is there a link with this link relation anywhere in the document?
 
         This checks both the main document and the authentication flows.
 
         :rel: The link must have this link relation.
-        :return: True if there is a link with the link relation in the document,
-            False otherwise.
+        :return: True if there is a link with the link relation in the document, False otherwise.
         """
         if self._extract_link(self.links, rel):
             return True
 
-        # We couldn't find a matching link in the main set of
-        # links, but maybe there's a matching link associated with
-        # a particular authentication flow.
+        # We couldn't find a matching link in the main set of links, but maybe there's a
+        # matching link associated with a particular authentication flow.
         for flow in self.authentication_flows:
             if self._extract_link(flow.get('links', []), rel):
                 return True
@@ -126,22 +125,19 @@ class AuthenticationDocument(object):
     def parse_service_and_focus_area(cls, _db, service_area, focus_area,
                                      place_class=Place):
         if service_area:
-            service_area = cls.parse_coverage(
-                _db, service_area, place_class=place_class
-            )
+            service_area = cls.parse_coverage(_db, service_area, place_class=place_class)
         else:
             service_area = [place_class.everywhere(_db)], {}, {}
         if focus_area:
-            focus_area = cls.parse_coverage(
-                _db, focus_area, place_class=place_class
-            )
+            focus_area = cls.parse_coverage(_db, focus_area, place_class=place_class)
         else:
             focus_area = service_area
         return service_area, focus_area
 
     @classmethod
     def parse_coverage(cls, _db, coverage, place_class=Place):
-        """Derive Place objects from an Authentication For OPDS coverage
+        """
+        Derive Place objects from an Authentication For OPDS coverage
         object (i.e. a value for `service_area` or `focus_area`)
 
         :param coverage: An Authentication For OPDS coverage object.
@@ -166,8 +162,7 @@ class AuthenticationDocument(object):
         unknown = defaultdict(list)
         ambiguous = defaultdict(list)
         if coverage == cls.COVERAGE_EVERYWHERE:
-            # This library covers the entire universe! No need to
-            # parse anything.
+            # This library covers the entire universe! No need to parse anything.
             place_objs.append(place_class.everywhere(_db))
             coverage = dict()  # Do no more processing
 
@@ -175,6 +170,7 @@ class AuthenticationDocument(object):
             # The coverage is not in { nation: place } format.
             # Convert it into that format using the default nation.
             default_nation = place_class.default_nation(_db)
+
             if default_nation:
                 coverage = {default_nation.abbreviated_name: coverage}
             else:
@@ -186,15 +182,11 @@ class AuthenticationDocument(object):
 
         for nation, places in list(coverage.items()):
             try:
-                nation_obj = place_class.lookup_one_by_name(
-                    _db, nation, place_type=Place.NATION,
-                )
+                nation_obj = place_class.lookup_one_by_name(_db, nation, place_type=Place.NATION)
                 if places == cls.COVERAGE_EVERYWHERE:
-                    # This library covers an entire nation.
-                    place_objs.append(nation_obj)
+                    place_objs.append(nation_obj)   # This library covers an entire nation.
                 else:
-                    # This library covers a list of places within a
-                    # nation.
+                    # This library covers a list of places within a nation.
                     if isinstance(places, str):
                         # This is invalid -- you're supposed to always
                         # pass in a list -- but we can support it.
@@ -203,42 +195,36 @@ class AuthenticationDocument(object):
                         try:
                             place_obj = nation_obj.lookup_inside(place)
                             if place_obj:
-                                # We found it.
-                                place_objs.append(place_obj)
+                                place_objs.append(place_obj)    # We found it.
                             else:
-                                # We couldn't find any place with this name.
-                                unknown[nation].append(place)
+                                unknown[nation].append(place)   # We couldn't find any place with this name.
                         except MultipleResultsFound:
-                            # The place was ambiguously named.
-                            ambiguous[nation].append(place)
+                            ambiguous[nation].append(place)     # The place was ambiguously named.
             except MultipleResultsFound:
-                # A nation was ambiguously named -- not very likely.
-                ambiguous[nation] = places
+                ambiguous[nation] = places      # A nation was ambiguously named -- not very likely.
             except NoResultFound:
-                # Either this isn't a recognized nation
-                # or we don't have a geography for it.
+                # Either this isn't a recognized nation or we don't have a geography for it.
                 unknown[nation] = places
+
         return place_objs, unknown, ambiguous
 
     @classmethod
     def _extract_link(cls, links, rel, require_type=None, prefer_type=None):
         if require_type and prefer_type:
-            raise ValueError(
-                "At most one of require_type and prefer_type may be specified."
-            )
+            raise ValueError("At most one of require_type and prefer_type may be specified.")
+
         if not links:
-            # There are no links, period.
-            return None
+            return None     # There are no links, period.
         good_enough = None
+
         if not isinstance(links, list):
-            # Invalid links object; ignore it.
-            return
+            return          # Invalid links object; ignore it.
+
         for link in links:
             if rel != link.get('rel'):
                 continue
             if not require_type and not prefer_type:
-                # Any link with this relation will work. Return the
-                # first one we see.
+                # Any link with this relation will work. Return the first one we see.
                 return link
 
             # Beyond this point, either require_type or prefer_type is
@@ -247,10 +233,8 @@ class AuthenticationDocument(object):
 
             if type:
                 if (require_type and type.startswith(require_type) or prefer_type and type.startswith(prefer_type)):
-                    # If we have a require_type, this means we have
-                    # met the requirement. If we have a prefer_type,
-                    # we will not find a better link than this
-                    # one. Return it immediately.
+                    # If we have a require_type, this means we have met the requirement. If we have a prefer_type,
+                    # we will not find a better link than this one. Return it immediately.
                     return link
             if not require_type and not good_enough:
                 # We would prefer a link of a certain type, but if it
@@ -283,7 +267,8 @@ class AuthenticationDocument(object):
         )
 
     def update_library(self, library):
-        """Modify a library to reflect the current state of this
+        """
+        Modify a library to reflect the current state of this
         AuthenticationDocument.
 
         :param library: A Library.
@@ -295,8 +280,10 @@ class AuthenticationDocument(object):
         library.anonymous_access = self.anonymous_access
 
         problem = self.update_audiences(library)
+
         if not problem:
             problem = self.update_service_areas(library)
+
         if not problem:
             problem = self.update_collection_size(library)
 
@@ -307,12 +294,12 @@ class AuthenticationDocument(object):
 
     @classmethod
     def _update_audiences(self, library, audiences):
-        original_audiences = audiences
         if not audiences:
             audiences = [Audience.PUBLIC]
+
         if isinstance(audiences, str):
-            # This is invalid but we can easily support it.
-            audiences = [audiences]
+            audiences = [audiences]     # This is invalid but we can easily support it.
+
         if not isinstance(audiences, list):
             return INVALID_INTEGRATION_DOCUMENT.detailed(
                 _("'audience' must be a list: %(audiences)r",
@@ -336,58 +323,36 @@ class AuthenticationDocument(object):
         library.audiences = audience_objs
 
     def update_service_areas(self, library):
-        """Update a library's ServiceAreas based on the contents of this
-        document.
-        """
-        return self.set_service_areas(
-            library, self.service_area, self.focus_area
-        )
+        """Update a library's ServiceAreas based on the contents of this document"""
+        return self.set_service_areas(library, self.service_area, self.focus_area)
 
     @classmethod
     def set_service_areas(cls, library, service_area, focus_area):
-        """Replace a library's ServiceAreas with specific new values.
-        """
+        """Replace a library's ServiceAreas with specific new values"""
         service_areas = []
 
-        old_service_areas = list(library.service_areas)
-
-        # What service_area or focus_area looks like when
-        # no input was specified.
-        empty = [[], {}, {}]
+        empty = [[], {}, {}]    # What service_area or focus_area looks like when no input was specified.
 
         if focus_area == empty and service_area == empty:
-            # A library can't lose its entire coverage area -- it's
-            # more likely that the coverage area was grandfathered in
-            # and it just isn't set on the remote side.
-            #
-            # Do nothing.
-            return
+            # A library can't lose its entire coverage area -- it's more likely that the coverage area
+            # was grandfathered in and it just isn't set on the remote side.
+            return  # Do nothing.
 
         if (focus_area == empty and service_area != empty or service_area == focus_area):
-            # Service area and focus area are the same, either because
-            # they were defined that way explicitly or because focus
-            # area was not specified.
+            # Service area and focus area are the same, either because they were defined that way
+            # explicitly or because focus area was not specified.
             #
-            # Register the service area as the focus area and call it
-            # a day.
-            problem = cls._update_service_areas(
-                library, service_area, ServiceArea.FOCUS,
-                service_areas
-            )
+            # Register the service area as the focus area and call it a day.
+            problem = cls._update_service_areas(library, service_area, ServiceArea.FOCUS, service_areas)
             if problem:
                 return problem
         else:
             # Service area and focus area are different.
-            problem = cls._update_service_areas(
-                library, service_area, ServiceArea.ELIGIBILITY,
-                service_areas
-            )
+            problem = cls._update_service_areas(library, service_area, ServiceArea.ELIGIBILITY, service_areas)
             if problem:
                 return problem
-            problem = cls._update_service_areas(
-                library, focus_area, ServiceArea.FOCUS,
-                service_areas
-            )
+
+            problem = cls._update_service_areas(library, focus_area, ServiceArea.FOCUS, service_areas)
             if problem:
                 return problem
 
@@ -397,8 +362,8 @@ class AuthenticationDocument(object):
 
     @classmethod
     def _update_service_areas(cls, library, areas, type, service_areas):
-        """Update a Library's ServiceAreas with a new set based on
-        `areas`.
+        """
+        Update a Library's ServiceAreas with a new set based on `areas`.
 
         :param library: A Library.
         :param areas: A list [place_objs, unknown, ambiguous]
@@ -415,16 +380,15 @@ class AuthenticationDocument(object):
         if unknown or ambiguous:
             msgs = []
             if unknown:
-                msgs.append(str(_("The following service area was unknown: %(service_area)s.", service_area=json.dumps(unknown))))
+                msgs.append(str(_(f"The following service area was unknown: {json.dumps(unknown)}.")))
             if ambiguous:
-                msgs.append(str(_("The following service area was ambiguous: %(service_area)s.", service_area=json.dumps(ambiguous))))
+                msgs.append(str(_(f"The following service area was ambiguous: {json.dumps(ambiguous)}.")))
+
             return INVALID_INTEGRATION_DOCUMENT.detailed(" ".join(msgs))
 
         for place in places:
             service_area, is_new = get_one_or_create(
-                _db, ServiceArea, library_id=library.id,
-                place_id=place.id, type=type
-            )
+                    _db, ServiceArea, library_id=library.id, place_id=place.id, type=type)
             service_areas.append(service_area)
 
     def update_collection_size(self, library):
@@ -439,9 +403,8 @@ class AuthenticationDocument(object):
             # No collections are specified.
             sizes = {}
         if not isinstance(sizes, dict):
-            return INVALID_INTEGRATION_DOCUMENT.detailed(
-                _("'collection_size' must be a number or an object mapping language codes to numbers")
-            )
+            msg = "'collection_size' must be a number or an object mapping language codes to numbers"
+            return INVALID_INTEGRATION_DOCUMENT.detailed(_(msg))
 
         new_collections = set()
         unknown_size = 0
@@ -452,15 +415,11 @@ class AuthenticationDocument(object):
                     unknown_size += summary.size
                 new_collections.add(summary)
             if unknown_size:
-                # We found one or more collections in languages we
-                # didn't recognize. Set the total size of this collection
-                # as the size of a collection with unknown language.
-                new_collections.add(
-                    CollectionSummary.set(library, None, unknown_size)
-                )
+                # We found one or more collections in languages we didn't recognize.
+                # Set the total size of this collection as the size of a collection with unknown language.
+                new_collections.add(CollectionSummary.set(library, None, unknown_size))
         except ValueError as e:
             return INVALID_INTEGRATION_DOCUMENT.detailed(str(e))
 
-        # Destroy any CollectionSummaries representing collections
-        # no longer associated with this library.
+        # Destroy any CollectionSummaries representing collections no longer associated with this library.
         library.collections = list(new_collections)

@@ -8,8 +8,10 @@ import logging
 def temp_config(new_config=None, replacement_classes=None):
     old_config = Configuration.instance
     replacement_classes = replacement_classes or [Configuration]
+
     if new_config is None:
         new_config = copy.deepcopy(old_config)
+
     try:
         for c in replacement_classes:
             c.instance = new_config
@@ -20,7 +22,7 @@ def temp_config(new_config=None, replacement_classes=None):
 
 
 class CannotLoadConfiguration(Exception):
-    pass
+    ...
 
 
 class Configuration(object):
@@ -41,8 +43,7 @@ class Configuration(object):
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
     ADOBE_VENDOR_ID_DELEGATE_URL = "delegate_url"
 
-    # The URL to the document containing the terms of service for
-    # library registration
+    # The URL to the document containing the terms of service for library registration
     REGISTRATION_TERMS_OF_SERVICE_URL = "registration_terms_of_service_url"
 
     # An HTML snippet describing the terms of service for library
@@ -75,9 +76,7 @@ class Configuration(object):
 
     @classmethod
     def database_url(cls, test=False):
-        """Find the URL to the database so that other configuration
-        settings can be looked up.
-        """
+        """Find the URL to the database so that other configuration settings can be looked up"""
         if test:
             environment_variable = cls.DATABASE_TEST_ENVIRONMENT_VARIABLE
         else:
@@ -85,26 +84,27 @@ class Configuration(object):
 
         url = os.environ.get(environment_variable)
         if not url:
-            raise CannotLoadConfiguration(
-                "Database URL not defined in environment variable (%s) or configuration file." % environment_variable
-            )
+            msg = f"Database URL not defined in environment variable ({environment_variable}) or configuration file."
+            raise CannotLoadConfiguration(msg)
         return url
 
     @classmethod
     def vendor_id(cls, _db):
-        """Look up the Adobe Vendor ID configuration for this registry.
+        """
+        Look up the Adobe Vendor ID configuration for this registry.
 
         :return: a 3-tuple (vendor ID, node value, [delegates])
         """
         from library_registry.model import ExternalIntegration
 
-        integration = ExternalIntegration.lookup(
-            _db, ExternalIntegration.ADOBE_VENDOR_ID,
-            ExternalIntegration.DRM_GOAL)
+        integration = ExternalIntegration.lookup(_db, ExternalIntegration.ADOBE_VENDOR_ID, ExternalIntegration.DRM_GOAL)
+
         if not integration:
             return None, None, []
+
         setting = integration.setting(cls.ADOBE_VENDOR_ID_DELEGATE_URL)
         delegates = []
+
         try:
             delegates = setting.json_value or []
         except ValueError:
@@ -113,7 +113,4 @@ class Configuration(object):
         node = integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).value
         if node:
             node = int(node, 16)
-        return (
-            integration.setting(cls.ADOBE_VENDOR_ID).value,
-            node, delegates,
-        )
+        return (integration.setting(cls.ADOBE_VENDOR_ID).value, node, delegates)

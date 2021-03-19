@@ -39,9 +39,7 @@ class TestLibraryScript(DatabaseTest):
         ignored = self._library(name="Ignored Library")
 
         class Mock(LibraryScript):
-            # Mock of LibraryScript that returns a special value
-            # when all_libraries is called.
-
+            """Mock of LibraryScript that returns a special value when all_libraries is called"""
             all_libraries_return_value = object()
 
             @property
@@ -53,6 +51,7 @@ class TestLibraryScript(DatabaseTest):
         # Any library can be processed if it's identified by name.
         for lib in library, ignored:
             assert script.libraries(lib.name) == [lib]
+
         with pytest.raises(ValueError) as exc:
             script.libraries("Nonexistent Library")
         assert "No library with name 'Nonexistent Library'" in str(exc.value)

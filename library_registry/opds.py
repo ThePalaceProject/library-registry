@@ -67,9 +67,7 @@ class OPDSCatalog:
         self.catalog = dict(metadata=dict(title=title), catalogs=[])
 
         self.add_link_to_catalog(self.catalog, rel="self", href=url, type=self.OPDS_TYPE)
-        web_client_uri_template = ConfigurationSetting.sitewide(
-            _db, Configuration.WEB_CLIENT_URL
-        ).value
+        web_client_uri_template = ConfigurationSetting.sitewide(_db, Configuration.WEB_CLIENT_URL).value
 
         for library in libraries:
             if not isinstance(library, tuple):
@@ -81,6 +79,7 @@ class OPDSCatalog:
                     web_client_uri_template=web_client_uri_template
                 )
             )
+
         annotator.annotate_catalog(self, live=live)
 
     @classmethod
@@ -89,8 +88,7 @@ class OPDSCatalog:
         Determine whether a prospective feed is 'large' per a sitewide setting.
 
         :param _db: A database session
-        :param libraries: A list of libraries (or anything else that might be
-            going into a feed).
+        :param libraries: A list of libraries (or anything else that might be going into a feed).
         """
         large_feed_size = ConfigurationSetting.sitewide(_db, Configuration.LARGE_FEED_SIZE).int_value
 
@@ -104,22 +102,14 @@ class OPDSCatalog:
         return size >= large_feed_size
 
     @classmethod
-    def library_catalog(
-            cls, library, distance=None,
-            include_private_information=False,
-            include_logo=True,
-            url_for=None,
-            web_client_uri_template=None
-    ):
-
+    def library_catalog(cls, library, distance=None, include_private_information=False, include_logo=True,
+                        url_for=None, web_client_uri_template=None):
         """
         Create an OPDS catalog for a library.
 
-        :param include_private_information: If this is True, the
-        consumer of this OPDS catalog is expected to be the library
-        whose catalog it is. Private information such as the point of
-        contact for integration problems will be included, where it
-        normally wouldn't be.
+        :param include_private_information: If this is True, the consumer of this OPDS catalog is expected
+            to be the library whose catalog it is. Private information such as the point of contact for
+            integration problems will be included, where it normally wouldn't be.
         """
         url_for = url_for or flask.url_for
         metadata = {
@@ -133,44 +123,36 @@ class OPDSCatalog:
         if library.description:
             metadata["description"] = library.description
 
-        catalog = dict(metadata=metadata)
+        catalog = {"metadata": metadata}
 
         if library.opds_url:
             # TODO: Keep track of whether each library uses OPDS 1 or 2?
-            cls.add_link_to_catalog(catalog, rel=cls.CATALOG_REL,
-                                    href=library.opds_url,
-                                    type=cls.OPDS_1_TYPE)
+            cls.add_link_to_catalog(catalog, rel=cls.CATALOG_REL, href=library.opds_url, type=cls.OPDS_1_TYPE)
 
         if library.authentication_url:
-            cls.add_link_to_catalog(catalog,
-                                    href=library.authentication_url,
-                                    type=AuthenticationDocument.MEDIA_TYPE)
+            cls.add_link_to_catalog(catalog, href=library.authentication_url, type=AuthenticationDocument.MEDIA_TYPE)
 
         if library.web_url:
-            cls.add_link_to_catalog(catalog, rel="alternate",
-                                    href=library.web_url,
-                                    type="text/html")
+            cls.add_link_to_catalog(catalog, rel="alternate", href=library.web_url, type="text/html")
 
         if library.logo and include_logo:
-            cls.add_image_to_catalog(catalog, rel=cls.THUMBNAIL_REL,
-                                     href=library.logo,
-                                     type="image/png")
+            cls.add_image_to_catalog(catalog, rel=cls.THUMBNAIL_REL, href=library.logo, type="image/png")
 
         # Add links that allow clients to discover the library's focus and eligibility area.
-        for rel, route in (
+        rel_route_pairs = [
             (cls.ELIGIBILITY_REL, "library_eligibility"),
             (cls.FOCUS_REL, "library_focus"),
-        ):
+        ]
+        for (rel, route) in rel_route_pairs:
             url = url_for(route, uuid=library.internal_urn, _external=True)
-            cls.add_link_to_catalog(
-                catalog, rel=rel, href=url, type="application/geo+json"
-            )
+            cls.add_link_to_catalog(catalog, rel=rel, href=url, type="application/geo+json")
+
         for hyperlink in library.hyperlinks:
             if (not include_private_information and hyperlink.rel in Hyperlink.PRIVATE_RELS):
                 continue
             args = cls._hyperlink_args(hyperlink)
             if not args:
-                continue                # Not enough information to create a link.
+                continue    # Not enough information to create a link.
             cls.add_link_to_catalog(catalog, **args)
 
         # Add a link for the registry's web client, if it has one.
@@ -205,9 +187,9 @@ class OPDSCatalog:
             properties[Validation.STATUS_PROPERTY] = status
         if properties:
             args['properties'] = properties
+
         return args
 
-    # TODO PYTHON3 rename to __str__
     def __str__(self):
         if self.catalog is None:
             return None

@@ -21,35 +21,29 @@ class JSONFormatter(logging.Formatter):
                 message = record.msg % record.args
             except TypeError as e:
                 raise e
-        data = dict(
-            host=self.hostname,
-            app="simplified",
-            name=record.name,
-            level=record.levelname,
-            filename=record.filename,
-            message=message,
-            timestamp=datetime.datetime.utcnow().isoformat()
-        )
+
+        data = {
+            "host": self.hostname,
+            "app": "simplified",
+            "name": record.name,
+            "level": record.levelname,
+            "filename": record.filename,
+            "message": message,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
         if record.exc_info:
             data['traceback'] = self.formatException(record.exc_info)
         return json.dumps(data)
 
 
 class StringFormatter(logging.Formatter):
-    """Encode all output as a string.
-
-    In Python 2, this means a UTF-8 bytestring. In Python 3, it means a
-    Unicode string.
-    """
+    """Encode all output as a string"""
     def format(self, record):
-        data = super(StringFormatter, self).format(record)
-        return str(data)
+        return str(super(StringFormatter, self).format(record))
 
 
 class LogConfiguration(object):
-    """Configures the active Python logging handlers based on logging
-    configuration from the database.
-    """
+    """Configures the active Python logging handlers based on logging configuration from the database"""
 
     DEFAULT_MESSAGE_TEMPLATE = "%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"
     DEFAULT_LOGGLY_URL = "https://logs-01.loggly.com/inputs/%(token)s/tag/python/"
@@ -70,18 +64,15 @@ class LogConfiguration(object):
 
     @classmethod
     def initialize(cls, _db, testing=False):
-        """Make the logging handlers reflect the current logging rules
-        as configured in the database.
+        """
+        Make the logging handlers reflect the current logging rules as configured in the database.
 
         :param _db: A database connection. If this is None, the default logging
         configuration will be used.
 
-        :param testing: True if unit tests are currently running; otherwise
-        False.
+        :param testing: True if unit tests are currently running; otherwise False.
         """
-        log_level, database_log_level, new_handlers = (
-            cls.from_configuration(_db, testing)
-        )
+        log_level, database_log_level, new_handlers = (cls.from_configuration(_db, testing))
 
         # Replace the set of handlers associated with the root logger.
         logger = logging.getLogger()
@@ -114,7 +105,8 @@ class LogConfiguration(object):
 
     @classmethod
     def from_configuration(cls, _db, testing=False):
-        """Return the logging policy as configured in the database.
+        """
+        Return the logging policy as configured in the database.
 
         :param _db: A database connection. If None, the default
         logging policy will be used.
@@ -142,28 +134,14 @@ class LogConfiguration(object):
         from library_registry.model import ExternalIntegration
         if _db and not testing:
             goal = ExternalIntegration.LOGGING_GOAL
-            internal = ExternalIntegration.lookup(
-                _db, ExternalIntegration.INTERNAL_LOGGING, goal
-            )
-            loggly = ExternalIntegration.lookup(
-                _db, ExternalIntegration.LOGGLY, goal
-            )
+            internal = ExternalIntegration.lookup(_db, ExternalIntegration.INTERNAL_LOGGING, goal)
+            loggly = ExternalIntegration.lookup(_db, ExternalIntegration.LOGGLY, goal)
+
             if internal:
-                internal_log_level = internal.setting(cls.LOG_LEVEL).setdefault(
-                    internal_log_level
-                )
-
-                internal_log_format = internal.setting(cls.LOG_FORMAT).setdefault(
-                    internal_log_format
-                )
-
-                database_log_level = internal.setting(cls.DATABASE_LOG_LEVEL).setdefault(
-                    database_log_level
-                )
-
-                message_template = internal.setting(cls.LOG_MESSAGE_TEMPLATE).setdefault(
-                    message_template
-                )
+                internal_log_level = internal.setting(cls.LOG_LEVEL).setdefault(internal_log_level)
+                internal_log_format = internal.setting(cls.LOG_FORMAT).setdefault(internal_log_format)
+                database_log_level = internal.setting(cls.DATABASE_LOG_LEVEL).setdefault(database_log_level)
+                message_template = internal.setting(cls.LOG_MESSAGE_TEMPLATE).setdefault(message_template)
 
             if loggly:
                 handlers.append(cls.loggly_handler(loggly))
@@ -173,9 +151,7 @@ class LogConfiguration(object):
         handlers.append(logging.StreamHandler())
 
         for handler in handlers:
-            cls.set_formatter(
-                handler, internal_log_format, message_template
-            )
+            cls.set_formatter(handler, internal_log_format, message_template)
 
         return internal_log_level, database_log_level, handlers
 
@@ -188,40 +164,34 @@ class LogConfiguration(object):
         else:
             internal_log_level = 'INFO'
             internal_log_format = cls.JSON_LOG_FORMAT
+
         database_log_level = 'WARN'
         message_template = cls.DEFAULT_MESSAGE_TEMPLATE
-        return (internal_log_level, internal_log_format, database_log_level,
-                message_template)
+        return (internal_log_level, internal_log_format, database_log_level, message_template)
 
     @classmethod
     def set_formatter(cls, handler, log_format, message_template):
-        """Tell the given `handler` to format its log messages in a
-        certain way.
-        """
+        """Tell the given `handler` to format its log messages in a certain way"""
         if (log_format == cls.JSON_LOG_FORMAT or isinstance(handler, LogglyHandler)):
             formatter = JSONFormatter()
         else:
             formatter = StringFormatter(message_template)
+
         handler.setFormatter(formatter)
 
     @classmethod
     def loggly_handler(cls, externalintegration):
-        """Turn a Loggly ExternalIntegration into a log handler.
-        """
+        """Turn a Loggly ExternalIntegration into a log handler"""
         token = externalintegration.password
         url = externalintegration.url or cls.DEFAULT_LOGGLY_URL
         if not url:
-            raise CannotLoadConfiguration(
-                "Loggly integration configured but no URL provided."
-            )
+            raise CannotLoadConfiguration("Loggly integration configured but no URL provided.")
+
         try:
             url = cls._interpolate_loggly_url(url, token)
         except (TypeError, KeyError):
-            raise CannotLoadConfiguration(
-                "Cannot interpolate token %s into loggly URL %s" % (
-                    token, url,
-                )
-            )
+            raise CannotLoadConfiguration(f"Cannot interpolate token {token} into loggly URL {url}")
+
         return LogglyHandler(url)
 
     @classmethod

@@ -79,7 +79,8 @@ class Emailer(object):
 
     @classmethod
     def from_sitewide_integration(cls, _db):
-        """Create an Emailer from a site-wide email integration.
+        """
+        Create an Emailer from a site-wide email integration.
 
         :param _db: A database connection
         """
@@ -112,22 +113,17 @@ class Emailer(object):
     def _sitewide_integration(cls, _db):
         """Find the ExternalIntegration for the emailer."""
         from library_registry.model import ExternalIntegration
-        qu = _db.query(ExternalIntegration).filter(
-            ExternalIntegration.goal == cls.GOAL
-        )
+        qu = _db.query(ExternalIntegration).filter(ExternalIntegration.goal == cls.GOAL)
         integrations = qu.all()
+
         if not integrations:
-            raise CannotLoadConfiguration(
-                "No email integration is configured."
-            )
+            raise CannotLoadConfiguration("No email integration is configured.")
             return None
 
         if len(integrations) > 1:
             # If there are multiple integrations configured, none of
             # them can be the 'site-wide' configuration.
-            raise CannotLoadConfiguration(
-                'Multiple email integrations are configured'
-            )
+            raise CannotLoadConfiguration("Multiple email integrations are configured")
 
         [integration] = integrations
         return integration
@@ -171,19 +167,18 @@ class Emailer(object):
                 )
 
     def send(self, email_type, to_address, smtp=None, **kwargs):
-        """Generate an email from a template and send it.
+        """
+        Generate an email from a template and send it.
 
         :param email_type: The name of the template to use.
         :param to_address: Addressee of the email.
-        :param smtp: Use this object as a mock instead of creating an
-            smtplib.SMTP object.
-        :param kwargs: Arguments to use when generating the email from
-            a template.
+        :param smtp: Use this object as a mock instead of creating an smtplib.SMTP object.
+        :param kwargs: Arguments to use when generating the email from a template.
         """
         if email_type not in self.templates:
-            raise ValueError("No such email template: %s" % email_type)
+            raise ValueError(f"No such email template: {email_type}")
         template = self.templates[email_type]
-        from_header = '%s <%s>' % (self.from_name, self.from_address)
+        from_header = f"{self.from_name} <{self.from_address}>"
         kwargs['from_address'] = self.from_address
         kwargs['to_address'] = to_address
         body = template.body(from_header, to_address, **kwargs)
@@ -207,7 +202,8 @@ class EmailTemplate(object):
         self.body_template = body_template
 
     def body(self, from_header, to_header, **kwargs):
-        """Generate the complete body of the email message, including headers.
+        """
+        Generate the complete body of the email message, including headers.
 
         :param from_header: Originating address to use in From: header.
         :param to_header: Destination address to use in To: header.
@@ -219,14 +215,15 @@ class EmailTemplate(object):
         message['To'] = to_header
         message['Subject'] = Header(self.subject_template % kwargs, 'utf-8')
 
-        # This might look ugly, because %(from_address)s in a template
-        # is expected to be an unadorned email address, whereas this
-        # might look like '"Name" <email>', but it's better than
-        # nothing.
+        # This might look ugly, because %(from_address)s in a template is expected to be
+        # an unadorned email address, whereas this might look like '"Name" <email>', but
+        # it's better than nothing.
         for k, v in (('to_address', to_header), ('from_address', from_header)):
             if k not in kwargs:
                 kwargs[k] = v
+
         payload = self.body_template % kwargs
         text_part = MIMEText(payload, 'plain', 'utf-8')
         message.attach(text_part)
+
         return message.as_string()

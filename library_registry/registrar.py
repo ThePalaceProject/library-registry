@@ -1,6 +1,6 @@
 import base64
 import feedparser
-from flask_babel import lazy_gettext as _
+from flask_babel import lazy_gettext as lgt
 import json
 import logging
 from PIL import Image
@@ -8,14 +8,16 @@ from io import BytesIO
 from urllib.parse import urljoin
 
 from library_registry.authentication_document import AuthenticationDocument
+from library_registry.model import Hyperlink
 from library_registry.opds import OPDSCatalog
-from library_registry.model import (
-    get_one,
-    get_one_or_create,
-    Hyperlink,
-    Library,
+from library_registry.problem_details import (
+    INVALID_INTEGRATION_DOCUMENT,
+    INTEGRATION_DOCUMENT_NOT_FOUND,
+    INVALID_CONTACT_URI,
+    LIBRARY_ALREADY_IN_PRODUCTION,
+    TIMEOUT,
+    ERROR_RETRIEVING_DOCUMENT,
 )
-from library_registry.problem_details import *
 from library_registry.util.http import (
     HTTP,
     RequestTimedOut,
@@ -32,13 +34,11 @@ class LibraryRegistrar(object):
         self.log = logging.getLogger("Library registrar")
 
     def reregister(self, library):
-        """Re-register the given Library by fetching its authentication
-        document and updating its record appropriately.
+        """
+        Re-register the given Library by fetching its authentication document and updating its record appropriately.
 
-        This process will not be as thorough as one initiated manually
-        by the library administrator, but it can be used to
-        automatically keep us up to date on minor changes to a
-        library's description, logo, etc.
+        This process will not be as thorough as one initiated manually by the library administrator, but it can
+        be used to automatically keep us up to date on minor changes to a library's description, logo, etc.
 
         :param library: A Library.
 
@@ -48,30 +48,25 @@ class LibraryRegistrar(object):
         if isinstance(result, ProblemDetail):
             return result
 
-        # The return value may include new settings for contact
-        # hyperlinks, but we will not be changing any Hyperlink
-        # objects, since that might result in emails being sent out
-        # unexpectedly. The library admin must explicitly re-register
-        # for that to happen.
+        # The return value may include new settings for contact hyperlinks, but we will not be changing any Hyperlink
+        # objects, since that might result in emails being sent out unexpectedly. The library admin must explicitly
+        # re-register for that to happen.
         #
-        # Basically, we don't actually use any of the items returned
-        # by register() -- only the controller uses that stuff.
+        # Basically, we don't actually use any of the items returned by register(); only the controller uses that stuff.
         return None
 
     def register(self, library, library_stage):
-        """Register the given Library with this registry, if possible.
+        """
+        Register the given Library with this registry, if possible.
 
         :param library: A Library to register or re-register.
-        :param library_stage: The library administrator's proposed value for
-            Library.library_stage.
+        :param library_stage: The library administrator's proposed value for Library.library_stage.
 
-        :return: A ProblemDetail if there's a problem. Otherwise, a 2-tuple
-            (auth_document, new_hyperlinks).
+        :return: A ProblemDetail if there's a problem. Otherwise, a 2-tuple (auth_document, new_hyperlinks).
 
-        `auth_document` is an AuthenticationDocument corresponding to
-            the library's authentication document, as found at auth_url.
-        `new_hyperlinks` is a list of Hyperlinks
-             that ought to be created for registration to be complete.
+        `auth_document` is an AuthenticationDocument corresponding to the library's authentication document,
+            as found at auth_url.
+        `new_hyperlinks` is a list of Hyperlinks that ought to be created for registration to be complete.
         """
         hyperlinks_to_create = []
 
@@ -79,42 +74,42 @@ class LibraryRegistrar(object):
         auth_response = self._make_request(
             auth_url,
             auth_url,
-            _("No Authentication For OPDS document present at %(url)s",
-              url=auth_url),
-            _("Timeout retrieving auth document %(url)s", url=auth_url),
-            _("Error retrieving auth document %(url)s", url=auth_url),
+            lgt("No Authentication For OPDS document present at %(url)s", url=auth_url),
+            lgt("Timeout retrieving auth document %(url)s", url=auth_url),
+            lgt("Error retrieving auth document %(url)s", url=auth_url),
         )
         if isinstance(auth_response, ProblemDetail):
             return auth_response
         try:
             auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
         except Exception as e:
-            self.log.error(
-                "Registration of %s failed: invalid auth document.",
-                auth_url, exc_info=e
-            )
+            self.log.error(f"Registration of {auth_url} failed: invalid auth document.", exc_info=e)
             return INVALID_INTEGRATION_DOCUMENT
+
         failure_detail = None
         if not auth_document.id:
-            failure_detail = _("The OPDS authentication document is missing an id.")
+            failure_detail = lgt("The OPDS authentication document is missing an id.")
+
         if not auth_document.title:
-            failure_detail = _("The OPDS authentication document is missing a title.")
+            failure_detail = lgt("The OPDS authentication document is missing a title.")
+
         if auth_document.root:
             opds_url = auth_document.root['href']
         else:
-            failure_detail = _("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
+            failure_detail = lgt("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
 
         if auth_document.id != auth_response.url:
-            failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.url)
-        if failure_detail:
-            self.log.error(
-                "Registration of %s failed: %s", auth_url, failure_detail
+            failure_msg = (
+                f"The OPDS authentication document's id ({auth_document.id})"
+                f" doesn't match its url ({auth_response.url})."
             )
+            failure_detail = lgt(failure_msg)
+        if failure_detail:
+            self.log.error(f"Registration of {auth_url} failed: {failure_detail}")
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
-        # Make sure the authentication document includes a way for
-        # patrons to get help or file a copyright complaint. These
-        # links must be stored in the database as Hyperlink objects.
+        # Make sure the authentication document includes a way for patrons to get help or file a
+        # copyright complaint. These links must be stored in the database as Hyperlink objects.
         links = auth_document.links or []
         for rel, problem_title in [
             ('help', "Invalid or missing patron support email address"),
@@ -126,15 +121,14 @@ class LibraryRegistrar(object):
                 return uris
             hyperlinks_to_create.append((rel, uris))
 
-        # Cross-check the opds_url to make sure it links back to the
-        # authentication document.
+        # Cross-check the opds_url to make sure it links back to the authentication document.
         opds_response = self._make_request(
             auth_url,
             opds_url,
-            _("No OPDS root document present at %(url)s", url=opds_url),
-            _("Timeout retrieving OPDS root document at %(url)s", url=opds_url),
-            _("Error retrieving OPDS root document at %(url)s", url=opds_url),
-            allow_401 = True
+            lgt("No OPDS root document present at %(url)s", url=opds_url),
+            lgt("Timeout retrieving OPDS root document at %(url)s", url=opds_url),
+            lgt("Error retrieving OPDS root document at %(url)s", url=opds_url),
+            allow_401=True
         )
         if isinstance(opds_response, ProblemDetail):
             return opds_response
@@ -142,35 +136,35 @@ class LibraryRegistrar(object):
         content_type = opds_response.headers.get('Content-Type')
         failure_detail = None
         if opds_response.status_code == 401:
-            # This is only acceptable if the server returned a copy of
-            # the Authentication For OPDS document we just got.
+            # This is only acceptable if the server returned a copy of the Authentication For OPDS document we just got.
             if content_type != AuthenticationDocument.MEDIA_TYPE:
-                failure_detail = _("401 response at %(url)s did not yield an Authentication For OPDS document", url=opds_url)
-            elif not self.opds_response_links_to_auth_document(
-                    opds_response, auth_url
-            ):
-                failure_detail = _("Authentication For OPDS document guarding %(opds_url)s does not match the one at %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
-        elif content_type not in (OPDSCatalog.OPDS_TYPE,
-                                OPDSCatalog.OPDS_1_TYPE):
-            failure_detail = _("Supposed root document at %(url)s is not an OPDS document", url=opds_url)
-        elif not self.opds_response_links_to_auth_document(
-                opds_response, auth_url
-        ):
-            failure_detail = _("OPDS root document at %(opds_url)s does not link back to authentication document %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
+                failure_detail = lgt(f"401 response at {opds_url} did not yield an Authentication For OPDS document")
+            elif not self.opds_response_links_to_auth_document(opds_response, auth_url):
+                failure_msg = (
+                    f"Authentication For OPDS document guarding {opds_url} "
+                    f"does not match the one at {auth_url}"
+                )
+                failure_detail = lgt(failure_msg)
+
+        elif content_type not in (OPDSCatalog.OPDS_TYPE, OPDSCatalog.OPDS_1_TYPE):
+            failure_detail = lgt(f"Supposed root document at {opds_url} is not an OPDS document")
+        elif not self.opds_response_links_to_auth_document(opds_response, auth_url):
+            failure_msg = f"OPDS root document at {opds_url} does not link back to authentication document {auth_url}"
+            failure_detail = lgt(failure_msg)
 
         if failure_detail:
-            self.log.error(
-                "Registration of %s failed: %s", auth_url, failure_detail
-            )
+            self.log.error("Registration of %s failed: %s", auth_url, failure_detail)
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
         auth_url = auth_response.url
 
         try:
             library.library_stage = library_stage
-        except ValueError as e:
+        except ValueError:
             return LIBRARY_ALREADY_IN_PRODUCTION
+
         library.name = auth_document.title
+
         if auth_document.website:
             url = auth_document.website.get("href")
             if url:
@@ -183,20 +177,19 @@ class LibraryRegistrar(object):
             library.logo = auth_document.logo
         elif auth_document.logo_link:
             url = auth_document.logo_link.get("href")
+
             if url:
                 url = urljoin(opds_url, url)
+
             logo_response = self.do_get(url, stream=True)
+
             try:
                 image = Image.open(logo_response.raw)
-            except Exception as e:
+            except Exception:
                 image_url = auth_document.logo_link.get("href")
-                self.log.error(
-                    "Registration of %s failed: could not read logo image %s",
-                    auth_url, image_url
-                )
-                return INVALID_INTEGRATION_DOCUMENT.detailed(
-                    _("Could not read logo image %(image_url)s", image_url=image_url)
-                )
+                self.log.error(f"Registration of {auth_url} failed: could not read logo image {image_url}")
+                return INVALID_INTEGRATION_DOCUMENT.detailed(lgt(f"Could not read logo image {image_url}"))
+
             # Convert to PNG.
             buffer = BytesIO()
             image.save(buffer, format="PNG")
@@ -206,13 +199,15 @@ class LibraryRegistrar(object):
                 library.logo = "data:%s;base64,%s" % (type, b64)
         else:
             library.logo = None
+
         problem = auth_document.update_library(library)
+
         if problem:
-            self.log.error(
-                "Registration of %s failed: problem during registration: %s/%s/%s/%s",
-                auth_url, problem.uri, problem.title, problem.detail,
-                problem.debug_message
+            error_msg = (
+                f"Registration of {auth_url} failed: problem during registration: "
+                f"{problem.uri}/{problem.title}/{problem.detail}/{problem.debug_message}"
             )
+            self.log.error(error_msg)
             return problem
 
         return auth_document, hyperlinks_to_create
@@ -221,29 +216,20 @@ class LibraryRegistrar(object):
         allowed_codes = ["2xx", "3xx", 404]
         if allow_401:
             allowed_codes.append(401)
+
         try:
             response = self.do_get(
                 url, allowed_response_codes=allowed_codes,
                 timeout=30
             )
-            # We only allowed 404 above so that we could return a more
-            # specific problem detail document if it happened.
+            # We only allowed 404 above so that we could return a more specific problem detail document if it happened.
             if response.status_code == 404:
                 return INTEGRATION_DOCUMENT_NOT_FOUND.detailed(on_404)
             if not allow_401 and response.status_code == 401:
-                self.log.error(
-                    "Registration of %s failed: %s is behind authentication gateway",
-                    auth_url, url
-                )
-                return ERROR_RETRIEVING_DOCUMENT.detailed(
-                    _("%(url)s is behind an authentication gateway",
-                      url=url)
-                )
+                self.log.error(f"Registration of failed: {url} is behind authentication gateway")
+                return ERROR_RETRIEVING_DOCUMENT.detailed(lgt(f"{url} is behind an authentication gateway"))
         except RequestTimedOut as e:
-            self.log.error(
-                "Registration of %s failed: timeout retrieving %s",
-                registration_url, url, exc_info=e
-            )
+            self.log.error(f"Registration of {registration_url} failed: timeout retrieving {url}", exc_info=e)
             return TIMEOUT.detailed(on_timeout)
         except Exception as e:
             self.log.error(
@@ -251,28 +237,26 @@ class LibraryRegistrar(object):
                 registration_url, url, exc_info=e
             )
             return ERROR_RETRIEVING_DOCUMENT.detailed(on_exception)
+
         return response
 
     @classmethod
     def opds_response_links(cls, response, rel):
-        """Find all the links in the given response for the given
-        link relation.
-        """
-        # Look in the response itself for a Link header.
+        """Find all the links in the given response for the given link relation"""
         links = []
-        link = response.links.get(rel)
+        link = response.links.get(rel)  # Look in the response itself for a Link header.
         if link:
             links.append(link.get('url'))
+
         media_type = response.headers.get('Content-Type')
-        if media_type == OPDSCatalog.OPDS_TYPE:
-            # Parse as OPDS 2.
+
+        if media_type == OPDSCatalog.OPDS_TYPE:         # Parse as OPDS 2.
             catalog = json.loads(response.content)
             links = []
-            for k,v in catalog.get("links", {}).items():
+            for k, v in catalog.get("links", {}).items():
                 if k == rel:
                     links.append(v.get("href"))
-        elif media_type == OPDSCatalog.OPDS_1_TYPE:
-            # Parse as OPDS 1.
+        elif media_type == OPDSCatalog.OPDS_1_TYPE:     # Parse as OPDS 1.
             feed = feedparser.parse(response.content)
             for link in feed.get("feed", {}).get("links", []):
                 if link.get('rel') == rel:
@@ -281,36 +265,32 @@ class LibraryRegistrar(object):
             document = json.loads(response.content)
             if isinstance(document, dict):
                 links.append(document.get('id'))
+
         return [urljoin(response.url, url) for url in links if url]
 
     @classmethod
     def opds_response_links_to_auth_document(cls, opds_response, auth_url):
-        """Verify that the given response links to the given URL as its
-        Authentication For OPDS document.
+        """
+        Verify that the given response links to the given URL as its Authentication For OPDS document.
 
-        The link might happen in the `Link` header or in the body of
-        an OPDS feed.
+        The link might happen in the `Link` header or in the body of an OPDS feed.
         """
         links = []
         try:
-            links = cls.opds_response_links(
-                opds_response, AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
-            )
-        except ValueError as e:
-            # The response itself is malformed.
-            return False
+            links = cls.opds_response_links(opds_response, AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL)
+        except ValueError:
+            return False    # The response itself is malformed.
         return auth_url in links
 
     @classmethod
     def _locate_email_addresses(cls, rel, links, problem_title):
-        """Find one or more email addresses in a list of links, all with
-        a given `rel`.
+        """
+        Find one or more email addresses in a list of links, all with a given `rel`.
 
         :param library: A Library
         :param rel: The rel for this type of link.
         :param links: A list of dictionaries with keys 'rel' and 'href'
-        :problem_title: The title to use in a ProblemDetail if no
-            valid links are found.
+        :problem_title: The title to use in a ProblemDetail if no valid links are found.
         :return: Either a list of candidate links or a customized ProblemDetail.
         """
         candidates = []
@@ -335,7 +315,8 @@ class LibraryRegistrar(object):
 
     @classmethod
     def _required_email_address(cls, uri, problem_title):
-        """Verify that `uri` is a mailto: URI.
+        """
+        Verify that `uri` is a mailto: URI.
 
         :return: Either a mailto: URI or a customized ProblemDetail.
         """
@@ -344,9 +325,7 @@ class LibraryRegistrar(object):
         if not uri:
             problem = on_error.detailed("No email address was provided")
         elif not uri.startswith("mailto:"):
-            problem = on_error.detailed(
-                _("URI must start with 'mailto:' (got: %s)") % uri
-            )
+            problem = on_error.detailed(lgt(f"URI must start with 'mailto:' (got: {uri})"))
         if problem:
             problem.title = problem_title
             return problem
