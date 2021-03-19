@@ -305,7 +305,7 @@ class TestRegistrationRefreshScript(DatabaseTest):
         success_library = self._library(name="Success")
         failure_library = self._library(name="Failure")
 
-        class MockRegistrar(object):
+        class MockRegistrar:
             reregistered = []
 
             def reregister(self, library):

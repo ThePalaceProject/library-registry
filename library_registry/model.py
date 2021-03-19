@@ -9,7 +9,7 @@ import warnings
 from collections import Counter
 
 import uszipcode
-from flask_babel import lazy_gettext
+from flask_babel import lazy_gettext as lgt
 from flask_bcrypt import check_password_hash, generate_password_hash
 from geoalchemy2 import Geography, Geometry
 from psycopg2.extensions import adapt as sqlescape
@@ -35,7 +35,6 @@ from library_registry.util import GeometryUtility
 from library_registry.util.language import LanguageCodes
 from library_registry.util.short_client_token import ShortClientTokenTool
 from library_registry.util.string_helpers import random_string
-
 
 Base = declarative_base()
 DEBUG = False
@@ -1310,7 +1309,7 @@ class Audience(Base):
     @classmethod
     def lookup(cls, _db, name):
         if name not in cls.KNOWN_AUDIENCES:
-            raise ValueError(lazy_gettext(f"Unknown audience: {name}"))
+            raise ValueError(lgt(f"Unknown audience: {name}"))
         audience, is_new = get_one_or_create(_db, Audience, name=name)
         return audience
 
@@ -1339,7 +1338,7 @@ class CollectionSummary(Base):
 
         size = int(size)
         if size < 0:
-            raise ValueError(lazy_gettext("Collection size cannot be negative."))
+            raise ValueError(lgt("Collection size cannot be negative."))
 
         # This might return None, which is fine. We'll store it as a
         # collection with an unknown language. This also covers the
@@ -1783,7 +1782,7 @@ class ExternalIntegration(Base):
     URL = "url"
 
     # If access requires authentication, these settings represent the username/password or
-    # key/secret combination necessary to authenticate. If there's a secret but no key, it's 
+    # key/secret combination necessary to authenticate. If there's a secret but no key, it's
     # stored in 'password'.
     USERNAME = "username"
     PASSWORD = "password"
@@ -1935,7 +1934,7 @@ class ConfigurationSetting(Base):
         """
         secret = ConfigurationSetting.sitewide(_db, key)
         if not secret.value:
-            secret.value = generate_secret()            
+            secret.value = generate_secret()
             _db.commit()        # Commit to get this in the database ASAP.
 
         return secret.value
@@ -1993,7 +1992,7 @@ class ConfigurationSetting(Base):
         return setting
 
     @property
-    def library(self):        
+    def library(self):
         if self.library_id:
             _db = Session.object_session(self)
             return get_one(_db, Library, id=self.library_id)

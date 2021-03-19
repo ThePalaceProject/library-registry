@@ -1,14 +1,10 @@
 from io import StringIO
 
+from library_registry.geometry_loader import GeometryLoader
+from library_registry.model import Place, PlaceAlias, get_one_or_create
 from sqlalchemy import func
 
-from library_registry.model import (
-    get_one_or_create,
-    Place,
-    PlaceAlias,
-)
 from . import DatabaseTest
-from library_registry.geometry_loader import GeometryLoader
 
 
 class TestGeometryLoader(DatabaseTest):

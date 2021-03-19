@@ -7,11 +7,12 @@ from contextlib import contextmanager
 from smtplib import SMTPException
 from urllib.parse import unquote
 
-import pytest
 import flask
+import pytest
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from flask import Response, session
+
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration
 from library_registry.controller import (AdobeVendorIDController,

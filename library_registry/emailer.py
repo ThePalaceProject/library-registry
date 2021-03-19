@@ -1,8 +1,8 @@
 import smtplib
+from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email import charset
 
 from library_registry.config import CannotLoadConfiguration
 
@@ -13,7 +13,7 @@ from library_registry.config import CannotLoadConfiguration
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
 
-class Emailer(object):
+class Emailer:
     """A class for sending small amounts of email."""
 
     # Goal and setting names for the ExternalIntegration.
@@ -194,7 +194,7 @@ class Emailer(object):
         smtp.quit()
 
 
-class EmailTemplate(object):
+class EmailTemplate:
     """A template for email messages."""
 
     def __init__(self, subject_template, body_template):

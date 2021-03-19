@@ -1,15 +1,13 @@
-from io import BytesIO
 import gzip
+from io import BytesIO
 
 import flask
 import pytest
 
-from library_registry.app_helpers import (
-    compressible,
-    has_library_factory,
-    uses_location_factory,
-)
+from library_registry.app_helpers import (compressible, has_library_factory,
+                                          uses_location_factory)
 from library_registry.problem_details import LIBRARY_NOT_FOUND
+
 from .test_controller import ControllerTest
 
 

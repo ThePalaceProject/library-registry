@@ -1,15 +1,15 @@
 import re
 
 import flask
-from flask import Response
 import requests
+from flask import Response
 
-from .model import ShortClientTokenDecoder
-from .util.string_helpers import base64
-from .util.xmlparser import XMLParser
+from library_registry.model import ShortClientTokenDecoder
+from library_registry.util.string_helpers import base64
+from library_registry.util.xmlparser import XMLParser
 
 
-class AdobeVendorIDController(object):
+class AdobeVendorIDController:
 
     """Flask controllers that implement the Account Service and
     Authorization Service portions of the Adobe Vendor ID protocol.
@@ -104,7 +104,7 @@ class AdobeAccountInfoRequestParser(AdobeRequestParser):
         return data
 
 
-class AdobeVendorIDRequestHandler(object):
+class AdobeVendorIDRequestHandler:
     """Standalone class that can be tested without bringing in Flask or the database schema"""
 
     SIGN_IN_RESPONSE_TEMPLATE = (
@@ -190,7 +190,7 @@ class AdobeVendorIDRequestHandler(object):
         return self.ERROR_RESPONSE_TEMPLATE % dict(vendor_id=self.vendor_id, type=type, message=message)
 
 
-class AdobeVendorIDModel(object):
+class AdobeVendorIDModel:
     """Implement Adobe Vendor ID within the library registry's database model"""
 
     def __init__(self, _db, node_value, delegates):
@@ -287,7 +287,7 @@ class VendorIDServerException(Exception):
     """The Vendor ID service is not working properly."""
 
 
-class AdobeVendorIDClient(object):
+class AdobeVendorIDClient:
     """
     A client library for the Adobe Vendor ID protocol.
 

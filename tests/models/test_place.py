@@ -1,8 +1,5 @@
 from library_registry.config import Configuration
-from library_registry.model import (
-    ConfigurationSetting,
-    Place,
-)
+from library_registry.model import ConfigurationSetting, Place
 
 
 class TestPlace:

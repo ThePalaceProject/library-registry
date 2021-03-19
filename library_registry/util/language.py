@@ -1,10 +1,12 @@
 import os
 from collections import defaultdict
+
 from pkg_resources import resource_string
 
 
-class LanguageCodes():
-    """Convert between ISO-639-2 and ISO-693-1 language codes.
+class LanguageCodes:
+    """
+    Convert between ISO-639-2 and ISO-693-1 language codes.
 
     The data file comes from
     http://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt
@@ -34,15 +36,17 @@ class LanguageCodes():
     ]
 
     for i in RAW_DATA.split("\n"):
-        (alpha_3, terminologic_code, alpha_2, names,
-         french_names) = i.strip().split("|")
+        (alpha_3, terminologic_code, alpha_2, names, french_names) = i.strip().split("|")
         names = [x.strip() for x in names.split(";")]
+
         if alpha_2:
             three_to_two[alpha_3] = alpha_2
             english_names[alpha_2] = names
             two_to_three[alpha_2] = alpha_3
+
         for name in names:
             english_names_to_three[name.lower()] = alpha_3
+
         english_names[alpha_3] = names
 
     for i in NATIVE_NAMES_RAW_DATA:
@@ -62,9 +66,11 @@ class LanguageCodes():
             if language and language not in seen:
                 languages.append(language)
                 seen.add(language)
+
         if not languages:
             languages = os.environ.get('DEFAULT_LANGUAGES', 'eng')
             languages = languages.split(',')
+
         return languages
 
     @classmethod
@@ -74,10 +80,12 @@ class LanguageCodes():
             language, place = locale.lower().split("-", 1)
         else:
             language = locale
+
         if cls.two_to_three[language]:
             return cls.two_to_three[language]
-        elif cls.three_to_two[language]:            # It's already ISO-639-2.
+        elif cls.three_to_two[language]:    # It's already ISO-639-2.
             return language
+
         return None
 
     @classmethod
@@ -103,9 +111,12 @@ class LanguageCodes():
     def name_for_languageset(cls, languages):
         if isinstance(languages, str):
             languages = languages.split(",")
+
         all_names = []
+
         if not languages:
             return ""
+
         for lang in languages:
             normalized = cls.string_to_alpha_3(lang)
             native_names = cls.native_names.get(normalized, [])
@@ -116,6 +127,8 @@ class LanguageCodes():
                 if not names:
                     raise ValueError("No native or English name for %s" % lang)
                 all_names.append(names[0])
+
         if len(all_names) == 1:
             return all_names[0]
+
         return "/".join(all_names)

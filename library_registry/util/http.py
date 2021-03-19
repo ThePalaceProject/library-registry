@@ -1,19 +1,19 @@
 import logging
-import requests
 import urllib.parse
 
-from flask_babel import lazy_gettext as _
+import requests
+from flask_babel import lazy_gettext as lgt
 
-from .problem_detail import (
-    ProblemDetail as pd,
+from library_registry.util.problem_detail import (
     JSON_MEDIA_TYPE as PROBLEM_DETAIL_JSON_MEDIA_TYPE,
+    ProblemDetail as pd,
 )
 
 INTEGRATION_ERROR = pd(
       "http://librarysimplified.org/terms/problem/remote-integration-failed",
       502,
-      _("Third-party service failed."),
-      _("A third-party service has failed."),
+      lgt("Third-party service failed."),
+      lgt("A third-party service has failed."),
 )
 
 
@@ -50,8 +50,8 @@ class RemoteIntegrationException(IntegrationException):
     with a third-party service over HTTP.
     """
 
-    title = _("Failure contacting external service")
-    detail = _("The server tried to access %(service)s but the third-party service experienced an error.")
+    title = lgt("Failure contacting external service")
+    detail = lgt("The server tried to access %(service)s but the third-party service experienced an error.")
     internal_message = "Error accessing %s: %s"
 
     def __init__(self, url_or_service, message, debug_message=None):
@@ -75,12 +75,12 @@ class RemoteIntegrationException(IntegrationException):
 
     def document_detail(self, debug=True):
         if debug:
-            return _(str(self.detail), service=self.url)
-        return _(str(self.detail), service=self.service)
+            return lgt(str(self.detail), service=self.url)
+        return lgt(str(self.detail), service=self.service)
 
     def document_debug_message(self, debug=True):
         if debug:
-            return _(str(self.detail), service=self.url)
+            return lgt(str(self.detail), service=self.url)
         return None
 
     def as_problem_detail_document(self, debug):
@@ -92,8 +92,8 @@ class RemoteIntegrationException(IntegrationException):
 
 class BadResponseException(RemoteIntegrationException):
     """The request seemingly went okay, but we got a bad response."""
-    title = _("Bad response")
-    detail = _("The server made a request to %(service)s, and got an unexpected or invalid response.")
+    title = lgt("Bad response")
+    detail = lgt("The server made a request to %(service)s, and got an unexpected or invalid response.")
     internal_message = "Bad response from %s: %s"
 
     BAD_STATUS_CODE_MESSAGE = "Got status code %s from external server, cannot continue."
@@ -153,8 +153,8 @@ class RequestNetworkException(RemoteIntegrationException,
     """An exception from the requests module that can be represented as
     a problem detail document.
     """
-    title = _("Network failure contacting third-party service")
-    detail = _("The server experienced a network error while contacting %(service)s.")
+    title = lgt("Network failure contacting third-party service")
+    detail = lgt("The server experienced a network error while contacting %(service)s.")
     internal_message = "Network error contacting %s: %s"
 
 
@@ -163,12 +163,12 @@ class RequestTimedOut(RequestNetworkException, requests.exceptions.Timeout):
     detail document.
     """
 
-    title = _("Timeout")
-    detail = _("The server made a request to %(service)s, and that request timed out.")
+    title = lgt("Timeout")
+    detail = lgt("The server made a request to %(service)s, and that request timed out.")
     internal_message = "Timeout accessing %s: %s"
 
 
-class HTTP(object):
+class HTTP:
     """A helper for the `requests` module."""
 
     @classmethod
@@ -363,9 +363,9 @@ class HTTP(object):
 
     @classmethod
     def process_debuggable_response(cls, url, response, disallowed_response_codes=None, allowed_response_codes=None):
-        """If there was a problem with an integration request,
-        return an appropriate ProblemDetail. Otherwise, return the
-        response to the original request.
+        """
+        If there was a problem with an integration request, return an appropriate ProblemDetail.
+        Otherwise, return the response to the original request.
 
         :param response: A Response object from the requests library.
         """
@@ -381,21 +381,15 @@ class HTTP(object):
 
         content_type = response.headers.get('Content-Type')
         if content_type == PROBLEM_DETAIL_JSON_MEDIA_TYPE:
-            # The server returned a problem detail document. Wrap it
-            # in a new document that represents the integration
-            # failure.
+            # The server returned a problem detail document. Wrap it in a new document that
+            # represents the integration failure.
             problem = INTEGRATION_ERROR.detailed(
-                _('Remote service returned a problem detail document: %r') % (
-                    response.content
-                )
+                lgt(f'Remote service returned a problem detail document: {response.content}')
             )
             problem.debug_message = response.content
             return problem
-        # There's been a problem. Return the message we got from the
-        # server, verbatim.
+
+        # There's been a problem. Return the message we got from the server, verbatim.
         return INTEGRATION_ERROR.detailed(
-            _("%s response from integration server: %r") % (
-                response.status_code,
-                response.content,
-            )
+            lgt(f"{response.status_code} response from integration server: {response.content}")
         )

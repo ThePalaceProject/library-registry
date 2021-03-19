@@ -2,10 +2,7 @@
 import flask
 from flask import Response
 
-from . import (
-    problem_detail,
-)
-
+from library_registry.util import problem_detail
 from library_registry.util.language import LanguageCodes
 
 
@@ -18,8 +15,7 @@ def problem_raw(type, status, title, detail=None, instance=None, headers={}):
 
 def problem(type, status, title, detail=None, instance=None, headers={}):
     """Create a Response that includes a Problem Detail Document."""
-    status, headers, data = problem_raw(
-        type, status, title, detail, instance, headers)
+    status, headers, data = problem_raw(type, status, title, detail, instance, headers)
     return Response(data, status, headers)
 
 
@@ -28,14 +24,17 @@ def languages_for_request():
 
 
 def originating_ip():
-    """If there is an X-Forwarded-For header, use its value as the
-    originating IP address. Otherwise, use the address that originated
-    this request.
+    """
+    If there is an X-Forwarded-For header, use its value as the originating IP address.
+    Otherwise, use the address that originated this request.
     """
     address = None
     header = 'X-Forwarded-For'
+
     if header in flask.request.headers:
         address = flask.request.headers[header]
+
     if not address:
         address = flask.request.remote_addr
+
     return address

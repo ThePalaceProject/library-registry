@@ -1,6 +1,6 @@
 import datetime
-import logging
 import json
+import logging
 import socket
 
 from loggly.handlers import HTTPSHandler as LogglyHandler
@@ -42,7 +42,7 @@ class StringFormatter(logging.Formatter):
         return str(super(StringFormatter, self).format(record))
 
 
-class LogConfiguration(object):
+class LogConfiguration:
     """Configures the active Python logging handlers based on logging configuration from the database"""
 
     DEFAULT_MESSAGE_TEMPLATE = "%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"

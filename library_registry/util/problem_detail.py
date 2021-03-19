@@ -1,9 +1,11 @@
-"""Simple helper library for generating problem detail documents.
+"""
+Simple helper library for generating problem detail documents.
 
 As per http://datatracker.ietf.org/doc/draft-ietf-appsawg-http-problem/
 """
 import json as j
 import logging
+
 from flask_babel import LazyString
 
 JSON_MEDIA_TYPE = "application/api-problem+json"
@@ -13,10 +15,13 @@ def json(type, status, title, detail=None, instance=None, debug_message=None):
     d = dict(type=type, title=str(title), status=status)
     if detail:
         d['detail'] = str(detail)
+
     if instance:
         d['instance'] = instance
+
     if debug_message:
         d['debug_message'] = debug_message
+
     return j.dumps(d)
 
 
@@ -25,8 +30,7 @@ class ProblemDetail():
 
     JSON_MEDIA_TYPE = JSON_MEDIA_TYPE
 
-    def __init__(self, uri, status_code=None, title=None, detail=None,
-                 instance=None, debug_message=None):
+    def __init__(self, uri, status_code=None, title=None, detail=None, instance=None, debug_message=None):
         self.uri = uri
         self.title = title
         self.status_code = status_code
@@ -48,8 +52,8 @@ class ProblemDetail():
 
     def detailed(self, detail, status_code=None, title=None, instance=None,
                  debug_message=None):
-        """Create a ProblemDetail for a more specific occurance of an existing
-        ProblemDetail.
+        """
+        Create a ProblemDetail for a more specific occurance of an existing ProblemDetail.
 
         The detailed error message will be shown to patrons.
         """
@@ -57,9 +61,10 @@ class ProblemDetail():
         # Title and detail must be LazyStrings from Flask-Babel that are
         # localized when they are first used as strings.
         if title and not isinstance(title, LazyString):
-            logging.warning("\"%s\" has not been internationalized" % title)
+            logging.warning(f'"{title}" has not been internationalized')
+
         if detail and not isinstance(detail, LazyString):
-            logging.warning("\"%s\" has not been internationalized" % detail)
+            logging.warning(f'"{detail}" has not been internationalized')
 
         return ProblemDetail(
             self.uri, status_code or self.status_code, title or self.title,
@@ -67,11 +72,11 @@ class ProblemDetail():
         )
 
     def with_debug(self, debug_message, detail=None, status_code=None, title=None, instance=None):
-        """Insert debugging information into a ProblemDetail.
+        """
+        Insert debugging information into a ProblemDetail.
 
-        The original ProblemDetail's error message will be shown to
-        patrons, but a more specific error message will be visible to
-        those who inspect the problem document.
+        The original ProblemDetail's error message will be shown to patrons, but a more specific error
+        message will be visible to those who inspect the problem document.
         """
         return ProblemDetail(
             self.uri, status_code or self.status_code, title or self.title,

@@ -61,7 +61,7 @@ class TestConfiguration(VendorIDTest):
         assert delegates == ["delegate"]
 
 
-class TestVendorIDRequestParsers(object):
+class TestVendorIDRequestParsers:
 
     username_sign_in_request = (
         '<signInRequest method="standard" xmlns="http://ns.adobe.com/adept">'
@@ -99,7 +99,7 @@ class TestVendorIDRequestParsers(object):
         assert data == {'method': 'standard', 'user': 'urn:uuid:0xxxxxxx-xxxx-1xxx-xxxx-yyyyyyyyyyyy'}
 
 
-class TestVendorIDRequestHandler(object):
+class TestVendorIDRequestHandler:
 
     username_sign_in_request = (
         '<signInRequest method="standard" xmlns="http://ns.adobe.com/adept">'

@@ -1,13 +1,11 @@
+import quopri
 from email.mime.text import MIMEText
 
-import quopri
 import pytest
 
 from library_registry.config import CannotLoadConfiguration
-from library_registry.emailer import (
-    Emailer,
-    EmailTemplate,
-)
+from library_registry.emailer import Emailer, EmailTemplate
+
 from . import DatabaseTest
 
 

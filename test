@@ -1,2 +1,2 @@
 #!/bin/sh
-nosetests tests
+pipenv run pytest tests

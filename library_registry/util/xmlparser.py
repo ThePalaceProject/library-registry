@@ -1,9 +1,9 @@
-from nose.tools import set_trace
-from lxml import etree
 from io import StringIO
 
-class XMLParser(object):
+from lxml import etree
 
+
+class XMLParser:
     """Helper functions to process XML data."""
 
     NAMESPACES = {}
@@ -25,7 +25,11 @@ class XMLParser(object):
 
     def _cls(self, tag_name, class_name):
         """Return an XPath expression that will find a tag with the given CSS class."""
-        return 'descendant-or-self::node()/%s[contains(concat(" ", normalize-space(@class), " "), " %s ")]' % (tag_name, class_name)
+        xpath_exp = (
+            f'descendant-or-self::node()/{tag_name}'
+            f'[contains(concat(" ", normalize-space(@class), " "), " {class_name} ")]'
+        )
+        return xpath_exp
 
     def text_of_optional_subtag(self, tag, name, namespaces=None):
         tag = self._xpath1(tag, name, namespaces=namespaces)
@@ -33,7 +37,7 @@ class XMLParser(object):
             return None
         else:
             return str(tag.text)
-      
+
     def text_of_subtag(self, tag, name, namespaces=None):
         return str(tag.xpath(name, namespaces=namespaces)[0].text)
 
@@ -49,12 +53,15 @@ class XMLParser(object):
     def process_all(self, xml, xpath, namespaces=None, handler=None, parser=None):
         if not parser:
             parser = etree.XMLParser()
+
         if not handler:
             handler = self.process_one
+
         if isinstance(xml, str):
             root = etree.parse(StringIO(xml), parser)
         else:
             root = xml
+
         for i in root.xpath(xpath, namespaces=namespaces):
             data = handler(i, namespaces)
             if data:

@@ -2,12 +2,8 @@ import logging
 
 import pytest
 
-from library_registry.log import (
-    StringFormatter,
-    JSONFormatter,
-    LogglyHandler,
-    LogConfiguration,
-)
+from library_registry.log import (JSONFormatter, LogConfiguration,
+                                  LogglyHandler, StringFormatter)
 from library_registry.model import ExternalIntegration
 
 from . import DatabaseTest

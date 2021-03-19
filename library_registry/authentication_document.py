@@ -1,24 +1,16 @@
-from collections import defaultdict
 import json
+from collections import defaultdict
 
-from flask_babel import lazy_gettext as _
-from sqlalchemy.orm.exc import (
-    MultipleResultsFound,
-    NoResultFound,
-)
+from flask_babel import lazy_gettext as lgt
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.session import Session
 
-from library_registry.model import (
-    get_one_or_create,
-    Audience,
-    CollectionSummary,
-    Place,
-    ServiceArea,
-)
+from library_registry.model import (Audience, CollectionSummary, Place,
+                                    ServiceArea, get_one_or_create)
 from library_registry.problem_details import INVALID_INTEGRATION_DOCUMENT
 
 
-class AuthenticationDocument(object):
+class AuthenticationDocument:
     """
     Parse an Authentication For OPDS document, including the
     Library Simplified-specific extensions, extracting all the information
@@ -301,10 +293,7 @@ class AuthenticationDocument(object):
             audiences = [audiences]     # This is invalid but we can easily support it.
 
         if not isinstance(audiences, list):
-            return INVALID_INTEGRATION_DOCUMENT.detailed(
-                _("'audience' must be a list: %(audiences)r",
-                  audiences=audiences)
-            )
+            return INVALID_INTEGRATION_DOCUMENT.detailed(lgt(f"'audience' must be a list: {audiences}"))
 
         # Unrecognized audiences become Audience.OTHER.
         filtered_audiences = set()
@@ -380,9 +369,9 @@ class AuthenticationDocument(object):
         if unknown or ambiguous:
             msgs = []
             if unknown:
-                msgs.append(str(_(f"The following service area was unknown: {json.dumps(unknown)}.")))
+                msgs.append(str(lgt(f"The following service area was unknown: {json.dumps(unknown)}.")))
             if ambiguous:
-                msgs.append(str(_(f"The following service area was ambiguous: {json.dumps(ambiguous)}.")))
+                msgs.append(str(lgt(f"The following service area was ambiguous: {json.dumps(ambiguous)}.")))
 
             return INVALID_INTEGRATION_DOCUMENT.detailed(" ".join(msgs))
 
@@ -404,7 +393,7 @@ class AuthenticationDocument(object):
             sizes = {}
         if not isinstance(sizes, dict):
             msg = "'collection_size' must be a number or an object mapping language codes to numbers"
-            return INVALID_INTEGRATION_DOCUMENT.detailed(_(msg))
+            return INVALID_INTEGRATION_DOCUMENT.detailed(lgt(msg))
 
         new_collections = set()
         unknown_size = 0

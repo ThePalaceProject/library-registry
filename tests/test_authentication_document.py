@@ -1,16 +1,12 @@
 from collections import defaultdict
 
 import pytest
-
 from library_registry.authentication_document import AuthenticationDocument
-from library_registry.model import (
-    Audience,
-    Place,
-    ServiceArea,
-)
-from library_registry.util.problem_detail import ProblemDetail
+from library_registry.model import Audience, Place, ServiceArea
 from library_registry.problem_details import INVALID_INTEGRATION_DOCUMENT
-from . import MockPlace, DatabaseTest
+from library_registry.util.problem_detail import ProblemDetail
+
+from . import DatabaseTest, MockPlace
 
 # Alias for a long class name
 AuthDoc = AuthenticationDocument

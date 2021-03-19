@@ -9,10 +9,12 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 
 from library_registry.config import Configuration
 from library_registry.emailer import Emailer
-from library_registry.model import (Admin, Audience, CollectionSummary, ConfigurationSetting,
-                                    DelegatedPatronIdentifier, ExternalIntegration, Hyperlink,
-                                    Library, LibraryAlias, Place, PlaceAlias, Validation,
-                                    create, get_one_or_create)
+from library_registry.model import (Admin, Audience, CollectionSummary,
+                                    ConfigurationSetting,
+                                    DelegatedPatronIdentifier,
+                                    ExternalIntegration, Hyperlink, Library,
+                                    LibraryAlias, Place, PlaceAlias,
+                                    Validation, create, get_one_or_create)
 from library_registry.util import GeometryUtility
 
 from . import DatabaseTest

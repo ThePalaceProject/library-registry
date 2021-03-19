@@ -3,62 +3,34 @@ import logging
 from smtplib import SMTPException
 from urllib.parse import unquote
 
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 import flask
-from flask_babel import lazy_gettext as _
-from flask import (
-    Response,
-    redirect,
-    url_for,
-    session,
-)
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.PublicKey import RSA
+from flask import Response, redirect, session, url_for
+from flask_babel import lazy_gettext as lgt
 from sqlalchemy.orm import joinedload
 
 from library_registry.adobe_vendor_id import AdobeVendorIDController
 from library_registry.authentication_document import AuthenticationDocument
+from library_registry.config import CannotLoadConfiguration, Configuration
 from library_registry.emailer import Emailer
-from library_registry.model import (
-    Admin,
-    ConfigurationSetting,
-    Hyperlink,
-    Library,
-    Place,
-    Resource,
-    ServiceArea,
-    Validation,
-    get_one,
-    get_one_or_create,
-    production_session,
-)
-from library_registry.config import (
-    Configuration,
-    CannotLoadConfiguration,
-)
-from library_registry.opds import (
-    Annotator,
-    OPDSCatalog,
-)
+from library_registry.model import (Admin, ConfigurationSetting, Hyperlink,
+                                    Library, Place, Resource, ServiceArea,
+                                    Validation, get_one, get_one_or_create,
+                                    production_session)
+from library_registry.opds import Annotator, OPDSCatalog
+from library_registry.problem_details import (AUTHENTICATION_FAILURE,
+                                              INTEGRATION_ERROR,
+                                              INVALID_CONTACT_URI,
+                                              INVALID_CREDENTIALS,
+                                              LIBRARY_NOT_FOUND, NO_AUTH_URL)
 from library_registry.registrar import LibraryRegistrar
 from library_registry.templates import admin as admin_template
-from library_registry.util.app_server import (
-    HeartbeatController,
-    catalog_response,
-)
+from library_registry.util.app_server import (HeartbeatController,
+                                              catalog_response)
 from library_registry.util.http import HTTP
 from library_registry.util.problem_detail import ProblemDetail
-from library_registry.util.string_helpers import (
-    base64,
-    random_string,
-)
-from library_registry.problem_details import (
-    AUTHENTICATION_FAILURE,
-    INTEGRATION_ERROR,
-    INVALID_CONTACT_URI,
-    INVALID_CREDENTIALS,
-    LIBRARY_NOT_FOUND,
-    NO_AUTH_URL,
-)
+from library_registry.util.string_helpers import base64, random_string
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = (
@@ -66,7 +38,7 @@ OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = (
 )
 
 
-class LibraryRegistry(object):
+class LibraryRegistry:
 
     def __init__(self, _db=None, testing=False, emailer_class=Emailer):
         self.log = logging.getLogger("Library registry web app")
@@ -192,7 +164,7 @@ class LibraryRegistryController(BaseController):
             nearby_controller = 'nearby_qa'
         this_url = self.app.url_for(nearby_controller)
         catalog = OPDSCatalog(
-            self._db, str(_("Libraries near you")), this_url, qu,
+            self._db, str(lgt("Libraries near you")), this_url, qu,
             annotator=self.annotator, live=live
         )
         return catalog_response(catalog)
@@ -213,21 +185,21 @@ class LibraryRegistryController(BaseController):
                 search_controller, q=query
             )
             catalog = OPDSCatalog(
-                self._db, str(_(f'Search results for "{query}"')), this_url,
+                self._db, str(lgt(f'Search results for "{query}"')), this_url,
                 results, annotator=self.annotator, live=live
             )
             return catalog_response(catalog)
         else:
             # Send the search form.
             body = self.OPENSEARCH_TEMPLATE % {
-                "name": _("Find your library"),
-                "description": _("Search by ZIP code, city or library name."),
+                "name": lgt("Find your library"),
+                "description": lgt("Search by ZIP code, city or library name."),
                 "tags": "",
                 "url_template": self.app.url_for(search_controller) + "?q={searchTerms}"
             }
             headers = {}
             headers['Content-Type'] = OPENSEARCH_MEDIA_TYPE
-            headers['Cache-Control'] = f"public, no-transform, max-age: {3600 * 24 * 30}"
+            headers['Cache-Control'] = f"public, no-transform, max-age: {int(3600 * 24 * 30)}"
             return Response(body, 200, headers)
 
     def libraries(self, live=True):
@@ -556,7 +528,7 @@ class LibraryRegistryController(BaseController):
             library = get_one(self._db, Library, shared_secret=shared_secret)
             if not library:
                 __transaction.rollback()
-                return AUTHENTICATION_FAILURE.detailed(_("Provided shared secret is invalid"))
+                return AUTHENTICATION_FAILURE.detailed(lgt("Provided shared secret is invalid"))
 
             # This gives the requestor an elevated level of permissions.
             elevated_permissions = True
@@ -629,7 +601,9 @@ class LibraryRegistryController(BaseController):
                     hyperlink.notify(self.emailer, self.app.url_for)
                 except SMTPException:
                     # We were unable to send the email.
-                    return INTEGRATION_ERROR.detailed(_(f"SMTP error while sending email to {hyperlink.resource.href}"))
+                    return INTEGRATION_ERROR.detailed(
+                        lgt(f"SMTP error while sending email to {hyperlink.resource.href}")
+                    )
 
         # Create an OPDS 2 catalog containing all available information about the library.
         catalog = OPDSCatalog.library_catalog(library, include_private_information=True, url_for=self.app.url_for)
@@ -691,16 +665,16 @@ class ValidationController(BaseController):
         :return: A Response containing a simple HTML document.
         """
         if not secret:
-            return self.html_response(404, _("No confirmation code provided"))
+            return self.html_response(404, lgt("No confirmation code provided"))
 
         if not resource_id:
-            return self.html_response(404, _("No resource ID provided"))
+            return self.html_response(404, lgt("No resource ID provided"))
 
         validation = get_one(self._db, Validation, secret=secret)
         resource = get_one(self._db, Resource, id=resource_id)
 
         if not resource:
-            return self.html_response(404, _("No such resource"))
+            return self.html_response(404, lgt("No such resource"))
 
         if not validation:
             # The secret is invalid. This might be because the secret is wrong, or because
@@ -709,24 +683,24 @@ class ValidationController(BaseController):
             # Let's eliminate the 'Resource has already been validated' possibility and take
             # care of the other case next.
             if resource and resource.validation and resource.validation.success:
-                return self.html_response(200, _("This URI has already been validated."))
+                return self.html_response(200, lgt("This URI has already been validated."))
 
         if (not validation or not validation.resource or validation.resource.id != resource_id):
             # For whatever reason the resource ID and secret don't match.
             # A generic error that doesn't reveal information is appropriate in all cases.
-            error = _(f"Confirmation code '{secret}' not found")
+            error = lgt(f"Confirmation code '{secret}' not found")
             return self.html_response(404, error)
 
         # At this point we know that the resource has not been
         # confirmed, and that the secret matches the resource. The
         # only other problem might be that the validation has expired.
         if not validation.active:
-            error = _(f"Confirmation code '{secret}' has expired. Re-register to get another code.")
+            error = lgt(f"Confirmation code '{secret}' has expired. Re-register to get another code.")
             return self.html_response(400, error)
         validation.mark_as_successful()
 
         resource = validation.resource
-        message = _(f"You successfully confirmed {resource.href}.")
+        message = lgt(f"You successfully confirmed {resource.href}.")
         return self.html_response(200, message)
 
 

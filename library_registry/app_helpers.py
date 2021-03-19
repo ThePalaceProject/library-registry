@@ -1,6 +1,6 @@
 import gzip
-from io import BytesIO
 from functools import wraps
+from io import BytesIO
 
 import flask
 

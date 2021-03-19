@@ -1,7 +1,7 @@
 import contextlib
 import copy
-import os
 import logging
+import os
 
 
 @contextlib.contextmanager
@@ -25,7 +25,7 @@ class CannotLoadConfiguration(Exception):
     ...
 
 
-class Configuration(object):
+class Configuration:
 
     instance = None
 

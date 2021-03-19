@@ -4,25 +4,15 @@ import logging
 import os
 import sys
 
-from library_registry.geometry_loader import GeometryLoader
-from library_registry.model import (
-    get_one,
-    get_one_or_create,
-    production_session,
-    Place,
-    Library,
-    LibraryAlias,
-    ServiceArea,
-    ConfigurationSetting,
-    ExternalIntegration,
-)
-from library_registry.config import Configuration
 from library_registry.adobe_vendor_id import AdobeVendorIDClient
 from library_registry.authentication_document import AuthenticationDocument
-from library_registry.emailer import (
-    Emailer,
-    EmailTemplate,
-)
+from library_registry.config import Configuration
+from library_registry.emailer import Emailer, EmailTemplate
+from library_registry.geometry_loader import GeometryLoader
+from library_registry.model import (ConfigurationSetting, ExternalIntegration,
+                                    Library, LibraryAlias, Place, ServiceArea,
+                                    get_one, get_one_or_create,
+                                    production_session)
 from library_registry.registrar import LibraryRegistrar
 from library_registry.util.problem_detail import ProblemDetail
 
@@ -183,7 +173,7 @@ class AddLibraryScript(Script):
         parser.add_argument('--short-name', help="Short name of the library for Adobe Vendor ID purposes.")
         parser.add_argument('--shared-secret',
                             help="Shared secret between the library and the registry for Adobe Vendor ID purposes.")
-        parser.add_argument('--place', nargs='+',help="External ID of the library's service area.")
+        parser.add_argument('--place', nargs='+', help="External ID of the library's service area.")
 
         return parser
 

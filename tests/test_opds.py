@@ -23,7 +23,7 @@ class TestOPDSCatalog:
         l1 = create_test_library(db_session, library_name="The New York Public Library")
         l2 = create_test_library(db_session, library_name="Brooklyn Public Library")
 
-        class TestAnnotator(object):
+        class TestAnnotator:
             def annotate_catalog(self, catalog_obj, live=True):
                 catalog_obj.catalog['metadata']['random'] = "Random text inserted by annotator."
 

@@ -1,24 +1,15 @@
 import os
-from pathlib import Path
 import random
 import uuid
+from pathlib import Path
 
 import pytest
-
-from library_registry.geometry_loader import GeometryUtility
 from library_registry.config import Configuration
-from library_registry.model import (
-    get_one_or_create,
-    Base,
-    Place,
-    PlaceAlias,
-    SessionManager,
-    Library,
-    ServiceArea,
-    Audience,
-    Hyperlink,
-    ExternalIntegration,
-)
+from library_registry.geometry_loader import GeometryUtility
+from library_registry.model import (Audience, Base, ExternalIntegration,
+                                    Hyperlink, Library, Place, PlaceAlias,
+                                    ServiceArea, SessionManager,
+                                    get_one_or_create)
 
 ##############################################################################
 # Function Level Fixtures                                                    #

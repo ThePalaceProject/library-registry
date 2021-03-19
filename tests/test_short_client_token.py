@@ -2,11 +2,9 @@ import base64
 
 import pytest
 
+from library_registry.model import (DelegatedPatronIdentifier,
+                                    ShortClientTokenDecoder)
 from library_registry.util.short_client_token import ShortClientTokenEncoder
-from library_registry.model import (
-    DelegatedPatronIdentifier,
-    ShortClientTokenDecoder,
-)
 
 
 class TestShortClientTokenEncoder:
@@ -31,7 +29,7 @@ class TestShortClientTokenEncoder:
         assert self.encoder.adobe_base64_decode(encoded) == value
 
     def test_encode_short_client_token_uses_adobe_base64_encoding(self):
-        class MockSigner(object):
+        class MockSigner:
             def prepare_key(self, key):
                 return key
 

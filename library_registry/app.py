@@ -7,23 +7,14 @@ from flask import Flask, Response
 from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
+from library_registry.app_helpers import (compressible, has_library_factory,
+                                          uses_location_factory)
 from library_registry.config import Configuration
 from library_registry.controller import LibraryRegistry
 from library_registry.log import LogConfiguration
-from library_registry.model import (
-    ConfigurationSetting,
-    SessionManager,
-)
+from library_registry.model import ConfigurationSetting, SessionManager
 from library_registry.util.app_server import (
-    returns_json_or_response_or_problem_detail,
-    returns_problem_detail,
-)
-from library_registry.app_helpers import (
-    compressible,
-    has_library_factory,
-    uses_location_factory,
-)
-
+    returns_json_or_response_or_problem_detail, returns_problem_detail)
 
 app = Flask(__name__)
 babel = Babel(app)

@@ -1,17 +1,17 @@
 """Implement logic common to more than one of the Simplified applications."""
-import sys
-from functools import wraps
-import traceback
 import logging
+import sys
+import traceback
+from functools import wraps
 
-from psycopg2 import DatabaseError
 import flask
-from lxml import etree
 from flask import make_response
-from flask_babel import lazy_gettext as _
+from flask_babel import lazy_gettext as lgt
+from lxml import etree
+from psycopg2 import DatabaseError
 
-from library_registry.util.problem_detail import ProblemDetail
 from library_registry.opds import OPDSCatalog
+from library_registry.util.problem_detail import ProblemDetail
 
 
 def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):
@@ -26,26 +26,26 @@ def _make_response(content, content_type, cache_for):
         content = str(content)
 
     if isinstance(cache_for, int):
-        # A CDN should hold on to the cached representation only half
-        # as long as the end-user.
+        # A CDN should hold on to the cached representation only half as long as the end-user.
         client_cache = cache_for
         cdn_cache = cache_for / 2
-        cache_control = "public, no-transform, max-age: %d, s-maxage: %d" % (
-            client_cache, cdn_cache)
+        cache_control = f"public, no-transform, max-age: {int(client_cache)}, s-maxage: {int(cdn_cache)}"
     else:
         cache_control = "private, no-cache"
 
-    return make_response(content, 200, {"Content-Type": content_type,
-                                        "Cache-Control": cache_control})
+    return make_response(content, 200, {"Content-Type": content_type, "Cache-Control": cache_control})
 
 
 def returns_problem_detail(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         v = f(*args, **kwargs)
+
         if isinstance(v, ProblemDetail):
             return v.response
+
         return v
+
     return decorated
 
 
@@ -53,11 +53,15 @@ def returns_json_or_response_or_problem_detail(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         v = f(*args, **kwargs)
+
         if isinstance(v, ProblemDetail):
             return v.response
+
         if isinstance(v, flask.Response):
             return v
+
         return flask.jsonify(**v)
+
     return decorated
 
 
@@ -68,33 +72,28 @@ class ErrorHandler():
 
     def handle(self, exception):
         if hasattr(self.app, 'manager') and hasattr(self.app.manager, '_db'):
-            # There is an active database session. Roll it back.
-            self.app.manager._db.rollback()
+            self.app.manager._db.rollback()  # There is an active database session. Roll it back.
         tb = traceback.format_exc()
 
         if isinstance(exception, DatabaseError):
-            # The database session may have become tainted. For now
-            # the simplest thing to do is to kill the entire process
-            # and let uwsgi restart it.
-            logging.error(
-                "Database error: %s Treating as fatal to avoid holding on to a tainted session!",
-                exception, exc_info=exception
-            )
+            # The database session may have become tainted. For now the simplest thing to do is
+            # to kill the entire process and let uwsgi restart it.
+            err_msg = f"Database error: {exception} Treating as fatal to avoid holding on to a tainted session!"
+            logging.error(err_msg, exc_info=exception)
             shutdown = flask.request.environ.get('werkzeug.server.shutdown')
+
             if shutdown:
                 shutdown()
             else:
                 sys.exit()
 
-        # By default, the error will be logged at log level ERROR.
-        log_method = logging.error
+        log_method = logging.error      # By default, the error will be logged at log level ERROR.
 
-        # Okay, it's not a database error. Turn it into a useful HTTP error
-        # response.
+        # Okay, it's not a database error. Turn it into a useful HTTP error response.
         if hasattr(exception, 'as_problem_detail_document'):
-            # This exception can be turned directly into a problem
-            # detail document.
+            # This exception can be turned directly into a problem detail document.
             document = exception.as_problem_detail_document(self.debug)
+
             if not self.debug:
                 document.debug_message = None
             else:
@@ -102,28 +101,28 @@ class ErrorHandler():
                     document.debug_message += "\n\n" + tb
                 else:
                     document.debug_message = tb
+
             if document.status_code == 502:
-                # This is an error in integrating with some upstream
-                # service. It's a serious problem, but probably not
-                # indicative of a bug in our software. Log it at log level
-                # WARN.
+                # This is an error in integrating with some upstream service.
+                # It's a serious problem, but probably not indicative of a bug in our software.
+                # Log it at log level WARN.
                 log_method = logging.warn
+
             response = make_response(document.response)
         else:
-            # There's no way to turn this exception into a problem
-            # document. This is probably indicative of a bug in our
-            # software.
+            # There's no way to turn this exception into a problem document.
+            # This is probably indicative of a bug in our software.
             if self.debug:
                 body = tb
             else:
-                body = _('An internal error occured')
+                body = lgt('An internal error occured')
+
             response = make_response(str(body), 500, {"Content-Type": "text/plain"})
 
         log_method("Exception in web app: %s", exception, exc_info=exception)
         return response
 
 
-class HeartbeatController(object):
-
+class HeartbeatController:
     def heartbeat(self):
         return make_response("", 200, {"Content-Type": "application/json"})

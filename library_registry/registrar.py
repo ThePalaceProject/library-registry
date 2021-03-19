@@ -1,31 +1,27 @@
 import base64
-import feedparser
-from flask_babel import lazy_gettext as lgt
 import json
 import logging
-from PIL import Image
 from io import BytesIO
 from urllib.parse import urljoin
+
+import feedparser
+from flask_babel import lazy_gettext as lgt
+from PIL import Image
 
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.model import Hyperlink
 from library_registry.opds import OPDSCatalog
-from library_registry.problem_details import (
-    INVALID_INTEGRATION_DOCUMENT,
-    INTEGRATION_DOCUMENT_NOT_FOUND,
-    INVALID_CONTACT_URI,
-    LIBRARY_ALREADY_IN_PRODUCTION,
-    TIMEOUT,
-    ERROR_RETRIEVING_DOCUMENT,
-)
-from library_registry.util.http import (
-    HTTP,
-    RequestTimedOut,
-)
+from library_registry.problem_details import (ERROR_RETRIEVING_DOCUMENT,
+                                              INTEGRATION_DOCUMENT_NOT_FOUND,
+                                              INVALID_CONTACT_URI,
+                                              INVALID_INTEGRATION_DOCUMENT,
+                                              LIBRARY_ALREADY_IN_PRODUCTION,
+                                              TIMEOUT)
+from library_registry.util.http import HTTP, RequestTimedOut
 from library_registry.util.problem_detail import ProblemDetail
 
 
-class LibraryRegistrar(object):
+class LibraryRegistrar:
     """Encapsulates the logic of the library registration process."""
 
     def __init__(self, _db, do_get=HTTP.debuggable_get):

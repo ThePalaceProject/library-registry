@@ -1,34 +1,21 @@
-from datetime import datetime, timedelta
-from io import BytesIO
 import json
 import os
+import pathlib
+from datetime import datetime, timedelta
+from io import BytesIO
 
 import pytest
-
-from sqlalchemy.orm.session import Session
-from sqlalchemy.orm.exc import (
-    NoResultFound,
-    MultipleResultsFound,
-)
-
 from library_registry.config import Configuration
 from library_registry.log import LogConfiguration
-from library_registry.model import (
-    get_one_or_create,
-    Admin,
-    Audience,
-    Base,
-    ConfigurationSetting,
-    ExternalIntegration,
-    Hyperlink,
-    Library,
-    Place,
-    PlaceAlias,
-    ServiceArea,
-    SessionManager,
-)
+from library_registry.model import (Admin, Audience, Base,
+                                    ConfigurationSetting, ExternalIntegration,
+                                    Hyperlink, Library, Place, PlaceAlias,
+                                    ServiceArea, SessionManager,
+                                    get_one_or_create)
 from library_registry.util import GeometryUtility
 from library_registry.util.http import BadResponseException
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+from sqlalchemy.orm.session import Session
 
 
 def package_setup():
@@ -54,7 +41,6 @@ def package_setup():
     engine.dispose()
 
 
-import pathlib
 shared_datadir = pathlib.Path(__file__).parent / 'data'
 
 
