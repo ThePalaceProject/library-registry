@@ -14,6 +14,7 @@ from . import DatabaseTest
 class TestEmailTemplate:
     """Test the ability to generate email messages."""
 
+    # TODO: Parameterize this
     def test_body(self):
         template = EmailTemplate(
             "A %(color)s subject",
@@ -62,7 +63,7 @@ class TestEmailTemplate:
             assert expect in body
 
 
-class MockSMTP(object):
+class MockSMTP:
     """Mock of smtplib.SMTP that records all incoming calls."""
 
     calls = []

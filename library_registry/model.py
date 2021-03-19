@@ -75,7 +75,7 @@ from .util.string_helpers import random_string
 
 def production_session():
     url = Configuration.database_url()
-    logging.debug("Database url: %s", url)
+    logging.debug(f"Database url: {url}")
     _db = SessionManager.session(url)
 
     # The first thing to do after getting a database connection is to
@@ -391,9 +391,7 @@ class Library(Base):
         if choice is None:
             # This is very bad, but it's better to raise an exception
             # than to be stuck in an infinite loop.
-            raise ValueError(
-                "Could not generate random short name after %d attempts!" % attempts
-            )
+            raise ValueError(f"Could not generate random short name after {attempts} attempts!")
         return choice
 
     @hybrid_property
@@ -402,13 +400,10 @@ class Library(Base):
 
     @library_stage.setter
     def library_stage(self, value):
-        """A library can't unilaterally go from being in production to
-        not being in production.
-        """
+        """A library can't unilaterally go from being in production to not being in production"""
         if self.in_production and value != self.PRODUCTION_STAGE:
-            raise ValueError(
-                "This library is already in production; only the registry can take it out of production."
-            )
+            msg = "This library is already in production; only the registry can take it out of production."
+            raise ValueError(msg)
         self._library_stage = value
 
     @property
@@ -855,7 +850,7 @@ class Library(Base):
 
     us_zip = re.compile("^[0-9]{5}$")
     us_zip_plus_4 = re.compile("^[0-9]{5}-[0-9]{4}$")
-    running_whitespace = re.compile("\s+")
+    running_whitespace = re.compile(r"\s+")
 
     @classmethod
     def create_query(cls, _db, here=None, production=True, *args):
@@ -963,7 +958,7 @@ class Library(Base):
     def partial_match(cls, field, value):
         """Create a SQL clause that attempts to match a partial value--e.g.
         just one word of a library's name--against the given field."""
-        return field.ilike("%{}%".format(value))
+        return field.ilike(f"%{value}%")
 
     def set_hyperlink(self, rel, *hrefs):
         """Make sure this library has a Hyperlink with the given `rel` that
@@ -1138,9 +1133,7 @@ class Place(Base):
                 _db, Place, type=Place.NATION, abbreviated_name=abbreviation
             )
             if not default_nation:
-                logging.error(
-                    "Could not look up default nation %s", abbreviation
-                )
+                logging.error(f"Could not look up default nation {abbreviation}")
         return default_nation
 
     @classmethod
@@ -1191,11 +1184,10 @@ class Place(Base):
         if not place_type:
             name, place_type = cls.parse_name(name)
         qu = _db.query(Place).outerjoin(PlaceAlias).filter(
-            or_(Place.external_name==name, Place.abbreviated_name==name,
-                PlaceAlias.name==name)
+            or_(Place.external_name == name, Place.abbreviated_name == name, PlaceAlias.name == name)
         )
         if place_type:
-            qu = qu.filter(Place.type==place_type)
+            qu = qu.filter(Place.type == place_type)
         else:
             # The place type "county" is excluded unless it was
             # explicitly asked for (e.g. "Cook County"). This is to
@@ -1205,7 +1197,7 @@ class Place(Base):
             # service area is referring to the city of Foo, not Foo
             # County -- if they want Foo County they can say "Foo
             # County".
-            qu = qu.filter(Place.type!=Place.COUNTY)
+            qu = qu.filter(Place.type != Place.COUNTY)
         return qu
 
     @classmethod
@@ -1319,14 +1311,14 @@ class Place(Base):
         # "Springfield" or "Lake County" within the United States,
         # instead of specifying which state you're talking about.
         _db = Session.object_session(self)
-        qu = Place.lookup_by_name(_db, name).filter(Place.type!=self.type)
+        qu = Place.lookup_by_name(_db, name).filter(Place.type != self.type)
 
         # Don't look in a place type known to be 'bigger' than this
         # place.
         exclude_types = Place.larger_place_types(self.type)
         qu = qu.filter(~Place.type.in_(exclude_types))
 
-        if self.type==self.EVERYWHERE:
+        if self.type == self.EVERYWHERE:
             # The concept of 'inside' is not relevant because every
             # place is 'inside' EVERYWHERE. We are really trying to
             # find one and only one place with a certain name.
@@ -1337,41 +1329,34 @@ class Place(Base):
             else:
                 parent = aliased(Place)
                 grandparent = aliased(Place)
-                qu = qu.join(parent, Place.parent_id==parent.id)
-                qu = qu.outerjoin(grandparent, parent.parent_id==grandparent.id)
+                qu = qu.join(parent, Place.parent_id == parent.id)
+                qu = qu.outerjoin(grandparent, parent.parent_id == grandparent.id)
 
                 # For postal codes, but no other types of places, we
                 # allow the lookup to skip a level. This lets you look
                 # up "93203" within a state *or* within the nation.
-                postal_code_grandparent_match = and_(
-                    Place.type==Place.POSTAL_CODE, grandparent.id==self.id,
-                )
+                postal_code_grandparent_match = and_(Place.type == Place.POSTAL_CODE, grandparent.id == self.id)
                 qu = qu.filter(
-                    or_(Place.parent==self, postal_code_grandparent_match)
+                    or_(Place.parent == self, postal_code_grandparent_match)
                 )
 
         places = qu.all()
         if len(places) == 0:
             if using_external_source:
-                # We don't have any matching places in the database _now_,
-                # but there's a possibility we can find a representative
-                # postal code.
+                # We don't have any matching places in the database _now_, but there's a possibility
+                # we can find a representative postal code.
                 return self.lookup_one_through_external_source(name)
             else:
-                # We're not allowed to use uszipcodes, probably
-                # because this method was called by
+                # We're not allowed to use uszipcodes, probably because this method was called by
                 # lookup_through_external_source.
                 return None
         if len(places) > 1:
-            raise MultipleResultsFound(
-                "More than one place called %s inside %s." % (
-                    name, self.external_name
-                )
-            )
+            raise MultipleResultsFound(f"More than one place called {name} inside {self.external_name}.")
         return places[0]
 
     def lookup_one_through_external_source(self, name):
-        """Use an external source to find a Place that is a) inside `self`
+        """
+        Use an external source to find a Place that is a) inside `self`
         and b) identifies the place human beings call `name`.
 
         Currently the only way this might work is when using
@@ -1380,21 +1365,16 @@ class Place(Base):
 
         :return: A Place, or None if the lookup fails.
         """
-        if self.type != Place.STATE:
-            # uszipcodes keeps track of places in terms of their state.
-            return None
+        if self.type != Place.STATE:            
+            return None         # uszipcodes keeps track of places in terms of their state.
 
-        _db = Session.object_session(self)
         search = uszipcode.SearchEngine(simple_zipcode=True)
         state = self.abbreviated_name
         uszipcode_matches = []
-        if (state in search.state_to_city_mapper
-            and name in search.state_to_city_mapper[state]):
+        if (state in search.state_to_city_mapper and name in search.state_to_city_mapper[state]):
             # The given name is an exact match for one of the
             # cities. Let's look up every ZIP code for that city.
-            uszipcode_matches = search.by_city_and_state(
-                name, state, returns=None
-            )
+            uszipcode_matches = search.by_city_and_state(name, state, returns=None)
 
         # Look up a Place object for each ZIP code and return the
         # first one we actually know about.
@@ -1403,14 +1383,13 @@ class Place(Base):
         # possibility of wasted effort or (I don't think this can
         # happen) infinite recursion.
         for match in uszipcode_matches:
-            place = self.lookup_inside(
-                match.zipcode, using_external_source=False
-            )
+            place = self.lookup_inside(match.zipcode, using_external_source=False)
             if place:
                 return place
 
     def served_by(self):
-        """Find all Libraries with a ServiceArea whose Place overlaps
+        """
+        Find all Libraries with a ServiceArea whose Place overlaps
         this Place, not counting the border.
 
         A Library whose ServiceArea borders this place, but does not
@@ -1430,76 +1409,61 @@ class Place(Base):
         else:
             parent = None
         if self.abbreviated_name:
-            abbr = "abbr=%s " % self.abbreviated_name
+            abbr = f"abbr={self.abbreviated_name} "
         else:
             abbr = ''
-        output = "<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
-            self.external_name, self.type, abbr, self.external_id, parent
-        )
-        return str(output)
+
+        return f"<Place: {self.external_name} type={self.type} {abbr}external_id={self.external_id} parent={parent}>"
 
 
 class PlaceAlias(Base):
-
     """An alternate name for a place."""
     __tablename__ = 'placealiases'
+    __table_args__ = tuple(UniqueConstraint('place_id', 'name', 'language'))
 
     id = Column(Integer, primary_key=True)
     place_id = Column(Integer, ForeignKey('places.id'), index=True)
     name = Column(Unicode, index=True)
     language = Column(Unicode(3), index=True)
 
-    __table_args__ = (
-        UniqueConstraint('place_id', 'name', 'language'),
-    )
-
 
 class Audience(Base):
     """A class of person served by a library."""
     __tablename__ = 'audiences'
 
-    # The general public
-    PUBLIC = "public"
-
-    # Pre-university students
-    EDUCATIONAL_PRIMARY = "educational-primary"
-
-    # University students
-    EDUCATIONAL_SECONDARY = "educational-secondary"
-
-    # Academics and researchers
-    RESEARCH = "research"
-
-    # People with print disabilities
-    PRINT_DISABILITY = "print-disability"
-
-    # A catch-all for other specialized audiences.
-    OTHER = "other"
+    PUBLIC = "public"                                # The general public
+    EDUCATIONAL_PRIMARY = "educational-primary"      # Pre-university students
+    EDUCATIONAL_SECONDARY = "educational-secondary"  # University students
+    RESEARCH = "research"                            # Academics and researchers
+    PRINT_DISABILITY = "print-disability"            # People with print disabilities
+    OTHER = "other"                                  # A catch-all for other specialized audiences.
 
     KNOWN_AUDIENCES = [
-        PUBLIC, EDUCATIONAL_PRIMARY, EDUCATIONAL_SECONDARY, RESEARCH,
-        PRINT_DISABILITY, OTHER
+        PUBLIC,
+        EDUCATIONAL_PRIMARY,
+        EDUCATIONAL_SECONDARY,
+        RESEARCH,
+        PRINT_DISABILITY,
+        OTHER,
     ]
 
     id = Column(Integer, primary_key=True)
     name = Column(Unicode, index=True, unique=True)
-
-    libraries = relationship("Library", secondary='libraries_audiences',
-                             back_populates="audiences")
+    libraries = relationship("Library", secondary='libraries_audiences', back_populates="audiences")
 
     @classmethod
     def lookup(cls, _db, name):
         if name not in cls.KNOWN_AUDIENCES:
-            raise ValueError(_("Unknown audience: %(name)s", name=name))
+            raise ValueError(_(f"Unknown audience: {name}"))
         audience, is_new = get_one_or_create(_db, Audience, name=name)
         return audience
 
 
 class CollectionSummary(Base):
-    """A summary of a collection held by a library.
+    """
+    A summary of a collection held by a library.
 
-    We only need to know the language of the collection and
-    approximately how big it is.
+    We only need to know the language of the collection and approximately how big it is.
     """
     __tablename__ = 'collectionsummaries'
 
@@ -1510,8 +1474,8 @@ class CollectionSummary(Base):
 
     @classmethod
     def set(cls, library, language, size):
-        """Create or update a CollectionSummary for the given
-        library and language.
+        """
+        Create or update a CollectionSummary for the given library and language.
 
         :return: An up-to-date CollectionSummary.
         """
@@ -1527,10 +1491,7 @@ class CollectionSummary(Base):
         # doesn't mention any languages.
         language_code = LanguageCodes.string_to_alpha_3(language)
 
-        summary, is_new = get_one_or_create(
-            _db, CollectionSummary, library=library,
-            language=language_code
-        )
+        summary, is_new = get_one_or_create(_db, CollectionSummary, library=library, language=language_code)
         summary.size = size
         return summary
 
@@ -1539,7 +1500,8 @@ Index("ix_collectionsummary_language_size", CollectionSummary.language, Collecti
 
 
 class Hyperlink(Base):
-    """A link between a Library and a Resource.
+    """
+    A link between a Library and a Resource.
 
     We trust that the Resource is actually associated with the Library
     because the library told us about it; either directly, during
@@ -1569,9 +1531,7 @@ class Hyperlink(Base):
 
     # A Library can have multiple links with the same rel, but we only
     # need to keep track of one.
-    __table_args__ = (
-        UniqueConstraint('library_id', 'rel'),
-    )
+    __table_args__ = tuple(UniqueConstraint('library_id', 'rel'))
 
     @hybrid_property
     def href(self):
@@ -1586,7 +1546,8 @@ class Hyperlink(Base):
         self.resource = resource
 
     def notify(self, emailer, url_for):
-        """Notify the target of this hyperlink that it is, in fact,
+        """
+        Notify the target of this hyperlink that it is, in fact,
         a target of the hyperlink.
 
         If the underlying resource needs a new validation, an
@@ -1601,8 +1562,7 @@ class Hyperlink(Base):
             generate a validation link if necessary.
         """
         if not emailer or not url_for:
-            # We can't actually send any emails.
-            return
+            return              # We can't actually send any emails.
         _db = Session.object_session(self)
 
         # These shouldn't happen, but just to be safe, do nothing if
@@ -1619,7 +1579,6 @@ class Hyperlink(Base):
         to_address = resource.href
         if to_address.startswith('mailto:'):
             to_address = to_address[7:]
-        deadline = None
 
         # Make sure there's a Validation object associated with this
         # Resource.
@@ -1638,15 +1597,13 @@ class Hyperlink(Base):
 
         # Create values for all the variables expected by the default
         # templates.
-        template_args = dict(
-            rel_desc = Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
-            library=library.name,
-            library_web_url = library.web_url,
-            email=to_address,
-            registry_support=ConfigurationSetting.sitewide(
-                _db, Configuration.REGISTRY_CONTACT_EMAIL
-            ).value,
-        )
+        template_args = {
+            "rel_desc": Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
+            "library": library.name,
+            "library_web_url": library.web_url,
+            "email": to_address,
+            "registry_support": ConfigurationSetting.sitewide(_db, Configuration.REGISTRY_CONTACT_EMAIL).value,
+        }
         if email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION:
             template_args['confirmation_link'] = url_for(
                 "confirm_resource", resource_id=resource.id, secret=validation.secret
@@ -1693,8 +1650,7 @@ class Validation(Base):
 
     id = Column(Integer, primary_key=True)
     success = Column(Boolean, index=True, default=False)
-    started_at = Column(DateTime, index=True, nullable=False,
-                        default = lambda x: datetime.datetime.utcnow())
+    started_at = Column(DateTime, index=True, nullable=False, default=lambda x: datetime.datetime.utcnow())
 
     # Used in OPDS catalogs to convey the status of a validation attempt.
     STATUS_PROPERTY = "https://schema.org/reservationStatus"
@@ -1826,7 +1782,8 @@ class DelegatedPatronIdentifier(Base):
 
 
 class ShortClientTokenDecoder(ShortClientTokenTool):
-    """Turn a short client token into a DelegatedPatronIdentifier.
+    """
+    Turn a short client token into a DelegatedPatronIdentifier.
 
     Used by the library registry. Not used by the circulation manager.
 
@@ -1855,7 +1812,8 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         self.delegates = delegates
 
     def decode(self, _db, token):
-        """Decode a short client token.
+        """
+        Decode a short client token.
 
         :return: a DelegatedPatronIdentifier
 
@@ -1863,18 +1821,14 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         """
         if not token:
             raise ValueError("Cannot decode an empty token.")
-        if not '|' in token:
-            raise ValueError(
-                'Supposed client token "%s" does not contain a pipe.' % token
-            )
+        if '|' not in token:
+            raise ValueError(f"Supposed client token '{token}' does not contain a pipe.")
 
         username, password = token.rsplit('|', 1)
         return self.decode_two_part(_db, username, password)
 
     def decode_two_part(self, _db, username, password):
-        """Decode a short client token that has already been split into
-        two parts.
-        """
+        """Decode a short client token that has already been split into two parts"""
         library = patron_identifier = account_id = None
 
         # No matter how we do this, if we're going to create
@@ -1885,81 +1839,63 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # If this username/password is not actually a Short Client
         # Token, this will raise an exception, which gives us a quick
         # way to bail out.
-        library, expires, patron_identifier = self._split_token(
-            _db, username
-        )
+        library, expires, patron_identifier = self._split_token(_db, username)
 
-        # First see if a delegate can give us an Adobe ID (account_id)
-        # for this patron.
+        # First see if a delegate can give us an Adobe ID (account_id) for this patron.
         for delegate in self.delegates:
             try:
-                account_id, label, content = delegate.sign_in_standard(
-                    username, password
-                )
+                account_id, label, content = delegate.sign_in_standard(username, password)
             except Exception:
-                # This delegate couldn't help us.
-                pass
+                pass            # This delegate couldn't help us.
             if account_id:
-                # We got it -- no need to keep checking delegates.
-                break
+                break           # We got it -- no need to keep checking delegates.
 
         if not account_id:
-            # The delegates couldn't help us; let's try to do it
-            # ourselves.
+            # The delegates couldn't help us; let's try to do it ourselves.
             try:
                 signature = self.adobe_base64_decode(password)
             except Exception:
-                raise ValueError("Invalid password: %s" % password)
+                raise ValueError(f"Invalid password: {password}")
 
-            patron_identifier, account_id = self._decode(
-                _db, username, signature
-            )
+            patron_identifier, account_id = self._decode(_db, username, signature)
 
-        # If we got this far, we have a Library, a patron_identifier,
-        # and an account_id.
-        delegated_patron_identifier, is_new = (
-            DelegatedPatronIdentifier.get_one_or_create(
-                _db, library, patron_identifier,
-                DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, account_id
-            )
+        # If we got this far, we have a Library, a patron_identifier, and an account_id.
+        (delegated_patron_identifier, _) = DelegatedPatronIdentifier.get_one_or_create(
+            _db, library, patron_identifier, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, account_id
         )
         return delegated_patron_identifier
 
     def _split_token(self, _db, token):
-        """Split the 'username' part of a Short Client Token.
+        """
+        Split the 'username' part of a Short Client Token.
 
         :return: A 3-tuple (Library, expiration, foreign patron identifier)
         """
         if token.count('|') < 2:
-            raise ValueError("Invalid client token: %s" % token)
+            raise ValueError(f"Invalid client token: {token}")
+
         library_short_name, expiration, patron_identifier = token.split("|", 2)
         library_short_name = library_short_name.upper()
 
         # Look up the Library object based on short name.
         library = get_one(_db, Library, short_name=library_short_name)
         if not library:
-            raise ValueError(
-                "I don't know how to handle tokens from library \"%s\"" % library_short_name
-            )
+            raise ValueError(f"I don't know how to handle tokens from library '{library_short_name}'")
         try:
             expiration = float(expiration)
         except ValueError:
-            raise ValueError('Expiration time "%s" is not numeric.' % expiration)
+            raise ValueError(f"Expiration time '{expiration}' is not numeric.")
         return library, expiration, patron_identifier
 
     def _decode(self, _db, token, supposed_signature):
-        """Make sure a client token is properly formatted, correctly signed,
-        and not expired.
-        """
+        """Make sure a client token is properly formatted, correctly signed, and not expired"""
         library, expiration, patron_identifier = self._split_token(_db, token)
         secret = library.shared_secret
 
         # We don't police the content of the patron identifier but there
         # has to be _something_ there.
         if not patron_identifier:
-            raise ValueError(
-                "Token %s has empty patron identifier." % token
-            )
+            raise ValueError(f"Token {token} has empty patron identifier.")
 
         # Don't bother checking an expired token.
         #
@@ -1968,23 +1904,16 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # or as a number of seconds since self.JWT_EPOCH.
         now = datetime.datetime.utcnow()
 
-        # NOTE: The JWT code needs to be removed by the year 4869 or
-        # this will break.
+        # NOTE: The JWT code needs to be removed by the year 4869 or this will break.
         if expiration < 1500000000:
             # This is a number of minutes since the start of 2017.
-            expiration = self.SCT_EPOCH + datetime.timedelta(
-                minutes=expiration
-            )
+            expiration = self.SCT_EPOCH + datetime.timedelta(minutes=expiration)
         else:
             # This is a number of seconds since the start of 1970.
             expiration = self.JWT_EPOCH + datetime.timedelta(seconds=expiration)
 
         if expiration < now:
-            raise ValueError(
-                "Token %s expired at %s (now is %s)." % (
-                    token, expiration, now
-                )
-            )
+            raise ValueError(f"Token {token} expired at {expiration} (now is {now}).")
 
         # Sign the token and check against the provided signature.
         key = self.signer.prepare_key(secret)
@@ -1992,9 +1921,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         actual_signature = self.signer.sign(token_bytes, key)
 
         if actual_signature != supposed_signature:
-            raise ValueError(
-                "Invalid signature for %s." % token
-            )
+            raise ValueError(f"Invalid signature for {token}.")
 
         # We have a Library, and a patron identifier which we know is valid.
         # Find or create a DelegatedPatronIdentifier for this person.
@@ -2064,18 +1991,18 @@ class ExternalIntegration(Base):
     )
 
     def __repr__(self):
-        return "<ExternalIntegration: protocol=%s goal='%s' settings=%d ID=%d>" % (
-            self.protocol, self.goal, len(self.settings), self.id)
+        return (
+            f"<ExternalIntegration: protocol={self.protocol} "
+            f"goal='{self.goal}' settings={len(self.settings)} ID={self.id}>"
+        )
 
     @classmethod
     def lookup(cls, _db, protocol, goal):
-        integrations = _db.query(cls).filter(
-            cls.protocol==protocol, cls.goal==goal
-        )
+        integrations = _db.query(cls).filter(cls.protocol == protocol, cls.goal == goal)
 
         integrations = integrations.all()
         if len(integrations) > 1:
-            logging.warn("Multiple integrations found for '%s'/'%s'" % (protocol, goal))
+            logging.warn(f"Multiple integrations found for '{protocol}'/'{goal}'")
 
         if not integrations:
             return None
@@ -2131,21 +2058,19 @@ class ExternalIntegration(Base):
         :return: A list of explanatory strings.
         """
         lines = []
-        lines.append("ID: %s" % self.id)
+        lines.append(f"ID: {self.id}")
         if self.name:
-            lines.append("Name: %s" % self.name)
-        lines.append("Protocol/Goal: %s/%s" % (self.protocol, self.goal))
+            lines.append(f"Name: {self.name}")
+        lines.append(f"Protocol/Goal: {self.protocol}/{self.goal}")
 
         def key(setting):
             if setting.library:
                 return setting.key, setting.library.name
             return (setting.key, None)
         for setting in sorted(self.settings, key=key):
-            explanation = "%s='%s'" % (setting.key, setting.value)
+            explanation = f"{setting.key}='{setting.value}'"
             if setting.library:
-                explanation = "%s (applies only to %s)" % (
-                    explanation, setting.library.name
-                )
+                explanation = f"{explanation} (applies only to {setting.library.name})"
             if include_secrets or not setting.is_secret:
                 lines.append(explanation)
         return lines
@@ -2189,12 +2114,12 @@ class ConfigurationSetting(Base):
     )
 
     def __repr__(self):
-        return '<ConfigurationSetting: key=%s, ID=%d>' % (
-            self.key, self.id)
+        return f"<ConfigurationSetting: key={self.key}, ID={self.id}>"
 
     @classmethod
     def sitewide_secret(cls, _db, key):
-        """Find or create a sitewide shared secret.
+        """
+        Find or create a sitewide shared secret.
 
         The value of this setting doesn't matter, only that it's
         unique across the site and that it's always available.
@@ -2213,8 +2138,8 @@ class ConfigurationSetting(Base):
         site_wide_settings = []
 
         for setting in _db.query(ConfigurationSetting).filter(
-                ConfigurationSetting.library_id==None).filter(
-                    ConfigurationSetting.external_integration==None):
+                ConfigurationSetting.library_id == None).filter(
+                    ConfigurationSetting.external_integration == None):
             if not include_secrets and setting.key.endswith("_secret"):
                 continue
             site_wide_settings.append(setting)
@@ -2222,7 +2147,7 @@ class ConfigurationSetting(Base):
             lines.append("Site-wide configuration settings:")
             lines.append("---------------------------------")
         for setting in sorted(site_wide_settings, key=lambda s: s.key):
-            lines.append("%s='%s'" % (setting.key, setting.value))
+            lines.append(f"{setting.key}='{setting.value}'")
         return lines
 
     @classmethod
@@ -2313,10 +2238,7 @@ class ConfigurationSetting(Base):
         saying that a specific setting should be treated as secret.
         """
         return any(
-            key == x or
-            key.startswith('%s_' % x) or
-            key.endswith('_%s' % x) or
-            ("_%s_" %x) in key
+            key == x or key.startswith(f"{x}_") or key.endswith(f"_{x}") or (f"_{x}_") in key
             for x in ('secret', 'password')
         )
 
@@ -2334,6 +2256,7 @@ class ConfigurationSetting(Base):
         return self.value
 
     MEANS_YES = set(['true', 't', 'yes', 'y'])
+
     @property
     def bool_value(self):
         """Turn the value into a boolean if possible.
@@ -2382,20 +2305,16 @@ class ConfigurationSetting(Base):
             return json.loads(self.value)
         return None
 
-# Join tables for many-to-many relationships
 
+# Join tables for many-to-many relationships
 libraries_audiences = Table(
-    'libraries_audiences', Base.metadata,
-     Column(
-         'library_id', Integer, ForeignKey('libraries.id'),
-         index=True, nullable=False
-     ),
-     Column(
-         'audience_id', Integer, ForeignKey('audiences.id'),
-         index=True, nullable=False
-     ),
-     UniqueConstraint('library_id', 'audience_id'),
+    'libraries_audiences',
+    Base.metadata,
+    Column('library_id', Integer, ForeignKey('libraries.id'), index=True, nullable=False),
+    Column('audience_id', Integer, ForeignKey('audiences.id'), index=True, nullable=False),
+    UniqueConstraint('library_id', 'audience_id'),
  )
+
 
 class Admin(Base):
     __tablename__ = 'admins'
@@ -2427,4 +2346,4 @@ class Admin(Base):
         return None
 
     def __repr__(self):
-        return "<Admin: username=%s>" % self.username
+        return f"<Admin: username={self.username}>"

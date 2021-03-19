@@ -1531,9 +1531,9 @@ class TestValidation(DatabaseTest):
         # The secret has changed.
         assert old_secret != email_validation.secret
 
-    def test_mark_as_successful(self):
+    def test_mark_as_successful(self, db_session):
 
-        validation, ignore = create(self._db, Validation)
+        validation, ignore = create(db_session, Validation)
         assert validation.active is True
         assert validation.success is False
         assert validation.secret is not None
@@ -1545,7 +1545,7 @@ class TestValidation(DatabaseTest):
 
         # A validation that has already succeeded cannot be marked as successful.
         with pytest.raises(Exception) as exc:
-            validation.mark_as_successful
+            validation.mark_as_successful()
         assert "This validation has already succeeded" in str(exc.value)
 
         # A validation that has expired cannot be marked as successful.
@@ -1553,7 +1553,7 @@ class TestValidation(DatabaseTest):
         validation.started_at = (datetime.datetime.utcnow() - datetime.timedelta(days=7))
         assert validation.active is False
         with pytest.raises(Exception) as exc:
-            validation.mark_as_successful
+            validation.mark_as_successful()
         assert "This validation has expired" in str(exc.value)
 
 
