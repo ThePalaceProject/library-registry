@@ -1,61 +1,59 @@
 import json
 
+import pytest
+
+from library_registry.adobe_vendor_id import (AdobeAccountInfoRequestParser,
+                                              AdobeSignInRequestParser,
+                                              AdobeVendorIDModel,
+                                              AdobeVendorIDRequestHandler,
+                                              MockAdobeVendorIDClient,
+                                              VendorIDAuthenticationError,
+                                              VendorIDServerException)
 from library_registry.config import Configuration
-from library_registry.adobe_vendor_id import (
-    AdobeSignInRequestParser,
-    AdobeAccountInfoRequestParser,
-    AdobeVendorIDRequestHandler,
-    AdobeVendorIDModel,
-    MockAdobeVendorIDClient,
-    VendorIDAuthenticationError,
-    VendorIDServerException,
-)
-from library_registry.model import (
-    DelegatedPatronIdentifier,
-    ExternalIntegration,
-    create,
-)
+from library_registry.model import (DelegatedPatronIdentifier,
+                                    ExternalIntegration, create)
 from library_registry.util.short_client_token import ShortClientTokenEncoder
 from library_registry.util.string_helpers import base64
-from . import DatabaseTest
 
 
-class VendorIDTest(DatabaseTest):
+@pytest.fixture
+def vendor_id_node_value():
+    return "0x685b35c00f05"
 
-    NODE_VALUE = "0x685b35c00f05"
 
-    def _integration(self):
-        """Configure a basic Vendor ID Service setup."""
-
-        integration, ignore = create(
-            self._db, ExternalIntegration,
+@pytest.fixture
+def create_integration(vendor_id_node_value, db_session):
+    def _create_integration(db_session=db_session, node_value=vendor_id_node_value):
+        (integration, _) = create(
+            db_session,
+            ExternalIntegration,
             protocol=ExternalIntegration.ADOBE_VENDOR_ID,
-            goal=ExternalIntegration.DRM_GOAL,
+            goal=ExternalIntegration.DRM_GOAL
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
-        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = self.NODE_VALUE
+        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = node_value
         return integration
+    return _create_integration
 
 
-class TestConfiguration(VendorIDTest):
-
-    def test_accessor(self):
-        self._integration()
-        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
+class TestConfiguration:
+    def test_accessor(self, db_session, create_integration):
+        create_integration()
+        vendor_id, node_value, delegates = Configuration.vendor_id(db_session)
         assert vendor_id == "VENDORID"
         assert node_value == 114740953091845
         assert delegates == []
 
-    def test_accessor_vendor_id_not_configured(self):
-        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
+    def test_accessor_vendor_id_not_configured(self, db_session):
+        vendor_id, node_value, delegates = Configuration.vendor_id(db_session)
         assert vendor_id is None
         assert node_value is None
         assert delegates == []
 
-    def test_accessor_with_delegates(self):
-        integration = self._integration()
+    def test_accessor_with_delegates(self, db_session, create_integration):
+        integration = create_integration()
         integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = json.dumps(["delegate"])
-        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
+        vendor_id, node_value, delegates = Configuration.vendor_id(db_session)
         assert vendor_id == "VENDORID"
         assert node_value == 114740953091845
         assert delegates == ["delegate"]
@@ -219,18 +217,18 @@ class TestVendorIDRequestHandler:
         assert result == expected
 
 
-class TestVendorIDModel(VendorIDTest):
+@pytest.fixture
+def vendor_id_model(db_session, create_integration):
+    create_integration()
+    (vendor_id, node_value, delegates) = Configuration.vendor_id(db_session)
+    model = AdobeVendorIDModel(db_session, node_value, delegates)
+    return model
 
-    def setup(self):
-        super(TestVendorIDModel, self).setup()
-        self._integration()
-        vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
-        self.model = AdobeVendorIDModel(self._db, node_value, delegates)
 
-        # Here's a library that participates in the registry.
-        self.library = self._library()
+class TestVendorIDModel:
 
-    def test_short_client_token_lookup_success(self):
+    def test_short_client_token_lookup_success(self, db_session, create_integration,
+                                               create_test_library, vendor_id_model):
         """
         Test that the library registry can perform an authdata lookup or a
         standard lookup on a short client token generated by one of
@@ -239,70 +237,64 @@ class TestVendorIDModel(VendorIDTest):
         Over on a library's circulation manager, a short client token
         is created for one of the patrons.
         """
+        library = create_test_library(db_session)
         encoder = ShortClientTokenEncoder()
-        short_client_token = encoder.encode(self.library.short_name, self.library.shared_secret, "patron alias")
+        short_client_token = encoder.encode(library.short_name, library.shared_secret, "patron alias")
 
         # Here at the library registry, we can validate the short client token as authdata and create a
         # DelegatedPatronIdentifier for that patron.
-        account_id, label = self.model.authdata_lookup(short_client_token)
+        account_id, label = vendor_id_model.authdata_lookup(short_client_token)
         assert account_id.startswith('urn:uuid:0')
         assert label == "Delegated account ID %s" % account_id
 
         # The UUID corresponds to a DelegatedPatronIdentifier, associated with the foreign library and the patron
         # identifier that library encoded in its JWT.
-        [dpi] = self._db.query(DelegatedPatronIdentifier).all()
+        [dpi] = db_session.query(DelegatedPatronIdentifier).all()
         assert dpi.patron_identifier == "patron alias"
         assert dpi.delegated_identifier == account_id
-        assert dpi.library == self.library
+        assert dpi.library == library
 
         # The label is the same one we get by calling urn_to_label.
-        assert label == self.model.urn_to_label(account_id)
+        assert label == vendor_id_model.urn_to_label(account_id)
 
         # We get the same UUID and label by splitting the short client
         # token into a 'token' part and a 'signature' part, and
         # passing the token and signature to standard_lookup as
         # username and password.
         token, signature = short_client_token.rsplit('|', 1)
-        credentials = dict(username=token, password=signature)
-        new_account_id, new_label = self.model.standard_lookup(credentials)
+        credentials = {"username": token, "password": signature}
+        new_account_id, new_label = vendor_id_model.standard_lookup(credentials)
         assert new_account_id == account_id
         assert new_label == label
 
-    def test_short_client_token_lookup_failure(self):
-        """An invalid short client token will not be turned into an
-        Adobe Account ID.
-        """
-        (val1, val2) = self.model.standard_lookup({"username": "bad token", "password": "bad signature"})
+    def test_short_client_token_lookup_failure(self, vendor_id_model, db_session, create_test_library):
+        """An invalid short client token will not be turned into an Adobe Account ID"""
+        library = create_test_library(db_session)
+        (val1, val2) = vendor_id_model.standard_lookup({"username": "bad token", "password": "bad signature"})
         assert val1 is None and val2 is None
-        assert self.model.authdata_lookup(None) == (None, None)
-        assert self.model.authdata_lookup('badauthdata') == (None, None)
+        assert vendor_id_model.authdata_lookup(None) == (None, None)
+        assert vendor_id_model.authdata_lookup('badauthdata') == (None, None)
 
         # This token is correctly formed but the signature doesn't match.
         encoder = ShortClientTokenEncoder()
-        bad_signature = encoder.encode(
-            self.library.short_name,
-            self.library.shared_secret + "bad",
-            "patron alias"
-        )
-        assert self.model.authdata_lookup(bad_signature) == (None, None)
+        bad_signature = encoder.encode(library.short_name, library.shared_secret + "bad", "patron alias")
+        assert vendor_id_model.authdata_lookup(bad_signature) == (None, None)
 
-    def test_delegation_standard_lookup(self):
+    def test_delegation_standard_lookup(self, vendor_id_node_value, vendor_id_model, db_session, create_test_library):
         """A model that doesn't know how to handle a login request can delegate to another Vendor ID server"""
+        library = create_test_library(db_session)
         delegate1 = MockAdobeVendorIDClient()
         delegate2 = MockAdobeVendorIDClient()
 
-        # Delegate 1 can't verify this user.
-        delegate1.enqueue(VendorIDAuthenticationError("Nope"))
-
-        # Delegate 2 can.
-        delegate2.enqueue(("adobe_id", "label", "content"))
+        delegate1.enqueue(VendorIDAuthenticationError("Nope"))  # Delegate 1 can't verify this user.
+        delegate2.enqueue(("adobe_id", "label", "content"))     # Delegate 2 can.
 
         delegates = [delegate1, delegate2]
-        model = AdobeVendorIDModel(self._db, self.NODE_VALUE, delegates)
+        model = AdobeVendorIDModel(db_session, vendor_id_node_value, delegates)
 
         # This isn't a valid Short Client Token, but as long as
         # a delegate can decode it, that doesn't matter.
-        username = self.library.short_name + "|1234|someuser"
+        username = library.short_name + "|1234|someuser"
 
         result = model.standard_lookup({"username": username, "password": "password"})
         assert result == ("adobe_id", "Delegated account ID adobe_id")
@@ -312,7 +304,7 @@ class TestVendorIDModel(VendorIDTest):
         assert delegate2.queue == []
 
         # A DelegatedPatronIdentifier was created to store the information we got from the delegate.
-        [delegated] = self.library.delegated_patron_identifiers
+        [delegated] = library.delegated_patron_identifiers
         assert delegated.patron_identifier == "someuser"
         assert delegated.delegated_identifier == "adobe_id"
         assert delegated.type == DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID
@@ -326,31 +318,28 @@ class TestVendorIDModel(VendorIDTest):
 
         # We did not create a local DelegatedPatronIdentifier, because we don't know which Library
         # the patron should be associated with.
-        assert self.library.delegated_patron_identifiers == [delegated]
+        assert library.delegated_patron_identifiers == [delegated]
 
-    def test_delegation_authdata_lookup(self):
+    def test_delegation_authdata_lookup(self, vendor_id_node_value, db_session, create_test_library):
         """Test the ability to delegate an authdata login request to another server"""
+        library = create_test_library(db_session)
         delegate1 = MockAdobeVendorIDClient()
         delegate2 = MockAdobeVendorIDClient()
         delegates = [delegate1, delegate2]
-        model = AdobeVendorIDModel(self._db, self.NODE_VALUE, delegates)
+        model = AdobeVendorIDModel(db_session, vendor_id_node_value, delegates)
 
         # First, test an authdata that is a Short Client Token.
+        delegate1.enqueue(("adobe_id", "label", "content"))     # Delegate 1 can verify the authdata
+        delegate2.enqueue(VendorIDServerException("blah"))      # Delegate 2 is broken.
 
-        # Delegate 1 can verify the authdata
-        delegate1.enqueue(("adobe_id", "label", "content"))
-
-        # Delegate 2 is broken.
-        delegate2.enqueue(VendorIDServerException("blah"))
-
-        authdata = self.library.short_name + "|1234|authdatauser|password"
+        authdata = library.short_name + "|1234|authdatauser|password"
         result = model.authdata_lookup(authdata)
         assert result == ("adobe_id", "Delegated account ID adobe_id")
 
         # We didn't even get to delegate 2.
         assert len(delegate2.queue) == 1
 
-        [delegated] = self.library.delegated_patron_identifiers
+        [delegated] = library.delegated_patron_identifiers
         assert delegated.patron_identifier == "authdatauser"
         assert delegated.delegated_identifier == "adobe_id"
         assert delegated.type == DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID
@@ -365,12 +354,8 @@ class TestVendorIDModel(VendorIDTest):
         assert delegate2.queue == []
 
         # Finally, test authentication by treating some random data as authdata.
-
-        # Delegate 1 can verify the authdata
-        delegate1.enqueue(("adobe_id_3", "label", "content"))
-
-        # Delegate 2 is broken.
-        delegate2.enqueue(VendorIDServerException("blah"))
+        delegate1.enqueue(("adobe_id_3", "label", "content"))   # Delegate 1 can verify the authdata
+        delegate2.enqueue(VendorIDServerException("blah"))      # Delegate 2 is broken.
 
         # This authdata is not a Short Client Token. We will ask the
         # delegates to authenticate it, and when one succeeds we will
@@ -381,7 +366,7 @@ class TestVendorIDModel(VendorIDTest):
         result = model.authdata_lookup("Some random authdata")
         assert result == ("adobe_id_3", "label")
 
-        assert self.library.delegated_patron_identifiers == [delegated]
+        assert library.delegated_patron_identifiers == [delegated]
 
         # We didn't get to delegate 2, because delegate 1 had the answer.
         assert len(delegate2.queue) == 1
