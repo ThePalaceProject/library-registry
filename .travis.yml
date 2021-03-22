@@ -16,7 +16,7 @@ git:
 
 before_install:
   - pip install pipenv
-  - sudo apt-get install -y postgresql-12.6-postgis-3.1
+  - sudo apt-get install -y postgresql-12-postgis-3
   - sleep 10
 
 install:
