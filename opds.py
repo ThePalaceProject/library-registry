@@ -156,7 +156,7 @@ class OPDSCatalog(object):
                                     href=library.web_url,
                                     type="text/html")
 
-        if library.logo and include_logo:
+        if include_logo and library.logo:
             cls.add_image_to_catalog(catalog, rel=cls.THUMBNAIL_REL,
                                      href=library.logo,
                                      type="image/png")
