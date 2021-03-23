@@ -10,12 +10,16 @@ from flask import (
     session,
 )
 import requests
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import (
+    defer,
+    joinedload,
+)
 from smtplib import SMTPException
 import json
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import os
+import time
 from urllib import unquote
 
 from adobe_vendor_id import AdobeVendorIDController
@@ -272,10 +276,14 @@ class LibraryRegistryController(BaseController):
             joinedload('hyperlinks', 'resource'),
             joinedload('hyperlinks', 'resource', 'validation'),
         )
+        alphabetical = alphabetical.options(defer('logo'))
         if location is None:
             # No location data is available. Use the alphabetical list as
             # the list of libraries.
-            libraries = alphabetical
+            a = time.time()
+            libraries = alphabetical.all()
+            b = time.time()
+            self.log.info("Built alphabetical list of all libraries in %.2fsec" % (b-a))
         else:
             # Location data is available. Get the list of nearby libraries, then get
             # the rest of the list in alphabetical order.
@@ -283,22 +291,30 @@ class LibraryRegistryController(BaseController):
             # We can't easily do the joindeload() thing for this
             # query, because it doesn't simply return Library objects,
             # but it won't return more than five results.
+            a = time.time()
             nearby_libraries = Library.nearby(
                 self._db, location, production=live
             ).limit(5).all()
+            b = time.time()
+            self.log.info("Fetched libraries near %s in %.2fsec" % (location, b-a))
 
             # Exclude nearby libraries from the alphabetical query
             # to get a list of faraway libraries.
             faraway_libraries = alphabetical.filter(
                 ~Library.id.in_([x.id for x, distance in nearby_libraries])
             )
+            c = time.time()
             libraries = nearby_libraries + faraway_libraries.all()
+            self.log.info("Fetched libraries far from %s in %.2fsec" % (location, c-b))
 
         url = self.app.url_for("libraries_opds")
+        a = time.time()
         catalog = OPDSCatalog(
             self._db, 'Libraries', url, libraries,
             annotator=self.annotator, live=live
         )
+        b = time.time()
+        self.log.info("Built library catalog in %.2fsec" % (b-a))
         return catalog_response(catalog)
 
     def library_details(self, uuid, library=None):
