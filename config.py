@@ -69,7 +69,7 @@ class Configuration(object):
     LARGE_FEED_SIZE = "large_feed_size"
 
     # The name of the sitewide secret used for admin login.
-    SECRET_KEY = u"secret_key"
+    SECRET_KEY = "secret_key"
 
     @classmethod
     def database_url(cls, test=False):
@@ -105,7 +105,7 @@ class Configuration(object):
         delegates = []
         try:
             delegates = setting.json_value or []
-        except ValueError, e:
+        except ValueError as e:
             cls.log.warn("Invalid Adobe Vendor ID delegates configured.")
 
         node = integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).value

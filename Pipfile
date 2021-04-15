@@ -1,0 +1,36 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+feedparser = "*"
+loggly-python-handler = "*"
+lxml = "*"
+psycopg2 = "*"
+maxminddb-geolite2 = "*"
+requests = "*"
+pycryptodome = "*"
+uszipcode = "*"
+Flask = "*"
+Flask-Bcrypt = "*"
+Flask-SQLAlchemy-Session = "*"
+Flask-Babel = "*"
+GeoAlchemy2 = "*"
+PyJWT = "*"
+SQLAlchemy = "==1.3.23"
+Pillow = "*"
+pytest = "*"
+pytest-datadir = "*"
+bcrypt = "*"
+gunicorn = "*"
+
+[dev-packages]
+future = "*"
+coverage = "*"
+pep8 = "*"
+pycodestyle = "*"
+flake8 = "*"
+
+[requires]
+python_version = "3.9"

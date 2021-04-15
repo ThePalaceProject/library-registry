@@ -1,4 +1,3 @@
-from nose.tools import set_trace
 import json
 
 import flask
@@ -221,8 +220,7 @@ class OPDSCatalog(object):
             args['properties'] = properties
         return args
 
-    # TODO PYTHON3 rename to __str__
-    def __unicode__(self):
+    def __str__(self):
         if self.catalog is None:
             return None
 

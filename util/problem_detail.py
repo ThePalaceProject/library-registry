@@ -10,9 +10,9 @@ JSON_MEDIA_TYPE = "application/api-problem+json"
 
 
 def json(type, status, title, detail=None, instance=None, debug_message=None):
-    d = dict(type=type, title=unicode(title), status=status)
+    d = dict(type=type, title=str(title), status=status)
     if detail:
-        d['detail'] = unicode(detail)
+        d['detail'] = str(detail)
     if instance:
         d['instance'] = instance
     if debug_message:
@@ -57,9 +57,9 @@ class ProblemDetail(object):
         # Title and detail must be LazyStrings from Flask-Babel that are
         # localized when they are first used as strings.
         if title and not isinstance(title, LazyString):
-            logging.warn("\"%s\" has not been internationalized" % title)
+            logging.warning("\"%s\" has not been internationalized" % title)
         if detail and not isinstance(detail, LazyString):
-            logging.warn("\"%s\" has not been internationalized" % detail)
+            logging.warning("\"%s\" has not been internationalized" % detail)
 
         return ProblemDetail(
             self.uri, status_code or self.status_code, title or self.title, 

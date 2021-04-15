@@ -1,6 +1,3 @@
-from nose.tools import (
-    eq_,
-)
 import json
 
 from authentication_document import AuthenticationDocument
@@ -34,17 +31,14 @@ class TestRegistrar(DatabaseTest):
 
         # Test the case where register() returns a problem detail.
         result = registrar.reregister(library)
-        eq_(
-            (library, library.library_stage),
-            registrar.called_with
-        )
-        eq_(Mock.RETURN_VALUE, result)
+        assert registrar.called_with == (library, library.library_stage)
+        assert result == Mock.RETURN_VALUE
 
         # If register() returns anything other than a problem detail,
         # we presume success and return nothing.
         registrar.RETURN_VALUE = (object(), object(), object())
         result = registrar.reregister(library)
-        eq_(None, result)
+        assert result is None
 
     def test_opds_response_links(self):
         """Test the opds_response_links method.
@@ -69,19 +63,9 @@ class TestRegistrar(DatabaseTest):
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, has_link_feed
         )
-        eq_([auth_url], LibraryRegistrar.opds_response_links(
-            response, rel
-        ))
-        eq_(True,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
-        eq_(False,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, "Some other URL"
-            )
-        )
+        assert LibraryRegistrar.opds_response_links(response, rel) == [auth_url]
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is True
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, "Some other URL") is False
 
         # The same feed, but with an additional link in the
         # Link header. Both links are returned.
@@ -90,14 +74,8 @@ class TestRegistrar(DatabaseTest):
             has_link_feed, links={rel: {'url': "http://another-auth-document",
                                         'rel': rel}}
         )
-        eq_(set([auth_url, "http://another-auth-document"]),
-            set(LibraryRegistrar.opds_response_links(response, rel))
-        )
-        eq_(True,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
+        assert set(LibraryRegistrar.opds_response_links(response, rel)) == set([auth_url, "http://another-auth-document"])
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is True
 
         # A similar feed, but with a relative URL, which is made absolute
         # by opds_response_links.
@@ -108,93 +86,53 @@ class TestRegistrar(DatabaseTest):
             200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, relative_url_feed
         )
         response.url = "http://opds-server/catalog.opds"
-        eq_(["http://opds-server/auth-document"],
-            LibraryRegistrar.opds_response_links(response, rel)
-        )
-        eq_(True,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, "http://opds-server/auth-document"
-            )
-        )
+        assert LibraryRegistrar.opds_response_links(response, rel) == ["http://opds-server/auth-document"]
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, "http://opds-server/auth-document") is True
 
         # An OPDS 1 feed that has no link.
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, "<feed></feed>"
         )
-        eq_([], LibraryRegistrar.opds_response_links(
-            response, rel
-        ))
-        eq_(False,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
+        assert LibraryRegistrar.opds_response_links(response, rel) == []
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is False
 
         # An OPDS 2 feed that has a link.
         catalog = json.dumps({"links": {rel: { "href": auth_url }}})
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog
         )
-        eq_([auth_url], LibraryRegistrar.opds_response_links(
-            response, rel
-        ))
-        eq_(True,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
+        assert LibraryRegistrar.opds_response_links(response, rel) == [auth_url]
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is True
 
         # An OPDS 2 feed that has no link.
         catalog = json.dumps({"links": {}})
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, catalog
         )
-        eq_([], LibraryRegistrar.opds_response_links(
-            response, rel
-        ))
-        eq_(False,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
+        assert LibraryRegistrar.opds_response_links(response, rel) == []
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is False
 
         # A malformed feed.
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_TYPE}, "Not a real feed"
         )
-        eq_(False,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is False
 
         # An Authentication For OPDS document.
         response = DummyHTTPResponse(
             200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE},
             json.dumps({ "id": auth_url })
         )
-        eq_([auth_url], LibraryRegistrar.opds_response_links(
-            response, rel
-        ))
-        eq_(True,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
+        assert LibraryRegistrar.opds_response_links(response, rel) == [auth_url]
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is True
 
         # A malformed Authentication For OPDS document.
         response = DummyHTTPResponse(
             200, {"Content-Type": AuthenticationDocument.MEDIA_TYPE},
             json.dumps("Not a document.")
         )
-        eq_([], LibraryRegistrar.opds_response_links(
-            response, rel
-        ))
-        eq_(False,
-            LibraryRegistrar.opds_response_links_to_auth_document(
-                response, auth_url
-            )
-        )
+        assert LibraryRegistrar.opds_response_links(response, rel) == []
+        assert LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url) is False
 
     def test__required_email_address(self):
         """Validate the code that makes sure an input is a mailto: URI."""
@@ -202,23 +140,22 @@ class TestRegistrar(DatabaseTest):
         m = LibraryRegistrar._required_email_address
 
         problem = m(None, 'a title')
-        eq_(uri, problem.uri)
+        assert problem.uri == uri
         # The custom title is used.
-        eq_("a title", problem.title)
-        eq_("No email address was provided", problem.detail)
+        assert problem.title == "a title"
+        assert problem.detail == "No email address was provided"
 
         # Changing the title doesn't affect the original ProblemDetail
         # document.
         assert "a title" != INVALID_CONTACT_URI.title
 
         problem = m("http://not-an-email/", "a title")
-        eq_(uri, problem.uri)
-        eq_("URI must start with 'mailto:' (got: http://not-an-email/)",
-            problem.detail)
+        assert problem.uri == uri
+        assert problem.detail == "URI must start with 'mailto:' (got: http://not-an-email/)"
 
         mailto = "mailto:me@library.org"
         success = m(mailto, "a title")
-        eq_(mailto, success)
+        assert success == mailto
 
     def test__locate_email_addresses(self):
         """Test the code that finds an email address in a list of links."""
@@ -228,9 +165,9 @@ class TestRegistrar(DatabaseTest):
         # No links at all.
         result = m("rel0", [], "a title")
         assert isinstance(result, ProblemDetail)
-        eq_(uri, result.uri)
-        eq_("a title", result.title)
-        eq_("No valid mailto: links found with rel=rel0", result.detail)
+        assert result.uri == uri
+        assert result.title == "a title"
+        assert result.detail == "No valid mailto: links found with rel=rel0"
 
         # Links exist but none are valid and relevant.
         links = [dict(rel="rel1", href="http://foo/"),
@@ -240,10 +177,10 @@ class TestRegistrar(DatabaseTest):
         ]
         result = m("rel1", links, "a title")
         assert isinstance(result, ProblemDetail)
-        eq_(uri, result.uri)
-        eq_("a title", result.title)
-        eq_("No valid mailto: links found with rel=rel1", result.detail)
+        assert result.uri == uri
+        assert result.title == "a title"
+        assert result.detail == "No valid mailto: links found with rel=rel1"
 
         # Multiple links that work.
         result = m("rel2", links, "a title")
-        eq_(["mailto:me@library.org", "mailto:me2@library.org"], result)
+        assert result == ["mailto:me@library.org", "mailto:me2@library.org"]

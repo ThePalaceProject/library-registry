@@ -1,8 +1,5 @@
-from nose.tools import (
-    assert_raises_regexp,
-    eq_,
-    set_trace,
-)
+import pytest
+
 from . import DatabaseTest
 from email.mime.text import MIMEText
 
@@ -50,10 +47,10 @@ class TestEmailTemplate(object):
     def test_unicode_quoted_printable(self):
         # Create an email message that includes Unicode characters in
         # its subject and body.
-        snowman = u"\N{SNOWMAN}"
+        snowman = "\N{SNOWMAN}"
         template = EmailTemplate(
-            u"A snowman for you! %s" % snowman,
-            u"Here he is: %s" % snowman
+            "A snowman for you! %s" % snowman,
+            "Here he is: %s" % snowman
         )
         body = template.body("me@example.com", "you@example.com")
         # The SNOWMAN character is encoded as quoted-printable in both
@@ -111,24 +108,20 @@ class TestEmailer(DatabaseTest):
         m = Emailer._sitewide_integration
         # If there's no integration with goal=Emailer.GOAL,
         # _sitewide_integration raises an exception.
-        assert_raises_regexp(
-            CannotLoadConfiguration,
-            'No email integration is configured',
-            m, self._db
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(self._db)
+        assert 'No email integration is configured' in str(exc.value)
 
         # If there's only one, _sitewide_integration finds it.
         integration = self._integration()
-        eq_(integration, m(self._db))
+        assert m(self._db) == integration
 
         # If there are multiple integrations with goal=Emailer.GOAL, no
         # sitewide configuration can be determined.
         duplicate = self._integration()
-        assert_raises_regexp(
-            CannotLoadConfiguration,
-            'Multiple email integrations are configured',
-            m, self._db
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(self._db)
+        assert 'Multiple email integrations are configured' in str(exc.value)
 
     def test_from_sitewide_integration(self):
         """Test the ability to load an Emailer from a sitewide integration."""
@@ -136,16 +129,16 @@ class TestEmailer(DatabaseTest):
         emailer = Emailer.from_sitewide_integration(self._db)
 
         # The Emailer's configuration is based on the sitewide integration.
-        eq_("smtp_username", emailer.smtp_username)
-        eq_("smtp_password", emailer.smtp_password)
-        eq_("smtp_host", emailer.smtp_host)
-        eq_("me@registry", emailer.from_address)
+        assert emailer.smtp_username == "smtp_username"
+        assert emailer.smtp_password == "smtp_password"
+        assert emailer.smtp_host == "smtp_host"
+        assert emailer.from_address == "me@registry"
 
         # Default EmailTemplates have been created for all known email types.
         for email_type in Emailer.EMAIL_TYPES:
             template = emailer.templates[email_type]
-            eq_(Emailer.SUBJECTS[email_type], template.subject_template)
-            eq_(Emailer.BODIES[email_type], template.body_template)
+            assert template.subject_template == Emailer.SUBJECTS[email_type]
+            assert template.body_template == Emailer.BODIES[email_type]
 
         # Configure custom subject lines and body templates for the
         # known email types, and build another Emailer.
@@ -159,8 +152,8 @@ class TestEmailer(DatabaseTest):
         emailer = Emailer.from_sitewide_integration(self._db)
         for email_type in Emailer.EMAIL_TYPES:
             template = emailer.templates[email_type]
-            eq_("subject %s" % email_type, template.subject_template)
-            eq_("body %s" % email_type, template.body_template)
+            assert template.subject_template == "subject %s" % email_type
+            assert template.body_template == "body %s" % email_type
 
     def test_constructor(self):
         """Verify the exceptions raised when required constructor
@@ -175,34 +168,40 @@ class TestEmailer(DatabaseTest):
         args['templates'] = {}
 
         m = Emailer
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP username specified", m, **args
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(**args)
+        assert "No SMTP username specified" in str(exc.value)
+
         args['smtp_username'] = 'user'
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP password specified", m, **args
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(**args)
+        assert "No SMTP password specified" in str(exc.value)
+
         args['smtp_password'] = 'password'
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP host specified", m, **args
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(**args)
+        assert "No SMTP host specified" in str(exc.value)
+
         args['smtp_host'] = 'host'
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No SMTP port specified", m, **args
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(**args)
+        assert "No SMTP port specified" in str(exc.value)
+
         args['smtp_port'] = 'port'
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No From: name specified", m, **args
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(**args)
+        assert "No From: name specified" in str(exc.value)
+
         args['from_name'] = 'Email Sender'
 
-        assert_raises_regexp(
-            CannotLoadConfiguration, "No From: address specified", m, **args
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(**args)
+        assert "No From: address specified" in str(exc.value)
+
         args['from_address'] = 'from@library.org'
 
         # With all the arguments specified, it works.
@@ -210,11 +209,9 @@ class TestEmailer(DatabaseTest):
 
         # If one of the templates can't be used, it doesn't work.
         args['templates']['key'] = EmailTemplate("%(nope)s", "email body")
-        assert_raises_regexp(
-            CannotLoadConfiguration,
-            "Template '%\(nope\)s'/'email body' contains unrecognized key",
-            m, **args
-        )
+        with pytest.raises(CannotLoadConfiguration) as exc:
+            m(**args)
+        assert r"Template '%(nope)s'/'email body' contains unrecognized key: KeyError('nope')" in str(exc.value)
 
     def test_templates(self):
         """Test the emails generated by the default templates."""
@@ -301,16 +298,16 @@ The link will expire in about a day. If the link expires, just re-register your 
         # The template was filled out and passed into our mocked-up
         # _send_email implementation.
         (to, body, smtp) = emailer.emails.pop()
-        eq_("you@library", to)
+        assert to == "you@library"
         for phrase in [
             "From: Me <me@registry>",
             "To: you@library",
             "subject Value".replace(" ", "_"), # Part of the encoding process.
             "Hello, you@library, this is me@registry."
         ]:
-            print phrase
+            print(phrase)
             assert phrase in body
-        eq_(mock_smtp, smtp)
+        assert smtp == mock_smtp
 
     def test__send_email(self):
         """Verify that send_email calls certain methods on smtplib.SMTP."""
@@ -321,24 +318,8 @@ The link will expire in about a day. If the link expires, just re-register your 
 
         # Five smtplib.SMTP methods were called.
         connect, starttls, login, sendmail, quit = mock.calls
-        eq_(
-            ('connect', (emailer.smtp_host, emailer.smtp_port), {}),
-            connect
-        )
-
-        eq_(
-            ('starttls', (), {}),
-            starttls
-        )
-
-        eq_(
-            ('login', (emailer.smtp_username, emailer.smtp_password), {}),
-            login
-        )
-
-        eq_(
-            ('sendmail', (emailer.from_address, "you@library", "email body"), {}),
-            sendmail
-        )
-
-        eq_(("quit", (), {}), quit)
+        assert connect == ('connect', (emailer.smtp_host, emailer.smtp_port), {})
+        assert starttls == ('starttls', (), {})
+        assert login == ('login', (emailer.smtp_username, emailer.smtp_password), {})
+        assert sendmail == ('sendmail', (emailer.from_address, "you@library", "email body"), {})
+        assert quit == ("quit", (), {})

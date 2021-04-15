@@ -1,7 +1,7 @@
 import datetime
 import flask
 from flask import Response
-from nose.tools import set_trace
+
 import base64
 import re
 import requests
@@ -140,7 +140,7 @@ class AdobeVendorIDRequestHandler(object):
         parser = AdobeSignInRequestParser()
         try:
             data = parser.process(data)
-        except Exception, e:
+        except Exception as e:
             return self.error_document(self.AUTH_ERROR_TYPE, str(e))
         user_id = label = None
         if not data:
@@ -176,7 +176,7 @@ class AdobeVendorIDRequestHandler(object):
                     self.ACCOUNT_INFO_ERROR_TYPE,
                     "Could not find user identifer in request document.")
             label = urn_to_label(data['user'])
-        except Exception, e:
+        except Exception as e:
             return self.error_document(
                 self.ACCOUNT_INFO_ERROR_TYPE, str(e))
 
@@ -203,7 +203,7 @@ class AdobeVendorIDModel(object):
 
         delegate_objs = []
         for i in delegates:
-            if isinstance(i, basestring):
+            if isinstance(i, str):
                 delegate_objs.append(AdobeVendorIDClient(i))
             else:
                 delegate_objs.append(i)
@@ -223,7 +223,7 @@ class AdobeVendorIDModel(object):
             delegated_patron_identifier = self.short_client_token_decoder.decode_two_part(
                 self._db, username, password
             )
-        except ValueError, e:
+        except ValueError as e:
             delegated_patron_identifier = None
         if delegated_patron_identifier:
             return self.account_id_and_label(delegated_patron_identifier)
@@ -234,7 +234,7 @@ class AdobeVendorIDModel(object):
                         username, password
                     )
                     return account_id, label
-                except Exception, e:
+                except Exception as e:
                     # This delegate couldn't help us.
                     pass
 
@@ -251,7 +251,7 @@ class AdobeVendorIDModel(object):
             delegated_patron_identifier = self.short_client_token_decoder.decode(
                 self._db, authdata
             )
-        except ValueError, e:
+        except ValueError as e:
             delegated_patron_identifier = None
 
         if delegated_patron_identifier:
@@ -263,7 +263,7 @@ class AdobeVendorIDModel(object):
                         authdata
                     )
                     return account_id, label
-                except Exception, e:
+                except Exception as e:
                     # This delegate couldn't help us.
                     pass
 

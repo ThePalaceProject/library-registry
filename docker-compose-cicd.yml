@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  libreg_test_db:
+    container_name: libreg_test_db
+    build:
+      context: .
+      target: libreg_local_db
+    volumes:
+      - local_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  libreg_test_webapp:
+    container_name: libreg_test_webapp
+    depends_on: 
+      - libreg_test_db
+    build:
+      context: .
+      target: libreg_dev
+      labels:
+        - "com.nypl.docker.imagename=library_registry"
+    entrypoint: ["tail", "-f", "/dev/null"]
+    environment:
+      - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_test_db:5432/simplified_registry_test
+      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_test_db:5432/simplified_registry_dev
+
+volumes:
+  local_db_data:

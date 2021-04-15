@@ -2,7 +2,7 @@ import flask
 import gzip
 from io import BytesIO
 from functools import wraps
-from nose.tools import set_trace
+
 from util import GeometryUtility
 from util.problem_detail import ProblemDetail
 from util.flask_util import originating_ip

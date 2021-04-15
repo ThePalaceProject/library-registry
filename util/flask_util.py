@@ -6,7 +6,7 @@ from . import (
     problem_detail,
 )
 
-from language import languages_from_accept
+from .language import languages_from_accept
 
 def problem_raw(type, status, title, detail=None, instance=None, headers={}):
     data = problem_detail.json(type, status, title, detail, instance)

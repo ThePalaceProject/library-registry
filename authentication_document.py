@@ -1,6 +1,6 @@
 from collections import defaultdict
 import json
-from nose.tools import set_trace
+
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm.exc import (
     MultipleResultsFound,
@@ -185,7 +185,7 @@ class AuthenticationDocument(object):
                 unknown["??"] = coverage
                 coverage = dict() # Do no more processing
 
-        for nation, places in coverage.items():
+        for nation, places in list(coverage.items()):
             try:
                 nation_obj = place_class.lookup_one_by_name(
                     _db, nation, place_type=Place.NATION,
@@ -196,7 +196,7 @@ class AuthenticationDocument(object):
                 else:
                     # This library covers a list of places within a
                     # nation.
-                    if isinstance(places, basestring):
+                    if isinstance(places, str):
                         # This is invalid -- you're supposed to always
                         # pass in a list -- but we can support it.
                         places = [places]
@@ -209,13 +209,13 @@ class AuthenticationDocument(object):
                             else:
                                 # We couldn't find any place with this name.
                                 unknown[nation].append(place)
-                        except MultipleResultsFound, e:
+                        except MultipleResultsFound as e:
                             # The place was ambiguously named.
                             ambiguous[nation].append(place)
-            except MultipleResultsFound, e:
+            except MultipleResultsFound as e:
                 # A nation was ambiguously named -- not very likely.
                 ambiguous[nation] = places
-            except NoResultFound, e:
+            except NoResultFound as e:
                 # Either this isn't a recognized nation
                 # or we don't have a geography for it.
                 unknown[nation] = places
@@ -312,7 +312,7 @@ class AuthenticationDocument(object):
         original_audiences = audiences
         if not audiences:
             audiences = [Audience.PUBLIC]
-        if isinstance(audiences, basestring):
+        if isinstance(audiences, str):
             # This is invalid but we can easily support it.
             audiences = [audiences]
         if not isinstance(audiences, list):
@@ -435,7 +435,7 @@ class AuthenticationDocument(object):
 
     @classmethod
     def _update_collection_size(self, library, sizes):
-        if isinstance(sizes, basestring) or isinstance(sizes, int):
+        if isinstance(sizes, str) or isinstance(sizes, int):
             # A single collection with no known language.
             sizes = { None: sizes }
         if sizes is None:
@@ -449,7 +449,7 @@ class AuthenticationDocument(object):
         new_collections = set()
         unknown_size = 0
         try:
-            for language, size in sizes.items():
+            for language, size in list(sizes.items()):
                 summary = CollectionSummary.set(library, language, size)
                 if summary.language is None:
                     unknown_size += summary.size
@@ -461,8 +461,8 @@ class AuthenticationDocument(object):
                 new_collections.add(
                     CollectionSummary.set(library, None, unknown_size)
                 )
-        except ValueError, e:
-            return INVALID_INTEGRATION_DOCUMENT.detailed(unicode(e))
+        except ValueError as e:
+            return INVALID_INTEGRATION_DOCUMENT.detailed(str(e))
 
         # Destroy any CollectionSummaries representing collections
         # no longer associated with this library.

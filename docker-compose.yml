@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  libreg_local_db:
+    container_name: libreg_local_db
+    build:
+      context: .
+      target: libreg_local_db
+    volumes:
+      - local_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  libreg_webapp:
+    container_name: libreg_webapp
+    depends_on: 
+      - libreg_local_db
+    build:
+      context: .
+      target: libreg_dev
+    ports:
+      - "80:80"
+    environment:
+      - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_local_db:5432/simplified_registry_test
+      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5432/simplified_registry_dev
+      - FLASK_ENV=development
+    volumes:
+      - type: bind
+        source: .
+        target: /libreg_app
+        read_only: true
+
+volumes:
+  local_db_data:

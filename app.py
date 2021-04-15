@@ -1,7 +1,7 @@
 """Library registry web application."""
 import os
 import sys
-import urlparse
+import urllib.parse
 
 from flask import Flask, url_for, redirect, Response, request
 from flask_babel import Babel
@@ -11,7 +11,7 @@ from config import Configuration
 from controller import LibraryRegistry
 from log import LogConfiguration
 from model import SessionManager, ConfigurationSetting
-from nose.tools import set_trace
+
 from util.app_server import returns_problem_detail, returns_json_or_response_or_problem_detail
 from app_helpers import (
     compressible,
@@ -224,18 +224,6 @@ def adobe_vendor_id_status():
 def admin_view():
     return app.library_registry.view_controller()
 
-@app.route('/admin/static/registry-admin.js')
-@returns_problem_detail
-def admin_js():
-    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
-    return app.library_registry.static_files.static_file(directory, "registry-admin.js")
-
-@app.route('/admin/static/registry-admin.css')
-@returns_problem_detail
-def admin_css():
-    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
-    return app.library_registry.static_files.static_file(directory, "registry-admin.css")
-
 
 if __name__ == '__main__':
     debug = True
@@ -243,8 +231,8 @@ if __name__ == '__main__':
         url = sys.argv[1]
     else:
         url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
-    url = url or u'http://localhost:7000/'
-    scheme, netloc, path, parameters, query, fragment = urlparse.urlparse(url)
+    url = url or 'http://localhost:7000/'
+    scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(url)
     if ':' in netloc:
         host, port = netloc.split(':')
         port = int(port)
