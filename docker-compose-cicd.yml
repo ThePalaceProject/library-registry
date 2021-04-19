@@ -11,16 +11,15 @@ services:
     ports:
       - "5432:5432"
 
-  libreg_test_webapp:
-    container_name: libreg_test_webapp
+  libreg_prod_webapp:
+    container_name: libreg_prod_webapp
     depends_on: 
       - libreg_test_db
     build:
       context: .
-      target: libreg_dev
+      target: libreg_prod
       labels:
         - "com.nypl.docker.imagename=library_registry"
-    entrypoint: ["tail", "-f", "/dev/null"]
     environment:
       - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_test_db:5432/simplified_registry_test
       - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_test_db:5432/simplified_registry_dev

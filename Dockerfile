@@ -106,8 +106,8 @@ RUN set -x \
 #   https://github.com/pypa/pipenv/issues/4052#issuecomment-588480867
 ENV CI 1
 
-# This creates the /libreg_app directory without issuing a separate RUN directive.
-WORKDIR /libreg_app
+# This creates the /simplye_app directory without issuing a separate RUN directive.
+WORKDIR /simplye_app
 
 # Copy over the dependency files individually. We copy over the entire local
 # directory later in the process, *after* the heavy RUN instructions, so that
@@ -116,17 +116,17 @@ COPY ./Pipfile* ./
 COPY ./package*.json ./
 
 # Setting WORKON_HOME causes pipenv to put its virtualenv in a pre-determined, 
-# OS-independent location. Note that /libreg_venv is NOT the virtualenv, it's 
+# OS-independent location. Note that /simplye_venv is NOT the virtualenv, it's 
 # just the parent directory for virtualenvs created by pipenv. The actual venv
 # is in a directory called something like
-# /libreg_venv/libreg_app-QOci6oRN, which follows the pattern 
+# /simplye_venv/simplye_app-QOci6oRN, which follows the pattern 
 # '<name-of-project-dir>-<hashval>', where the hashval is deterministic and based on
 # the path to the Pipfile. See this issue comment for a description of how that
 # name is built:
 #
 #   https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
 #
-ENV WORKON_HOME /libreg_venv
+ENV WORKON_HOME /simplye_venv
 
 # Install the system dependencies and the Python dependencies. Note that if 
 # you want to be able to install new Python dependencies on the fly from
@@ -170,15 +170,15 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && mkdir ${WORKON_HOME} \
- && cd /libreg_app \
+ && cd /simplye_app \
  && pipenv install --dev --skip-lock --clear \
  # Set up the NPM build in a place we can delete it once we have our built artifacts
- && mkdir /tmp/libreg_npm_build \
- && cp ./package*.json /tmp/libreg_npm_build \
- && npm install --prefix /tmp/libreg_npm_build \
- && mkdir -p /libreg_static/static \
- && cp /tmp/libreg_npm_build/node_modules/simplified-registry-admin/dist/* /libreg_static/static \
- && rm -rf /tmp/libreg_npm_build \
+ && mkdir /tmp/simplye_npm_build \
+ && cp ./package*.json /tmp/simplye_npm_build \
+ && npm install --prefix /tmp/simplye_npm_build \
+ && mkdir -p /simplye_static/static \
+ && cp /tmp/simplye_npm_build/node_modules/simplified-registry-admin/dist/* /simplye_static/static \
+ && rm -rf /tmp/simplye_npm_build \
  && apk del --no-network .build-deps
 
 COPY ./docker/gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
@@ -196,7 +196,7 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 # Build target: libreg_dev
 # 
 # Note that this target assumes a host mount is in place to link the current
-# directory into the container at /libreg_app. The production target copies in
+# directory into the container at /simplye_app. The production target copies in
 # the entire project directory since it will remain static.
 FROM builder AS libreg_dev
 
@@ -212,5 +212,5 @@ FROM builder AS libreg_prod
 
 ENV FLASK_ENV production
 
-COPY . /libreg_app
+COPY . /simplye_app
 ##############################################################################

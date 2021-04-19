@@ -5,7 +5,7 @@ PG_READY_WAIT_SECONDS=5
 COUNT=0
 RETRIES=10
 
-cd /libreg_app
+cd /simplye_app
 
 pg_is_ready () {
     pipenv run python > /dev/null 2>&1 <<EOF

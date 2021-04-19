@@ -19,5 +19,3 @@ psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     CREATE EXTENSION fuzzystrmatch;
     CREATE EXTENSION postgis;
 EOSQL
-
-#sed -i 's/listen_addresses = '

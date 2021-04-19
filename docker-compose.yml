@@ -27,7 +27,7 @@ services:
     volumes:
       - type: bind
         source: .
-        target: /libreg_app
+        target: /simplye_app
         read_only: true
 
 volumes:

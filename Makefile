@@ -1,4 +1,4 @@
-.PHONY: help build db-session webapp-shell up up-watch start stop down test clean full-clean
+.PHONY: help build build-prod db-session webapp-shell up up-watch start stop down test clean full-clean
 .DEFAULT_GOAL := help
 
 help:
@@ -7,6 +7,7 @@ help:
 	@echo "Commands:"
 	@echo ""
 	@echo "    build          - Build the libreg_webapp and libreg_local_db images"
+	@echo "    build-prod     - Build images based on the docker-compose-cicd.yml file"
 	@echo "    db-session     - Start a psql session as the superuser on the db container"
 	@echo "    webapp-shell   - Open a shell on the webapp container"
 	@echo "    up             - Bring up the local cluster in detached mode"
@@ -20,6 +21,9 @@ help:
 
 build:
 	docker-compose build
+
+build-prod:
+	docker-compose -f docker-compose-cicd.yml build
 
 db-session:
 	docker exec -it libreg_local_db psql -U postgres
