@@ -2,6 +2,15 @@
 
 A geographic search engine for matching people to the libraries that serve them.
 
+## Cloning the Registry Repositories
+
+You will need both this repository and the separate front end repo in order to build the local development images. The registry front end repo must be checked out to the same directory as the `library_registry` repo itself, or you will need to change the host mount instructions in the `docker-compose.yml` file to accomodate its location. To get them both in the same parent directory, just execute:
+
+```shell
+git clone https://github.com/NYPL-Simplified/library_registry.git
+git clone https://github.com/NYPL-Simplified/registry_admin.git
+```
+
 ## Installation (Docker)
 
 Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
@@ -13,6 +22,7 @@ _Note: If you would like to use the `Makefile` commands you will also need `make
 Local development uses two Docker images and one persistent Docker volume (for the PostgreSQL data directory). To create the base images:
 
 ```shell
+cd library_registry
 make build
 ```
 

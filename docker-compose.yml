@@ -29,6 +29,9 @@ services:
         source: .
         target: /simplye_app
         read_only: true
+      - type: bind
+        source: ../registry_admin
+        target: /registry_admin
 
 volumes:
   local_db_data:

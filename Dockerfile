@@ -50,6 +50,7 @@ ENV NGINX_VERSION 1.19.8
 ENV NJS_VERSION   0.5.2
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
+ENV SIMPLYE_RUN_WEBPACK_WATCH 0
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
@@ -113,7 +114,6 @@ WORKDIR /simplye_app
 # directory later in the process, *after* the heavy RUN instructions, so that
 # the docker layer caching isn't impacted by extraneous changes in the repo.
 COPY ./Pipfile* ./
-COPY ./package*.json ./
 
 # Setting WORKON_HOME causes pipenv to put its virtualenv in a pre-determined, 
 # OS-independent location. Note that /simplye_venv is NOT the virtualenv, it's 
@@ -135,50 +135,22 @@ ENV WORKON_HOME /simplye_venv
 # the image.
 RUN set -ex \
 	&& apk add --no-cache --virtual .build-deps  \
-		bluez-dev \
-        build-base \
+		build-base \
 		bzip2-dev \
-		coreutils \
-		dpkg-dev dpkg \
-		expat-dev \
-		findutils \
-		gcc \
-		gdbm-dev \        
-		libc-dev \
 		libffi-dev \
-		libnsl-dev \
-		libtirpc-dev \
-        libxslt-dev \
-		linux-headers \
-		make \
-		ncurses-dev \
-        npm \
+		libxslt-dev \
+		npm \
 		openssl-dev \
-		pax-utils \
-        postgresql-dev \
-		readline-dev \
-		sqlite-dev \
-		tcl-dev \
-		tk \
-		tk-dev \
-		util-linux-dev \
-		xz-dev \
-		zlib-dev \
+		postgresql-dev \
+		zlib-dev \        
  # We need to leave these installed for psycopg2 and PIL
- && apk add --no-cache \
+ && apk add --no-cache --virtual .runtime-deps \
     libpq \
     jpeg-dev \
     libxcb-dev \
  && mkdir ${WORKON_HOME} \
  && cd /simplye_app \
  && pipenv install --dev --skip-lock --clear \
- # Set up the NPM build in a place we can delete it once we have our built artifacts
- && mkdir /tmp/simplye_npm_build \
- && cp ./package*.json /tmp/simplye_npm_build \
- && npm install --prefix /tmp/simplye_npm_build \
- && mkdir -p /simplye_static/static \
- && cp /tmp/simplye_npm_build/node_modules/simplified-registry-admin/dist/* /simplye_static/static \
- && rm -rf /tmp/simplye_npm_build \
  && apk del --no-network .build-deps
 
 COPY ./docker/gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
@@ -201,7 +173,10 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 FROM builder AS libreg_dev
 
 ENV FLASK_ENV development
+ENV SIMPLYE_RUN_WEBPACK_WATCH 1
 ENV TESTING 1
+
+RUN apk add --no-cache npm
 ##############################################################################
 
 
@@ -211,6 +186,20 @@ ENV TESTING 1
 FROM builder AS libreg_prod
 
 ENV FLASK_ENV production
+
+# We'll be building the front end as static, so we need the package files.
+COPY ./package*.json ./
+
+# Compile the front end files and clean up the temporary build directory
+RUN set -ex \
+ && apk add --no-cache npm \
+ && mkdir /tmp/simplye_npm_build \
+ && cp ./package*.json /tmp/simplye_npm_build \
+ && npm install --prefix /tmp/simplye_npm_build \
+ && mkdir -p /simplye_static/static \
+ && cp /tmp/simplye_npm_build/node_modules/simplified-registry-admin/dist/* /simplye_static/static \
+ && rm -rf /tmp/simplye_npm_build \
+ && apk del npm
 
 COPY . /simplye_app
 ##############################################################################
