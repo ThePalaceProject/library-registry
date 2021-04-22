@@ -9,6 +9,7 @@ from model import (
     ExternalIntegration,
     Library,
     Place,
+    ServiceArea,
     create,
     get_one,
 )
@@ -412,27 +413,36 @@ class TestSetCoverageAreaScript(DatabaseTest):
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
 
-        # Setting a service area with no focus area assigns that
+        # Setting an eligibility area with no focus area assigns that
         # service area to the library.
         args = ["--library=%s" % library.name,
                 '--service-area={"US": "everywhere"}']
         s.run(args)
         [area] = library.service_areas
         assert area.place == us
+        assert area.type == ServiceArea.FOCUS
 
-        # Setting a focus area and not a service area treats 'everywhere'
-        # as the service area.
+        # Try again, setting both eligibility area (called "service
+        # area" here) and focus area.
+
+        # Note that running this script a second time replaces the
+        # old service areas rather than adding to them.
         uk = self._place(type=Place.NATION, abbreviated_name='UK')
         args = ["--library=%s" % library.name,
-                '--focus-area={"UK": "everywhere"}']
+                '--focus-area={"UK": "everywhere"}',
+                '--service-area="everywhere"'
+        ]
         s.run(args)
-        places = [x.place for x in library.service_areas]
-        assert len(places) == 2
-        assert uk in places
-        assert Place.everywhere(self._db) in places
-
-        # The library's former ServiceAreas have been removed.
-        assert us not in places
+        [focus] = [
+            x.place for x in library.service_areas
+            if x.type==ServiceArea.FOCUS
+        ]
+        [eligibility] = [
+            x.place for x in library.service_areas
+            if x.type==ServiceArea.ELIGIBILITY
+        ]
+        assert uk == focus
+        assert eligibility.type == Place.EVERYWHERE
 
         # If a default nation is set, you can name a single place as
         # your service area.
@@ -444,6 +454,9 @@ class TestSetCoverageAreaScript(DatabaseTest):
         args = ["--library=%s" % library.name,
                 '--service-area=UT']
         s.run(args)
+
+        # Again, running the script completely overwrites your service
+        # areas.
         [area] = library.service_areas
         assert area.place == ut
 
