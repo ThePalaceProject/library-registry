@@ -9,7 +9,9 @@ services:
     volumes:
       - local_db_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5433"
+    environment:
+      - PGPORT=5433
 
   libreg_webapp:
     container_name: libreg_webapp
@@ -21,8 +23,8 @@ services:
     ports:
       - "80:80"
     environment:
-      - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_local_db:5432/simplified_registry_test
-      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5432/simplified_registry_dev
+      - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_local_db:5433/simplified_registry_test
+      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5433/simplified_registry_dev
       - FLASK_ENV=development
     volumes:
       - type: bind
