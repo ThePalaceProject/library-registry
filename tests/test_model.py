@@ -187,6 +187,32 @@ class TestPlace(DatabaseTest):
         assert m("Anytown, USA") == ["USA", "Anytown"]
         assert m("Lake County, Ohio, US") == ["US", "Ohio", "Lake County"]
 
+    def test_human_friendly_name(self):
+        # Verify that places of different types are given good-looking
+        # human-friendly names.
+
+        everywhere = self._place(type=Place.EVERYWHERE)
+        eq_(None, everywhere.human_friendly_name)
+
+        nation = self._place(external_name="United States", type=Place.NATION)
+        eq_("United States", nation.human_friendly_name)
+
+        state = self._place(external_name="Alabama", abbreviated_name="AL"
+                            type=Place.STATE, parent=nation)
+        eq_("Alabama", state.human_friendly_name)
+
+        city = self._place(external_name="Montgomery", type=Place.CITY, 
+                           parent=state)
+        eq_("Montgomery, AL", city.human_friendly_name)
+
+        county = self._place(external_name="Montgomery", type=Place.COUNTY, 
+                             parent=state)
+        eq_("Montgomery County, AL", city.human_friendly_name)
+
+        postal_code = self._place(external_name="36043", type=Place.POSTAL_CODE,
+                                  parent=state)
+        eq_("36043", postal_code.human_friendly_name)
+
     def test_lookup_by_name(self):
 
         # There are two places in California called 'Santa Barbara': a
