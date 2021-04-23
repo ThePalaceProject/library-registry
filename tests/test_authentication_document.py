@@ -211,10 +211,11 @@ class TestLinkExtractor(object):
         everywhere = place.everywhere(None)
         parsed = AuthDoc.from_string(None, "{}", place)
 
-        # In the absence of specific information, it's assumed the
-        # OPDS server is open to everyone.
-        assert parsed.service_area == ([everywhere], {}, {})
-        assert parsed.focus_area== ([everywhere], {}, {})
+        # In the absence of specific information, we assume the most
+        # common case: a public library that simply hasn't specified
+        # its service area.
+        assert parsed.service_area == ([], {}, {})
+        assert parsed.focus_area== ([], {}, {})
         assert parsed.audiences == [parsed.PUBLIC_AUDIENCE]
 
         assert parsed.id is None

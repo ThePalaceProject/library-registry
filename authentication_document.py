@@ -131,7 +131,7 @@ class AuthenticationDocument(object):
                 _db, service_area, place_class=place_class
             )
         else:
-            service_area = [place_class.everywhere(_db)], {}, {}
+            service_area = [], {}, {}
         if focus_area:
             focus_area = cls.parse_coverage(
                 _db, focus_area, place_class=place_class
@@ -311,6 +311,8 @@ class AuthenticationDocument(object):
     def _update_audiences(self, library, audiences):
         original_audiences = audiences
         if not audiences:
+            # Most of the libraries in this system are open to at
+            # least some subset of the general public.
             audiences = [Audience.PUBLIC]
         if isinstance(audiences, str):
             # This is invalid but we can easily support it.
