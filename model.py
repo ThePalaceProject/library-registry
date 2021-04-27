@@ -1,3 +1,4 @@
+from collections import defaultdict
 from config import Configuration
 from flask_babel import lazy_gettext as _
 from flask_bcrypt import (
@@ -436,6 +437,48 @@ class Library(Base):
         """
         prod = self.PRODUCTION_STAGE
         return self.library_stage == prod and self.registry_stage == prod
+
+    @property
+    def service_area_name(self):
+        """Describe the library's service area in a short string a human would
+        understand, e.g. "Kern County, CA".
+
+        This library does the best it can to express a library's service
+        area as the name of a single place, but it's not always possible
+        since libraries can have multiple service areas.
+
+        TODO: We'll want to fetch a library's ServiceAreas (and their
+        Places) as part of the query that fetches libraries, so that
+        this doesn't result in extra DB queries per library.
+
+        :return: A string, or None if the library's service area can't be
+           described as a short string.
+        """
+        # Group the ServiceAreas by type.
+        by_type = defaultdict(set)
+        for a in self.service_areas:
+            if not a.place:
+                continue
+            if a.place.type == Place.EVERYWHERE:
+                # We already know that 'everywhere' won't work. Ignore
+                # it so it doesn't mask something more specific.
+                continue
+            by_type[a.type].add(a)
+
+        # If there is a single focus area, use it.
+        # Otherwise, if there is a single eligibility area, use that.
+        service_area = None
+        for area_type in ServiceArea.FOCUS, ServiceArea.ELIGIBILITY:
+            if len(by_type[area_type]) == 1:
+                [service_area] = by_type[area_type]
+                break
+
+        if service_area:
+            return service_area.place.human_friendly_name
+
+        # This library does not have one ServiceArea that stands out,
+        # so we can't describe its service area with a short string.
+        return None            
 
     @classmethod
     def _feed_restriction(cls, production, library_field=None, registry_field=None):
@@ -1254,6 +1297,34 @@ class Place(Base):
         """
         return [x.strip() for x in reversed(name.split(",")) if x.strip()]
 
+    @property
+    def human_friendly_name(self):
+        """Generate the sort of string a human would recognize as an
+        unambiguous name for this place.
+
+        This is in some sense the opposite of parse_name.
+
+        :return: A string, or None if there is no human-friendly name for
+           this place.
+        """
+        if self.type == self.EVERYWHERE:
+            # 'everywhere' is not a distinct place with a well-known name.
+            return None
+        if self.parent and self.parent.type == self.STATE:
+            parent = self.parent.abbreviated_name or self.parent.external_name
+            if self.type == Place.COUNTY:
+                # Renfrew County, ON
+                return "{} County, {}".format(self.external_name, parent)
+            elif self.type == Place.CITY:
+                # Montgomery, AL
+                return "{}, {}".format(self.external_name, parent)
+
+        # All other cases:
+        #  93203
+        #  Texas
+        #  France
+        return self.external_name
+
     def overlaps_not_counting_border(self, qu):
         """Modifies a filter to find places that have points inside this
         Place, not counting the border.
@@ -1267,6 +1338,7 @@ class Place(Base):
         return qu.filter(intersects).filter(touches==False)
 
     def lookup_inside(self, name, using_overlap=False, using_external_source=True):
+
         """Look up a named Place that is geographically 'inside' this Place.
 
         :param name: The name of a place, such as "Boston" or

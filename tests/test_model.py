@@ -187,6 +187,39 @@ class TestPlace(DatabaseTest):
         assert m("Anytown, USA") == ["USA", "Anytown"]
         assert m("Lake County, Ohio, US") == ["US", "Ohio", "Lake County"]
 
+    def test_human_friendly_name(self):
+        # Places of different types are given good-looking
+        # human-friendly names.
+
+        nation = self._place(external_name="United States", type=Place.NATION)
+        assert "United States" == nation.human_friendly_name
+
+        state = self._place(external_name="Alabama", abbreviated_name="AL",
+                            type=Place.STATE, parent=nation)
+        assert "Alabama" == state.human_friendly_name
+
+        city = self._place(external_name="Montgomery", type=Place.CITY, 
+                           parent=state)
+        assert "Montgomery, AL" == city.human_friendly_name
+
+        county = self._place(external_name="Montgomery", type=Place.COUNTY, 
+                             parent=state)
+        assert "Montgomery County, AL" == county.human_friendly_name
+
+        postal_code = self._place(external_name="36043", type=Place.POSTAL_CODE,
+                                  parent=state)
+        assert "36043" == postal_code.human_friendly_name
+
+        # This shouldn't happen, but just in case: the state's full
+        # name is used if it has no abbreviated name.
+        state.abbreviated_name = None
+        assert "Montgomery, Alabama" == city.human_friendly_name
+        assert "Montgomery County, Alabama" == county.human_friendly_name
+
+        # 'everywhere' is not a distinct place with a well-known name.
+        everywhere = self._place(type=Place.EVERYWHERE)
+        assert None == everywhere.human_friendly_name
+
     def test_lookup_by_name(self):
 
         # There are two places in California called 'Santa Barbara': a
@@ -604,10 +637,67 @@ class TestLibrary(DatabaseTest):
 
     def test_library_service_area(self):
         zip = self.zip_10018
+
         nypl = self._library("New York Public Library", eligibility_areas=[zip])
         [service_area] = nypl.service_areas
         assert service_area.place == zip
         assert service_area.library == nypl
+
+    def test_service_area_name(self):
+
+        # Gather a few focus areas; the details don't matter.
+        zip = self.zip_10018
+        nyc = self.new_york_city
+        new_york = self.new_york_state
+
+        # 'Everywhere' is not a place with a distinctive name, so throughout
+        # this test it will be ignored.
+        everywhere = Place.everywhere(self._db)
+
+        library = self._library(
+            "Internet Archive", eligibility_areas=[everywhere],
+            focus_areas=[everywhere]
+        )
+        assert None == library.service_area_name
+
+        # A library with a single eligibility area has a
+        # straightforward name.
+        library = self._library(
+            "test library", eligibility_areas=[everywhere, new_york],
+            focus_areas=[everywhere]
+        )
+        assert "New York" == library.service_area_name
+
+        # If you somehow specify the same place twice, it's fine.
+        library = self._library(
+            "test library", eligibility_areas=[new_york, new_york],
+            focus_areas=[everywhere]
+        )
+        assert "New York" == library.service_area_name
+
+        # If the library has an eligibility area and a focus area,
+        # the focus area takes precedence.
+        library = self._library(
+            "test library", eligibility_areas=[everywhere, new_york],
+            focus_areas=[nyc, everywhere]
+        )
+        assert "New York, NY" == library.service_area_name
+
+        # If there are multiple focus areas and one eligibility area,
+        # we're back to using the focus area.
+        library = self._library(
+            "test library", eligibility_areas=[everywhere, new_york],
+            focus_areas=[nyc, zip, everywhere]
+        )
+        assert "New York" == library.service_area_name
+
+        # If there are multiple focus areas _and_ multiple eligibility areas,
+        # there's no one string that describes the service area.
+        library = self._library(
+            "test library", eligibility_areas=[everywhere, new_york, zip],
+            focus_areas=[nyc, zip, everywhere]
+        )
+        assert None == library.service_area_name
 
     def test_relevant_audience(self):
         research = self._library(
