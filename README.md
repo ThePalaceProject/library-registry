@@ -1,14 +1,27 @@
-# SimplyE Library Registry
+# Library Registry
 
-A geographic search engine for matching people to the libraries that serve them.
+A discovery service for matching people to the libraries that serve them.
 
-## Cloning the Registry Repositories
+[![Test Library Registry & Build Docker Image](https://github.com/ThePalaceProject/library-registry/actions/workflows/test-build.yml/badge.svg)](https://github.com/ThePalaceProject/library-registry/actions/workflows/test-build.yml)
 
-You will need both this repository and the separate front end repo in order to build the local development images. The registry front end repo must be checked out to the same directory as the `library_registry` repo itself, or you will need to change the host mount instructions in the `docker-compose.yml` file to accomodate its location. To get them both in the same parent directory, just execute:
+This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL [Library Simplified](http://www.librarysimplified.org/) Library Registry.
+
+Docker images ar available at:
+- https://github.com/orgs/ThePalaceProject/packages?repo_name=library-registry
+
+## Cloning the Library Registry Repositories
+
+You will need both this repository and the separate front end repo, in 
+order to build the local development images. The registry front end repo
+should be checked out into a directory named `registry_admin` in the same
+parent directory as the `library-registry` repo itself. If it is not, you
+will need to change the host mount instructions in the `docker-compose.yml`
+file to accommodate its location. To get them both in the same directory, 
+execute the following from that directory:
 
 ```shell
-git clone https://github.com/NYPL-Simplified/library_registry.git
-git clone https://github.com/NYPL-Simplified/registry_admin.git
+git clone https://github.com/ThePalaceProject/library-registry.git
+git clone https://github.com/ThePalaceProject/library-registry-admin.git registry_admin
 ```
 
 ## Installation (Docker)
@@ -22,7 +35,7 @@ _Note: If you would like to use the `Makefile` commands you will also need `make
 Local development uses two Docker images and one persistent Docker volume (for the PostgreSQL data directory). To create the base images:
 
 ```shell
-cd library_registry
+cd library-registry
 make build
 ```
 
@@ -36,7 +49,7 @@ You can start up the local compose cluster in the background with:
 make up
 ```
 
-Alternatively, if you want to keep a terminal attached to the running containers so you can see their output, use:
+Alternatively, if you want to keep a terminal attached to the running containers, so you can see their output, use:
 
 ```shell
 make up-watch
