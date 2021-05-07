@@ -258,7 +258,7 @@ class TestLibraryRegistryController(ControllerTest):
             elif k in ["focus", "service"]:
                 area_type_names = dict(focus=ServiceArea.FOCUS, service=ServiceArea.ELIGIBILITY)
                 actual_areas = flattened.get(k)
-                expected_areas = ["%s (%s)" %(x.place.external_name, x.place.parent.abbreviated_name) for x in expected.service_areas if x.type == area_type_names[k]]
+                expected_areas = [x.place.human_friendly_name or 'Everywhere' for x in expected.service_areas if x.type == area_type_names[k]]
                 assert expected_areas == actual_areas
             elif k == Library.PLS_ID:
                 assert expected.pls_id.value == flattened.get(k)
@@ -290,6 +290,10 @@ class TestLibraryRegistryController(ControllerTest):
         ct = self.connecticut_state_library
         ks = self.kansas_state_library
         nypl = self.nypl
+        everywhere = self._place(type=Place.EVERYWHERE)
+        ia = self._library(
+            "InternetArchive", "IA", [everywhere], has_email=True
+        )
         in_testing = self._library(
             name="Testing",
             short_name="test_lib",
@@ -300,17 +304,18 @@ class TestLibraryRegistryController(ControllerTest):
         response = self.controller.libraries()
         libraries = response.get("libraries")
 
-        assert len(libraries) == 3
+        assert len(libraries) == 4
         for library in libraries:
             self._check_keys(library)
 
-        expected_names = [expected.name for expected in [ct, ks, nypl]]
+        expected_names = [expected.name for expected in [ct, ks, nypl, ia]]
         actual_names = [library.get("basic_info").get("name") for library in libraries]
         assert set(expected_names) == set(actual_names)
 
         self._is_library(ct, libraries[0])
-        self._is_library(ks, libraries[1])
-        self._is_library(nypl, libraries[2])
+        self._is_library(ia, libraries[1])
+        self._is_library(ks, libraries[2])
+        self._is_library(nypl, libraries[3])
 
     def test_libraries_qa_admin(self):
         # Test that the controller returns a specific set of information for each library.
