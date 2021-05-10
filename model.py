@@ -235,6 +235,14 @@ class LibraryType(object):
         "CA" : PROVINCE,
     }
 
+    NAME_FOR_CODE = {
+        LOCAL: "Local library",
+        COUNTY: "County library",
+        STATE: "State library",
+        PROVINCE: "Provincial library",
+        NATIONAL: "National library",
+        UNIVERSAL: "Online library",
+    }
 
 class Library(Base):
     """An entry in this table corresponds more or less to an OPDS server.
@@ -467,14 +475,17 @@ class Library(Base):
     def types(self):
         """Return any special types for this library.
 
-        :yield: A sequence of strings.
+        :yield: A sequence of code constants from LibraryTypes.
         """
         service_area = self.service_area
         if not service_area:
             return
-        yield service_area.library_type
+        code = service_area.library_type
+        if code:
+            yield code
 
-        # TODO: more types, e.g. audience-based, can go here.
+        # TODO: in the future, more types, e.g. audience-based, can go
+        # here.
 
     @property
     def service_area(self):

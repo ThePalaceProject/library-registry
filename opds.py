@@ -6,6 +6,7 @@ from sqlalchemy.orm import Query
 from model import (
     ConfigurationSetting,
     Hyperlink,
+    LibraryType,
     Session,
     Validation,
 )
@@ -153,6 +154,16 @@ class OPDSCatalog(object):
 
         if library.description:
             metadata["description"] = library.description
+
+        subjects = []
+        for code in library.types:
+            subjects.append(
+                dict(code=code, name=LibraryType.NAME_FOR_CODE[code],
+                     scheme=LibraryType.SCHEME_URI)
+            )
+        if subjects:
+            metadata['subject'] = subjects
+
         catalog = dict(metadata=metadata)
 
         if library.opds_url:

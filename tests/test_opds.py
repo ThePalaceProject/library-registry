@@ -12,6 +12,7 @@ from model import (
     ConfigurationSetting,
     Hyperlink,
     Library,
+    LibraryType,
     Validation,
 )
 from opds import OPDSCatalog
@@ -193,6 +194,13 @@ class TestOPDSCatalog(DatabaseTest):
         # terms, it is explained in 'schema:areaServed'.
         assert metadata['schema:areaServed'] == "New York, NY"
 
+        # That also means the library will be given an OPDS subject
+        # corresponding to its type.
+        [subject] = metadata['subject']
+        assert LibraryType.SCHEME_URI == subject['scheme']
+        assert LibraryType.LOCAL == subject['code']
+        assert LibraryType.NAME_FOR_CODE[LibraryType.LOCAL] == subject['name']
+
         [authentication_url, web_alternate, help, eligibility, focus, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel', ''), x.get('type', '')))
         [logo] = catalog['images']
 
@@ -256,7 +264,9 @@ class TestOPDSCatalog(DatabaseTest):
         # library's OPDS entry.
         library.service_areas = []
         catalog = Mock.library_catalog(library, url_for=self.mock_url_for)
-        for missing_key in ('schema:areaServed', 'schema:distance', 'distance'):
+        for missing_key in (
+            'schema:areaServed', 'schema:distance', 'distance', 'subject'
+        ):
             assert missing_key not in catalog['metadata']
 
     def test__hyperlink_args(self):
