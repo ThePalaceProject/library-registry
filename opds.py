@@ -120,20 +120,36 @@ class OPDSCatalog(object):
 
         """Create an OPDS catalog for a library.
 
+        :param distance: The distance, in meters, from the client's
+           current location (if known) to the edge of this library's
+           service area.
+
         :param include_private_information: If this is True, the
         consumer of this OPDS catalog is expected to be the library
         whose catalog it is. Private information such as the point of
         contact for integration problems will be included, where it
         normally wouldn't be.
+
         """
         url_for = url_for or flask.url_for
+
+        modified = cls._strftime(library.timestamp)
         metadata = dict(
             id=library.internal_urn,
             title=library.name,
-            updated=cls._strftime(library.timestamp),
+            modified=modified,
+            updated=modified, # For backwards compatibility with earlier
+                              # clients.
         )
         if distance is not None:
-            metadata["distance"] = "%d km." % (distance/1000)
+            # 'distance' for backwards compatibility.
+            value = "%d km." % (distance/1000)
+            for key in 'schema:distance', 'distance':
+                metadata[key] = value
+
+        service_area_name = library.service_area_name
+        if service_area_name is not None:
+            metadata['schema:areaServed'] = service_area_name
 
         if library.description:
             metadata["description"] = library.description

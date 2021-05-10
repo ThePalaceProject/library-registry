@@ -144,7 +144,9 @@ class TestOPDSCatalog(DatabaseTest):
                 cls.hyperlinks.append(hyperlink)
                 return OPDSCatalog._hyperlink_args(hyperlink)
 
-        library = self._library("The New York Public Library")
+        library = self._library(
+            "The New York Public Library", focus_areas=[self.new_york_city]
+        )
         library.urn = "123-abc"
         library.description = "It's a wonderful library."
         library.opds_url = "https://opds/"
@@ -167,14 +169,29 @@ class TestOPDSCatalog(DatabaseTest):
 
         catalog = Mock.library_catalog(
             library, url_for=self.mock_url_for,
-            web_client_uri_template="http://web/{uuid}"
+            web_client_uri_template="http://web/{uuid}",
+            distance=14244
         )
         metadata = catalog['metadata']
         assert metadata['title'] == library.name
         assert metadata['id'] == library.internal_urn
         assert metadata['description'] == library.description
 
-        assert metadata['updated'] == OPDSCatalog._strftime(library.timestamp)
+        # The distance between the current location and the edge of
+        # the library's service area is published as 'schema:distance'
+        # and also (for backwards compatibility) as 'distance'
+        for key in ('schema:distance', 'distance'):
+            assert metadata[key] == '14 km.'
+
+        # The library's updated timestamp is published as 'modified'
+        # and also (for backwards compatibility) as 'updated'.
+        timestamp = OPDSCatalog._strftime(library.timestamp)
+        for key in ('modified', 'updated'):
+            assert metadata[key] == timestamp
+
+        # If the library's service area is easy to explain in human-friendly
+        # terms, it is explained in 'schema:areaServed'.
+        assert metadata['schema:areaServed'] == "New York, NY"
 
         [authentication_url, web_alternate, help, eligibility, focus, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel', ''), x.get('type', '')))
         [logo] = catalog['images']
@@ -225,15 +242,22 @@ class TestOPDSCatalog(DatabaseTest):
         assert set(Mock.hyperlinks) == set([public_hyperlink, private_hyperlink])
 
         # If library_catalog is passed with include_logo=False,
-        # the (potentially large) inline logo is omitted, 
+        # the (potentially large) inline logo is omitted,
         # even though it was included before.
         catalog = Mock.library_catalog(
-            library, include_logo=False, 
+            library, include_logo=False,
             url_for=self.mock_url_for
         )
         relations = [x.get('rel') for x in catalog['links']]
         assert OPDSCatalog.THUMBNAIL_REL not in relations
 
+        # If availability or service area information are not
+        # available, that information cannot be published in the
+        # library's OPDS entry.
+        library.service_areas = []
+        catalog = Mock.library_catalog(library, url_for=self.mock_url_for)
+        for missing_key in ('schema:areaServed', 'schema:distance', 'distance'):
+            assert missing_key not in catalog['metadata']
 
     def test__hyperlink_args(self):
         """Verify that _hyperlink_args generates arguments appropriate

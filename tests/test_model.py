@@ -24,6 +24,7 @@ from model import (
     Hyperlink,
     Library,
     LibraryAlias,
+    LibraryType,
     Place,
     PlaceAlias,
     Validation,
@@ -642,6 +643,38 @@ class TestLibrary(DatabaseTest):
         [service_area] = nypl.service_areas
         assert service_area.place == zip
         assert service_area.library == nypl
+
+    def test_types(self):
+        # Test the various types of libraries.
+        # n.b. this incidentally tests Place.library_type.
+
+        postal = self.zip_10018
+        city = self.new_york_city
+        state = self.new_york_state
+        county = self.crude_kings_county
+        nation = self._place('CA', 'Canada', Place.NATION, 'CA', None)
+        province = self._place("MB", "Manitoba", Place.STATE, "MB", nation)
+        everywhere = Place.everywhere(self._db)
+
+        # Libraries with different kinds of service areas are given
+        # different types.
+        for focus, type in (
+            (postal, LibraryType.LOCAL),
+            (city, LibraryType.LOCAL),
+            (state, LibraryType.STATE),
+            (province, LibraryType.PROVINCE),
+            (nation, LibraryType.NATIONAL),
+            (everywhere, LibraryType.UNIVERSAL)
+        ):
+
+            library = self._library(self._str, focus_areas=[focus])
+            assert focus.library_type == type
+            assert [type] == list(library.types)
+
+        # If a library's service area is ambiguous, it has no service
+        # area-related type.
+        library = self._library("library", focus_areas=[postal, province])
+        assert [] == list(library.types)
 
     def test_service_area_name(self):
 
