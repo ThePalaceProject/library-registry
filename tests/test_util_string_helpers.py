@@ -1,13 +1,9 @@
 # encoding: utf-8
-# Test the helper objects in util.string.
-
-from nose.tools import (
-    assert_raises,
-    eq_,
-)
+"""Test the helper objects in util.string."""
 import base64 as stdlib_base64
-import random
 import re
+
+import pytest
 
 from util.string_helpers import (
     UnicodeAwareBase64,
@@ -15,29 +11,27 @@ from util.string_helpers import (
     random_string
 )
 
+
 class TestUnicodeAwareBase64(object):
 
-    def test_encoding(self):        
-        string = u"םולש"
+    def test_encoding(self):
+        test_string = u"םולש"
 
         # Run the same tests against two different encodings that can
         # handle Hebrew characters.
-        self._test_encoder(string, UnicodeAwareBase64("utf8"))
-        self._test_encoder(string, UnicodeAwareBase64("iso-8859-8"))
+        self._test_encoder(test_string, UnicodeAwareBase64("utf8"))
+        self._test_encoder(test_string, UnicodeAwareBase64("iso-8859-8"))
 
         # If UnicodeAwareBase64 is given a string it can't encode in
         # its chosen encoding, an exception is the result.
         shift_jis = UnicodeAwareBase64("shift-jis")
-        assert_raises(
-            UnicodeEncodeError,
-            shift_jis.b64encode,
-            string
-        )
+        with pytest.raises(UnicodeEncodeError):
+            shift_jis.b64decode(test_string)
 
-    def _test_encoder(self, string, base64):
+    def _test_encoder(self, test_string, base64):
         # Create a binary version of the string in the encoder's
         # encoding, for use in comparisons.
-        binary = string.encode(base64.encoding)
+        binary = test_string.encode(base64.encoding)
 
         # Test all supported methods of the base64 API.
         for encode, decode in [
@@ -50,9 +44,9 @@ class TestUnicodeAwareBase64(object):
 
             # Test a round-trip. Base64-encoding a Unicode string and
             # then decoding it should give the original string.
-            encoded = encode_method(string)
+            encoded = encode_method(test_string)
             decoded = decode_method(encoded)
-            eq_(string, decoded)
+            assert decoded == test_string
 
             # Test encoding on its own. Encoding with a
             # UnicodeAwareBase64 and then converting to ASCII should
@@ -61,51 +55,50 @@ class TestUnicodeAwareBase64(object):
             # module.
             base_encode = getattr(stdlib_base64, encode)
             base_encoded = base_encode(binary)
-            eq_(base_encoded, encoded.encode("ascii"))
+            assert base_encoded == encoded.encode("ascii")
 
             # If you pass in a bytes object to a UnicodeAwareBase64
             # method, it's no problem. You get a Unicode string back.
-            eq_(encoded, encode_method(binary))
-            eq_(decoded, decode_method(base_encoded))
+            assert encode_method(binary) == encoded
+            assert decode_method(base_encoded) == decoded
 
     def test_default_is_base64(self):
         # If you import "base64" from util.string, you get a
         # UnicodeAwareBase64 object that encodes as UTF-8 by default.
         assert isinstance(base64, UnicodeAwareBase64)
-        eq_("utf8", base64.encoding)
+        assert base64.encoding == "utf8"
         snowman = u"☃"
         snowman_utf8 = snowman.encode("utf8")
         as_base64 = base64.b64encode(snowman)
-        eq_("4piD", as_base64)
+        assert as_base64 == "4piD"
 
         # This is a Unicode representation of the string you'd get if
         # you encoded the snowman as UTF-8, then used the standard
         # library to base64-encode the bytestring.
-        eq_(b"4piD", stdlib_base64.b64encode(snowman_utf8))
+        assert stdlib_base64.b64encode(snowman_utf8) == b"4piD"
 
 
 class TestRandomstring(object):
 
     def test_random_string(self):
-        m = random_string
-        eq_("", m(0))
+        assert random_string(0) == ""
 
         # The strings are random.
-        res1 = m(8)
-        res2 = m(8)
+        res1 = random_string(8)
+        res2 = random_string(8)
         assert res1 != res2
 
         # We can't test exact values, because the randomness comes
         # from /dev/urandom, but we can test some of their properties:
         for size in range(1, 16):
-            x = m(size)
+            x = random_string(size)
 
             # The strings are Unicode strings, not bytestrings
             assert isinstance(x, str)
 
             # The strings are entirely composed of lowercase hex digits.
-            eq_(None, re.compile("[^a-f0-9]").search(x))
+            assert re.compile("[^a-f0-9]").search(x) is None
 
             # Each byte is represented as two digits, so the length of the
             # string is twice the length passed in to the function.
-            eq_(size*2, len(x))
+            assert len(x) == size*2
