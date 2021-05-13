@@ -542,15 +542,9 @@ class Library(Base):
         :return: A string, or None if the library's service area can't be
            described as a short string.
         """
-        service_area_place = self.service_area
-        if not service_area_place:
-            # There is no one place representing this library's service area.
-            return None
-        if service_area_place.type == Place.EVERYWHERE:
-            # "Everywhere" isn't a place with a well-known name.
-            return None
-
-        return service_area_place.human_friendly_name
+        if self.service_area:
+            return self.service_area.human_friendly_name
+        return None
 
     @classmethod
     def _feed_restriction(cls, production, library_field=None, registry_field=None):
@@ -1379,9 +1373,9 @@ class Place(Base):
         """
         if self.type == Place.EVERYWHERE:
             return LibraryType.UNIVERSAL
-        if self.type == Place.NATION:
+        elif self.type == Place.NATION:
             return LibraryType.NATIONAL
-        if self.type == Place.STATE:
+        elif self.type == Place.STATE:
             # Whether this is a 'state' library, 'province' library,
             # etc. depends on which nation it's in.
             library_type = LibraryType.STATE
@@ -1390,7 +1384,7 @@ class Place(Base):
                     self.parent.abbreviated_name, library_type
                 )
             return library_type
-        if self.type == Place.COUNTY:
+        elif self.type == Place.COUNTY:
             return LibraryType.COUNTY
         return LibraryType.LOCAL
 
