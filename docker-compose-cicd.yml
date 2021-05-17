@@ -8,8 +8,6 @@ services:
       target: libreg_local_db
     volumes:
       - local_db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
 
   libreg_prod_webapp:
     container_name: libreg_prod_webapp
@@ -20,8 +18,6 @@ services:
       target: libreg_prod
       labels:
         - "com.nypl.docker.imagename=library_registry"
-    ports:
-      - "80:80"
     environment:
       - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_test_db:5432/simplified_registry_test
       - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_test_db:5432/simplified_registry_dev
