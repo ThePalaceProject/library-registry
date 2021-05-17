@@ -361,8 +361,7 @@ class LibraryRegistryController(BaseController):
         return result
 
     def _format_place_name(self, place):
-        parent_name = (place.parent.abbreviated_name or place.parent.external_name) if place.parent else "unknown"
-        return "%s (%s)" %(place.external_name, parent_name)
+        return place.human_friendly_name or 'Everywhere'
 
     def _get_email(self, hyperlink):
         if hyperlink and hyperlink.resource and hyperlink.resource.href:
