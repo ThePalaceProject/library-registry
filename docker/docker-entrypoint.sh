@@ -1,7 +1,7 @@
 #!/bin/sh
 
 ##############################################################################
-# Set up the registry_admin front end if we're in development mode
+# Set up the Library Registry Admin front end if we're in development mode
 ##############################################################################
 
 # If this is the production image, the static copies of the registry admin
@@ -17,11 +17,14 @@ if [ ! -d /simplye_static/static ]; then
     cd /registry_admin && npm link
 
     # Make the registry link to the local install version of the admin
-    cd /simplye_app && npm link simplified-registry-admin
+    cd /simplye_app && npm link library-registry-admin
+    echo "NPM link completed: rc=$?"
 
     # Create a symlink in the location Nginx expects to serve static files from
     mkdir -p /simplye_static
     ln -s /registry_admin/dist /simplye_static/static
+    echo "Static files..."
+    ls /simplye_static/static
 fi
 
 ##############################################################################
