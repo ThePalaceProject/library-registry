@@ -32,7 +32,7 @@ services:
         target: /simplye_app
         read_only: true
       - type: bind
-        source: ../registry_admin
+        source: ../library-registry-admin
         target: /registry_admin
 
 volumes:
