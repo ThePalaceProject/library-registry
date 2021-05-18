@@ -20,8 +20,8 @@ file to accommodate its location. To get them both in the same directory,
 execute the following from that directory:
 
 ```shell
-git clone https://github.com/ThePalaceProject/library-registry.git
-git clone https://github.com/ThePalaceProject/library-registry-admin.git registry_admin
+git clone https://github.com/thepalaceproject/library-registry.git
+git clone https://github.com/thepalaceproject/library-registry-admin.git
 ```
 
 ## Installation (Docker)
@@ -71,7 +71,25 @@ While the cluster is running, you can access the containers with these commands:
 
 ### Viewing the Web Interface
 
-The registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a browser at `http://localhost/admin/` and access it with the username/password `admin/admin`.
+The Library Registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a browser at `http://localhost/admin/` and access it with the username/password `admin/admin`.
+
+The [Library Registry Admin](git clone https://github.com/thepalaceproject/library-registry-admin.git)
+front end is implemented as a Node package. The name and version of this package are configured in
+`admin/config.py`. In addition, either or both may be overridden via environment variables. For example:
+```shell
+TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME=@thepalaceproject/library-registry-admin
+TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION=1.0.0
+```
+
+The default configuration will result in the admin client being served from a content delivery
+network. To enable use of a local copy to support development/debugging, ensure that this
+repo and that of the admin UI have the same parent directory and then perform the following
+from the base of this repo:
+- `(cd admin && npm unlink ../../library-registry-admin)`
+
+This will link the admin UI project into the admin directory in a manner that is compatible with
+both docker and non-containerized development. If the package is properly linked, admin UI assets
+will be served from the linked package, rather than the CDN.
 
 ## Installation (non-Docker)
 
@@ -108,12 +126,14 @@ CREATE EXTENSION fuzzystrmatch;
 CREATE EXTENSION postgis;
 ```
 
-You should then create a `.env` file in the project directory with the following contents:
-
+The database configuration is exposed to the application via environment variables.
 ```SHELL
 SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@localhost:5432/simplified_registry_test
 SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@localhost:5432/simplified_registry_dev
 ```
+For development work, you should create a `.env` file in the project directory that includes these variables
+set to the appropriate values for your environment.
+
 
 ### Installing Python Dependencies
 
