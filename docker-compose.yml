@@ -29,11 +29,12 @@ services:
     volumes:
       - type: bind
         source: .
-        target: /simplye_app
+        target: /apps/library-registry
         read_only: true
       - type: bind
-        source: ../registry_admin
-        target: /registry_admin
+        source: ../library-registry-admin
+        target: /apps/library-registry-admin
+        read_only: true
 
 volumes:
   local_db_data:
