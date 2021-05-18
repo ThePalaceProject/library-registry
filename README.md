@@ -20,8 +20,8 @@ file to accommodate its location. To get them both in the same directory,
 execute the following from that directory:
 
 ```shell
-git clone https://github.com/ThePalaceProject/library-registry.git
-git clone https://github.com/ThePalaceProject/library-registry-admin.git registry_admin
+git clone https://github.com/thepalaceproject/library-registry.git
+git clone https://github.com/thepalaceproject/library-registry-admin.git
 ```
 
 ## Installation (Docker)
@@ -71,7 +71,7 @@ While the cluster is running, you can access the containers with these commands:
 
 ### Viewing the Web Interface
 
-The registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a browser at `http://localhost/admin/` and access it with the username/password `admin/admin`.
+The Library Registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a browser at `http://localhost/admin/` and access it with the username/password `admin/admin`.
 
 ## Installation (non-Docker)
 
