@@ -18,8 +18,10 @@ services:
     build:
       context: .
       target: libreg_prod
-      labels:
-        - "com.nypl.docker.imagename=library_registry"
+      args:
+        # This should match the key (package name) of the administrative
+        # client in the "dependencies" object in package.json.
+        - LIBRARY_REGISTRY_ADMIN_PACKAGE=@thepalaceproject/library-registry-admin
     ports:
       - "80:80"
     environment:

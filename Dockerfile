@@ -184,6 +184,7 @@ RUN apk add --no-cache npm
 # Build target: libreg_prod
 #
 FROM builder AS libreg_prod
+ARG LIBRARY_REGISTRY_ADMIN_PACKAGE=@thepalaceproject/library-registry-admin
 
 ENV FLASK_ENV production
 
@@ -197,7 +198,7 @@ RUN set -ex \
  && cp ./package*.json /tmp/simplye_npm_build \
  && npm install --prefix /tmp/simplye_npm_build \
  && mkdir -p /simplye_static/static \
- && cp /tmp/simplye_npm_build/node_modules/simplified-registry-admin/dist/* /simplye_static/static \
+ && cp /tmp/simplye_npm_build/node_modules/${LIBRARY_REGISTRY_ADMIN_PACKAGE}/dist/* /simplye_static/static \
  && rm -rf /tmp/simplye_npm_build \
  && apk del npm
 
