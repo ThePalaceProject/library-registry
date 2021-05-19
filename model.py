@@ -1552,7 +1552,10 @@ class Place(Base):
             return None
 
         _db = Session.object_session(self)
-        search = uszipcode.SearchEngine(simple_zipcode=True)
+        search = uszipcode.SearchEngine(
+            db_file_dir=Configuration.DATADIR,
+            simple_zipcode=True
+        )
         state = self.abbreviated_name
         uszipcode_matches = []
         if (state in search.state_to_city_mapper
