@@ -3,6 +3,8 @@ import copy
 import json
 import os
 import logging
+from pathlib import Path
+
 
 @contextlib.contextmanager
 def temp_config(new_config=None, replacement_classes=None):
@@ -18,10 +20,13 @@ def temp_config(new_config=None, replacement_classes=None):
         for c in replacement_classes:
             c.instance = old_config
 
+
 class CannotLoadConfiguration(Exception):
     pass
 
+
 class Configuration(object):
+    DATADIR = Path(os.path.dirname(__file__)) / 'data'
 
     instance = None
 
