@@ -211,6 +211,39 @@ def create(db, model, create_method='',
 
 Base = declarative_base()
 
+class LibraryType(object):
+    """Constant container for library types.
+
+    This is as defined here:
+
+    https://github.com/NYPL-Simplified/Simplified/wiki/LibraryRegistryPublicAPI#the-subject-scheme-for-library-types
+    """
+
+    SCHEME_URI = "http://librarysimplified.org/terms/library-types"
+    LOCAL = "local"
+    COUNTY = "county"
+    STATE = "state"
+    PROVINCE = "province"
+    NATIONAL = "national"
+    UNIVERSAL = "universal"
+
+    # Different nations use different terms for referring to their
+    # administrative divisions, which translates into different terms in
+    # the library type vocabulary.
+    ADMINISTRATIVE_DIVISION_TYPES = {
+        "US": STATE,
+        "CA" : PROVINCE,
+    }
+
+    NAME_FOR_CODE = {
+        LOCAL: "Local library",
+        COUNTY: "County library",
+        STATE: "State library",
+        PROVINCE: "Provincial library",
+        NATIONAL: "National library",
+        UNIVERSAL: "Online library",
+    }
+
 class Library(Base):
     """An entry in this table corresponds more or less to an OPDS server.
 
@@ -439,6 +472,61 @@ class Library(Base):
         return self.library_stage == prod and self.registry_stage == prod
 
     @property
+    def types(self):
+        """Return any special types for this library.
+
+        :yield: A sequence of code constants from LibraryTypes.
+        """
+        service_area = self.service_area
+        if not service_area:
+            return
+        code = service_area.library_type
+        if code:
+            yield code
+
+        # TODO: in the future, more types, e.g. audience-based, can go
+        # here.
+
+    @property
+    def service_area(self):
+        """Return the service area of this Library, assuming there is only
+        one.
+
+        :return: A Place, if there is one well-defined place this
+        library serves; otherwise None.
+        """
+        everywhere = None
+
+        # Group the ServiceAreas by type.
+        by_type = defaultdict(set)
+        for a in self.service_areas:
+            if not a.place:
+                continue
+            if a.place.type == Place.EVERYWHERE:
+                # We will only return 'everywhere' if we don't find
+                # something more specific.
+                everywhere = a.place
+                continue
+            by_type[a.type].add(a)
+
+        # If there is a single focus area, use it.
+        # Otherwise, if there is a single eligibility area, use that.
+        service_area = None
+        for area_type in ServiceArea.FOCUS, ServiceArea.ELIGIBILITY:
+            if len(by_type[area_type]) == 1:
+                [service_area] = by_type[area_type]
+                if service_area.place:
+                    return service_area.place
+
+        # This library serves everywhere, and it doesn't _also_ serve
+        # some more specific place.
+        if everywhere:
+            return everywhere
+
+        # This library does not have one ServiceArea that stands out.
+        return None
+
+    @property
     def service_area_name(self):
         """Describe the library's service area in a short string a human would
         understand, e.g. "Kern County, CA".
@@ -454,31 +542,9 @@ class Library(Base):
         :return: A string, or None if the library's service area can't be
            described as a short string.
         """
-        # Group the ServiceAreas by type.
-        by_type = defaultdict(set)
-        for a in self.service_areas:
-            if not a.place:
-                continue
-            if a.place.type == Place.EVERYWHERE:
-                # We already know that 'everywhere' won't work. Ignore
-                # it so it doesn't mask something more specific.
-                continue
-            by_type[a.type].add(a)
-
-        # If there is a single focus area, use it.
-        # Otherwise, if there is a single eligibility area, use that.
-        service_area = None
-        for area_type in ServiceArea.FOCUS, ServiceArea.ELIGIBILITY:
-            if len(by_type[area_type]) == 1:
-                [service_area] = by_type[area_type]
-                break
-
-        if service_area:
-            return service_area.place.human_friendly_name
-
-        # This library does not have one ServiceArea that stands out,
-        # so we can't describe its service area with a short string.
-        return None            
+        if self.service_area:
+            return self.service_area.human_friendly_name
+        return None
 
     @classmethod
     def _feed_restriction(cls, production, library_field=None, registry_field=None):
@@ -1103,7 +1169,8 @@ class Place(Base):
     # supposed to be precise terms. Each census-designated place is
     # called a 'city', even if it's not a city in the legal sense.
     # Countries that call their top-level administrative divisions something
-    # other than 'states' can still use 'state' as their type.
+    # other than 'states' can still use 'state' as their type. (But see
+    # LibraryType.ADMINISTRATIVE_DIVISION_TYPES.)
     NATION = 'nation'
     STATE = 'state'
     COUNTY = 'county'
@@ -1296,6 +1363,30 @@ class Place(Base):
            of the list.
         """
         return [x.strip() for x in reversed(name.split(",")) if x.strip()]
+
+    @property
+    def library_type(self):
+        """If a library serves this place, what type of library does that make
+        it?
+
+        :return: A string; one of the constants from LibraryType.
+        """
+        if self.type == Place.EVERYWHERE:
+            return LibraryType.UNIVERSAL
+        elif self.type == Place.NATION:
+            return LibraryType.NATIONAL
+        elif self.type == Place.STATE:
+            # Whether this is a 'state' library, 'province' library,
+            # etc. depends on which nation it's in.
+            library_type = LibraryType.STATE
+            if self.parent and self.parent.type == Place.NATION:
+                library_type = LibraryType.ADMINISTRATIVE_DIVISION_TYPES.get(
+                    self.parent.abbreviated_name, library_type
+                )
+            return library_type
+        elif self.type == Place.COUNTY:
+            return LibraryType.COUNTY
+        return LibraryType.LOCAL
 
     @property
     def human_friendly_name(self):
