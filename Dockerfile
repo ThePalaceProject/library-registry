@@ -157,6 +157,7 @@ COPY ./docker/gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/supervisord-alpine.ini /etc/supervisord.conf
 COPY ./docker/runinvenv /usr/local/bin/runinvenv
+COPY ./docker/webpack-watch /usr/local/bin/webpack-watch
 COPY ./docker/docker-entrypoint.sh /docker-entrypoint.sh
 
 ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]

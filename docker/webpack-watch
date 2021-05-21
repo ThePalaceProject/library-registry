@@ -1,0 +1,10 @@
+#!/bin/sh
+
+SHOULD_WATCH=$1
+
+# Normal exit if watching is not explicitly turned on.
+if [ "$SHOULD_WATCH" -ne 1 ]; then
+  exit 0
+fi
+
+cd /registry_admin && npm run dev
