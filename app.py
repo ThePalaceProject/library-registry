@@ -225,6 +225,12 @@ def admin_view():
     return app.library_registry.view_controller()
 
 
+# This path is used only in debug mode to serve frontend assets.
+@app.route('/static/<filename>')
+def admin_static_file(filename):
+    return app.library_registry.static_files.static_file(filename=filename)
+
+
 if __name__ == '__main__':
     debug = True
     if len(sys.argv) > 1:

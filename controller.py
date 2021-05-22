@@ -21,6 +21,8 @@ import os
 import time
 from urllib.parse import unquote
 
+from admin.config import Configuration as AdminClientConfig
+from admin.config import OperationalMode as AdminClientOperatingMode
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
 from emailer import Emailer
@@ -87,6 +89,7 @@ class LibraryRegistry(object):
         )
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
+        self.static_files = StaticFileController(self)
 
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
@@ -150,13 +153,25 @@ class BaseController(object):
 
 
 class ViewController(BaseController):
+
+    # If a local copy of the CSS and JS is available, we serve it instead of the copy
+    # from the CDN, so that it is easy to debug and test changes to the JS app
+    @classmethod
+    def use_debug_paths(cls):
+        return os.path.isdir(AdminClientConfig.package_development_directory())
+
     def __call__(self):
         username = session.get('username', '')
-        response = Response(flask.render_template_string(
+        admin_js = AdminClientConfig.lookup_asset_url(key='admin_js')
+        admin_css = AdminClientConfig.lookup_asset_url(key='admin_css')
+
+        return Response(flask.render_template_string(
             admin_template,
-            username=username
+            username=username,
+            admin_js=admin_js,
+            admin_css=admin_css,
         ))
-        return response
+
 
 class LibraryRegistryController(BaseController):
 
@@ -690,6 +705,12 @@ class LibraryRegistryController(BaseController):
         else:
             status_code = 200
         return self.catalog_response(catalog, status_code)
+
+
+class StaticFileController(BaseController):
+
+    def static_file(self, filename):
+        return flask.send_from_directory(AdminClientConfig.static_files_directory(), filename)
 
 
 class ValidationController(BaseController):
