@@ -23,6 +23,7 @@ from urllib.parse import unquote
 
 from admin.config import Configuration as AdminClientConfig
 from admin.config import OperationalMode as AdminClientOperatingMode
+from admin.templates import admin as admin_template
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
 from emailer import Emailer
@@ -48,7 +49,6 @@ from opds import (
     OPDSCatalog,
 )
 from registrar import LibraryRegistrar
-from templates import admin as admin_template
 from util import GeometryUtility
 from util.app_server import (
     HeartbeatController,
