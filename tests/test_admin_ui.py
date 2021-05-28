@@ -17,7 +17,7 @@ class TestAdminUI(object):
             del os.environ[key]
 
     @pytest.mark.parametrize(
-        'package_name, package_version, mode, expected_result',
+        'package_name, package_version, mode, expected_result_startswith',
         [
             [None, None, OperationalMode.production,
              'https://cdn.jsdelivr.net/npm/@thepalaceproject/library-registry-admin@'],
@@ -30,11 +30,11 @@ class TestAdminUI(object):
             ['some-package', '1.0.0', OperationalMode.development, '/'],
         ])
     def test_package_url(self, package_name: Optional[str], package_version: Optional[str],
-                         mode: OperationalMode, expected_result: str):
+                         mode: OperationalMode, expected_result_startswith: str):
         self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', package_name)
         self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', package_version)
         result = AdminConfig.package_url(_operational_mode=mode)
-        assert result.startswith(expected_result)
+        assert result.startswith(expected_result_startswith)
 
     @pytest.mark.parametrize(
         'package_name, package_version, expected_result',
@@ -48,4 +48,24 @@ class TestAdminUI(object):
         self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', package_name)
         self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', package_version)
         result = AdminConfig.package_development_directory(_base_dir='/my-base-dir')
+        assert result == expected_result
+
+    @pytest.mark.parametrize(
+        'asset_key, operational_mode, expected_result',
+        [
+            ['admin_css', OperationalMode.development, '/static/library-registry-admin.css'],
+            ['admin_css', OperationalMode.production,
+             'https://cdn.jsdelivr.net/npm/known-package-name@1.0.0/dist/library-registry-admin.css'],
+            ['admin_js', OperationalMode.development, '/static/library-registry-admin.js'],
+            ['admin_js', OperationalMode.production,
+             'https://cdn.jsdelivr.net/npm/known-package-name@1.0.0/dist/library-registry-admin.js'],
+            ['another-asset.jpg', OperationalMode.development, '/static/another-asset.jpg'],
+            ['another-asset.jpg', OperationalMode.production,
+             'https://cdn.jsdelivr.net/npm/known-package-name@1.0.0/dist/another-asset.jpg'],
+        ]
+    )
+    def test_lookup_asset_url(self, asset_key: str, operational_mode: OperationalMode, expected_result: str):
+        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', 'known-package-name')
+        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', '1.0.0')
+        result = AdminConfig.lookup_asset_url(key=asset_key, _operational_mode=operational_mode)
         assert result == expected_result
