@@ -72,14 +72,14 @@ jobs:
 
       - name: Generate tags for library-registry image
         id: library-registry-tags
-        uses: crazy-max/ghaction-docker-meta@v2
+        uses: docker/metadata-action@v3
         with:
           images: ${{ env.REGISTRY_HOST }}/${{ github.repository_owner }}/library-registry
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
+            type=semver,pattern={{major}}.{{minor}},priority=10
+            type=semver,pattern={{version}},priority=20
+            type=ref,event=branch,priority=30
+            type=sha,priority=40
 
       - name: Build and push library-registry image
         uses: docker/build-push-action@v2
