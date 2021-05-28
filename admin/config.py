@@ -19,7 +19,7 @@ class Configuration:
     }
 
     # For proper operation, `package_url` MUST end with a slash ('/') and
-    # `asset_rel_url` MUST NOT begin whith one.
+    # `asset_rel_url` MUST NOT begin with one.
     PACKAGE_TEMPLATES = {
         OperationalMode.production: {
             'package_url': 'https://cdn.jsdelivr.net/npm/{name}@{version}/',
@@ -37,8 +37,8 @@ class Configuration:
     ADMIN_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
 
     # Environment variables that contain admin client package information.
-    ENV_ADMIN_UI_PACKAGE_NAME = 'LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME'
-    ENV_ADMIN_UI_PACKAGE_VERSION = 'LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION'
+    ENV_ADMIN_UI_PACKAGE_NAME = 'TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME'
+    ENV_ADMIN_UI_PACKAGE_VERSION = 'TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION'
 
     @classmethod
     def operational_mode(cls) -> OperationalMode:

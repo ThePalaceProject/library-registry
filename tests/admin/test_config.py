@@ -31,8 +31,8 @@ class TestAdminUI(object):
         ])
     def test_package_url(self, package_name: Optional[str], package_version: Optional[str],
                          mode: OperationalMode, expected_result_startswith: str):
-        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', package_name)
-        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', package_version)
+        self._set_env('TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', package_name)
+        self._set_env('TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', package_version)
         result = AdminConfig.package_url(_operational_mode=mode)
         assert result.startswith(expected_result_startswith)
 
@@ -45,8 +45,8 @@ class TestAdminUI(object):
         ])
     def test_package_development_directory(self, package_name: Optional[str], package_version: Optional[str],
                                            expected_result: str):
-        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', package_name)
-        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', package_version)
+        self._set_env('TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', package_name)
+        self._set_env('TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', package_version)
         result = AdminConfig.package_development_directory(_base_dir='/my-base-dir')
         assert result == expected_result
 
@@ -65,7 +65,7 @@ class TestAdminUI(object):
         ]
     )
     def test_lookup_asset_url(self, asset_key: str, operational_mode: OperationalMode, expected_result: str):
-        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', 'known-package-name')
-        self._set_env('LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', '1.0.0')
+        self._set_env('TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME', 'known-package-name')
+        self._set_env('TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION', '1.0.0')
         result = AdminConfig.lookup_asset_url(key=asset_key, _operational_mode=operational_mode)
         assert result == expected_result
