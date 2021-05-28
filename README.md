@@ -30,6 +30,16 @@ Because the Registry runs in a Docker container, the only required software is [
 
 _Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the corresponding task in the `Makefile` manually. You can run `make help` to see the full list of commands._
 
+While they won't need to be changed often, there are a couple of environment
+variables set in the `Dockerfile` that are referenced within the container:
+- `LIBRARY_REGISTRY_DOCKER_HOME` is the app directory.
+- `LIBRARY_REGISTRY_DOCKER_VENV` is the app's virtual environment subdirectory
+  name. It is computed based on the value of `LIBRARY_REGISTRY_DOCKER_HOME`.
+  For more details, see:
+  - https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
+- `WORKON_HOME` is base directory for virtual environments.
+- The effective virtual environment directory for the app will be `$WORKON_HOME/$LIBRARY_REGISTRY_DOCKER_VENV`.
+
 ### Building the Images
 
 Local development uses two Docker images and one persistent Docker volume (for the PostgreSQL data directory). To create the base images:

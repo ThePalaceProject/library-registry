@@ -107,17 +107,19 @@ RUN set -x \
 ENV CI 1
 
 # Using `pipenv`, the virtual environment for the `Pipfile` at
-# `/apps/library-registry` will be `$WORKON/library-registry-Qj8ZFxES`.
+# `/apps/library-registry` will be `$WORKON_HOME/library-registry-Qj8ZFxES`.
+# `LIBRARY_REGISTRY_DOCKER_HOME` is the app's directory in the docker container.
+# `LIBRARY_REGISTRY_DOCKER_VENV` is the app's virtual environment name in the docker container.
 # For more details, see:
 # - https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
-ENV LIBRARY_REGISTRY_HOME=/apps/library-registry
-ENV LIBRARY_REGISTRY_VENV=library-registry-Qj8ZFxES
+ENV LIBRARY_REGISTRY_DOCKER_HOME=/apps/library-registry
+ENV LIBRARY_REGISTRY_DOCKER_VENV=library-registry-Qj8ZFxES
 
 # Setting WORKON_HOME causes pipenv to put its virtualenv in a pre-determined,
 # OS-independent location.
 ENV WORKON_HOME /venv
 
-WORKDIR $LIBRARY_REGISTRY_HOME
+WORKDIR $LIBRARY_REGISTRY_DOCKER_HOME
 
 # Copy over the dependency files individually. We copy over the entire local
 # directory later in the process, *after* the heavy RUN instructions, so that
@@ -144,7 +146,7 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && mkdir "${WORKON_HOME}" \
- && cd "${LIBRARY_REGISTRY_HOME}" \
+ && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
  && pipenv install --dev --skip-lock --clear \
  && apk del --no-network .build-deps
 

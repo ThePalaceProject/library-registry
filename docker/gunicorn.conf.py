@@ -5,22 +5,14 @@ import os
 from pathlib import Path
 
 
-def _venv_name(app_home, file='Pipfile'):
-    """Compute the virtual environment name, given an app's directory."""
-    app_home = os.path.normpath(app_home)
-    filepath = os.path.join(app_home, file)
-    hash = base64.urlsafe_b64encode(hashlib.sha256(filepath.encode()).digest()[:6]).decode()[:8]
-    last_path_component = os.path.split(app_home)[-1]
-    return f'{last_path_component}-{hash}'
-
-# VENV_BASE_DIR = Path("/simplye_venv")
-# VENV_ACTUAL = [Path(VENV_BASE_DIR / d) for d
-#                in os.listdir(VENV_BASE_DIR)
-#                if d.startswith("simplye_app-") and os.path.isdir(VENV_BASE_DIR / d)][0]
-
-VENV_BASE = os.environ.get('WORKON_HOME', '/venv')
-APP_HOME = os.environ.get('LIBRARY_REGISTRY_HOME', '/apps/library-registry')
-APP_VENV = os.path.join(VENV_BASE, os.environ.get('LIBRARY_REGISTRY_VENV', _venv_name(APP_HOME)))
+# The `LIBRARY_REGISTRY_DOCKER_HOME` and LIBRARY_REGISTRY_DOCKER_VENV`
+# environment variables are set in the `Dockerfile`. They contain the values
+# of the app directory and the app's virtual environment name, respectively.
+# `APP_HOME` and `APP_VENV` are set to the app home directory the absolute
+# path of the virtual environment directory.
+_venv_base = os.environ.get('WORKON_HOME')
+APP_HOME = os.environ.get('LIBRARY_REGISTRY_DOCKER_HOME')
+APP_VENV = os.path.join(_venv_base, os.environ.get('LIBRARY_REGISTRY_DOCKER_VENV'))
 
 # Shared Settings
 wsgi_app = "app:app"
