@@ -710,6 +710,17 @@ class LibraryRegistryController(BaseController):
 class StaticFileController(BaseController):
 
     def static_file(self, filename):
+        """Safely retrieve and send a client-requested file.
+
+        `send_from_directory` safely joins the directory and filename to ensure
+        that the resulting filepath is inside the directory. See:
+            - https://flask.palletsprojects.com/en/2.0.x/api/#flask.send_from_directory
+
+        :param filename: A filename derived from a client request.
+        :type filename: str
+        :return: Response
+        :rtype: Response
+        """
         return flask.send_from_directory(AdminClientConfig.static_files_directory(), filename)
 
 
