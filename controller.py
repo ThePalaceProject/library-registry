@@ -1,31 +1,23 @@
 import datetime
-import logging
-import flask
-from flask_babel import lazy_gettext as _
-from flask import (
-    Response,
-    redirect,
-    url_for,
-    session,
-)
-import requests
-from sqlalchemy.orm import (
-    defer,
-    joinedload,
-)
-from smtplib import SMTPException
 import json
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
+import logging
 import os
 import time
 from urllib.parse import unquote
 
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import flask
+from flask import redirect, Response, session, url_for
+from flask_babel import lazy_gettext as _
+from smtplib import SMTPException
+from sqlalchemy.orm import defer, joinedload
+
 from admin.config import Configuration as AdminClientConfig
-from admin.config import OperationalMode as AdminClientOperatingMode
 from admin.templates import admin as admin_template
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
+from config import Configuration, CannotLoadConfiguration
 from emailer import Emailer
 from model import (
     Admin,
@@ -40,29 +32,17 @@ from model import (
     get_one_or_create,
     production_session,
 )
-from config import (
-    Configuration,
-    CannotLoadConfiguration,
-)
-from opds import (
-    Annotator,
-    OPDSCatalog,
-)
+from opds import Annotator, OPDSCatalog
+from problem_details import *
 from registrar import LibraryRegistrar
-from util import GeometryUtility
 from util.app_server import (
     HeartbeatController,
     catalog_response,
 )
-from util.http import (
-    HTTP,
-)
+from util.http import HTTP
 from util.problem_detail import ProblemDetail
-from util.string_helpers import (
-    base64,
-    random_string,
-)
-from problem_details import *
+from util.string_helpers import base64, random_string
+
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
