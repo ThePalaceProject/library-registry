@@ -1,30 +1,6 @@
 #!/bin/sh
 
 ##############################################################################
-# Set up the registry_admin front end if we're in development mode
-##############################################################################
-
-# If this is the production image, the static copies of the registry admin
-# files are already present, and we don't need to do any symlinking.
-if [ ! -d /simplye_static/static ]; then
-    echo "No static files directory found, building registry_admin frontend"
-    if [ ! -d /registry_admin ]; then
-        echo "Nothing found at /registry_admin--is that repo host mounted into the container?"
-        exit 1
-    fi
-
-    # Establish that this is a local install
-    cd /registry_admin && npm link
-
-    # Make the registry link to the local install version of the admin
-    cd /simplye_app && npm link simplified-registry-admin
-
-    # Create a symlink in the location Nginx expects to serve static files from
-    mkdir -p /simplye_static
-    ln -s /registry_admin/dist /simplye_static/static
-fi
-
-##############################################################################
 # Wait for the database to be ready before starting the servers
 ##############################################################################
 

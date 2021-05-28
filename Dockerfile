@@ -50,7 +50,6 @@ ENV NGINX_VERSION 1.19.8
 ENV NJS_VERSION   0.5.2
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
-ENV SIMPLYE_RUN_WEBPACK_WATCH 0
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
@@ -107,28 +106,27 @@ RUN set -x \
 #   https://github.com/pypa/pipenv/issues/4052#issuecomment-588480867
 ENV CI 1
 
-# This creates the /simplye_app directory without issuing a separate RUN directive.
-WORKDIR /simplye_app
+# Using `pipenv`, the virtual environment for the `Pipfile` at
+# `/apps/library-registry` will be `$WORKON_HOME/library-registry-Qj8ZFxES`.
+# `LIBRARY_REGISTRY_DOCKER_HOME` is the app's directory in the docker container.
+# `LIBRARY_REGISTRY_DOCKER_VENV` is the app's virtual environment name in the docker container.
+# For more details, see:
+# - https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
+ENV LIBRARY_REGISTRY_DOCKER_HOME=/apps/library-registry
+ENV LIBRARY_REGISTRY_DOCKER_VENV=library-registry-Qj8ZFxES
+
+# Setting WORKON_HOME causes pipenv to put its virtualenv in a pre-determined,
+# OS-independent location.
+ENV WORKON_HOME /venv
+
+WORKDIR $LIBRARY_REGISTRY_DOCKER_HOME
 
 # Copy over the dependency files individually. We copy over the entire local
 # directory later in the process, *after* the heavy RUN instructions, so that
 # the docker layer caching isn't impacted by extraneous changes in the repo.
 COPY ./Pipfile* ./
 
-# Setting WORKON_HOME causes pipenv to put its virtualenv in a pre-determined, 
-# OS-independent location. Note that /simplye_venv is NOT the virtualenv, it's 
-# just the parent directory for virtualenvs created by pipenv. The actual venv
-# is in a directory called something like
-# /simplye_venv/simplye_app-QOci6oRN, which follows the pattern 
-# '<name-of-project-dir>-<hashval>', where the hashval is deterministic and based on
-# the path to the Pipfile. See this issue comment for a description of how that
-# name is built:
-#
-#   https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
-#
-ENV WORKON_HOME /simplye_venv
-
-# Install the system dependencies and the Python dependencies. Note that if 
+# Install the system dependencies and the Python dependencies. Note that if
 # you want to be able to install new Python dependencies on the fly from
 # within the container, you should remove the line below that deletes the
 # build dependencies (`apk del --no-network .build-deps`), then rebuild
@@ -139,7 +137,6 @@ RUN set -ex \
 		bzip2-dev \
 		libffi-dev \
 		libxslt-dev \
-		npm \
 		openssl-dev \
 		postgresql-dev \
 		zlib-dev \        
@@ -148,8 +145,8 @@ RUN set -ex \
     libpq \
     jpeg-dev \
     libxcb-dev \
- && mkdir ${WORKON_HOME} \
- && cd /simplye_app \
+ && mkdir "${WORKON_HOME}" \
+ && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
  && pipenv install --dev --skip-lock --clear \
  && apk del --no-network .build-deps
 
@@ -173,10 +170,8 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 FROM builder AS libreg_dev
 
 ENV FLASK_ENV development
-ENV SIMPLYE_RUN_WEBPACK_WATCH 1
 ENV TESTING 1
 
-RUN apk add --no-cache npm
 ##############################################################################
 
 
@@ -187,19 +182,5 @@ FROM builder AS libreg_prod
 
 ENV FLASK_ENV production
 
-# We'll be building the front end as static, so we need the package files.
-COPY ./package*.json ./
-
-# Compile the front end files and clean up the temporary build directory
-RUN set -ex \
- && apk add --no-cache npm \
- && mkdir /tmp/simplye_npm_build \
- && cp ./package*.json /tmp/simplye_npm_build \
- && npm install --prefix /tmp/simplye_npm_build \
- && mkdir -p /simplye_static/static \
- && cp /tmp/simplye_npm_build/node_modules/simplified-registry-admin/dist/* /simplye_static/static \
- && rm -rf /tmp/simplye_npm_build \
- && apk del npm
-
-COPY . /simplye_app
+COPY . ./
 ##############################################################################

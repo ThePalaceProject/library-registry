@@ -1,28 +1,23 @@
 import datetime
-import logging
-import flask
-from flask_babel import lazy_gettext as _
-from flask import (
-    Response,
-    redirect,
-    url_for,
-    session,
-)
-import requests
-from sqlalchemy.orm import (
-    defer,
-    joinedload,
-)
-from smtplib import SMTPException
 import json
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
+import logging
 import os
 import time
 from urllib.parse import unquote
 
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import flask
+from flask import redirect, Response, session, url_for
+from flask_babel import lazy_gettext as _
+from smtplib import SMTPException
+from sqlalchemy.orm import defer, joinedload
+
+from admin.config import Configuration as AdminClientConfig
+from admin.templates import admin as admin_template
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
+from config import Configuration, CannotLoadConfiguration
 from emailer import Emailer
 from model import (
     Admin,
@@ -37,30 +32,17 @@ from model import (
     get_one_or_create,
     production_session,
 )
-from config import (
-    Configuration,
-    CannotLoadConfiguration,
-)
-from opds import (
-    Annotator,
-    OPDSCatalog,
-)
+from opds import Annotator, OPDSCatalog
+from problem_details import *
 from registrar import LibraryRegistrar
-from templates import admin as admin_template
-from util import GeometryUtility
 from util.app_server import (
     HeartbeatController,
     catalog_response,
 )
-from util.http import (
-    HTTP,
-)
+from util.http import HTTP
 from util.problem_detail import ProblemDetail
-from util.string_helpers import (
-    base64,
-    random_string,
-)
-from problem_details import *
+from util.string_helpers import base64, random_string
+
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
@@ -87,6 +69,7 @@ class LibraryRegistry(object):
         )
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
+        self.static_files = StaticFileController(self)
 
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
@@ -150,13 +133,25 @@ class BaseController(object):
 
 
 class ViewController(BaseController):
+
+    # If a local copy of the CSS and JS is available, we serve it instead of the copy
+    # from the CDN, so that it is easy to debug and test changes to the JS app
+    @classmethod
+    def use_debug_paths(cls):
+        return os.path.isdir(AdminClientConfig.package_development_directory())
+
     def __call__(self):
         username = session.get('username', '')
-        response = Response(flask.render_template_string(
+        admin_js = AdminClientConfig.lookup_asset_url(key='admin_js')
+        admin_css = AdminClientConfig.lookup_asset_url(key='admin_css')
+
+        return Response(flask.render_template_string(
             admin_template,
-            username=username
+            username=username,
+            admin_js=admin_js,
+            admin_css=admin_css,
         ))
-        return response
+
 
 class LibraryRegistryController(BaseController):
 
@@ -690,6 +685,23 @@ class LibraryRegistryController(BaseController):
         else:
             status_code = 200
         return self.catalog_response(catalog, status_code)
+
+
+class StaticFileController(BaseController):
+
+    def static_file(self, filename):
+        """Safely retrieve and send a client-requested file.
+
+        `send_from_directory` safely joins the directory and filename to ensure
+        that the resulting filepath is inside the directory. See:
+            - https://flask.palletsprojects.com/en/2.0.x/api/#flask.send_from_directory
+
+        :param filename: A filename derived from a client request.
+        :type filename: str
+        :return: Response
+        :rtype: Response
+        """
+        return flask.send_from_directory(AdminClientConfig.static_files_directory(), filename)
 
 
 class ValidationController(BaseController):

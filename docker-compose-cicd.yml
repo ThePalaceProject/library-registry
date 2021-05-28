@@ -18,8 +18,6 @@ services:
     build:
       context: .
       target: libreg_prod
-      labels:
-        - "com.nypl.docker.imagename=library_registry"
     ports:
       - "80:80"
     environment:
