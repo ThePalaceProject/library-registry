@@ -95,7 +95,7 @@ The default configuration will result in the admin client being served from a co
 network. To enable use of a local copy to support development/debugging, ensure that this
 repo and that of the admin UI have the same parent directory and then perform the following
 from the base of this repo:
-- `(cd admin && npm unlink ../../library-registry-admin)`
+- `(cd admin && npm link ../../library-registry-admin)`
 
 This will link the admin UI project into the admin directory in a manner that is compatible with
 both docker and non-containerized development. If the package is properly linked, admin UI assets
