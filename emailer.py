@@ -187,7 +187,7 @@ The link will expire in about a day. If the link expires, just re-register your 
 
     def _send_email(self, to_address, body, smtp=None):
         """Actually send an email."""
-        smtp = smtp or smtplib.SMTP()
+        smtp = smtp or smtplib.SMTP(host=self.smtp_host, port=self.smtp_port)
         smtp.connect(self.smtp_host, self.smtp_port)
         smtp.starttls()
         smtp.login(self.smtp_username, self.smtp_password)
