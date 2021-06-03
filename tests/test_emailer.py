@@ -68,6 +68,10 @@ class MockSMTP(object):
 
     calls = []
 
+    def __init__(self, *args, **kwargs):
+        self.calls.append(('__init__', args, kwargs))
+        super().__init__()
+
     def __getattr__(self, method, *args, **kwargs):
         """When asked for a method, return a function that simply records the
         method call.
@@ -308,13 +312,14 @@ The link will expire in about a day. If the link expires, just re-register your 
 
     def test__send_email(self):
         """Verify that send_email calls certain methods on smtplib.SMTP."""
-        integration = self._integration()
+        _ = self._integration()
         emailer = Emailer.from_sitewide_integration(self._db)
-        mock = MockSMTP()
-        emailer._send_email("you@library", "email body", mock)
+        mock_class = MockSMTP
+        emailer._send_email("you@library", "email body", mock_class)
 
-        # Five smtplib.SMTP methods were called.
-        connect, starttls, login, sendmail, quit = mock.calls
+        # These smtplib.SMTP methods were called.
+        init, connect, starttls, login, sendmail, quit = mock_class.calls
+        assert init == ('__init__', (), {'host': emailer.smtp_host, 'port': emailer.smtp_port})
         assert connect == ('connect', (emailer.smtp_host, emailer.smtp_port), {})
         assert starttls == ('starttls', (), {})
         assert login == ('login', (emailer.smtp_username, emailer.smtp_password), {})
