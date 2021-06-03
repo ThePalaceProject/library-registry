@@ -1,14 +1,11 @@
+from email.mime.text import MIMEText
+import quopri
+
 import pytest
 
 from . import DatabaseTest
-from email.mime.text import MIMEText
-
 from config import CannotLoadConfiguration
-from emailer import (
-    Emailer,
-    EmailTemplate,
-)
-import quopri
+from emailer import Emailer, EmailTemplate
 
 
 class TestEmailTemplate(object):

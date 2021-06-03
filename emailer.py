@@ -1,9 +1,11 @@
+from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email import charset
-import email
 import smtplib
+
+from config import CannotLoadConfiguration
+
 
 # Set up an encoding/decoding between UTF-8 and quoted-printable.
 # Otherwise, the bodies of email messages will be encoded with base64
@@ -11,9 +13,6 @@ import smtplib
 # need to be encoded.
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
-from config import (
-    CannotLoadConfiguration,
-)
 
 
 class Emailer(object):
