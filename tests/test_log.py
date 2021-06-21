@@ -1,10 +1,6 @@
 import logging
-from nose.tools import (
-    assert_raises,
-    assert_raises_regexp,
-    eq_,
-    set_trace
-)
+
+import pytest
 
 from . import DatabaseTest
 from log import (
@@ -16,6 +12,7 @@ from log import (
 from model import (
     ExternalIntegration,
 )
+    
 
 class TestLogConfiguration(DatabaseTest):
 
@@ -38,8 +35,8 @@ class TestLogConfiguration(DatabaseTest):
         internal_log_level, database_log_level, [handler] = m(
             None, testing=False
         )
-        eq_(cls.INFO, internal_log_level)
-        eq_(cls.WARN, database_log_level)
+        assert internal_log_level == cls.INFO
+        assert database_log_level == cls.WARN
         assert isinstance(handler.formatter, JSONFormatter)
 
         # The same defaults hold when there is a database connection
@@ -47,8 +44,8 @@ class TestLogConfiguration(DatabaseTest):
         internal_log_level, database_log_level, [handler] = m(
             self._db, testing=False
         )
-        eq_(cls.INFO, internal_log_level)
-        eq_(cls.WARN, database_log_level)
+        assert internal_log_level == cls.INFO
+        assert database_log_level == cls.WARN
         assert isinstance(handler.formatter, JSONFormatter)
 
         # Let's set up a Loggly integration and change the defaults.
@@ -65,15 +62,15 @@ class TestLogConfiguration(DatabaseTest):
         internal_log_level, database_log_level, handlers = m(
             self._db, testing=False
         )
-        eq_(cls.ERROR, internal_log_level)
-        eq_(cls.DEBUG, database_log_level)
+        assert internal_log_level == cls.ERROR
+        assert database_log_level == cls.DEBUG
         [loggly_handler] = [x for x in handlers if isinstance(x, LogglyHandler)]
-        eq_("http://example.com/a_token/", loggly_handler.url)
+        assert loggly_handler.url == "http://example.com/a_token/"
 
         [stream_handler] = [x for x in handlers
                             if isinstance(x, logging.StreamHandler)]
         assert isinstance(stream_handler.formatter, StringFormatter)
-        eq_(template, stream_handler.formatter._fmt)
+        assert stream_handler.formatter._fmt == template
 
         # If testing=True, then the database configuration is ignored,
         # and the log setup is one that's appropriate for display
@@ -81,9 +78,9 @@ class TestLogConfiguration(DatabaseTest):
         internal_log_level, database_log_level, [handler] = m(
             self._db, testing=True
         )
-        eq_(cls.DEBUG, internal_log_level)
-        eq_(cls.WARN, database_log_level)
-        eq_(cls.DEFAULT_MESSAGE_TEMPLATE, handler.formatter._fmt)
+        assert internal_log_level == cls.DEBUG
+        assert database_log_level == cls.WARN
+        assert handler.formatter._fmt == cls.DEFAULT_MESSAGE_TEMPLATE
 
     def test_defaults(self):
         cls = LogConfiguration
@@ -91,19 +88,11 @@ class TestLogConfiguration(DatabaseTest):
 
         # Normally the default log level is INFO and log messages are
         # emitted in JSON format.
-        eq_(
-            (cls.INFO, cls.JSON_LOG_FORMAT, cls.WARN,
-             cls.DEFAULT_MESSAGE_TEMPLATE),
-            cls._defaults(testing=False)
-        )
+        assert cls._defaults(testing=False) == (cls.INFO, cls.JSON_LOG_FORMAT, cls.WARN, cls.DEFAULT_MESSAGE_TEMPLATE)
 
         # When we're running unit tests, the default log level is DEBUG
         # and log messages are emitted in text format.
-        eq_(
-            (cls.DEBUG, cls.TEXT_LOG_FORMAT, cls.WARN,
-             cls.DEFAULT_MESSAGE_TEMPLATE),
-            cls._defaults(testing=True)
-        )
+        assert cls._defaults(testing=True) == (cls.DEBUG, cls.TEXT_LOG_FORMAT, cls.WARN, cls.DEFAULT_MESSAGE_TEMPLATE)
 
     def test_set_formatter(self):
         # Create a generic handler.
@@ -116,7 +105,7 @@ class TestLogConfiguration(DatabaseTest):
         )
         formatter = handler.formatter
         assert isinstance(formatter, StringFormatter)
-        eq_(template, formatter._fmt)
+        assert formatter._fmt == template
 
         # Configure a similar handler for JSON output.
         handler = logging.StreamHandler()
@@ -129,7 +118,7 @@ class TestLogConfiguration(DatabaseTest):
         # In this case the template is irrelevant. The JSONFormatter
         # uses the default format template, but it doesn't matter,
         # because JSONFormatter overrides the format() method.
-        eq_('%(message)s', formatter._fmt)
+        assert formatter._fmt == '%(message)s'
 
         # Configure a handler for output to Loggly. In this case
         # the format and template are irrelevant.
@@ -143,30 +132,31 @@ class TestLogConfiguration(DatabaseTest):
         integration = self.loggly_integration()
         handler = LogConfiguration.loggly_handler(integration)
         assert isinstance(handler, LogglyHandler)
-        eq_("http://example.com/a_token/", handler.url)
+        assert handler.url == "http://example.com/a_token/"
 
         # Remove the loggly handler's .url, and the default URL will
         # be used.
         integration.url = None
         handler = LogConfiguration.loggly_handler(integration)
-        eq_(LogConfiguration.DEFAULT_LOGGLY_URL % dict(token="a_token"),
-            handler.url)
+        assert handler.url == LogConfiguration.DEFAULT_LOGGLY_URL % dict(token="a_token")
 
     def test_interpolate_loggly_url(self):
         m = LogConfiguration._interpolate_loggly_url
 
         # We support two string interpolation techniques for combining
         # a token with a URL.
-        eq_("http://foo/token/bar/", m("http://foo/%s/bar/", "token"))
-        eq_("http://foo/token/bar/", m("http://foo/%(token)s/bar/", "token"))
+        assert m("http://foo/%s/bar/", "token") == "http://foo/token/bar/"
+        assert m("http://foo/%(token)s/bar/", "token") == "http://foo/token/bar/"
 
         # If the URL contains no string interpolation, we assume the token's
         # already in there.
-        eq_("http://foo/othertoken/bar/",
-            m("http://foo/othertoken/bar/", "token"))
+        assert m("http://foo/othertoken/bar/", "token") == "http://foo/othertoken/bar/"
 
         # Anything that doesn't fall under one of these cases will raise an
         # exception.
-        assert_raises(TypeError, m, "http://%s/%s", "token")
-        assert_raises(KeyError, m, "http://%(atoken)s/", "token")
+        with pytest.raises(TypeError):
+            m("http://%s/%s", "token")
+
+        with pytest.raises(KeyError):
+            m("http://%(atoken)s/", "token")
 

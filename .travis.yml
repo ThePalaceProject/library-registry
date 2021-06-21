@@ -1,5 +1,10 @@
+dist: focal
+
 addons:
-  postgresql: "9.6"
+  postgresql: "12"
+  apt:
+    packages:
+      - postgresql-12-postgis-3
 
 services:
   - postgresql
@@ -7,7 +12,7 @@ services:
 language: python
 
 python:
-  - "2.7"
+  - "3.9"
 
 cache: pip
 
@@ -15,21 +20,21 @@ git:
   submodules: false
 
 before_install:
-  - pip install "setuptools>=18.5"
-  - sudo apt-get install -y postgresql-9.6-postgis-2.4
-  - sleep 10
-
+  - pip install setuptools pipenv
+  
 install:
-  - pip install -r requirements.txt
+  - pipenv install
 
 env:
-  - SIMPLIFIED_TEST_DATABASE="postgres://simplified_test:test@localhost:5432/simplified_library_registry_test"
-
+  global:
+    - SIMPLIFIED_TEST_DATABASE=postgres://simplified_test:simplified_test@localhost:5433/simplified_library_registry_test
+    - PGPORT=5433
+  
 before_script:
-  - psql -c 'create user simplified_test;' -U postgres
-  - psql -c 'create database simplified_library_registry_test;' -U postgres
-  - psql -c 'create extension postgis;' -U postgres simplified_library_registry_test
-  - psql -c 'create extension fuzzystrmatch;' -U postgres simplified_library_registry_test
-  - psql -c 'grant all privileges on database simplified_library_registry_test to simplified_test;' -U postgres
+  - psql -c 'CREATE USER simplified_test WITH PASSWORD '"'"'simplified_test'"'"';' -U travis -p 5433
+  - psql -c 'CREATE DATABASE simplified_library_registry_test;' -U travis -p 5433
+  - psql -c 'CREATE EXTENSION postgis;' -U travis simplified_library_registry_test -p 5433
+  - psql -c 'CREATE EXTENSION fuzzystrmatch;' -U travis simplified_library_registry_test -p 5433
+  - psql -c 'GRANT ALL PRIVILEGES ON DATABASE simplified_library_registry_test TO simplified_test;' -U travis -p 5433
 
-script: ./test
+script: pipenv run pytest -x tests

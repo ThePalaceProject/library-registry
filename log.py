@@ -1,13 +1,12 @@
-from nose.tools import set_trace
 import datetime
 import logging
 import json
 import os
 import socket
 from config import Configuration
-from StringIO import StringIO
+from io import StringIO
 from loggly.handlers import HTTPSHandler as LogglyHandler
-from util.string_helpers import native_string
+
 
 class JSONFormatter(logging.Formatter):
     hostname = socket.gethostname()
@@ -19,7 +18,7 @@ class JSONFormatter(logging.Formatter):
         if record.args:
             try:
                 message = record.msg % record.args
-            except TypeError, e:
+            except TypeError as e:
                 raise e
         data = dict(
             host=self.hostname,
@@ -43,7 +42,7 @@ class StringFormatter(logging.Formatter):
     """
     def format(self, record):
         data = super(StringFormatter, self).format(record)
-        return native_string(data)
+        return str(data)
 
 
 class LogConfiguration(object):
@@ -51,22 +50,22 @@ class LogConfiguration(object):
     configuration from the database.
     """
 
-    DEFAULT_MESSAGE_TEMPLATE = u"%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"
-    DEFAULT_LOGGLY_URL = u"https://logs-01.loggly.com/inputs/%(token)s/tag/python/"
+    DEFAULT_MESSAGE_TEMPLATE = "%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"
+    DEFAULT_LOGGLY_URL = "https://logs-01.loggly.com/inputs/%(token)s/tag/python/"
 
-    DEBUG = u"DEBUG"
-    INFO = u"INFO"
-    WARN = u"WARN"
-    ERROR = u"ERROR"
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARN = "WARN"
+    ERROR = "ERROR"
 
-    JSON_LOG_FORMAT = u'json'
-    TEXT_LOG_FORMAT = u'text'
+    JSON_LOG_FORMAT = 'json'
+    TEXT_LOG_FORMAT = 'text'
 
     # Settings for the integration with protocol=INTERNAL_LOGGING
-    LOG_LEVEL = u'log_level'
-    LOG_FORMAT = u'log_format'
-    DATABASE_LOG_LEVEL = u'database_log_level'
-    LOG_MESSAGE_TEMPLATE = u'message_template'
+    LOG_LEVEL = 'log_level'
+    LOG_FORMAT = 'log_format'
+    DATABASE_LOG_LEVEL = 'database_log_level'
+    LOG_MESSAGE_TEMPLATE = 'message_template'
 
     @classmethod
     def initialize(cls, _db, testing=False):
@@ -217,7 +216,7 @@ class LogConfiguration(object):
             )
         try:
             url = cls._interpolate_loggly_url(url, token)
-        except (TypeError, KeyError), e:
+        except (TypeError, KeyError) as e:
             raise CannotLoadConfiguraiton(
                 "Cannot interpolate token %s into loggly URL %s" % (
                     token, url,

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from config import Configuration
 from flask_babel import lazy_gettext as _
 from flask_bcrypt import (
@@ -6,7 +7,7 @@ from flask_bcrypt import (
 )
 import datetime
 import logging
-from nose.tools import set_trace
+
 import os
 import re
 import json
@@ -79,10 +80,7 @@ from util import (
     GeometryUtility,
 )
 from util.short_client_token import ShortClientTokenTool
-from util.string_helpers import (
-    native_string,
-    random_string,
-)
+from util.string_helpers import random_string
 
 def production_session():
     url = Configuration.database_url()
@@ -153,7 +151,7 @@ def get_one(db, model, on_multiple='error', **kwargs):
     q = db.query(model).filter_by(**kwargs)
     try:
         return q.one()
-    except MultipleResultsFound, e:
+    except MultipleResultsFound as e:
         if on_multiple == 'error':
             raise e
         elif on_multiple == 'interchangeable':
@@ -174,8 +172,8 @@ def dump_query(query):
     comp.compile()
     enc = dialect.encoding
     params = {}
-    for k,v in comp.params.iteritems():
-        if isinstance(v, unicode):
+    for k,v in comp.params.items():
+        if isinstance(v, str):
             v = v.encode(enc)
         params[k] = sqlescape(v)
     return (comp.string.encode(enc) % params).decode(enc)
@@ -195,7 +193,7 @@ def get_one_or_create(db, model, create_method='',
             obj = create(db, model, create_method, create_method_kwargs, **kwargs)
             __transaction.commit()
             return obj
-        except IntegrityError, e:
+        except IntegrityError as e:
             logging.info(
                 "INTEGRITY ERROR on %r %r, %r: %r", model, create_method_kwargs,
                 kwargs, e)
@@ -212,6 +210,39 @@ def create(db, model, create_method='',
     return created, True
 
 Base = declarative_base()
+
+class LibraryType(object):
+    """Constant container for library types.
+
+    This is as defined here:
+
+    https://github.com/NYPL-Simplified/Simplified/wiki/LibraryRegistryPublicAPI#the-subject-scheme-for-library-types
+    """
+
+    SCHEME_URI = "http://librarysimplified.org/terms/library-types"
+    LOCAL = "local"
+    COUNTY = "county"
+    STATE = "state"
+    PROVINCE = "province"
+    NATIONAL = "national"
+    UNIVERSAL = "universal"
+
+    # Different nations use different terms for referring to their
+    # administrative divisions, which translates into different terms in
+    # the library type vocabulary.
+    ADMINISTRATIVE_DIVISION_TYPES = {
+        "US": STATE,
+        "CA" : PROVINCE,
+    }
+
+    NAME_FOR_CODE = {
+        LOCAL: "Local library",
+        COUNTY: "County library",
+        STATE: "State library",
+        PROVINCE: "Provincial library",
+        NATIONAL: "National library",
+        UNIVERSAL: "Online library",
+    }
 
 class Library(Base):
     """An entry in this table corresponds more or less to an OPDS server.
@@ -440,6 +471,81 @@ class Library(Base):
         prod = self.PRODUCTION_STAGE
         return self.library_stage == prod and self.registry_stage == prod
 
+    @property
+    def types(self):
+        """Return any special types for this library.
+
+        :yield: A sequence of code constants from LibraryTypes.
+        """
+        service_area = self.service_area
+        if not service_area:
+            return
+        code = service_area.library_type
+        if code:
+            yield code
+
+        # TODO: in the future, more types, e.g. audience-based, can go
+        # here.
+
+    @property
+    def service_area(self):
+        """Return the service area of this Library, assuming there is only
+        one.
+
+        :return: A Place, if there is one well-defined place this
+        library serves; otherwise None.
+        """
+        everywhere = None
+
+        # Group the ServiceAreas by type.
+        by_type = defaultdict(set)
+        for a in self.service_areas:
+            if not a.place:
+                continue
+            if a.place.type == Place.EVERYWHERE:
+                # We will only return 'everywhere' if we don't find
+                # something more specific.
+                everywhere = a.place
+                continue
+            by_type[a.type].add(a)
+
+        # If there is a single focus area, use it.
+        # Otherwise, if there is a single eligibility area, use that.
+        service_area = None
+        for area_type in ServiceArea.FOCUS, ServiceArea.ELIGIBILITY:
+            if len(by_type[area_type]) == 1:
+                [service_area] = by_type[area_type]
+                if service_area.place:
+                    return service_area.place
+
+        # This library serves everywhere, and it doesn't _also_ serve
+        # some more specific place.
+        if everywhere:
+            return everywhere
+
+        # This library does not have one ServiceArea that stands out.
+        return None
+
+    @property
+    def service_area_name(self):
+        """Describe the library's service area in a short string a human would
+        understand, e.g. "Kern County, CA".
+
+        This library does the best it can to express a library's service
+        area as the name of a single place, but it's not always possible
+        since libraries can have multiple service areas.
+
+        TODO: We'll want to fetch a library's ServiceAreas (and their
+        Places) as part of the query that fetches libraries, so that
+        this doesn't result in extra DB queries per library.
+
+        :return: A string, or None if the library's service area can't be
+           described as a short string.
+        """
+        if self.service_area:
+            return self.service_area.human_friendly_name
+        return None
+
     @classmethod
     def _feed_restriction(cls, production, library_field=None, registry_field=None):
         """Create a SQLAlchemy restriction that only finds libraries that
@@ -622,7 +728,7 @@ class Library(Base):
             return func.min(
                 case(
                     [(subquery.c.type==Place.EVERYWHERE, literal_column(str(0)))],
-                    else_=func.ST_Distance_Sphere(target, subquery.c.geometry)
+                    else_=func.ST_DistanceSphere(target, subquery.c.geometry)
                 )
             ) / 1000
 
@@ -687,7 +793,7 @@ class Library(Base):
         result = _db.execute(library_id_and_score)
         library_ids_and_scores = {r[0]: r[1] for r in result}
         # Look up the Library objects and return them with the scores.
-        libraries = _db.query(Library).filter(Library.id.in_(library_ids_and_scores.keys()))
+        libraries = _db.query(Library).filter(Library.id.in_(list(library_ids_and_scores.keys())))
         c = Counter()
         for library in libraries:
             c[library] = library_ids_and_scores[library.id]
@@ -736,13 +842,13 @@ class Library(Base):
         # For each library served by such a place, calculate the
         # minimum distance between the library's service area and
         # Point A in meters.
-        min_distance = func.min(func.ST_Distance_Sphere(target, Place.geometry))
+        min_distance = func.min(func.ST_DistanceSphere(target, Place.geometry))
 
         qu = _db.query(Library).join(Library.service_areas).join(
             ServiceArea.place)
         qu = qu.filter(cls._feed_restriction(production))
         qu = qu.filter(nearby)
-        qu = qu.add_column(
+        qu = qu.add_columns(
                 min_distance).group_by(Library.id).order_by(
                 min_distance.asc())
         return qu
@@ -853,15 +959,15 @@ class Library(Base):
         if type:
             qu = qu.filter(named_place.type==type)
         if here:
-            min_distance = func.min(func.ST_Distance_Sphere(here, named_place.geometry))
-            qu = qu.add_column(min_distance)
+            min_distance = func.min(func.ST_DistanceSphere(here, named_place.geometry))
+            qu = qu.add_columns(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
         return qu
 
     us_zip = re.compile("^[0-9]{5}$")
     us_zip_plus_4 = re.compile("^[0-9]{5}-[0-9]{4}$")
-    running_whitespace = re.compile("\s+")
+    running_whitespace = re.compile(r"\s+")
 
     @classmethod
     def create_query(cls, _db, here=None, production=True, *args):
@@ -874,9 +980,9 @@ class Library(Base):
             # Order by the minimum distance between one of the
             # library's service areas and the current location.
             min_distance = func.min(
-                func.ST_Distance_Sphere(here, Place.geometry)
+                func.ST_DistanceSphere(here, Place.geometry)
             )
-            qu = qu.add_column(min_distance)
+            qu = qu.add_columns(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
         return qu
@@ -1063,7 +1169,8 @@ class Place(Base):
     # supposed to be precise terms. Each census-designated place is
     # called a 'city', even if it's not a city in the legal sense.
     # Countries that call their top-level administrative divisions something
-    # other than 'states' can still use 'state' as their type.
+    # other than 'states' can still use 'state' as their type. (But see
+    # LibraryType.ADMINISTRATIVE_DIVISION_TYPES.)
     NATION = 'nation'
     STATE = 'state'
     COUNTY = 'county'
@@ -1257,6 +1364,58 @@ class Place(Base):
         """
         return [x.strip() for x in reversed(name.split(",")) if x.strip()]
 
+    @property
+    def library_type(self):
+        """If a library serves this place, what type of library does that make
+        it?
+
+        :return: A string; one of the constants from LibraryType.
+        """
+        if self.type == Place.EVERYWHERE:
+            return LibraryType.UNIVERSAL
+        elif self.type == Place.NATION:
+            return LibraryType.NATIONAL
+        elif self.type == Place.STATE:
+            # Whether this is a 'state' library, 'province' library,
+            # etc. depends on which nation it's in.
+            library_type = LibraryType.STATE
+            if self.parent and self.parent.type == Place.NATION:
+                library_type = LibraryType.ADMINISTRATIVE_DIVISION_TYPES.get(
+                    self.parent.abbreviated_name, library_type
+                )
+            return library_type
+        elif self.type == Place.COUNTY:
+            return LibraryType.COUNTY
+        return LibraryType.LOCAL
+
+    @property
+    def human_friendly_name(self):
+        """Generate the sort of string a human would recognize as an
+        unambiguous name for this place.
+
+        This is in some sense the opposite of parse_name.
+
+        :return: A string, or None if there is no human-friendly name for
+           this place.
+        """
+        if self.type == self.EVERYWHERE:
+            # 'everywhere' is not a distinct place with a well-known name.
+            return None
+        if self.parent and self.parent.type == self.STATE:
+            parent = self.parent.abbreviated_name or self.parent.external_name
+            if self.type == Place.COUNTY:
+                # Renfrew County, ON
+                return "{} County, {}".format(self.external_name, parent)
+            elif self.type == Place.CITY:
+                # Montgomery, AL
+                return "{}, {}".format(self.external_name, parent)
+
+        # All other cases:
+        #  93203
+        #  Texas
+        #  France
+        return self.external_name
+
     def overlaps_not_counting_border(self, qu):
         """Modifies a filter to find places that have points inside this
         Place, not counting the border.
@@ -1270,6 +1429,7 @@ class Place(Base):
         return qu.filter(intersects).filter(touches==False)
 
     def lookup_inside(self, name, using_overlap=False, using_external_source=True):
+
         """Look up a named Place that is geographically 'inside' this Place.
 
         :param name: The name of a place, such as "Boston" or
@@ -1392,7 +1552,10 @@ class Place(Base):
             return None
 
         _db = Session.object_session(self)
-        search = uszipcode.SearchEngine(simple_zipcode=True)
+        search = uszipcode.SearchEngine(
+            db_file_dir=Configuration.DATADIR,
+            simple_zipcode=True
+        )
         state = self.abbreviated_name
         uszipcode_matches = []
         if (state in search.state_to_city_mapper
@@ -1440,10 +1603,10 @@ class Place(Base):
             abbr = "abbr=%s " % self.abbreviated_name
         else:
             abbr = ''
-        output = u"<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
+        output = "<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
             self.external_name, self.type, abbr, self.external_id, parent
         )
-        return native_string(output)
+        return str(output)
 
 
 class PlaceAlias(Base):
@@ -1765,7 +1928,7 @@ class DelegatedPatronIdentifier(Base):
 
     This is probably an Adobe Account ID.
     """
-    ADOBE_ACCOUNT_ID = u'Adobe Account ID'
+    ADOBE_ACCOUNT_ID = 'Adobe Account ID'
 
     __tablename__ = 'delegatedpatronidentifiers'
     id = Column(Integer, primary_key=True)
@@ -1850,7 +2013,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
     def __init__(self, node_value, delegates):
         super(ShortClientTokenDecoder, self).__init__()
-        if isinstance(node_value, basestring):
+        if isinstance(node_value, str):
             # The node value may be stored in hex form (that's how
             # Adobe gives it out) or as the equivalent decimal number.
             if node_value.startswith('0x'):
@@ -1902,7 +2065,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 account_id, label, content = delegate.sign_in_standard(
                     username, password
                 )
-            except Exception, e:
+            except Exception as e:
                 # This delegate couldn't help us.
                 pass
             if account_id:
@@ -1914,7 +2077,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             # ourselves.
             try:
                 signature = self.adobe_base64_decode(password)
-            except Exception, e:
+            except Exception as e:
                 raise ValueError("Invalid password: %s" % password)
 
             patron_identifier, account_id = self._decode(
@@ -2016,35 +2179,35 @@ class ExternalIntegration(Base):
 
     # These integrations are associated with external services such as
     # Adobe Vendor ID, which manage access to DRM-dependent content.
-    DRM_GOAL = u'drm'
+    DRM_GOAL = 'drm'
 
     # Integrations with DRM_GOAL
-    ADOBE_VENDOR_ID = u'Adobe Vendor ID'
+    ADOBE_VENDOR_ID = 'Adobe Vendor ID'
 
     # These integrations are associated with external services that
     # collect logs of server-side events.
-    LOGGING_GOAL = u'logging'
+    LOGGING_GOAL = 'logging'
 
     # Integrations with LOGGING_GOAL
-    INTERNAL_LOGGING = u'Internal logging'
-    LOGGLY = u'Loggly'
+    INTERNAL_LOGGING = 'Internal logging'
+    LOGGLY = 'Loggly'
 
     # These integrations are for sending email.
-    EMAIL_GOAL = u'email'
+    EMAIL_GOAL = 'email'
 
     # Integrations with EMAIL_GOAL
-    SMTP = u'SMTP'
+    SMTP = 'SMTP'
 
     # If there is a special URL to use for access to this API,
     # put it here.
-    URL = u"url"
+    URL = "url"
 
     # If access requires authentication, these settings represent the
     # username/password or key/secret combination necessary to
     # authenticate. If there's a secret but no key, it's stored in
     # 'password'.
-    USERNAME = u"username"
-    PASSWORD = u"password"
+    USERNAME = "username"
+    PASSWORD = "password"
 
     __tablename__ = 'externalintegrations'
     id = Column(Integer, primary_key=True)
@@ -2069,7 +2232,7 @@ class ExternalIntegration(Base):
     )
 
     def __repr__(self):
-        return u"<ExternalIntegration: protocol=%s goal='%s' settings=%d ID=%d>" % (
+        return "<ExternalIntegration: protocol=%s goal='%s' settings=%d ID=%d>" % (
             self.protocol, self.goal, len(self.settings), self.id)
 
     @classmethod
@@ -2194,7 +2357,7 @@ class ConfigurationSetting(Base):
     )
 
     def __repr__(self):
-        return u'<ConfigurationSetting: key=%s, ID=%d>' % (
+        return '<ConfigurationSetting: key=%s, ID=%d>' % (
             self.key, self.id)
 
     @classmethod
@@ -2432,4 +2595,4 @@ class Admin(Base):
         return None
 
     def __repr__(self):
-        return u"<Admin: username=%s>" % self.username
+        return "<Admin: username=%s>" % self.username

@@ -1,67 +1,65 @@
 # encoding: utf-8
-from nose.tools import (
-    eq_,
-    assert_raises,
-    set_trace
-)
+import pytest
+
 from util.language import LanguageCodes
+
 
 class TestLanguageCodes(object):
 
     def test_lookups(self):
         c = LanguageCodes
-        eq_("eng", c.two_to_three['en'])
-        eq_("en", c.three_to_two['eng'])
-        eq_(["English"], c.english_names['en'])
-        eq_(["English"], c.english_names['eng'])
-        eq_(["English"], c.native_names['en'])
-        eq_(["English"], c.native_names['eng'])
+        assert c.two_to_three['en'] == "eng"
+        assert c.three_to_two['eng'] == "en"
+        assert c.english_names['en'] == ["English"]
+        assert c.english_names['eng'] == ["English"]
+        assert c.native_names['en'] == ["English"]
+        assert c.native_names['eng'] == ["English"]
 
-        eq_("spa", c.two_to_three['es'])
-        eq_("es", c.three_to_two['spa'])
-        eq_(['Spanish', 'Castilian'], c.english_names['es'])
-        eq_(['Spanish', 'Castilian'], c.english_names['spa'])
-        eq_([u"español", "castellano"], c.native_names['es'])
-        eq_([u"español", "castellano"], c.native_names['spa'])
+        assert c.two_to_three['es'] == "spa"
+        assert c.three_to_two['spa'] == "es"
+        assert c.english_names['es'] == ['Spanish', 'Castilian']
+        assert c.english_names['spa'] == ['Spanish', 'Castilian']
+        assert c.native_names['es'] == ["español", "castellano"]
+        assert c.native_names['spa'] == ["español", "castellano"]
 
-        eq_("chi", c.two_to_three['zh'])
-        eq_("zh", c.three_to_two['chi'])
-        eq_(["Chinese"], c.english_names['zh'])
-        eq_(["Chinese"], c.english_names['chi'])
+        assert c.two_to_three['zh'] == "chi"
+        assert c.three_to_two['chi'] == "zh"
+        assert c.english_names['zh'] == ["Chinese"]
+        assert c.english_names['chi'] == ["Chinese"]
         # We don't have this translation yet.
-        eq_([], c.native_names['zh'])
-        eq_([], c.native_names['chi'])
+        assert c.native_names['zh'] == []
+        assert c.native_names['chi'] == []
 
-        eq_(None, c.two_to_three['nosuchlanguage'])
-        eq_(None, c.three_to_two['nosuchlanguage'])
-        eq_([], c.english_names['nosuchlanguage'])
-        eq_([], c.native_names['nosuchlanguage'])
+        assert c.two_to_three['nosuchlanguage'] is None
+        assert c.three_to_two['nosuchlanguage'] is None
+        assert c.english_names['nosuchlanguage'] == []
+        assert c.native_names['nosuchlanguage'] == []
 
     def test_locale(self):
         m = LanguageCodes.iso_639_2_for_locale
-        eq_("eng", m("en-US"))
-        eq_("eng", m("en"))
-        eq_("eng", m("en-GB"))
-        eq_(None, m("nq-none"))
+        assert m("en-US") == "eng"
+        assert m("en") == "eng"
+        assert m("en-GB") == "eng"
+        assert m("nq-none") is None
 
     def test_string_to_alpha_3(self):
         m = LanguageCodes.string_to_alpha_3
-        eq_("eng", m("en"))
-        eq_("eng", m("eng"))
-        eq_("eng", m("en-GB"))
-        eq_("eng", m("English"))
-        eq_("eng", m("ENGLISH"))
-        eq_("ssa", m("Nilo-Saharan languages"))
-        eq_(None, m("NO SUCH LANGUAGE"))
-        eq_(None, None)
+        assert m("en") == "eng"
+        assert m("eng") == "eng"
+        assert m("en-GB") == "eng"
+        assert m("English") == "eng"
+        assert m("ENGLISH") == "eng"
+        assert m("Nilo-Saharan languages") == "ssa"
+        assert m("NO SUCH LANGUAGE") is None
 
     def test_name_for_languageset(self):
         m = LanguageCodes.name_for_languageset
-        eq_("", m([]))
-        eq_("English", m(["en"]))
-        eq_("English", m(["eng"]))
-        eq_(u"español", m(['es']))
-        eq_(u"English/español", m(["eng", "spa"]))
-        eq_(u"español/English", m("spa,eng"))
-        eq_(u"español/English/Chinese", m(["spa","eng","chi"]))
-        assert_raises(ValueError, m, ["eng, nxx"])
+        assert m([]) == ""
+        assert m(["en"]) == "English"
+        assert m(["eng"]) == "English"
+        assert m(['es']) == "español"
+        assert m(["eng", "spa"]) == "English/español"
+        assert m("spa,eng") == "español/English"
+        assert m(["spa","eng","chi"]) == "español/English/Chinese"
+        with pytest.raises(ValueError):
+            m(["eng, nxx"])

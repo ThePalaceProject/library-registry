@@ -1,0 +1,39 @@
+version: "3.7"
+
+services:
+  libreg_local_db:
+    container_name: libreg_local_db
+    build:
+      context: .
+      target: libreg_local_db
+    volumes:
+      - local_db_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5433"
+    environment:
+      - PGPORT=5433
+
+  libreg_webapp:
+    container_name: libreg_webapp
+    depends_on: 
+      - libreg_local_db
+    build:
+      context: .
+      target: libreg_dev
+    ports:
+      - "80:80"
+    environment:
+      - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_local_db:5433/simplified_registry_test
+      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5433/simplified_registry_dev
+      - FLASK_ENV=development
+    volumes:
+      - type: bind
+        source: .
+        target: /simplye_app
+        read_only: true
+      - type: bind
+        source: ../registry_admin
+        target: /registry_admin
+
+volumes:
+  local_db_data:

@@ -1,4 +1,3 @@
-from nose.tools import set_trace
 import json
 from geoalchemy2 import Geometry
 from sqlalchemy import func

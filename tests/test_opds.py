@@ -1,7 +1,3 @@
-from nose.tools import (
-    eq_,
-    set_trace,
-)
 import datetime
 import json
 
@@ -16,9 +12,11 @@ from model import (
     ConfigurationSetting,
     Hyperlink,
     Library,
+    LibraryType,
     Validation,
 )
 from opds import OPDSCatalog
+
 
 class TestOPDSCatalog(DatabaseTest):
 
@@ -46,20 +44,20 @@ class TestOPDSCatalog(DatabaseTest):
             self._db, "A Catalog!", "http://url/", [l1, l2],
             TestAnnotator(), url_for=self.mock_url_for
         )
-        catalog = unicode(catalog)
+        catalog = str(catalog)
         parsed = json.loads(catalog)
 
         # The catalog is labeled appropriately.
-        eq_("A Catalog!", parsed['metadata']['title'])
+        assert parsed['metadata']['title'] == "A Catalog!"
         [self_link] = parsed['links']
-        eq_("http://url/", self_link['href'])
-        eq_("self", self_link['rel'])
+        assert self_link['href'] == "http://url/"
+        assert self_link['rel'] == "self"
 
         # The annotator modified the catalog in passing.
-        eq_("Random text inserted by annotator.", parsed['metadata']['random'])
+        assert parsed['metadata']['random'] == "Random text inserted by annotator."
 
         # Each library became a catalog in the catalogs collection.
-        eq_([l1.name, l2.name], [x['metadata']['title'] for x in parsed['catalogs']])
+        assert [x['metadata']['title'] for x in parsed['catalogs']] == [l1.name, l2.name]
 
         # Each library has a link to its web catalog.
         l1_links, l2_links = [
@@ -67,11 +65,11 @@ class TestOPDSCatalog(DatabaseTest):
         ]
         [l1_web] = [link['href'] for link in l1_links
                     if link['type'] == 'text/html']
-        eq_(l1_web, template.replace("{uuid}", l1.internal_urn))
+        assert template.replace("{uuid}", l1.internal_urn) == l1_web
 
         [l2_web] = [link['href'] for link in l2_links
                     if link['type'] == 'text/html']
-        eq_(l2_web, template.replace("{uuid}", l2.internal_urn))
+        assert template.replace("{uuid}", l2.internal_urn) == l2_web
 
     def test_large_feeds_treated_differently(self):
         # The libraries in large feeds are converted to JSON in ways
@@ -87,32 +85,32 @@ class TestOPDSCatalog(DatabaseTest):
         class Mock(OPDSCatalog):
             def library_catalog(*args, **kwargs):
                 # Every time library_catalog is called, record whether
-                # we were asked to include a logo.
-                return kwargs['include_logo']
+                # we were asked to include logo and service area.
+                return kwargs['include_logo'], kwargs['include_service_area']
 
         # Every item in the large feed resulted in a call with
-        # include_logo=False.
+        # include_logo=False and include_service_areas=False.
         large_feed = Mock(self._db, "title", "url", ["it's", "large"])
         large_catalog = large_feed.catalog['catalogs']
-        eq_([False, False], large_catalog)
+        assert large_catalog == [(False, False), (False, False)]
 
-        # Every item in the large feed resulted in a call with
-        # include_logo=True.
+        # Every item in the small feed resulted in a call with
+        # include_logo=True and include_service_areas=True.
         small_feed = Mock(self._db, "title", "url", ["small"])
         small_catalog = small_feed.catalog['catalogs']
-        eq_([True], small_catalog)
+        assert small_catalog == [(True, True)]
 
         # Make it so even a feed with one item is 'large'.
         setting.value = 1
         small_feed = Mock(self._db, "title", "url", ["small"])
         small_catalog = small_feed.catalog['catalogs']
-        eq_([False], small_catalog)
+        assert small_catalog == [(False, False)]
 
         # Try it with a query that returns no results. No catalogs
         # are included at all.
         small_feed = Mock(self._db, "title", "url", self._db.query(Library))
         small_catalog = small_feed.catalog['catalogs']
-        eq_([], small_catalog)
+        assert small_catalog == []
 
     def test_feed_is_large(self):
         # Verify that the _feed_is_large helper method
@@ -125,16 +123,16 @@ class TestOPDSCatalog(DatabaseTest):
         query = self._db.query(Library)
 
         # There are no libraries, and the limit is 2, so a feed of libraries would not be large.
-        eq_(0, query.count())
-        eq_(False, m(self._db, query))
+        assert query.count() == 0
+        assert m(self._db, query) is False
 
         # Make some libraries, and the feed becomes large.
         [self._library() for x in range(2)]
-        eq_(True, m(self._db, query))
+        assert m(self._db, query) is True
 
         # It also works with a list.
-        eq_(True, m(self._db, [1,2]))
-        eq_(False, m(self._db, [1]))
+        assert m(self._db, [1,2]) is True
+        assert m(self._db, [1]) is False
 
     def test_library_catalog(self):
 
@@ -147,7 +145,9 @@ class TestOPDSCatalog(DatabaseTest):
                 cls.hyperlinks.append(hyperlink)
                 return OPDSCatalog._hyperlink_args(hyperlink)
 
-        library = self._library("The New York Public Library")
+        library = self._library(
+            "The New York Public Library", focus_areas=[self.new_york_city]
+        )
         library.urn = "123-abc"
         library.description = "It's a wonderful library."
         library.opds_url = "https://opds/"
@@ -170,55 +170,75 @@ class TestOPDSCatalog(DatabaseTest):
 
         catalog = Mock.library_catalog(
             library, url_for=self.mock_url_for,
-            web_client_uri_template="http://web/{uuid}"
+            web_client_uri_template="http://web/{uuid}",
+            distance=14244, include_service_area=True
         )
         metadata = catalog['metadata']
-        eq_(library.name, metadata['title'])
-        eq_(library.internal_urn, metadata['id'])
-        eq_(library.description, metadata['description'])
+        assert metadata['title'] == library.name
+        assert metadata['id'] == library.internal_urn
+        assert metadata['description'] == library.description
 
-        eq_(metadata['updated'], OPDSCatalog._strftime(library.timestamp))
+        # The distance between the current location and the edge of
+        # the library's service area is published as 'schema:distance'
+        # and also (for backwards compatibility) as 'distance'
+        for key in ('schema:distance', 'distance'):
+            assert metadata[key] == '14 km.'
+
+        # The library's updated timestamp is published as 'modified'
+        # and also (for backwards compatibility) as 'updated'.
+        timestamp = OPDSCatalog._strftime(library.timestamp)
+        for key in ('modified', 'updated'):
+            assert metadata[key] == timestamp
+
+        # If the library's service area is easy to explain in human-friendly
+        # terms, it is explained in 'schema:areaServed'.
+        assert metadata['schema:areaServed'] == "New York, NY"
+
+        # That also means the library will be given an OPDS subject
+        # corresponding to its type.
+        [subject] = metadata['subject']
+        assert LibraryType.SCHEME_URI == subject['scheme']
+        assert LibraryType.LOCAL == subject['code']
+        assert LibraryType.NAME_FOR_CODE[LibraryType.LOCAL] == subject['name']
 
         [authentication_url, web_alternate, help, eligibility, focus, opds_self, web_self] = sorted(catalog['links'], key=lambda x: (x.get('rel', ''), x.get('type', '')))
         [logo] = catalog['images']
 
-        eq_("mailto:help@library.org", help['href'])
-        eq_(Hyperlink.HELP_REL, help['rel'])
+        assert help['href'] == "mailto:help@library.org"
+        assert help['rel'] == Hyperlink.HELP_REL
 
-        eq_(library.web_url, web_alternate['href'])
-        eq_("alternate", web_alternate['rel'])
-        eq_("text/html", web_alternate['type'])
+        assert web_alternate['href'] == library.web_url
+        assert web_alternate['rel'] == "alternate"
+        assert web_alternate['type'] == "text/html"
 
-        eq_(library.opds_url, opds_self['href'])
-        eq_(OPDSCatalog.CATALOG_REL, opds_self['rel'])
-        eq_(OPDSCatalog.OPDS_1_TYPE, opds_self['type'])
+        assert opds_self['href'] == library.opds_url
+        assert opds_self['rel'] == OPDSCatalog.CATALOG_REL
+        assert opds_self['type'] == OPDSCatalog.OPDS_1_TYPE
 
-        eq_("http://web/%s" % library.internal_urn, web_self['href'])
-        eq_("self", web_self['rel'])
-        eq_("text/html", web_self['type'])
+        assert web_self['href'] == "http://web/%s" % library.internal_urn
+        assert web_self['rel'] == "self"
+        assert web_self['type'] == "text/html"
 
-        eq_("http://library_eligibility/%s" % library.internal_urn,
-            eligibility['href'])
-        eq_(OPDSCatalog.ELIGIBILITY_REL, eligibility['rel'])
-        eq_("application/geo+json", eligibility['type'])
+        assert eligibility['href'] == "http://library_eligibility/%s" % library.internal_urn
+        assert eligibility['rel'] == OPDSCatalog.ELIGIBILITY_REL
+        assert eligibility['type'] == "application/geo+json"
 
-        eq_("http://library_focus/%s" % library.internal_urn,
-            focus['href'])
-        eq_(OPDSCatalog.FOCUS_REL, focus['rel'])
-        eq_("application/geo+json", focus['type'])
+        assert focus['href'] == "http://library_focus/%s" % library.internal_urn
+        assert focus['rel'] == OPDSCatalog.FOCUS_REL
+        assert focus['type'] == "application/geo+json"
 
-        eq_(library.logo, logo['href'])
-        eq_(OPDSCatalog.THUMBNAIL_REL, logo['rel'])
-        eq_("image/png", logo['type'])
+        assert logo['href'] == library.logo
+        assert logo['rel'] == OPDSCatalog.THUMBNAIL_REL
+        assert logo['type'] == "image/png"
 
-        eq_(library.authentication_url, authentication_url['href'])
+        assert authentication_url['href'] == library.authentication_url
         assert 'rel' not in authentication_url
-        eq_(AuthenticationDocument.MEDIA_TYPE, authentication_url['type'])
+        assert authentication_url['type'] == AuthenticationDocument.MEDIA_TYPE
         # The public Hyperlink was passed into _hyperlink_args,
         # which made it show up in the list of links.
         #
         # The private Hyperlink was not passed in.
-        eq_([public_hyperlink], Mock.hyperlinks)
+        assert Mock.hyperlinks == [public_hyperlink]
         Mock.hyperlinks = []
 
         # If library_catalog is called with include_private_information=True,
@@ -227,18 +247,39 @@ class TestOPDSCatalog(DatabaseTest):
             library, include_private_information=True,
             url_for=self.mock_url_for
         )
-        eq_(set([public_hyperlink, private_hyperlink]), set(Mock.hyperlinks))
+        assert set(Mock.hyperlinks) == set([public_hyperlink, private_hyperlink])
 
-        # If library_catalog is passed with include_logo=False,
-        # the (potentially large) inline logo is omitted, 
+        # If library_catalog is called with include_logo=False,
+        # the (potentially large) inline logo is omitted,
         # even though it was included before.
         catalog = Mock.library_catalog(
-            library, include_logo=False, 
+            library, include_logo=False,
             url_for=self.mock_url_for
         )
         relations = [x.get('rel') for x in catalog['links']]
         assert OPDSCatalog.THUMBNAIL_REL not in relations
 
+        # If library_catalog is called with
+        # include_service_area=False, information about the library's
+        # service area is not included in the library's OPDS entry.
+        catalog = Mock.library_catalog(
+            library, url_for=self.mock_url_for,
+            include_service_area=False
+        )
+        for missing_key in (
+            'schema:areaServed', 'schema:distance', 'distance', 'subject'
+        ):
+            assert missing_key not in catalog['metadata']
+
+        # The same holds true if service area information is not available.
+        library.service_areas = []
+        catalog = Mock.library_catalog(
+            library, url_for=self.mock_url_for, include_service_area = True
+        )
+        for missing_key in (
+            'schema:areaServed', 'schema:distance', 'distance', 'subject'
+        ):
+            assert missing_key not in catalog['metadata']
 
     def test__hyperlink_args(self):
         """Verify that _hyperlink_args generates arguments appropriate
@@ -251,12 +292,12 @@ class TestOPDSCatalog(DatabaseTest):
 
         # If there's not enough information to make a link,
         # _hyperlink_args returns None.
-        eq_(None, m(None))
-        eq_(None, m(hyperlink))
+        assert m(None) is None
+        assert m(hyperlink) is None
 
         # Now there's enough for a link, but there's no Validation.
         hyperlink.href = "a url"
-        eq_(dict(href=hyperlink.href, rel=hyperlink.rel), m(hyperlink))
+        assert m(hyperlink) == dict(href=hyperlink.href, rel=hyperlink.rel)
 
         # Create a Validation.
         validation, is_new = create(self._db, Validation)
@@ -264,7 +305,7 @@ class TestOPDSCatalog(DatabaseTest):
 
         def assert_reservation_status(expect):
             args = m(hyperlink)
-            eq_(args['properties'][Validation.STATUS_PROPERTY], expect)
+            assert expect == args['properties'][Validation.STATUS_PROPERTY]
 
         # Validation in progress
         assert_reservation_status(Validation.IN_PROGRESS)
@@ -282,4 +323,4 @@ class TestOPDSCatalog(DatabaseTest):
         # If for some reason the Resource is removed from the Hyperlink,
         # _hyperlink_args stops working.
         hyperlink.resource = None
-        eq_(None, m(hyperlink))
+        assert m(hyperlink) is None
