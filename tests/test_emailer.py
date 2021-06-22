@@ -1,14 +1,13 @@
+from email.mime.text import MIMEText
+import quopri
+from unittest import mock
+
 import pytest
+import smtplib
 
 from . import DatabaseTest
-from email.mime.text import MIMEText
-
 from config import CannotLoadConfiguration
-from emailer import (
-    Emailer,
-    EmailTemplate,
-)
-import quopri
+from emailer import Emailer, EmailTemplate
 
 
 class TestEmailTemplate(object):
@@ -65,19 +64,6 @@ class TestEmailTemplate(object):
             expect = template % dict(snowman=quoted_printable_snowman)
             assert expect in body
 
-
-class MockSMTP(object):
-    """Mock of smtplib.SMTP that records all incoming calls."""
-
-    calls = []
-
-    def __getattr__(self, method, *args, **kwargs):
-        """When asked for a method, return a function that simply records the
-        method call.
-        """
-        def record(*args, **kwargs):
-            self.calls.append((method, args, kwargs))
-        return record
 
 
 class MockEmailer(Emailer):
@@ -309,17 +295,24 @@ The link will expire in about a day. If the link expires, just re-register your 
             assert phrase in body
         assert smtp == mock_smtp
 
-    def test__send_email(self):
+    @mock.patch('smtplib.SMTP', autospec=True)
+    def test__send_email2(self, mock_class):
         """Verify that send_email calls certain methods on smtplib.SMTP."""
-        integration = self._integration()
-        emailer = Emailer.from_sitewide_integration(self._db)
-        mock = MockSMTP()
-        emailer._send_email("you@library", "email body", mock)
 
-        # Five smtplib.SMTP methods were called.
-        connect, starttls, login, sendmail, quit = mock.calls
-        assert connect == ('connect', (emailer.smtp_host, emailer.smtp_port), {})
-        assert starttls == ('starttls', (), {})
-        assert login == ('login', (emailer.smtp_username, emailer.smtp_password), {})
-        assert sendmail == ('sendmail', (emailer.from_address, "you@library", "email body"), {})
-        assert quit == ("quit", (), {})
+        _ = self._integration()
+        emailer = Emailer.from_sitewide_integration(self._db)
+        email_recipient = 'you@library'
+        email_body = 'email body'
+
+        expected_calls = [
+            mock.call(host=emailer.smtp_host, port=emailer.smtp_port),
+            mock.call().connect(emailer.smtp_host, emailer.smtp_port),
+            mock.call().starttls(),
+            mock.call().login(emailer.smtp_username, emailer.smtp_password),
+            mock.call().sendmail(emailer.from_address, email_recipient, email_body),
+            mock.call().quit(),
+        ]
+
+        emailer._send_email(email_recipient, email_body, mock_class)
+
+        mock_class.assert_has_calls(expected_calls, any_order=False)

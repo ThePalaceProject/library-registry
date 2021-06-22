@@ -1,9 +1,11 @@
+from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email import charset
-import email
-import smtplib
+from smtplib import SMTP
+
+from config import CannotLoadConfiguration
+
 
 # Set up an encoding/decoding between UTF-8 and quoted-printable.
 # Otherwise, the bodies of email messages will be encoded with base64
@@ -11,9 +13,6 @@ import smtplib
 # need to be encoded.
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
-from config import (
-    CannotLoadConfiguration,
-)
 
 
 class Emailer(object):
@@ -166,13 +165,12 @@ The link will expire in about a day. If the link expires, just re-register your 
                 )
 
 
-    def send(self, email_type, to_address, smtp=None, **kwargs):
+    def send(self, email_type: str, to_address: str, smtp_class=SMTP, **kwargs):
         """Generate an email from a template and send it.
 
         :param email_type: The name of the template to use.
         :param to_address: Addressee of the email.
-        :param smtp: Use this object as a mock instead of creating an
-            smtplib.SMTP object.
+        :param smtp_class: Use this class for the SMTP protocol client.
         :param kwargs: Arguments to use when generating the email from
             a template.
         """
@@ -183,11 +181,11 @@ The link will expire in about a day. If the link expires, just re-register your 
         kwargs['from_address'] = self.from_address
         kwargs['to_address'] = to_address
         body = template.body(from_header, to_address, **kwargs)
-        return self._send_email(to_address, body, smtp)
+        return self._send_email(to_address, body, smtp_class)
 
-    def _send_email(self, to_address, body, smtp=None):
+    def _send_email(self, to_address, body, smtp_class=SMTP):
         """Actually send an email."""
-        smtp = smtp or smtplib.SMTP()
+        smtp = smtp_class(host=self.smtp_host, port=self.smtp_port)
         smtp.connect(self.smtp_host, self.smtp_port)
         smtp.starttls()
         smtp.login(self.smtp_username, self.smtp_password)
