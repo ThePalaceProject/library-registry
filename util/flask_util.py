@@ -1,12 +1,11 @@
 """Utilities for Flask applications."""
+
 import flask
 from flask import Response
 
-from . import (
-    problem_detail,
-)
-
+from . import problem_detail
 from .language import languages_from_accept
+
 
 def problem_raw(type, status, title, detail=None, instance=None, headers={}):
     data = problem_detail.json(type, status, title, detail, instance)
@@ -23,15 +22,17 @@ def problem(type, status, title, detail=None, instance=None, headers={}):
 def languages_for_request():
     return languages_from_accept(flask.request.accept_languages)
 
-def originating_ip():
-    """If there is an X-Forwarded-For header, use its value as the
-    originating IP address. Otherwise, use the address that originated
-    this request.
+def originating_ip() -> str:
+    """Determine the client's IP address.
+
+    If there is an X-Forwarded-For header and it has a non-empty value,
+    use the client value as the originating IP address. Otherwise, use
+    the address that originated this request.
+
+    NB: The format of an X-Forwarded-For header value is: "<client-ip>, [proxy1-ip, [proxy2ip ...]]
+
+    :return: IP address of request originator
+    :rtype: str
     """
-    address = None
-    header = 'X-Forwarded-For'
-    if header in flask.request.headers:
-        address = flask.request.headers[header]
-    if not address:
-        address = flask.request.remote_addr
-    return address
+    forwarded_for_client_ip = next(map(str.strip, flask.request.headers.get('X-Forwarded-For', '').split(',')))
+    return forwarded_for_client_ip or flask.request.remote_addr
