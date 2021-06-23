@@ -1,14 +1,10 @@
 """Utilities for Flask applications."""
-import re
 
 import flask
 from flask import Response
 
 from . import problem_detail
 from .language import languages_from_accept
-
-
-_COMMA_SPACE_SEPARATOR = re.compile(r'\s*,\s*')
 
 
 def problem_raw(type, status, title, detail=None, instance=None, headers={}):
@@ -38,5 +34,5 @@ def originating_ip() -> str:
     :return: IP address of request originator
     :rtype: str
     """
-    addresses = re.split(_COMMA_SPACE_SEPARATOR, flask.request.headers.get('X-Forwarded-For', '').strip())
-    return addresses[0] or flask.request.remote_addr
+    forwarded_for_client_ip = next(map(str.strip, flask.request.headers.get('X-Forwarded-For', '').split(',')))
+    return forwarded_for_client_ip or flask.request.remote_addr
