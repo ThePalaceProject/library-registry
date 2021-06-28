@@ -19,7 +19,7 @@ services:
       - libreg_local_db
     build:
       context: .
-      target: libreg_dev
+      target: libreg_local
     ports:
       - "80:80"
     environment:
