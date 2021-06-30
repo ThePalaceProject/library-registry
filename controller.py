@@ -257,9 +257,17 @@ class LibraryRegistryController(BaseController):
         if live:
             alphabetical = alphabetical.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
 
+        libraries = list(alphabetical)
+
+        # Run a single database query to get patron counts for all
+        # relevant libraries, rather than calculating this one library
+        # at a time.
+        patron_counts = Library.patron_counts_by_library(self._db, libraries)
+
         for library in alphabetical:
             uuid = library.internal_urn.split("uuid:")[1]
-            result += [self.library_details(uuid, library)]
+            patron_count = patron_counts.get(library.id, 0)
+            result += [self.library_details(uuid, library, patron_count)]
 
         data = dict(libraries=result)
         now = datetime.datetime.utcnow()
@@ -327,8 +335,15 @@ class LibraryRegistryController(BaseController):
         self.log.info("Built library catalog in %.2fsec" % (b-a))
         return catalog_response(catalog)
 
-    def library_details(self, uuid, library=None):
-        # Return complete information about one specific library.
+    def library_details(self, uuid, library=None, patron_count=None):
+        """Return complete information about one specific library.
+
+        :param uuid: UUID of the library in question.
+        :param library: Preloaded Library object for the library in question.
+        :param patron_count: Precalculated patron count for the library in question.
+
+        :return: A dict.
+        """
         if not library:
             library = self.library_for_request(uuid)
 
@@ -366,12 +381,9 @@ class LibraryRegistryController(BaseController):
             settings[s.key] = s._value
         pls_id = settings.get(Library.PLS_ID, None)
 
-        # TODO: This is the current bottleneck for this method, and
-        # thus for the admin interface load time. number_of_patrons
-        # makes a database query, and it's not one we can remove by
-        # adding a simple joinedload() to the original query, because
-        # it makes a count of a potentially very large number.
-        num_patrons = str(library.number_of_patrons)
+        if patron_count is None:
+            patron_count = library.number_of_patrons
+        num_patrons = str(patron_count)
 
         basic_info = dict(
             name=library.name,
