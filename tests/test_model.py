@@ -527,6 +527,15 @@ class TestLibrary(DatabaseTest):
             None
         )
         assert production_library.number_of_patrons == 1
+
+        # Identifiers for another library don't count towards the total.
+        production_library_2 = self._library()
+        identifier1, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, production_library_2, self._str, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            None
+        )
+        assert production_library.number_of_patrons == 1
+
         # Identifiers that aren't Adobe Account IDs don't count towards the total.
         identifier2, is_new = DelegatedPatronIdentifier.get_one_or_create(
             self._db, production_library, self._str, "abc", None
@@ -540,6 +549,16 @@ class TestLibrary(DatabaseTest):
             None
         )
         assert testing_library.number_of_patrons == 0
+
+        # Using patron_counts_by_library you can determine patron counts for a number
+        # of libraries at once.
+        counts = Library.patron_counts_by_library(
+            self._db, [production_library, production_library_2, testing_library]
+        )
+        assert counts == {
+            production_library.id : 1,
+            production_library_2.id : 1,
+        }
 
     def test__feed_restriction(self):
         """Test the _feed_restriction helper method."""

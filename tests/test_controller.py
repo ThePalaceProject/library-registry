@@ -36,6 +36,7 @@ from model import (
     get_one,
     get_one_or_create,
     ConfigurationSetting,
+    DelegatedPatronIdentifier,
     ExternalIntegration,
     Hyperlink,
     Library,
@@ -290,6 +291,13 @@ class TestLibraryRegistryController(ControllerTest):
         ct = self.connecticut_state_library
         ks = self.kansas_state_library
         nypl = self.nypl
+
+        # Setting this up ensures that patron counts are measured.
+        identifier, is_new = DelegatedPatronIdentifier.get_one_or_create(
+            self._db, nypl, self._str, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            None
+        )
+
         everywhere = self._place(type=Place.EVERYWHERE)
         ia = self._library(
             "InternetArchive", "IA", [everywhere], has_email=True
@@ -468,7 +476,7 @@ class TestLibraryRegistryController(ControllerTest):
         def check(has_email=True):
             uuid = library.internal_urn.split("uuid:")[1]
             with self.app.test_request_context("/"):
-                response = self.controller.library_details(uuid)
+                response = self.controller.library_details(uuid, 0)
             assert response.get("uuid") == uuid
             self._check_keys(response)
             self._is_library(library, response, has_email)

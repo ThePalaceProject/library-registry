@@ -236,14 +236,38 @@ class LibraryRegistryController(BaseController):
         # Return a specific set of information about all libraries in production; this generates the library list in the admin interface.
         # If :param live is set to False, libraries in testing will also be shown.
         result = []
-        libraries = self._db.query(Library).order_by(Library.name)
+        alphabetical = self._db.query(Library).order_by(Library.name)
+
+        # Load all the ORM objects we'll need for these libraries in a single query.
+        alphabetical = alphabetical.options(
+            joinedload(Library.hyperlinks),
+            joinedload('hyperlinks', 'resource'),
+            joinedload('hyperlinks', 'resource', 'validation'),
+            joinedload(Library.service_areas),
+            joinedload('service_areas', 'place'),
+            joinedload('service_areas', 'place', 'parent'),
+            joinedload(Library.settings),
+        )
+
+        # Avoid transferring large fields that we won't end up using.
+        alphabetical = alphabetical.options(defer('logo'))
+        alphabetical = alphabetical.options(defer('service_areas', 'place', 'geometry'))
+        alphabetical = alphabetical.options(defer('service_areas', 'place', 'parent', 'geometry'))
 
         if live:
-            libraries = libraries.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
+            alphabetical = alphabetical.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
 
-        for library in libraries:
+        libraries = list(alphabetical)
+
+        # Run a single database query to get patron counts for all
+        # relevant libraries, rather than calculating this one library
+        # at a time.
+        patron_counts = Library.patron_counts_by_library(self._db, libraries)
+
+        for library in alphabetical:
             uuid = library.internal_urn.split("uuid:")[1]
-            result += [self.library_details(uuid, library)]
+            patron_count = patron_counts.get(library.id, 0)
+            result += [self.library_details(uuid, library, patron_count)]
 
         data = dict(libraries=result)
         now = datetime.datetime.utcnow()
@@ -311,19 +335,55 @@ class LibraryRegistryController(BaseController):
         self.log.info("Built library catalog in %.2fsec" % (b-a))
         return catalog_response(catalog)
 
-    def library_details(self, uuid, library=None):
-        # Return complete information about one specific library.
+    def library_details(self, uuid, library=None, patron_count=None):
+        """Return complete information about one specific library.
+
+        :param uuid: UUID of the library in question.
+        :param library: Preloaded Library object for the library in question.
+        :param patron_count: Precalculated patron count for the library in question.
+
+        :return: A dict.
+        """
         if not library:
             library = self.library_for_request(uuid)
 
         if isinstance(library, ProblemDetail):
             return library
 
+        # It's presumed that associated Hyperlinks and
+        # ConfigurationSettings were loaded using joinedload(), as a
+        # performance optimization. To avoid further database access,
+        # we'll iterate over the preloaded objects and put the
+        # information into Python data structures.
         hyperlink_types = [Hyperlink.INTEGRATION_CONTACT_REL, Hyperlink.HELP_REL, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL]
-        hyperlinks = [Library.get_hyperlink(library, x) for x in hyperlink_types]
-        contact_email, help_email, copyright_email = [self._get_email(x) for x in hyperlinks]
-        contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [self._validated_at(x) for x in hyperlinks]
-        contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = hyperlinks
+        hyperlinks = dict()
+        for hyperlink in library.hyperlinks:
+            if hyperlink.rel not in hyperlink_types:
+                continue
+            hyperlinks[hyperlink.rel] = hyperlink
+        contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = [
+            hyperlinks.get(rel, None) for rel in hyperlink_types
+        ]
+        contact_email, help_email, copyright_email = [self._get_email(hyperlinks.get(rel, None)) for rel in hyperlink_types]
+        contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [
+            self._validated_at(hyperlinks.get(rel, None)) for rel in hyperlink_types
+        ]
+
+        setting_types = [Library.PLS_ID]
+        settings = dict()
+        for s in library.settings:
+            if s.key not in setting_types or s.external_integration is not None:
+                continue
+            # We use _value to access the database value directly,
+            # instead of the 'value' hybrid property, which creates
+            # the possibility that we'll have to go to the database to
+            # try to find a default we know isn't there.
+            settings[s.key] = s._value
+        pls_id = settings.get(Library.PLS_ID, None)
+
+        if patron_count is None:
+            patron_count = library.number_of_patrons
+        num_patrons = str(patron_count)
 
         basic_info = dict(
             name=library.name,
@@ -332,8 +392,8 @@ class LibraryRegistryController(BaseController):
             timestamp=library.timestamp,
             internal_urn=library.internal_urn,
             online_registration=str(library.online_registration),
-            pls_id=library.pls_id.value,
-            number_of_patrons=str(library.number_of_patrons)
+            pls_id=pls_id,
+            number_of_patrons=num_patrons
         )
         urls_and_contact = dict(
             contact_email=contact_email,
@@ -346,7 +406,10 @@ class LibraryRegistryController(BaseController):
             opds_url=library.opds_url,
             web_url=library.web_url,
         )
+
+        # This will be slow unless ServiceArea has been preloaded with a joinedload().
         areas = self._areas(library.service_areas)
+
         stages = dict(
             library_stage=library._library_stage,
             registry_stage=library.registry_stage,
@@ -370,7 +433,7 @@ class LibraryRegistryController(BaseController):
     def _validated_at(self, hyperlink):
         validated_at = "Not validated"
         if hyperlink and hyperlink.resource:
-            validation = get_one(self._db, Validation, resource=hyperlink.resource)
+            validation = hyperlink.resource.validation
             if validation:
                 return validation.started_at
         return validated_at
