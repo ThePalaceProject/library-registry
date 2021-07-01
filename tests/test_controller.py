@@ -3,20 +3,11 @@ import datetime
 import os
 import json
 import random
+from contextlib import contextmanager
 from smtplib import SMTPException
 from urllib.parse import unquote
 
-from contextlib import contextmanager
-from controller import (
-    AdobeVendorIDController,
-    BaseController,
-    CoverageController,
-    LibraryRegistry,
-    LibraryRegistryAnnotator,
-    LibraryRegistryController,
-    ValidationController,
-)
-
+import pytest
 import flask
 from flask import Response, session
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
@@ -29,7 +20,16 @@ from util import GeometryUtility
 from util.problem_detail import ProblemDetail
 
 from authentication_document import AuthenticationDocument
-from emailer import Emailer
+from controller import (
+    AdobeVendorIDController,
+    BaseController,
+    CoverageController,
+    LibraryRegistry,
+    LibraryRegistryAnnotator,
+    LibraryRegistryController,
+    ValidationController,
+)
+from emailer import Emailer, EmailTemplate
 from opds import OPDSCatalog
 from model import (
     create,
@@ -45,7 +45,17 @@ from model import (
     Validation,
 )
 from util.http import RequestTimedOut
-from problem_details import *
+from problem_details import (
+    ERROR_RETRIEVING_DOCUMENT,
+    INTEGRATION_DOCUMENT_NOT_FOUND,
+    INTEGRATION_ERROR,
+    INVALID_CREDENTIALS,
+    INVALID_INTEGRATION_DOCUMENT,
+    LIBRARY_NOT_FOUND,
+    NO_AUTH_URL,
+    TIMEOUT,
+    UNABLE_TO_NOTIFY,
+)
 from config import Configuration
 
 
@@ -1429,6 +1439,51 @@ class TestLibraryRegistryController(ControllerTest):
         # library's authentication document.
         assert response.uri == INTEGRATION_ERROR.uri
         assert response.detail == "SMTP error while sending email to mailto:help@library.org"
+
+    def test_registration_fails_if_email_server_unusable(self):
+        """
+        GIVEN: An email integration which is missing or not responding
+        WHEN:  A registration is requested
+        THEN:  A ProblemDetail of an appropriate type should be returned
+        """
+        # Simulate an SMTP server that is wholly unresponsive
+        class UnresponsiveEmailer(Emailer):
+            def _send_email(*args):
+                raise Exception("message from UnresponsiveEmailer")
+        unresponsive_emailer_kwargs = {
+            "smtp_username": "library",
+            "smtp_password": "library",
+            "smtp_host": "library",
+            "smtp_port": "12345",
+            "from_name": "Test",
+            "from_address": "test@library.tld",
+            "templates": {
+                "address_needs_confirmation": EmailTemplate("subject", "Hello, %(to_address)s, this is %(from_address)s.")
+            },
+        }
+        self.controller.emailer = UnresponsiveEmailer(**unresponsive_emailer_kwargs)
+
+        # Pretend we are a library with a valid authentication document.
+        auth_document = self._auth_document(None)
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document),
+            url=auth_document['id']
+        )
+        self.queue_opds_success()
+
+        # Send a registration request to the registry.
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = ImmutableMultiDict([
+                ("url", auth_document['id']),
+                ("contact", "mailto:me@library.org"),
+            ])
+            response = self.controller.register(do_get=self.http_client.do_get)
+
+        # We get back a ProblemDetail the first time
+        # we got a problem sending an email. In this case, it was
+        # trying to contact the library's 'help' address included in the
+        # library's authentication document.
+        assert response.uri == UNABLE_TO_NOTIFY.uri
 
     def test_register_success(self):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
