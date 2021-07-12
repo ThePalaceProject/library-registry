@@ -25,6 +25,10 @@ class CannotLoadConfiguration(Exception):
     pass
 
 
+class CannotSendEmail(Exception):
+    pass
+
+
 class Configuration(object):
     DATADIR = Path(os.path.dirname(__file__)) / 'data'
 

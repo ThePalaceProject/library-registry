@@ -1,25 +1,15 @@
-import datetime
-import logging
-import flask
-from flask_babel import lazy_gettext as _
-from flask import (
-    Response,
-    redirect,
-    url_for,
-    session,
-)
-import requests
-from sqlalchemy.orm import (
-    defer,
-    joinedload,
-)
-from smtplib import SMTPException
 import json
+import logging
+import time
+from smtplib import SMTPException
+from urllib.parse import unquote
+
+from flask import (Response, redirect, render_template_string, request, url_for, session)
+from flask_babel import lazy_gettext as _
+from sqlalchemy.orm import (defer, joinedload)
+
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
-import os
-import time
-from urllib.parse import unquote
 
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
@@ -37,35 +27,31 @@ from model import (
     get_one_or_create,
     production_session,
 )
-from config import (
-    Configuration,
-    CannotLoadConfiguration,
-)
-from opds import (
-    Annotator,
-    OPDSCatalog,
-)
+from config import (Configuration, CannotLoadConfiguration, CannotSendEmail)
+from opds import (Annotator, OPDSCatalog)
 from registrar import LibraryRegistrar
 from templates import admin as admin_template
-from util import GeometryUtility
-from util.app_server import (
-    HeartbeatController,
-    catalog_response,
-)
-from util.http import (
-    HTTP,
-)
+from util.app_server import (HeartbeatController, catalog_response)
+from util.http import HTTP
 from util.problem_detail import ProblemDetail
-from util.string_helpers import (
-    base64,
-    random_string,
+from util.string_helpers import (base64, random_string)
+from problem_details import (
+    AUTHENTICATION_FAILURE,
+    INTEGRATION_ERROR,
+    INVALID_CONTACT_URI,
+    INVALID_CREDENTIALS,
+    LIBRARY_NOT_FOUND,
+    NO_AUTH_URL,
+    UNABLE_TO_NOTIFY,
 )
-from problem_details import *
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
-OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
+OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = (
+    "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
+)
 
-class LibraryRegistry(object):
+
+class LibraryRegistry:
 
     def __init__(self, _db=None, testing=False, emailer_class=Emailer):
 
@@ -125,12 +111,18 @@ class LibraryRegistryAnnotator(Annotator):
         # Add a templated link for getting a single library's entry.
         library_url = unquote(self.app.url_for("library", uuid="{uuid}"))
         catalog.add_link_to_catalog(
-            catalog.catalog, href=library_url, rel="http://librarysimplified.org/rel/registry/library", type=OPDSCatalog.OPDS_TYPE, templated=True)
+            catalog.catalog,
+            href=library_url,
+            rel="http://librarysimplified.org/rel/registry/library",
+            type=OPDSCatalog.OPDS_TYPE,
+            templated=True
+        )
 
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id
 
-class BaseController(object):
+
+class BaseController:
 
     def __init__(self, app):
         self.app = app
@@ -145,18 +137,19 @@ class BaseController(object):
         library = Library.for_urn(self._db, uuid)
         if not library:
             return LIBRARY_NOT_FOUND
-        flask.request.library = library
+        request.library = library
         return library
 
 
 class ViewController(BaseController):
     def __call__(self):
         username = session.get('username', '')
-        response = Response(flask.render_template_string(
+        response = Response(render_template_string(
             admin_template,
             username=username
         ))
         return response
+
 
 class LibraryRegistryController(BaseController):
 
@@ -197,7 +190,7 @@ class LibraryRegistryController(BaseController):
         return catalog_response(catalog)
 
     def search(self, location, live=True):
-        query = flask.request.args.get('q')
+        query = request.args.get('q')
         if live:
             search_controller = 'search'
         else:
@@ -223,7 +216,7 @@ class LibraryRegistryController(BaseController):
                 name=_("Find your library"),
                 description=_("Search by ZIP code, city or library name."),
                 tags="",
-                url_template = self.app.url_for(search_controller) + "?q={searchTerms}"
+                url_template=self.app.url_for(search_controller) + "?q={searchTerms}"
             )
             headers = {}
             headers['Content-Type'] = OPENSEARCH_MEDIA_TYPE
@@ -233,20 +226,44 @@ class LibraryRegistryController(BaseController):
             return Response(body, 200, headers)
 
     def libraries(self, live=True):
-        # Return a specific set of information about all libraries in production; this generates the library list in the admin interface.
+        # Return a specific set of information about all libraries in production;
+        # this generates the library list in the admin interface.
         # If :param live is set to False, libraries in testing will also be shown.
         result = []
-        libraries = self._db.query(Library).order_by(Library.name)
+        alphabetical = self._db.query(Library).order_by(Library.name)
+
+        # Load all the ORM objects we'll need for these libraries in a single query.
+        alphabetical = alphabetical.options(
+            joinedload(Library.hyperlinks),
+            joinedload('hyperlinks', 'resource'),
+            joinedload('hyperlinks', 'resource', 'validation'),
+            joinedload(Library.service_areas),
+            joinedload('service_areas', 'place'),
+            joinedload('service_areas', 'place', 'parent'),
+            joinedload(Library.settings),
+        )
+
+        # Avoid transferring large fields that we won't end up using.
+        alphabetical = alphabetical.options(defer('logo'))
+        alphabetical = alphabetical.options(defer('service_areas', 'place', 'geometry'))
+        alphabetical = alphabetical.options(defer('service_areas', 'place', 'parent', 'geometry'))
 
         if live:
-            libraries = libraries.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
+            alphabetical = alphabetical.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
 
-        for library in libraries:
+        libraries = list(alphabetical)
+
+        # Run a single database query to get patron counts for all
+        # relevant libraries, rather than calculating this one library
+        # at a time.
+        patron_counts = Library.patron_counts_by_library(self._db, libraries)
+
+        for library in alphabetical:
             uuid = library.internal_urn.split("uuid:")[1]
-            result += [self.library_details(uuid, library)]
+            patron_count = patron_counts.get(library.id, 0)
+            result += [self.library_details(uuid, library, patron_count)]
 
         data = dict(libraries=result)
-        now = datetime.datetime.utcnow()
         return data
 
     def libraries_opds(self, live=True, location=None):
@@ -311,19 +328,55 @@ class LibraryRegistryController(BaseController):
         self.log.info("Built library catalog in %.2fsec" % (b-a))
         return catalog_response(catalog)
 
-    def library_details(self, uuid, library=None):
-        # Return complete information about one specific library.
+    def library_details(self, uuid, library=None, patron_count=None):
+        """Return complete information about one specific library.
+
+        :param uuid: UUID of the library in question.
+        :param library: Preloaded Library object for the library in question.
+        :param patron_count: Precalculated patron count for the library in question.
+
+        :return: A dict.
+        """
         if not library:
             library = self.library_for_request(uuid)
 
         if isinstance(library, ProblemDetail):
             return library
 
+        # It's presumed that associated Hyperlinks and
+        # ConfigurationSettings were loaded using joinedload(), as a
+        # performance optimization. To avoid further database access,
+        # we'll iterate over the preloaded objects and put the
+        # information into Python data structures.
         hyperlink_types = [Hyperlink.INTEGRATION_CONTACT_REL, Hyperlink.HELP_REL, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL]
-        hyperlinks = [Library.get_hyperlink(library, x) for x in hyperlink_types]
-        contact_email, help_email, copyright_email = [self._get_email(x) for x in hyperlinks]
-        contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [self._validated_at(x) for x in hyperlinks]
-        contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = hyperlinks
+        hyperlinks = dict()
+        for hyperlink in library.hyperlinks:
+            if hyperlink.rel not in hyperlink_types:
+                continue
+            hyperlinks[hyperlink.rel] = hyperlink
+        contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = [
+            hyperlinks.get(rel, None) for rel in hyperlink_types
+        ]
+        contact_email, help_email, copyright_email = [self._get_email(hyperlinks.get(rel, None)) for rel in hyperlink_types]
+        contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [
+            self._validated_at(hyperlinks.get(rel, None)) for rel in hyperlink_types
+        ]
+
+        setting_types = [Library.PLS_ID]
+        settings = dict()
+        for s in library.settings:
+            if s.key not in setting_types or s.external_integration is not None:
+                continue
+            # We use _value to access the database value directly,
+            # instead of the 'value' hybrid property, which creates
+            # the possibility that we'll have to go to the database to
+            # try to find a default we know isn't there.
+            settings[s.key] = s._value
+        pls_id = settings.get(Library.PLS_ID, None)
+
+        if patron_count is None:
+            patron_count = library.number_of_patrons
+        num_patrons = str(patron_count)
 
         basic_info = dict(
             name=library.name,
@@ -332,8 +385,8 @@ class LibraryRegistryController(BaseController):
             timestamp=library.timestamp,
             internal_urn=library.internal_urn,
             online_registration=str(library.online_registration),
-            pls_id=library.pls_id.value,
-            number_of_patrons=str(library.number_of_patrons)
+            pls_id=pls_id,
+            number_of_patrons=num_patrons
         )
         urls_and_contact = dict(
             contact_email=contact_email,
@@ -346,7 +399,10 @@ class LibraryRegistryController(BaseController):
             opds_url=library.opds_url,
             web_url=library.web_url,
         )
+
+        # This will be slow unless ServiceArea has been preloaded with a joinedload().
         areas = self._areas(library.service_areas)
+
         stages = dict(
             library_stage=library._library_stage,
             registry_stage=library.registry_stage,
@@ -370,15 +426,15 @@ class LibraryRegistryController(BaseController):
     def _validated_at(self, hyperlink):
         validated_at = "Not validated"
         if hyperlink and hyperlink.resource:
-            validation = get_one(self._db, Validation, resource=hyperlink.resource)
+            validation = hyperlink.resource.validation
             if validation:
                 return validation.started_at
         return validated_at
 
     def validate_email(self):
         # Manually validate an email address, without the admin having to click on a confirmation link
-        uuid = flask.request.form.get("uuid")
-        email = flask.request.form.get("email")
+        uuid = request.form.get("uuid")
+        email = request.form.get("email")
         library = self.library_for_request(uuid)
         if isinstance(library, ProblemDetail):
             return library
@@ -401,30 +457,31 @@ class LibraryRegistryController(BaseController):
         return self.library_details(uuid)
 
     def edit_registration(self):
-        # Edit a specific library's registry_stage and library_stage based on information which an admin has submitted in the interface.
-        uuid = flask.request.form.get("uuid")
+        # Edit a specific library's registry_stage and library_stage based on
+        # information which an admin has submitted in the interface.
+        uuid = request.form.get("uuid")
         library = self.library_for_request(uuid)
         if isinstance(library, ProblemDetail):
             return library
-        registry_stage = flask.request.form.get("Registry Stage")
-        library_stage = flask.request.form.get("Library Stage")
+        registry_stage = request.form.get("Registry Stage")
+        library_stage = request.form.get("Library Stage")
 
         library._library_stage = library_stage
         library.registry_stage = registry_stage
         return Response(str(library.internal_urn), 200)
 
     def add_or_edit_pls_id(self):
-        uuid = flask.request.form.get("uuid")
+        uuid = request.form.get("uuid")
         library = self.library_for_request(uuid)
         if isinstance(library, ProblemDetail):
             return library
-        pls_id = flask.request.form.get(Library.PLS_ID)
+        pls_id = request.form.get(Library.PLS_ID)
         library.pls_id.value = pls_id
         return Response(str(library.internal_urn), 200)
 
     def log_in(self):
-        username = flask.request.form.get("username")
-        password = flask.request.form.get("password")
+        username = request.form.get("username")
+        password = request.form.get("password")
         if Admin.authenticate(self._db, username, password):
             session["username"] = username
             return redirect(url_for('admin_view'))
@@ -432,11 +489,11 @@ class LibraryRegistryController(BaseController):
             return INVALID_CREDENTIALS
 
     def log_out(self):
-        session["username"] = "";
+        session["username"] = ""
         return redirect(url_for('admin_view'))
 
     def search_details(self):
-        name = flask.request.form.get("name")
+        name = request.form.get("name")
         search_results = Library.search(self._db, {}, name, production=False)
         if search_results:
             info = [self.library_details(lib.internal_urn.split("uuid:")[1], lib) for lib in search_results]
@@ -445,7 +502,7 @@ class LibraryRegistryController(BaseController):
             return LIBRARY_NOT_FOUND
 
     def library(self):
-        library = flask.request.library
+        library = request.library
         this_url = self.app.url_for(
             'library', uuid=library.internal_urn
         )
@@ -457,9 +514,7 @@ class LibraryRegistryController(BaseController):
         return catalog_response(catalog)
 
     def render(self):
-        response = Response(flask.render_template_string(
-            admin_template
-        ))
+        response = Response(render_template_string(admin_template))
         return response
 
     @property
@@ -504,23 +559,23 @@ class LibraryRegistryController(BaseController):
         """Serve an OPDS 2.0 catalog."""
         if not isinstance(document, (bytes, str)):
             document = json.dumps(document)
-        headers = { "Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE }
+        headers = {"Content-Type": OPDS_CATALOG_REGISTRATION_MEDIA_TYPE}
         return Response(document, status, headers=headers)
 
     def register(self, do_get=HTTP.debuggable_get):
-        if flask.request.method == 'GET':
+        if request.method == 'GET':
             document = self.registration_document
             return self.catalog_response(document)
 
-        auth_url = flask.request.form.get("url")
+        auth_url = request.form.get("url")
         self.log.info("Got request to register %s", auth_url)
         if not auth_url:
             return NO_AUTH_URL
 
-        integration_contact_uri = flask.request.form.get("contact")
+        integration_contact_uri = request.form.get("contact")
         integration_contact_email = integration_contact_uri
         shared_secret = None
-        auth_header = flask.request.headers.get('Authorization')
+        auth_header = request.headers.get('Authorization')
         if auth_header and isinstance(auth_header, str) and "bearer" in auth_header.lower():
             shared_secret = auth_header.split(' ', 1)[1]
             self.log.info("Incoming shared secret: %s...", shared_secret[:4])
@@ -529,7 +584,7 @@ class LibraryRegistryController(BaseController):
         # testing/production distinction. We have to assume they want
         # production -- otherwise they wouldn't bother registering.
 
-        library_stage = flask.request.form.get("stage")
+        library_stage = request.form.get("stage")
         self.log.info("Incoming stage: %s", library_stage)
         library_stage = library_stage or Library.PRODUCTION_STAGE
 
@@ -538,10 +593,10 @@ class LibraryRegistryController(BaseController):
         # every new library to be on a circulation manager that can meet
         # this requirement.
         #
-        #integration_contact_email = self._required_email_address(
-        #    integration_contact_uri,
-        #    "Invalid or missing configuration contact email address"
-        #)
+        # integration_contact_email = self._required_email_address(
+        #     integration_contact_uri,
+        #     "Invalid or missing configuration contact email address"
+        # )
         if isinstance(integration_contact_email, ProblemDetail):
             return integration_contact_email
 
@@ -625,7 +680,7 @@ class LibraryRegistryController(BaseController):
         if elevated_permissions:
             # If you have elevated permissions you may ask for the
             # shared secret to be reset.
-            reset_shared_secret = flask.request.form.get(
+            reset_shared_secret = request.form.get(
                 "reset_shared_secret", False
             )
 
@@ -645,11 +700,15 @@ class LibraryRegistryController(BaseController):
                 # them a new library is using their address.
                 try:
                     hyperlink.notify(self.emailer, self.app.url_for)
-                except SMTPException as e:
-                    # We were unable to send the email.
+                except SMTPException:
+                    # We were unable to send the email due to an SMTP error
                     return INTEGRATION_ERROR.detailed(
                         _("SMTP error while sending email to %(address)s",
                           address=hyperlink.resource.href)
+                    )
+                except CannotSendEmail:
+                    return UNABLE_TO_NOTIFY.detailed(
+                        _("The Registry was unable to send a notification email.")
                     )
 
         # Create an OPDS 2 catalog containing all available
@@ -735,9 +794,7 @@ class ValidationController(BaseController):
             if resource and resource.validation and resource.validation.success:
                 return self.html_response(200, _("This URI has already been validated."))
 
-        if (not validation
-            or not validation.resource
-            or validation.resource.id != resource_id):
+        if (not validation or not validation.resource or validation.resource.id != resource_id):
             # For whatever reason the resource ID and secret don't match.
             # A generic error that doesn't reveal information is appropriate
             # in all cases.
@@ -769,10 +826,10 @@ class CoverageController(BaseController):
         return Response(document, 200, headers=headers)
 
     def lookup(self):
-        coverage = flask.request.args.get('coverage')
+        coverage = request.args.get('coverage')
         try:
             coverage = json.loads(coverage)
-        except ValueError as e:
+        except ValueError:
             pass
         places, unknown, ambiguous = AuthenticationDocument.parse_coverage(
             self._db, coverage
@@ -792,8 +849,7 @@ class CoverageController(BaseController):
         """Serve a GeoJSON document describing some subset of the active
         library's service areas.
         """
-        areas = [x.place for x in flask.request.library.service_areas
-                 if x.type==service_type]
+        areas = [x.place for x in request.library.service_areas if x.type == service_type]
         return self.geojson_response(Place.to_geojson(self._db, *areas))
 
     def eligibility_for_library(self):
