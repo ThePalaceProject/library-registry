@@ -1,5 +1,8 @@
+import os
+
 from email.mime.text import MIMEText
 import quopri
+from typing import Optional
 from unittest import mock
 
 import pytest
@@ -74,6 +77,13 @@ class MockEmailer(Emailer):
 
 
 class TestEmailer(DatabaseTest):
+
+    @staticmethod
+    def _set_env(key: str, value: Optional[str]):
+        if value:
+            os.environ[key] = value
+        elif key in os.environ:
+            del os.environ[key]
 
     def _integration(self):
         """Configure a complete sitewide email integration."""
@@ -294,6 +304,44 @@ The link will expire in about a day. If the link expires, just re-register your 
             print(phrase)
             assert phrase in body
         assert smtp == mock_smtp
+
+
+    @pytest.mark.parametrize(
+        'email_type, override_is_specified, expected_recipient',
+        [
+            ('test', True, 'default@example.org'),
+            ('test', False, 'default@example.org'),
+            (Emailer.ADDRESS_DESIGNATED, True, 'override@example.org'),
+            (Emailer.ADDRESS_DESIGNATED, False, 'default@example.org'),
+            (Emailer.ADDRESS_NEEDS_CONFIRMATION, True, 'override@example.org'),
+            (Emailer.ADDRESS_NEEDS_CONFIRMATION, False, 'default@example.org'),
+        ])
+    def test_override_recipient(self, email_type: str, override_is_specified: bool, expected_recipient):
+        """Except for test email, recipient should be overridden when an override is specified in the environment."""
+
+        default_recipient = 'default@example.org'
+        override_recipient = 'override@example.org'
+
+        # Setup the environment appropriately.
+        environment_override_value = override_recipient if override_is_specified else None
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, environment_override_value)
+
+        # Configure the Emailer.
+        _ = self._integration()
+        emailer = Emailer.from_sitewide_integration(self._db)
+
+        # Always reset the override address environment variable.
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
+
+        # Setup a dummy template.
+        emailer.templates[email_type] = EmailTemplate("Email", "This is an email.")
+
+        # Send the email and ensure that we used the correct recipient.
+        with mock.patch.object(Emailer, '_send_email', autospec=True) as send_email:
+            emailer.send(email_type, default_recipient)
+            send_email.assert_called_once()
+            assert expected_recipient == send_email.call_args_list[0][0][1]
+
 
     @mock.patch('smtplib.SMTP', autospec=True)
     def test__send_email2(self, mock_class):

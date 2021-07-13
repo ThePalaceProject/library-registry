@@ -24,6 +24,12 @@ git clone https://github.com/thepalaceproject/library-registry.git
 git clone https://github.com/thepalaceproject/library-registry-admin.git
 ```
 
+## Key Environment Variables
+
+These environment variables are generally applicable, regardless of installation method, and are included here because they are not discussed elsewhere in this document.
+
+- EMAILER_RECIPIENT_OVERRIDE: If set, `emailer` will send all non-test email to this email address.
+
 ## Installation (Docker)
 
 Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
