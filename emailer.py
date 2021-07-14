@@ -1,3 +1,4 @@
+import os
 from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
@@ -25,6 +26,8 @@ class Emailer(object):
     FROM_NAME = 'from_name'
 
     DEFAULT_FROM_NAME = 'Library Simplified registry support'
+
+    ENV_RECIPIENT_OVERRIDE_ADDRESS = 'EMAILER_RECIPIENT_OVERRIDE'
 
     # Constants for different types of email.
     ADDRESS_DESIGNATED = 'address_designated'
@@ -146,6 +149,7 @@ The link will expire in about a day. If the link expires, just re-register your 
         self.from_name = from_name
         self.from_address = from_address
         self.templates = templates
+        self.recipient_address_override = os.environ.get(self.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
 
         # Make sure the templates don't contain any template values we
         # can't handle.
@@ -164,6 +168,9 @@ The link will expire in about a day. If the link expires, just re-register your 
                     )
                 )
 
+    def _effective_recipient(self, default: str = None) -> str:
+        """Override the recipient's email address, when applicable."""
+        return self.recipient_address_override or default
 
     def send(self, email_type: str, to_address: str, smtp_class=SMTP, **kwargs):
         """Generate an email from a template and send it.
@@ -174,11 +181,15 @@ The link will expire in about a day. If the link expires, just re-register your 
         :param kwargs: Arguments to use when generating the email from
             a template.
         """
-        if not email_type in self.templates:
+        if email_type not in self.templates:
             raise ValueError("No such email template: %s" % email_type)
         template = self.templates[email_type]
         from_header = '%s <%s>' % (self.from_name, self.from_address)
         kwargs['from_address'] = self.from_address
+        # Check to see if we have an alternative recipient, unless this is a test email.
+        to_address = (self._effective_recipient(default=to_address)
+                      if email_type != 'test'
+                      else to_address)
         kwargs['to_address'] = to_address
         body = template.body(from_header, to_address, **kwargs)
         return self._send_email(to_address, body, smtp_class)
