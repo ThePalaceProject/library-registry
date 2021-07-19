@@ -1,5 +1,10 @@
 ## CHANGELOG
 
+### 07/15/21
+
+#### Updated
+- Added back code to serve static files locally, in a non-Docker environment.
+
 ### v1.0.9
 #### Updated
 - Updated the Registry Admin version to v1.4.8.

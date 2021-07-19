@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import flask
 from smtplib import SMTPException
 from urllib.parse import unquote
 
@@ -73,7 +74,7 @@ class LibraryRegistry:
         )
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
-
+        self.static_files = StaticFileController(self)
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         if vendor_id:
@@ -140,7 +141,9 @@ class BaseController:
         request.library = library
         return library
 
-
+class StaticFileController(BaseController):
+    def static_file(self, directory, filename):
+        return flask.send_from_directory(directory, filename, cache_timeout=None)
 class ViewController(BaseController):
     def __call__(self):
         username = session.get('username', '')
