@@ -51,7 +51,8 @@ else:
 @app.before_first_request
 def set_secret_key(_db=None):
     _db = _db or app._db
-    app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
+    app.secret_key = ConfigurationSetting.sitewide_secret(
+        _db, Configuration.SECRET_KEY)
 
 
 @app.teardown_request
@@ -238,18 +239,6 @@ def adobe_vendor_id_status():
     else:
         return Response("", 404)
 
-@app.route('/static/registry-admin.js')
-@returns_problem_detail
-def admin_js():
-    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
-    return app.library_registry.static_files.static_file(directory, "registry-admin.js")
-
-@app.route('/static/registry-admin.css')
-@returns_problem_detail
-def admin_css():
-    directory = os.path.join(os.path.abspath(os.path.dirname(__file__)), "node_modules", "simplified-registry-admin", "dist")
-    return app.library_registry.static_files.static_file(directory, "registry-admin.css")
-
 
 @app.route('/admin/', strict_slashes=False)
 def admin_view():
@@ -263,7 +252,8 @@ if __name__ == '__main__':
     else:
         url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
     url = url or 'http://localhost:7000/'
-    scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(url)
+    scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(
+        url)
     if ':' in netloc:
         host, port = netloc.split(':')
         port = int(port)

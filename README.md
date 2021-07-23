@@ -44,17 +44,17 @@ make up-watch
 
 ### Controlling the Cluster
 
-* `make stop` to stop (but not remove) the running containers
-* `make start` to restart a stopped cluster
-* `make down` to stop and remove the running containers
-* `make clean` to stop and remove the running containers and delete the database container's data volume
+- `make stop` to stop (but not remove) the running containers
+- `make start` to restart a stopped cluster
+- `make down` to stop and remove the running containers
+- `make clean` to stop and remove the running containers and delete the database container's data volume
 
 ### Accessing the Containers
 
 While the cluster is running, you can access the containers with these commands:
 
-* `make db-session` - Starts a `psql` session on the database container as the superuser
-* `make webapp-shell` - Open a shell on the webapp container
+- `make db-session` - Starts a `psql` session on the database container as the superuser
+- `make webapp-shell` - Open a shell on the webapp container
 
 ### Viewing the Web Interface
 
@@ -64,14 +64,14 @@ The registry listens (via Nginx) on port 80, so once the cluster is running you 
 
 To install the registry locally, you'll need the following:
 
-* PostgreSQL 12+
-* PostGIS 3
-* Python 3.6+ (3.9 is the build target for the Docker install)
-* Appropriate system dependencies to build the Python dependencies, which may include:
-    * `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
-    * Compression libs like `bzip2-dev`, `zlib-dev`, etc.
-    * PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
-    * Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
+- PostgreSQL 12+
+- PostGIS 3
+- Python 3.6+ (3.9 is the build target for the Docker install)
+- Appropriate system dependencies to build the Python dependencies, which may include:
+  - `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
+  - Compression libs like `bzip2-dev`, `zlib-dev`, etc.
+  - PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
+  - Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
 
 ### Creating the Databases
 
@@ -125,3 +125,11 @@ FLASK_APP=app.py pipenv run flask run
 ```
 
 Pipenv should read in the local `.env` file and supply those database connection strings to the application, which will be run by the Flask development server.
+
+You can then navigate to http://localhost:5000/admin in the browser.
+
+### Debugging
+
+If you are served an error message on the admin home screen, you may need to run `npm install` in the root directory of the library_registry repo. If you're running the application locally, you can also try running the same command in the root directory of the registry_admin repo.
+
+The latter command will only work if the circulation-web and circulation repos are linked using `npm link`. To do this, run `npm link` in the registry_admin repo and then `npm link simplified-registry-admin` in the library_registry repo.
