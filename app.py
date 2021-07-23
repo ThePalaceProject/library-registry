@@ -51,7 +51,8 @@ else:
 @app.before_first_request
 def set_secret_key(_db=None):
     _db = _db or app._db
-    app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
+    app.secret_key = ConfigurationSetting.sitewide_secret(
+        _db, Configuration.SECRET_KEY)
 
 
 @app.teardown_request
@@ -251,7 +252,8 @@ if __name__ == '__main__':
     else:
         url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
     url = url or 'http://localhost:7000/'
-    scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(url)
+    scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(
+        url)
     if ':' in netloc:
         host, port = netloc.split(':')
         port = int(port)
