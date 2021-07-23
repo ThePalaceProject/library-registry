@@ -13,6 +13,8 @@ git clone https://github.com/NYPL-Simplified/registry_admin.git
 
 ## Installation (Docker)
 
+If not using Docker, skip to section entitled, "Installation (non-Docker)."
+
 Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
 
 _Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the corresponding task in the `Makefile` manually. You can run `make help` to see the full list of commands._
