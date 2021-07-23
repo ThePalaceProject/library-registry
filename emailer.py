@@ -3,6 +3,7 @@ from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import logging
 from smtplib import SMTP
 
 from config import CannotLoadConfiguration
@@ -18,6 +19,8 @@ charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
 class Emailer(object):
     """A class for sending small amounts of email."""
+
+    log = logging.getLogger("Emailer")
 
     # Goal and setting names for the ExternalIntegration.
     GOAL = 'email'
@@ -197,6 +200,10 @@ The link will expire in about a day. If the link expires, just re-register your 
                      else to_address)
         kwargs['to_address'] = to_address
         body = template.body(from_header, to_header=recipient, **kwargs)
+        self.log.info('Sending email of type {!r} to {!r}{}'.format(
+            email_type, recipient,
+            f' on behalf of {to_address!r}' if recipient != to_address else '',
+        ))
         return self._send_email(recipient, body, smtp_class)
 
     def _send_email(self, to_address, body, smtp_class=SMTP):
