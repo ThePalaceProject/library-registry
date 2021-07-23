@@ -4,7 +4,7 @@
 
 #### Updated
 
-- Added a message to be displayed if JS/CSS files cannot be found.
+- Added a message to be displayed if JS/CSS files cannot be found when the app is running and the /admin page is visited.
 - Updated README to include debugging tips.
 
 ### v1.0.9
