@@ -132,6 +132,8 @@ You can then navigate to http://localhost:5000/admin in the browser.
 
 ### Debugging
 
-If you are served an error message on the admin home screen, you may need to run `npm install` in the root directory of the library_registry repo. If you're running the application locally, you can also try running the same command in the root directory of the registry_admin repo.
+If you are served an error message on the admin home screen and you are running the app locally without Docker, you may need to run `npm install` in the root directory of the library_registry repo. You can also try running the same command in the root directory of the registry_admin repo.
 
 The latter command will only work if the circulation-web and circulation repos are linked using `npm link`. To do this, run `npm link` in the registry_admin repo and then `npm link simplified-registry-admin` in the library_registry repo.
+
+If you are using Docker, ensure it's running `npm install` for you by checking the configuration files.
