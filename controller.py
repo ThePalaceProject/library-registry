@@ -4,7 +4,8 @@ import time
 from smtplib import SMTPException
 from urllib.parse import unquote
 
-from flask import (Response, redirect, render_template_string, request, url_for, session)
+from flask import (Response, redirect, render_template_string,
+                   request, url_for, session)
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm import (defer, joinedload)
 
@@ -73,7 +74,6 @@ class LibraryRegistry:
         )
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
-
         self.heartbeat = HeartbeatController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         if vendor_id:
@@ -216,7 +216,8 @@ class LibraryRegistryController(BaseController):
                 name=_("Find your library"),
                 description=_("Search by ZIP code, city or library name."),
                 tags="",
-                url_template=self.app.url_for(search_controller) + "?q={searchTerms}"
+                url_template=self.app.url_for(
+                    search_controller) + "?q={searchTerms}"
             )
             headers = {}
             headers['Content-Type'] = OPENSEARCH_MEDIA_TYPE
@@ -245,11 +246,14 @@ class LibraryRegistryController(BaseController):
 
         # Avoid transferring large fields that we won't end up using.
         alphabetical = alphabetical.options(defer('logo'))
-        alphabetical = alphabetical.options(defer('service_areas', 'place', 'geometry'))
-        alphabetical = alphabetical.options(defer('service_areas', 'place', 'parent', 'geometry'))
+        alphabetical = alphabetical.options(
+            defer('service_areas', 'place', 'geometry'))
+        alphabetical = alphabetical.options(
+            defer('service_areas', 'place', 'parent', 'geometry'))
 
         if live:
-            alphabetical = alphabetical.filter(Library.registry_stage==Library.PRODUCTION_STAGE)
+            alphabetical = alphabetical.filter(
+                Library.registry_stage == Library.PRODUCTION_STAGE)
 
         libraries = list(alphabetical)
 
@@ -277,7 +281,8 @@ class LibraryRegistryController(BaseController):
 
         # We always want to filter out cancelled libraries.  If live, we also filter out
         # libraries that are in the testing stage, i.e. only show production libraries.
-        alphabetical = alphabetical.filter(Library._feed_restriction(production=live))
+        alphabetical = alphabetical.filter(
+            Library._feed_restriction(production=live))
 
         # Pick up each library's hyperlinks and validation
         # information; this will save database queries when building
@@ -294,7 +299,8 @@ class LibraryRegistryController(BaseController):
             a = time.time()
             libraries = alphabetical.all()
             b = time.time()
-            self.log.info("Built alphabetical list of all libraries in %.2fsec" % (b-a))
+            self.log.info(
+                "Built alphabetical list of all libraries in %.2fsec" % (b-a))
         else:
             # Location data is available. Get the list of nearby libraries, then get
             # the rest of the list in alphabetical order.
@@ -307,7 +313,8 @@ class LibraryRegistryController(BaseController):
                 self._db, location, production=live
             ).limit(5).all()
             b = time.time()
-            self.log.info("Fetched libraries near %s in %.2fsec" % (location, b-a))
+            self.log.info("Fetched libraries near %s in %.2fsec" %
+                          (location, b-a))
 
             # Exclude nearby libraries from the alphabetical query
             # to get a list of faraway libraries.
@@ -316,7 +323,8 @@ class LibraryRegistryController(BaseController):
             )
             c = time.time()
             libraries = nearby_libraries + faraway_libraries.all()
-            self.log.info("Fetched libraries far from %s in %.2fsec" % (location, c-b))
+            self.log.info("Fetched libraries far from %s in %.2fsec" %
+                          (location, c-b))
 
         url = self.app.url_for("libraries_opds")
         a = time.time()
@@ -348,7 +356,8 @@ class LibraryRegistryController(BaseController):
         # performance optimization. To avoid further database access,
         # we'll iterate over the preloaded objects and put the
         # information into Python data structures.
-        hyperlink_types = [Hyperlink.INTEGRATION_CONTACT_REL, Hyperlink.HELP_REL, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL]
+        hyperlink_types = [Hyperlink.INTEGRATION_CONTACT_REL,
+                           Hyperlink.HELP_REL, Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL]
         hyperlinks = dict()
         for hyperlink in library.hyperlinks:
             if hyperlink.rel not in hyperlink_types:
@@ -357,7 +366,8 @@ class LibraryRegistryController(BaseController):
         contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = [
             hyperlinks.get(rel, None) for rel in hyperlink_types
         ]
-        contact_email, help_email, copyright_email = [self._get_email(hyperlinks.get(rel, None)) for rel in hyperlink_types]
+        contact_email, help_email, copyright_email = [self._get_email(
+            hyperlinks.get(rel, None)) for rel in hyperlink_types]
         contact_email_validated_at, help_email_validated_at, copyright_email_validated_at = [
             self._validated_at(hyperlinks.get(rel, None)) for rel in hyperlink_types
         ]
@@ -413,7 +423,8 @@ class LibraryRegistryController(BaseController):
         result = {}
         for (a, b) in [(ServiceArea.FOCUS, "focus"), (ServiceArea.ELIGIBILITY, "service")]:
             filtered = [place for place in areas if (place.type == a)]
-            result[b] = [self._format_place_name(item.place) for item in filtered]
+            result[b] = [self._format_place_name(
+                item.place) for item in filtered]
         return result
 
     def _format_place_name(self, place):
@@ -450,7 +461,8 @@ class LibraryRegistryController(BaseController):
             return INVALID_CONTACT_URI.detailed(
                 "The contact URI for this library is missing or invalid"
             )
-        validation, is_new = get_one_or_create(self._db, Validation, resource=hyperlink.resource)
+        validation, is_new = get_one_or_create(
+            self._db, Validation, resource=hyperlink.resource)
         validation.restart()
         validation.mark_as_successful()
 
@@ -496,7 +508,8 @@ class LibraryRegistryController(BaseController):
         name = request.form.get("name")
         search_results = Library.search(self._db, {}, name, production=False)
         if search_results:
-            info = [self.library_details(lib.internal_urn.split("uuid:")[1], lib) for lib in search_results]
+            info = [self.library_details(lib.internal_urn.split("uuid:")[
+                                         1], lib) for lib in search_results]
             return dict(libraries=info)
         else:
             return LIBRARY_NOT_FOUND
@@ -673,7 +686,8 @@ class LibraryRegistryController(BaseController):
         # the registration request itself.
         if integration_contact_email:
             hyperlinks_to_create.append(
-                (Hyperlink.INTEGRATION_CONTACT_REL, [integration_contact_email])
+                (Hyperlink.INTEGRATION_CONTACT_REL,
+                 [integration_contact_email])
             )
 
         reset_shared_secret = False
@@ -741,7 +755,8 @@ class LibraryRegistryController(BaseController):
             )
 
             catalog["metadata"]["short_name"] = library.short_name
-            catalog["metadata"]["shared_secret"] = base64.b64encode(encrypted_secret)
+            catalog["metadata"]["shared_secret"] = base64.b64encode(
+                encrypted_secret)
 
         if library_is_new:
             status_code = 201
@@ -805,7 +820,8 @@ class ValidationController(BaseController):
         # confirmed, and that the secret matches the resource. The
         # only other problem might be that the validation has expired.
         if not validation.active:
-            error = _("Confirmation code %r has expired. Re-register to get another code.") % secret
+            error = _(
+                "Confirmation code %r has expired. Re-register to get another code.") % secret
             return self.html_response(400, error)
         validation.mark_as_successful()
 
@@ -849,7 +865,8 @@ class CoverageController(BaseController):
         """Serve a GeoJSON document describing some subset of the active
         library's service areas.
         """
-        areas = [x.place for x in request.library.service_areas if x.type == service_type]
+        areas = [
+            x.place for x in request.library.service_areas if x.type == service_type]
         return self.geojson_response(Place.to_geojson(self._db, *areas))
 
     def eligibility_for_library(self):

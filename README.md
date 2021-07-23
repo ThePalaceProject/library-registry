@@ -13,6 +13,8 @@ git clone https://github.com/NYPL-Simplified/registry_admin.git
 
 ## Installation (Docker)
 
+If not using Docker, skip to section entitled ["Installation (non-Docker)"](#installation-non-docker)
+
 Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
 
 _Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the corresponding task in the `Makefile` manually. You can run `make help` to see the full list of commands._
@@ -44,17 +46,17 @@ make up-watch
 
 ### Controlling the Cluster
 
-* `make stop` to stop (but not remove) the running containers
-* `make start` to restart a stopped cluster
-* `make down` to stop and remove the running containers
-* `make clean` to stop and remove the running containers and delete the database container's data volume
+- `make stop` to stop (but not remove) the running containers
+- `make start` to restart a stopped cluster
+- `make down` to stop and remove the running containers
+- `make clean` to stop and remove the running containers and delete the database container's data volume
 
 ### Accessing the Containers
 
 While the cluster is running, you can access the containers with these commands:
 
-* `make db-session` - Starts a `psql` session on the database container as the superuser
-* `make webapp-shell` - Open a shell on the webapp container
+- `make db-session` - Starts a `psql` session on the database container as the superuser
+- `make webapp-shell` - Open a shell on the webapp container
 
 ### Viewing the Web Interface
 
@@ -64,14 +66,14 @@ The registry listens (via Nginx) on port 80, so once the cluster is running you 
 
 To install the registry locally, you'll need the following:
 
-* PostgreSQL 12+
-* PostGIS 3
-* Python 3.6+ (3.9 is the build target for the Docker install)
-* Appropriate system dependencies to build the Python dependencies, which may include:
-    * `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
-    * Compression libs like `bzip2-dev`, `zlib-dev`, etc.
-    * PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
-    * Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
+- PostgreSQL 12+
+- PostGIS 3
+- Python 3.6+ (3.9 is the build target for the Docker install)
+- Appropriate system dependencies to build the Python dependencies, which may include:
+  - `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
+  - Compression libs like `bzip2-dev`, `zlib-dev`, etc.
+  - PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
+  - Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
 
 ### Creating the Databases
 
@@ -125,3 +127,13 @@ FLASK_APP=app.py pipenv run flask run
 ```
 
 Pipenv should read in the local `.env` file and supply those database connection strings to the application, which will be run by the Flask development server.
+
+You can then navigate to http://localhost:5000/admin in the browser.
+
+### Debugging
+
+If you are served an error message on the admin home screen and you are running the app locally without Docker, you may need to run `npm install` in the root directory of the library_registry repo. You can also try running the same command in the root directory of the registry_admin repo.
+
+The latter command will only work if the circulation-web and circulation repos are linked using `npm link`. To do this, run `npm link` in the registry_admin repo and then `npm link simplified-registry-admin` in the library_registry repo.
+
+If you are using Docker, ensure it's running `npm install` for you by checking the configuration files.
