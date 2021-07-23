@@ -4,7 +4,7 @@
 
 #### Updated
 
-- Added a message to templates.py to be displayed if JS/CSS cannot be found.
+- Added a message to be displayed if JS/CSS files cannot be found.
 - Updated README to include debugging tips.
 
 ### v1.0.9
