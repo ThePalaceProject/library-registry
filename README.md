@@ -13,7 +13,7 @@ git clone https://github.com/NYPL-Simplified/registry_admin.git
 
 ## Installation (Docker)
 
-If not using Docker, skip to section entitled, "Installation (non-Docker)."
+If not using Docker, skip to section entitled "Installation (non-Docker)."
 
 Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
 
