@@ -142,12 +142,12 @@ class BaseController:
         request.library = library
         return library
 
-    # This static_file function is used only when
-    # the library registry app is running locally *without* Docker.
-    # In all other cases, nginx serves the static files (see docker/nginx.conf).
-    class StaticFileController(BaseController):
-        def static_file(self, directory, filename):
-            return flask.send_from_directory(directory, filename, cache_timeout=None)
+# This static_file function is used only when
+# the app is running locally *without* Docker.
+# In all other cases, nginx serves the static files (see docker/nginx.conf).
+class StaticFileController(BaseController):
+    def static_file(self, directory, filename):
+        return flask.send_from_directory(directory, filename, cache_timeout=None)
 
 
 class ViewController(BaseController):
