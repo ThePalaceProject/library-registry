@@ -3,6 +3,7 @@ from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import logging
 from smtplib import SMTP
 
 from config import CannotLoadConfiguration
@@ -18,6 +19,8 @@ charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
 class Emailer(object):
     """A class for sending small amounts of email."""
+
+    log = logging.getLogger("Emailer")
 
     # Goal and setting names for the ExternalIntegration.
     GOAL = 'email'
@@ -175,6 +178,11 @@ The link will expire in about a day. If the link expires, just re-register your 
     def send(self, email_type: str, to_address: str, smtp_class=SMTP, **kwargs):
         """Generate an email from a template and send it.
 
+        If we are overriding the email address, we send to and set the
+        "To:" header to the overriding address. However, we keep the
+        original `to_address` in the message body, so it is clear on
+        whose behalf the email is being sent.
+
         :param email_type: The name of the template to use.
         :param to_address: Addressee of the email.
         :param smtp_class: Use this class for the SMTP protocol client.
@@ -187,12 +195,16 @@ The link will expire in about a day. If the link expires, just re-register your 
         from_header = '%s <%s>' % (self.from_name, self.from_address)
         kwargs['from_address'] = self.from_address
         # Check to see if we have an alternative recipient, unless this is a test email.
-        to_address = (self._effective_recipient(default=to_address)
-                      if email_type != 'test'
-                      else to_address)
+        recipient = (self._effective_recipient(default=to_address)
+                     if email_type != 'test'
+                     else to_address)
         kwargs['to_address'] = to_address
-        body = template.body(from_header, to_address, **kwargs)
-        return self._send_email(to_address, body, smtp_class)
+        body = template.body(from_header, to_header=recipient, **kwargs)
+        self.log.info('Sending email of type {!r} to {!r}{}'.format(
+            email_type, recipient,
+            f' on behalf of {to_address!r}' if recipient != to_address else '',
+        ))
+        return self._send_email(recipient, body, smtp_class)
 
     def _send_email(self, to_address, body, smtp_class=SMTP):
         """Actually send an email."""
