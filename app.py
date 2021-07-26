@@ -239,7 +239,7 @@ def adobe_vendor_id_status():
     else:
         return Response("", 404)
 
-# The following two routes are only here to serve static files when
+# The following two routes serve static files only when
 # the library registry app is running locally *without* Docker.
 # In all other cases, nginx serves these files (see docker/nginx.conf).
 
