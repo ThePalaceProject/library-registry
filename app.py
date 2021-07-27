@@ -239,6 +239,26 @@ def adobe_vendor_id_status():
     else:
         return Response("", 404)
 
+# The following two routes serve static files only when
+# the app is running locally *without* Docker.
+# In all other cases, nginx serves these files (see docker/nginx.conf).
+
+
+@app.route('/static/registry-admin.js')
+@returns_problem_detail
+def admin_js():
+    directory = os.path.join(os.path.abspath(os.path.dirname(
+        __file__)), "node_modules", "simplified-registry-admin", "dist")
+    return app.library_registry.static_files.static_file(directory, "registry-admin.js")
+
+
+@app.route('/static/registry-admin.css')
+@returns_problem_detail
+def admin_css():
+    directory = os.path.join(os.path.abspath(os.path.dirname(
+        __file__)), "node_modules", "simplified-registry-admin", "dist")
+    return app.library_registry.static_files.static_file(directory, "registry-admin.css")
+
 
 @app.route('/admin/', strict_slashes=False)
 def admin_view():

@@ -1,5 +1,11 @@
 ## CHANGELOG
 
+### 07/26/21
+
+#### Updated
+
+- Added static file routes back into app.py so that the app can be run locally without Docker (as well as being able to run with Docker).
+
 ### 07/23/21
 
 #### Updated
