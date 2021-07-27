@@ -271,9 +271,9 @@ if __name__ == '__main__':
         url = sys.argv[1]
     else:
         url = ConfigurationSetting.sitewide(_db, Configuration.BASE_URL).value
-        url = url or 'http://localhost:7000/'
-        scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(
-            url)
+    url = url or 'http://localhost:7000/'
+    scheme, netloc, path, parameters, query, fragment = urllib.parse.urlparse(
+        url)
     if ':' in netloc:
         host, port = netloc.split(':')
         port = int(port)
