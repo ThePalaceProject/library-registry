@@ -1,16 +1,24 @@
 ## CHANGELOG
 
+### v1.0.10
+
+#### Updated
+
+- Updated the Registry Admin version to v1.4.14.
+
 ### 07/26/21
 
 #### Updated
 
-- Added static file routes back into app.py so that the app can be run locally without Docker (as well as being able to run with Docker).
+- Added static file routes back into app.py so that the app can be run locally
+  without Docker (as well as being able to run with Docker).
 
 ### 07/23/21
 
 #### Updated
 
-- Added a message to be displayed if JS/CSS files cannot be found when the app is running and the /admin page is visited.
+- Added a message to be displayed if JS/CSS files cannot be found when the app
+  is running and the /admin page is visited.
 - Updated README to include debugging tips.
 
 ### v1.0.9
