@@ -1,5 +1,11 @@
 ## CHANGELOG
 
+### v1.0.11
+
+#### Updated
+
+- Updated the Registry Admin version to v1.4.15.
+
 ### v1.0.10
 
 #### Updated
