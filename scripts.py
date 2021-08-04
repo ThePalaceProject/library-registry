@@ -611,9 +611,8 @@ class ConfigureVendorIDScript(Script):
             "--node-value", help="Node value issued by Adobe", required=True
         )
         parser.add_argument(
-            "--delegate",
+            "--delegate", action="append", default=[],
             help="Delegate Adobe IDs to this URL if no local answer found",
-            action="append"
         )
         return parser
 

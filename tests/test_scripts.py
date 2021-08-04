@@ -521,6 +521,23 @@ class TestConfigureVendorIDScript(DatabaseTest):
         assert integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value == "abc12"
         assert integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).json_value == ["http://server1/AdobeAuth/", "http://server2/AdobeAuth/"]
 
+        # It's okay to configure without a delegate.
+        cmd_args = [
+            "--vendor-id=VENDOR",
+            "--node-value=133715d34d",
+        ]
+        script = ConfigureVendorIDScript(self._db)
+        script.do_run(self._db, cmd_args=cmd_args)
+
+        # The ExternalIntegration is properly configured.
+        integration = ExternalIntegration.lookup(
+            self._db, ExternalIntegration.ADOBE_VENDOR_ID,
+            ExternalIntegration.DRM_GOAL
+        )
+        assert integration.setting(Configuration.ADOBE_VENDOR_ID).value == "VENDOR"
+        assert integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value == "133715d34d"
+        assert integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).json_value == []
+
         # The script won't run if --node-value or --delegate have obviously
         # wrong values.
         cmd_args = [
