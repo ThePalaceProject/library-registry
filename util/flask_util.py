@@ -76,6 +76,7 @@ def originating_ip():
     (which can happen with multiple layers of proxy server). If no valid, public
     IP address is found there, looks at the request.remote_addr value.
 
+    The format of an X-Forwarded-For header value is: "<client-ip>, [proxy1-ip, [proxy2ip ...]]
     If X-Forwarded-For contains more than one IP, we return the first public IP
     since the proxy servers will almost certainly be appending their IP to the end.
 
