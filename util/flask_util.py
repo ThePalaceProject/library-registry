@@ -31,15 +31,17 @@ IPV4_REGEX = re.compile(r"""(?<![0-9])                # Preceding character if a
                           """, re.VERBOSE)
 
 
-def problem_raw(type, status, title, detail=None, instance=None, headers={}):
+def problem_raw(type, status, title, detail=None, instance=None, headers=None):
+    headers = headers or {}
     data = problem_detail.json(type, status, title, detail, instance)
     final_headers = {"Content-Type": problem_detail.JSON_MEDIA_TYPE}
     final_headers.update(headers)
     return status, final_headers, data
 
 
-def problem(type, status, title, detail=None, instance=None, headers={}):
+def problem(type, status, title, detail=None, instance=None, headers=None):
     """Create a Response that includes a Problem Detail Document."""
+    headers = headers or {}
     status, headers, data = problem_raw(
         type, status, title, detail, instance, headers)
     return Response(data, status, headers)
