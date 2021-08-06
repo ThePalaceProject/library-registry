@@ -1,23 +1,17 @@
 import json
 import logging
 import time
-import flask
 import os
 from smtplib import SMTPException
 from urllib.parse import unquote
 
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+import flask
 from flask import (Response, redirect, render_template_string,
                    request, url_for, session)
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm import (defer, joinedload)
-
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-import flask
-from flask import redirect, Response, session, url_for
-from flask_babel import lazy_gettext as _
-from smtplib import SMTPException
-from sqlalchemy.orm import defer, joinedload
 
 from admin.config import Configuration as AdminClientConfig
 from admin.templates import admin as admin_template
@@ -40,7 +34,6 @@ from model import (
 from config import (Configuration, CannotLoadConfiguration, CannotSendEmail)
 from opds import (Annotator, OPDSCatalog)
 from registrar import LibraryRegistrar
-from templates import admin as admin_template
 from util.app_server import (HeartbeatController, catalog_response)
 from util.http import HTTP
 from util.problem_detail import ProblemDetail
@@ -164,7 +157,7 @@ class ViewController(BaseController):
         admin_js = AdminClientConfig.lookup_asset_url(key='admin_js')
         admin_css = AdminClientConfig.lookup_asset_url(key='admin_css')
 
-        return Response(flask.render_template_string(
+        return Response(render_template_string(
             admin_template,
             username=username,
             admin_js=admin_js,

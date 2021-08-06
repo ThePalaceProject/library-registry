@@ -103,6 +103,8 @@ class Emailer:
         self.from_address = from_address
         self.templates = templates
 
+        self.recipient_address_override = os.environ.get(self.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
+
         # Make sure the templates don't contain any template values we can't handle.
         test_template_values = dict(
             (key, "value") for key in self.KNOWN_TEMPLATE_KEYS
