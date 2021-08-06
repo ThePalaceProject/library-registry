@@ -6,6 +6,7 @@ from sqlalchemy.orm import Query
 from model import (
     ConfigurationSetting,
     Hyperlink,
+    LibraryType,
     Session,
     Validation,
 )
@@ -67,7 +68,12 @@ class OPDSCatalog(object):
 
         # To save bandwidth, omit logos from large feeds. What 'large'
         # means is customizable.
-        include_logos = not (self._feed_is_large(_db, libraries))
+        #
+        # To save time, omit service area information from large feeds
+        # which we know won't use it.
+        include_logos = include_service_areas = not (
+            self._feed_is_large(_db, libraries)
+        )
         self.catalog = dict(metadata=dict(title=title), catalogs=[])
 
         self.add_link_to_catalog(self.catalog, rel="self",
@@ -82,7 +88,8 @@ class OPDSCatalog(object):
                 self.library_catalog(
                     *library, url_for=url_for,
                     include_logo=include_logos,
-                    web_client_uri_template=web_client_uri_template
+                    web_client_uri_template=web_client_uri_template,
+                    include_service_area=include_service_areas
                 )
             )
         annotator.annotate_catalog(self, live=live)
@@ -115,28 +122,61 @@ class OPDSCatalog(object):
             include_private_information=False,
             include_logo=True,
             url_for=None,
-            web_client_uri_template=None
+            web_client_uri_template=None,
+            include_service_area=False,
     ):
 
         """Create an OPDS catalog for a library.
+
+        :param distance: The distance, in meters, from the client's
+           current location (if known) to the edge of this library's
+           service area.
 
         :param include_private_information: If this is True, the
         consumer of this OPDS catalog is expected to be the library
         whose catalog it is. Private information such as the point of
         contact for integration problems will be included, where it
         normally wouldn't be.
+
+        :param include_service_area: If this is True, the
+            consumer of this OPDS catalog will be using information about
+            the library's service area. TODO: This can be removed
+            once we stop using the endpoints that just give a huge
+            list of libraries.
         """
         url_for = url_for or flask.url_for
+
+        modified = cls._strftime(library.timestamp)
         metadata = dict(
             id=library.internal_urn,
             title=library.name,
-            updated=cls._strftime(library.timestamp),
+            modified=modified,
+            updated=modified, # For backwards compatibility with earlier
+                              # clients.
         )
         if distance is not None:
-            metadata["distance"] = "%d km." % (distance/1000)
+            # 'distance' for backwards compatibility.
+            value = "%d km." % (distance/1000)
+            for key in 'schema:distance', 'distance':
+                metadata[key] = value
 
         if library.description:
             metadata["description"] = library.description
+
+        if include_service_area:
+            service_area_name = library.service_area_name
+            if service_area_name is not None:
+                metadata['schema:areaServed'] = service_area_name
+
+            subjects = []
+            for code in library.types:
+                subjects.append(
+                    dict(code=code, name=LibraryType.NAME_FOR_CODE[code],
+                         scheme=LibraryType.SCHEME_URI)
+                )
+            if subjects:
+                metadata['subject'] = subjects
+
         catalog = dict(metadata=metadata)
 
         if library.opds_url:

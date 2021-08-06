@@ -6,8 +6,7 @@ from email.mime.text import MIMEText
 import logging
 from smtplib import SMTP
 
-from config import CannotLoadConfiguration
-
+from config import CannotLoadConfiguration, CannotSendEmail
 
 # Set up an encoding/decoding between UTF-8 and quoted-printable.
 # Otherwise, the bodies of email messages will be encoded with base64
@@ -16,51 +15,60 @@ from config import CannotLoadConfiguration
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
 
-
-class Emailer(object):
+class Emailer:
     """A class for sending small amounts of email."""
 
     log = logging.getLogger("Emailer")
 
+    ##### Class Constants ####################################################  # noqa: E266
     # Goal and setting names for the ExternalIntegration.
-    GOAL = 'email'
-    PORT = 'port'
-    FROM_ADDRESS = 'from_address'
-    FROM_NAME = 'from_name'
-
-    DEFAULT_FROM_NAME = 'Library Simplified registry support'
+    GOAL                = 'email'                                   # noqa: E221
+    PORT                = 'port'                                    # noqa: E221
+    FROM_ADDRESS        = 'from_address'                            # noqa: E221
+    FROM_NAME           = 'from_name'                               # noqa: E221
+    DEFAULT_FROM_NAME   = 'Library Simplified registry support'     # noqa: E221
 
     ENV_RECIPIENT_OVERRIDE_ADDRESS = 'EMAILER_RECIPIENT_OVERRIDE'
 
     # Constants for different types of email.
-    ADDRESS_DESIGNATED = 'address_designated'
-    ADDRESS_NEEDS_CONFIRMATION = 'address_needs_confirmation'
+    ADDRESS_DESIGNATED          = 'address_designated'              # noqa: E221
+    ADDRESS_NEEDS_CONFIRMATION  = 'address_needs_confirmation'      # noqa: E221
 
     EMAIL_TYPES = [ADDRESS_DESIGNATED, ADDRESS_NEEDS_CONFIRMATION]
 
     DEFAULT_ADDRESS_DESIGNATED_SUBJECT = "This address designated as the %(rel_desc)s for %(library)s"
     DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT = "Confirm the %(rel_desc)s for %(library)s"
 
-    DEFAULT_ADDRESS_DESIGNATED_TEMPLATE = """This email address, %(to_address)s, has been registered with the Library Simplified library registry as the %(rel_desc)s for the library %(library)s (%(library_web_url)s).
+    DEFAULT_ADDRESS_DESIGNATED_TEMPLATE = (
+        "This email address, %(to_address)s, has been registered with the Library Simplified library registry "
+        "as the %(rel_desc)s for the library %(library)s (%(library_web_url)s)."
+        "\n\n"
+        "If this is obviously wrong (for instance, you don't work at a public library), please accept our "
+        "apologies and contact the Library Simplified support address at %(from_address)s -- something has gone wrong."
+        "\n\n"
+        "If you do work at a public library, but you're not sure what this means, please speak to a technical point "
+        "of contact at your library, or contact the Library Simplified support address at %(from_address)s."
+    )
 
-If this is obviously wrong (for instance, you don't work at a public library), please accept our apologies and contact the Library Simplified support address at %(from_address)s -- something has gone wrong.
-
-If you do work at a public library, but you're not sure what this means, please speak to a technical point of contact at your library, or contact the Library Simplified support address at %(from_address)s."""
-
-    NEEDS_CONFIRMATION_ADDITION = """If you do know what this means, you should also know that you're not quite done. We need to confirm that you actually meant to use this email address for this purpose. If everything looks right, please visit this link:
-
-%(confirmation_link)s
-
-The link will expire in about a day. If the link expires, just re-register your library with the library registry, and a fresh confirmation email like this will be sent out."""
+    NEEDS_CONFIRMATION_ADDITION = (
+        "If you do know what this means, you should also know that you're not quite done. We need to confirm that "
+        "you actually meant to use this email address for this purpose. If everything looks right, please "
+        "visit this link:"
+        "\n\n"
+        "%(confirmation_link)s"
+        "\n\n"
+        "The link will expire in about a day. If the link expires, just re-register your library with the library "
+        "registry, and a fresh confirmation email like this will be sent out."
+    )
 
     BODIES = {
-        ADDRESS_DESIGNATED : DEFAULT_ADDRESS_DESIGNATED_TEMPLATE,
-        ADDRESS_NEEDS_CONFIRMATION : DEFAULT_ADDRESS_DESIGNATED_TEMPLATE + "\n\n" + NEEDS_CONFIRMATION_ADDITION
+        ADDRESS_DESIGNATED: DEFAULT_ADDRESS_DESIGNATED_TEMPLATE,
+        ADDRESS_NEEDS_CONFIRMATION: DEFAULT_ADDRESS_DESIGNATED_TEMPLATE + "\n\n" + NEEDS_CONFIRMATION_ADDITION
     }
 
     SUBJECTS = {
         ADDRESS_DESIGNATED: DEFAULT_ADDRESS_DESIGNATED_SUBJECT,
-        ADDRESS_NEEDS_CONFIRMATION : DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT,
+        ADDRESS_NEEDS_CONFIRMATION: DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT,
     }
 
     # We use this to catch templates that contain variables we won't
@@ -75,6 +83,89 @@ The link will expire in about a day. If the link expires, just re-register your 
         'from_address',
     ]
 
+    ##### Public Interface / Magic Methods ###################################  # noqa: E266
+    def __init__(self, smtp_username, smtp_password, smtp_host, smtp_port, from_name, from_address, templates):
+        config_errors = []
+        required_parameters = ('smtp_username', 'smtp_password', 'smtp_host', 'smtp_port', 'from_name', 'from_address')
+        for param_name in required_parameters:
+            if not locals()[param_name]:
+                config_errors.append(param_name)
+
+        if config_errors:
+            msg = "Emailer instantiated with missing params: " + ", ".join(config_errors)
+            raise CannotLoadConfiguration(msg)
+
+        self.smtp_username = smtp_username
+        self.smtp_password = smtp_password
+        self.smtp_host = smtp_host
+        self.smtp_port = smtp_port
+        self.from_name = from_name
+        self.from_address = from_address
+        self.templates = templates
+
+        # Make sure the templates don't contain any template values we can't handle.
+        test_template_values = dict(
+            (key, "value") for key in self.KNOWN_TEMPLATE_KEYS
+        )
+        for template in list(self.templates.values()):
+            try:
+                template.body("from address", "to address", **test_template_values)
+            except Exception as e:
+                m = f"Template '{template.subject_template}'/'{template.body_template}' contains unrecognized key: {e}"
+                raise CannotLoadConfiguration(m)
+
+    def send(self, email_type: str, to_address: str, smtp_class=SMTP, **kwargs):
+        """Generate an email from a template and send it.
+
+        If we are overriding the email address, we send to and set the
+        "To:" header to the overriding address. However, we keep the
+        original `to_address` in the message body, so it is clear on
+        whose behalf the email is being sent.
+
+        :param email_type: The name of the template to use.
+        :param to_address: Addressee of the email.
+        :param smtp_class: Use this class for the SMTP protocol client.
+        :param kwargs: Arguments to use when generating the email from
+            a template.
+        """
+        if email_type not in self.templates:
+            raise ValueError("No such email template: %s" % email_type)
+        template = self.templates[email_type]
+        from_header = '%s <%s>' % (self.from_name, self.from_address)
+        kwargs['from_address'] = self.from_address
+        # Check to see if we have an alternative recipient, unless this is a test email.
+        recipient = (self._effective_recipient(default=to_address)
+                     if email_type != 'test'
+                     else to_address)
+        kwargs['to_address'] = to_address
+        body = template.body(from_header, to_header=recipient, **kwargs)
+        self.log.info('Sending email of type {!r} to {!r}{}'.format(
+            email_type, recipient,
+            f' on behalf of {to_address!r}' if recipient != to_address else '',
+        ))
+
+        try:
+            self._send_email(recipient, body, smtp_class)
+        except Exception as exc:
+            raise CannotSendEmail(exc)
+
+    ##### Private Methods ####################################################  # noqa: E266
+    def _effective_recipient(self, default: str = None) -> str:
+        """Override the recipient's email address, when applicable."""
+        return self.recipient_address_override or default
+
+    def _send_email(self, to_address, body, smtp_class=SMTP):
+        """Actually send an email."""
+        smtp = smtp_class(host=self.smtp_host, port=self.smtp_port)
+        smtp.connect(self.smtp_host, self.smtp_port)
+        smtp.starttls()
+        smtp.login(self.smtp_username, self.smtp_password)
+        smtp.sendmail(self.from_address, to_address, body)
+        smtp.quit()
+
+    ##### Properties and Getters/Setters #####################################  # noqa: E266
+
+    ##### Class Methods ######################################################  # noqa: E266
     @classmethod
     def from_sitewide_integration(cls, _db):
         """Create an Emailer from a site-wide email integration.
@@ -106,12 +197,13 @@ The link will expire in about a day. If the link expires, just re-register your 
                    from_address=from_address,
                    templates=email_templates)
 
+    ##### Private Class Methods ##############################################  # noqa: E266
     @classmethod
     def _sitewide_integration(cls, _db):
         """Find the ExternalIntegration for the emailer."""
         from model import ExternalIntegration
         qu = _db.query(ExternalIntegration).filter(
-            ExternalIntegration.goal==cls.GOAL
+            ExternalIntegration.goal == cls.GOAL
         )
         integrations = qu.all()
         if not integrations:
@@ -130,101 +222,19 @@ The link will expire in about a day. If the link expires, just re-register your 
         [integration] = integrations
         return integration
 
-    def __init__(self, smtp_username, smtp_password, smtp_host, smtp_port,
-                 from_name, from_address, templates):
-        """Constructor."""
-        if not smtp_username:
-            raise CannotLoadConfiguration("No SMTP username specified")
-        self.smtp_username = smtp_username
-        if not smtp_password:
-            raise CannotLoadConfiguration("No SMTP password specified")
-        self.smtp_password = smtp_password
-        if not smtp_host:
-            raise CannotLoadConfiguration("No SMTP host specified")
-        self.smtp_host = smtp_host
-        if not smtp_port:
-            raise CannotLoadConfiguration("No SMTP port specified")
-        self.smtp_port = smtp_port
-        if not from_name:
-            raise CannotLoadConfiguration("No From: name specified")
-        if not from_address:
-            raise CannotLoadConfiguration("No From: address specified")
-        self.from_name = from_name
-        self.from_address = from_address
-        self.templates = templates
-        self.recipient_address_override = os.environ.get(self.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
 
-        # Make sure the templates don't contain any template values we
-        # can't handle.
-        test_template_values = dict(
-            (key, "value") for key in self.KNOWN_TEMPLATE_KEYS
-        )
-        for template in list(self.templates.values()):
-            try:
-                test_body = template.body(
-                    "from address", "to address", **test_template_values
-                )
-            except Exception as e:
-                raise CannotLoadConfiguration(
-                    "Template %r/%r contains unrecognized key: %r" % (
-                        template.subject_template, template.body_template, e
-                    )
-                )
-
-    def _effective_recipient(self, default: str = None) -> str:
-        """Override the recipient's email address, when applicable."""
-        return self.recipient_address_override or default
-
-    def send(self, email_type: str, to_address: str, smtp_class=SMTP, **kwargs):
-        """Generate an email from a template and send it.
-
-        If we are overriding the email address, we send to and set the
-        "To:" header to the overriding address. However, we keep the
-        original `to_address` in the message body, so it is clear on
-        whose behalf the email is being sent.
-
-        :param email_type: The name of the template to use.
-        :param to_address: Addressee of the email.
-        :param smtp_class: Use this class for the SMTP protocol client.
-        :param kwargs: Arguments to use when generating the email from
-            a template.
-        """
-        if email_type not in self.templates:
-            raise ValueError("No such email template: %s" % email_type)
-        template = self.templates[email_type]
-        from_header = '%s <%s>' % (self.from_name, self.from_address)
-        kwargs['from_address'] = self.from_address
-        # Check to see if we have an alternative recipient, unless this is a test email.
-        recipient = (self._effective_recipient(default=to_address)
-                     if email_type != 'test'
-                     else to_address)
-        kwargs['to_address'] = to_address
-        body = template.body(from_header, to_header=recipient, **kwargs)
-        self.log.info('Sending email of type {!r} to {!r}{}'.format(
-            email_type, recipient,
-            f' on behalf of {to_address!r}' if recipient != to_address else '',
-        ))
-        return self._send_email(recipient, body, smtp_class)
-
-    def _send_email(self, to_address, body, smtp_class=SMTP):
-        """Actually send an email."""
-        smtp = smtp_class(host=self.smtp_host, port=self.smtp_port)
-        smtp.connect(self.smtp_host, self.smtp_port)
-        smtp.starttls()
-        smtp.login(self.smtp_username, self.smtp_password)
-        smtp.sendmail(self.from_address, to_address, body)
-        smtp.quit()
-
-
-class EmailTemplate(object):
+class EmailTemplate:
     """A template for email messages."""
+    ##### Class Constants ####################################################  # noqa: E266
 
+    ##### Public Interface / Magic Methods ###################################  # noqa: E266
     def __init__(self, subject_template, body_template):
         self.subject_template = subject_template
         self.body_template = body_template
 
     def body(self, from_header, to_header, **kwargs):
-        """Generate the complete body of the email message, including headers.
+        """
+        Generate the complete body of the email message, including headers.
 
         :param from_header: Originating address to use in From: header.
         :param to_header: Destination address to use in To: header.
@@ -241,9 +251,19 @@ class EmailTemplate(object):
         # might look like '"Name" <email>', but it's better than
         # nothing.
         for k, v in (('to_address', to_header), ('from_address', from_header)):
-            if not k in kwargs:
+            if k not in kwargs:
                 kwargs[k] = v
+
         payload = self.body_template % kwargs
         text_part = MIMEText(payload, 'plain', 'utf-8')
         message.attach(text_part)
+
         return message.as_string()
+
+    ##### Private Methods ####################################################  # noqa: E266
+
+    ##### Properties and Getters/Setters #####################################  # noqa: E266
+
+    ##### Class Methods ######################################################  # noqa: E266
+
+    ##### Private Class Methods ##############################################  # noqa: E266

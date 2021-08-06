@@ -1,8 +1,8 @@
 ##############################################################################
 # This is a multi-stage Dockerfile with three targets:
 #   * libreg_local_db
-#   * webapp_dev
-#   * webapp_prod
+#   * libreg_local
+#   * libreg_active
 # 
 # For background on multi-stage builds, see:
 #
@@ -162,12 +162,12 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 
 
 ##############################################################################
-# Build target: libreg_dev
+# Build target: libreg_local
 # 
 # Note that this target assumes a host mount is in place to link the current
 # directory into the container at /simplye_app. The production target copies in
 # the entire project directory since it will remain static.
-FROM builder AS libreg_dev
+FROM builder AS libreg_local
 
 ENV FLASK_ENV development
 ENV TESTING 1
@@ -176,9 +176,9 @@ ENV TESTING 1
 
 
 ##############################################################################
-# Build target: libreg_prod
+# Build target: libreg_active
 #
-FROM builder AS libreg_prod
+FROM builder AS libreg_active
 
 ENV FLASK_ENV production
 

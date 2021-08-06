@@ -1,4 +1,4 @@
-version: "3.9"
+version: "3.7"
 
 services:
   libreg_test_db:
@@ -8,16 +8,14 @@ services:
       target: libreg_local_db
     volumes:
       - local_db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
 
-  libreg_prod_webapp:
-    container_name: libreg_prod_webapp
+  libreg_active_webapp:
+    container_name: libreg_active_webapp
     depends_on: 
       - libreg_test_db
     build:
       context: .
-      target: libreg_prod
+      target: libreg_active
     ports:
       - "80:80"
     environment:
