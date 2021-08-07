@@ -11,7 +11,7 @@ class OperationalMode(str, Enum):
 class Configuration:
 
     PACKAGE_NAME = '@thepalaceproject/library-registry-admin'
-    PACKAGE_VERSION = '0.0.1'
+    PACKAGE_VERSION = '0.0.2'
 
     STATIC_ASSETS = {
         'admin_js': 'library-registry-admin.js',
