@@ -18,7 +18,6 @@ admin = """
   <p class="error" id="error2" style="font-size:medium;margin-top:10px"></p>
   <script src="{{ admin_js }}"></script>
   <script>
-  <script>
   try {
     var registryAdmin = new LibraryRegistryAdmin({username: "{{ username }}"});
     const elementsToRemove = document.getElementsByClassName("error");
