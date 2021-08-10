@@ -1,4 +1,4 @@
-version: "3.9"
+version: "3.7"
 
 services:
   libreg_local_db:
@@ -19,7 +19,7 @@ services:
       - libreg_local_db
     build:
       context: .
-      target: libreg_dev
+      target: libreg_local
     ports:
       - "80:80"
     environment:

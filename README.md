@@ -32,6 +32,8 @@ These environment variables are generally applicable, regardless of installation
 
 ## Installation (Docker)
 
+If not using Docker, skip to section entitled ["Installation (non-Docker)"](#installation-non-docker)
+
 Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
 
 _Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the corresponding task in the `Makefile` manually. You can run `make help` to see the full list of commands._
@@ -73,17 +75,17 @@ make up-watch
 
 ### Controlling the Cluster
 
-* `make stop` to stop (but not remove) the running containers
-* `make start` to restart a stopped cluster
-* `make down` to stop and remove the running containers
-* `make clean` to stop and remove the running containers and delete the database container's data volume
+- `make stop` to stop (but not remove) the running containers
+- `make start` to restart a stopped cluster
+- `make down` to stop and remove the running containers
+- `make clean` to stop and remove the running containers and delete the database container's data volume
 
 ### Accessing the Containers
 
 While the cluster is running, you can access the containers with these commands:
 
-* `make db-session` - Starts a `psql` session on the database container as the superuser
-* `make webapp-shell` - Open a shell on the webapp container
+- `make db-session` - Starts a `psql` session on the database container as the superuser
+- `make webapp-shell` - Open a shell on the webapp container
 
 ### Viewing the Web Interface
 
@@ -96,6 +98,8 @@ front end is implemented as a Node package. The name and version of this package
 TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME=@thepalaceproject/library-registry-admin
 TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION=1.0.0
 ```
+
+#### Debugging/Development of the Web Interface
 
 The default configuration will result in the admin client being served from a content delivery
 network. To enable use of a local copy to support development/debugging, ensure that this
@@ -111,14 +115,14 @@ will be served from the linked package, rather than the CDN.
 
 To install the registry locally, you'll need the following:
 
-* PostgreSQL 12+
-* PostGIS 3
-* Python 3.6+ (3.9 is the build target for the Docker install)
-* Appropriate system dependencies to build the Python dependencies, which may include:
-    * `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
-    * Compression libs like `bzip2-dev`, `zlib-dev`, etc.
-    * PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
-    * Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
+- PostgreSQL 12+
+- PostGIS 3
+- Python 3.6+ (3.9 is the build target for the Docker install)
+- Appropriate system dependencies to build the Python dependencies, which may include:
+  - `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
+  - Compression libs like `bzip2-dev`, `zlib-dev`, etc.
+  - PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
+  - Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
 
 ### Creating the Databases
 
