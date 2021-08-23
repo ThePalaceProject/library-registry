@@ -133,7 +133,7 @@ class Emailer:
     ##### Private Methods ####################################################  # noqa: E266
     def _send_email(self, to_address, body, smtp=None):
         """Actually send an email."""
-        smtp = smtp or smtplib.SMTP()
+        smtp = smtp or smtplib.SMTP(self.smtp_host)
         smtp.connect(self.smtp_host, self.smtp_port)
         smtp.starttls()
         smtp.login(self.smtp_username, self.smtp_password)
