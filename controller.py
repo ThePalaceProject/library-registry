@@ -723,13 +723,15 @@ class LibraryRegistryController(BaseController):
                 # them a new library is using their address.
                 try:
                     hyperlink.notify(self.emailer, self.app.url_for)
-                except SMTPException:
+                except SMTPException as exc:
+                    self.log.error("EMAIL_SEND_PROBLEM, SMTPException:", exc_info=exc)
                     # We were unable to send the email due to an SMTP error
                     return INTEGRATION_ERROR.detailed(
                         _("SMTP error while sending email to %(address)s",
                           address=hyperlink.resource.href)
                     )
-                except CannotSendEmail:
+                except CannotSendEmail as exc:
+                    self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail:", exc_info=exc)
                     return UNABLE_TO_NOTIFY.detailed(
                         _("The Registry was unable to send a notification email.")
                     )
