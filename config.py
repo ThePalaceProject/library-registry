@@ -30,19 +30,19 @@ class CannotSendEmail(Exception):
 
 
 class Configuration(object):
-    DATADIR = Path(os.path.dirname(__file__)) / 'data'
+    DATADIR = Path(os.path.dirname(__file__)) / "data"
 
     instance = None
 
     # Environment variables that contain URLs to the database
-    DATABASE_TEST_ENVIRONMENT_VARIABLE = 'SIMPLIFIED_TEST_DATABASE'
-    DATABASE_PRODUCTION_ENVIRONMENT_VARIABLE = 'SIMPLIFIED_PRODUCTION_DATABASE'
+    DATABASE_TEST_ENVIRONMENT_VARIABLE = "SIMPLIFIED_TEST_DATABASE"
+    DATABASE_PRODUCTION_ENVIRONMENT_VARIABLE = "SIMPLIFIED_PRODUCTION_DATABASE"
 
     log = logging.getLogger("Configuration file loader")
 
-    INTEGRATIONS = 'integrations'
+    INTEGRATIONS = "integrations"
 
-    BASE_URL = 'base_url'
+    BASE_URL = "base_url"
 
     ADOBE_VENDOR_ID = "vendor_id"
     ADOBE_VENDOR_ID_NODE_VALUE = "node_value"
@@ -93,7 +93,8 @@ class Configuration(object):
         url = os.environ.get(environment_variable)
         if not url:
             raise CannotLoadConfiguration(
-                "Database URL was not defined in environment variable (%s) or configuration file." % environment_variable
+                "Database URL was not defined in environment variable (%s) or configuration file."
+                % environment_variable
             )
         return url
 
@@ -106,8 +107,8 @@ class Configuration(object):
         from model import ExternalIntegration
 
         integration = ExternalIntegration.lookup(
-            _db, ExternalIntegration.ADOBE_VENDOR_ID,
-            ExternalIntegration.DRM_GOAL)
+            _db, ExternalIntegration.ADOBE_VENDOR_ID, ExternalIntegration.DRM_GOAL
+        )
         if not integration:
             return None, None, []
         setting = integration.setting(cls.ADOBE_VENDOR_ID_DELEGATE_URL)
@@ -122,5 +123,6 @@ class Configuration(object):
             node = int(node, 16)
         return (
             integration.setting(cls.ADOBE_VENDOR_ID).value,
-            node, delegates,
+            node,
+            delegates,
         )

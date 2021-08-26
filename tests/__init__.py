@@ -11,8 +11,8 @@ sys.path.insert(0, parent)
 # being imported twice through two different paths. Uncomment these two lines
 # and see where the second one is happening.
 #
-#from pdb import set_trace
-#set_trace()
+# from pdb import set_trace
+# set_trace()
 
 from testing import DatabaseTest, package_setup
 

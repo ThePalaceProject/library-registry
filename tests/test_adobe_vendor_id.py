@@ -64,17 +64,19 @@ class VendorIDTest(DatabaseTest):
         """Configure a basic Vendor ID Service setup."""
 
         integration, ignore = create(
-            self._db, ExternalIntegration,
+            self._db,
+            ExternalIntegration,
             protocol=ExternalIntegration.ADOBE_VENDOR_ID,
             goal=ExternalIntegration.DRM_GOAL,
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
-        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = self.NODE_VALUE
+        integration.setting(
+            Configuration.ADOBE_VENDOR_ID_NODE_VALUE
+        ).value = self.NODE_VALUE
         return integration
 
 
 class TestConfiguration(VendorIDTest):
-
     def test_accessor(self):
         self._integration()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
@@ -90,7 +92,9 @@ class TestConfiguration(VendorIDTest):
 
     def test_accessor_with_delegates(self):
         integration = self._integration()
-        integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = json.dumps(["delegate"])
+        integration.setting(
+            Configuration.ADOBE_VENDOR_ID_DELEGATE_URL
+        ).value = json.dumps(["delegate"])
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         assert vendor_id == "VENDORID"
         assert node_value == 114740953091845
@@ -99,27 +103,40 @@ class TestConfiguration(VendorIDTest):
 
 class TestVendorIDRequestParsers(object):
     username_sign_in_request = t.SIGN_IN_REQUEST_TEMPLATE % {
-        "username": "Vendor username", "password": "Vendor password"
+        "username": "Vendor username",
+        "password": "Vendor password",
     }
     authdata_sign_in_request = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % {
         "authdata": "dGhpcyBkYXRhIHdhcyBiYXNlNjQgZW5jb2RlZA=="
     }
-    accountinfo_request = t.ACCOUNT_INFO_REQUEST_TEMPLATE % {"uuid": "urn:uuid:0xxxxxxx-xxxx-1xxx-xxxx-yyyyyyyyyyyy"}
+    accountinfo_request = t.ACCOUNT_INFO_REQUEST_TEMPLATE % {
+        "uuid": "urn:uuid:0xxxxxxx-xxxx-1xxx-xxxx-yyyyyyyyyyyy"
+    }
 
     def test_username_sign_in_request(self):
         parser = AdobeSignInRequestParser()
         data = parser.process(self.username_sign_in_request)
-        assert data == {'username': 'Vendor username', 'password': 'Vendor password', 'method': 'standard'}
+        assert data == {
+            "username": "Vendor username",
+            "password": "Vendor password",
+            "method": "standard",
+        }
 
     def test_authdata_sign_in_request(self):
         parser = AdobeSignInRequestParser()
         data = parser.process(self.authdata_sign_in_request)
-        assert data == {'authData': 'this data was base64 encoded', 'method': 'authData'}
+        assert data == {
+            "authData": "this data was base64 encoded",
+            "method": "authData",
+        }
 
     def test_accountinfo_request(self):
         parser = AdobeAccountInfoRequestParser()
         data = parser.process(self.accountinfo_request)
-        assert data == {'method': 'standard', 'user': 'urn:uuid:0xxxxxxx-xxxx-1xxx-xxxx-yyyyyyyyyyyy'}
+        assert data == {
+            "method": "standard",
+            "user": "urn:uuid:0xxxxxxx-xxxx-1xxx-xxxx-yyyyyyyyyyyy",
+        }
 
 
 class TestVendorIDRequestHandler:
@@ -130,7 +147,10 @@ class TestVendorIDRequestHandler:
 
     user1_uuid = "test-uuid"
     user1_label = "Human-readable label for user1"
-    user1_signin_xml_response_body = t.SIGN_IN_RESPONSE_TEMPLATE % {"user": user1_uuid, "label": user1_label}
+    user1_signin_xml_response_body = t.SIGN_IN_RESPONSE_TEMPLATE % {
+        "user": user1_uuid,
+        "label": user1_label,
+    }
     username_password_lookup = {("user1", "pass1"): (user1_uuid, user1_label)}
     authdata_lookup = {"The secret token": (user1_uuid, user1_label)}
     userinfo_lookup = {user1_uuid: user1_label}
@@ -142,7 +162,8 @@ class TestVendorIDRequestHandler:
     @classmethod
     def _standard_login(cls, data):
         return cls.username_password_lookup.get(
-            (data.get('username'), data.get('password')), (None, None))
+            (data.get("username"), data.get("password")), (None, None)
+        )
 
     @classmethod
     def _authdata_login(cls, authdata):
@@ -154,23 +175,28 @@ class TestVendorIDRequestHandler:
 
     def test_error_document(self):
         doc = self._handler.error_document("VENDORID", "Some random error")
-        assert doc == '<error xmlns="http://ns.adobe.com/adept" data="E_1045_VENDORID Some random error"/>'
+        assert (
+            doc
+            == '<error xmlns="http://ns.adobe.com/adept" data="E_1045_VENDORID Some random error"/>'
+        )
 
     def test_handle_username_sign_in_request_success(self):
-        signin_request_xml_body = t.SIGN_IN_REQUEST_TEMPLATE % {"username": "user1", "password": "pass1"}
+        signin_request_xml_body = t.SIGN_IN_REQUEST_TEMPLATE % {
+            "username": "user1",
+            "password": "pass1",
+        }
         result = self._handler.handle_signin_request(
-            signin_request_xml_body,
-            self._standard_login,
-            self._authdata_login
+            signin_request_xml_body, self._standard_login, self._authdata_login
         )
         assert result.startswith(self.user1_signin_xml_response_body)
 
     def test_handle_username_sign_in_request_failure(self):
-        signin_request_xml_body = t.SIGN_IN_REQUEST_TEMPLATE % {"username": self.user1_uuid, "password": "wrongpass"}
+        signin_request_xml_body = t.SIGN_IN_REQUEST_TEMPLATE % {
+            "username": self.user1_uuid,
+            "password": "wrongpass",
+        }
         result = self._handler.handle_signin_request(
-            signin_request_xml_body,
-            self._standard_login,
-            self._authdata_login
+            signin_request_xml_body, self._standard_login, self._authdata_login
         )
         expected = t.ERROR_RESPONSE_TEMPLATE % {
             "vendor_id": "1045",
@@ -181,22 +207,30 @@ class TestVendorIDRequestHandler:
 
     def test_handle_username_authdata_request_success(self):
         secret_token = base64.b64encode("The secret token")
-        authdata_request_xml_body = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % {"authdata": secret_token}
+        authdata_request_xml_body = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % {
+            "authdata": secret_token
+        }
         result = self._handler.handle_signin_request(
-            authdata_request_xml_body,
-            self._standard_login,
-            self._authdata_login
+            authdata_request_xml_body, self._standard_login, self._authdata_login
         )
         assert result.startswith(self.user1_signin_xml_response_body)
 
     def test_handle_username_authdata_request_invalid(self):
         doc = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % dict(authdata="incorrect")
-        result = self._handler.handle_signin_request(doc, self._standard_login, self._authdata_login)
-        assert result.startswith('<error xmlns="http://ns.adobe.com/adept" data="E_1045_AUTH')
+        result = self._handler.handle_signin_request(
+            doc, self._standard_login, self._authdata_login
+        )
+        assert result.startswith(
+            '<error xmlns="http://ns.adobe.com/adept" data="E_1045_AUTH'
+        )
 
     def test_handle_username_authdata_request_failure(self):
-        doc = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % dict(authdata=base64.b64encode("incorrect"))
-        result = self._handler.handle_signin_request(doc, self._standard_login, self._authdata_login)
+        doc = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % dict(
+            authdata=base64.b64encode("incorrect")
+        )
+        result = self._handler.handle_signin_request(
+            doc, self._standard_login, self._authdata_login
+        )
         expected = t.ERROR_RESPONSE_TEMPLATE % {
             "vendor_id": "1045",
             "type": "AUTH",
@@ -205,7 +239,9 @@ class TestVendorIDRequestHandler:
         assert result == expected
 
     def test_failure_send_login_request_to_accountinfo(self):
-        doc = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % dict(authdata=base64.b64encode("incorrect"))
+        doc = t.AUTHDATA_SIGN_IN_REQUEST_TEMPLATE % dict(
+            authdata=base64.b64encode("incorrect")
+        )
         result = self._handler.handle_accountinfo_request(doc, self._userinfo)
         expected = t.ERROR_RESPONSE_TEMPLATE % {
             "vendor_id": "1045",
@@ -216,7 +252,9 @@ class TestVendorIDRequestHandler:
 
     def test_failure_send_accountinfo_request_to_login(self):
         doc = self.accountinfo_request % dict(uuid=self.user1_uuid)
-        result = self._handler.handle_signin_request(doc, self._standard_login, self._authdata_login)
+        result = self._handler.handle_signin_request(
+            doc, self._standard_login, self._authdata_login
+        )
         expected = t.ERROR_RESPONSE_TEMPLATE % {
             "vendor_id": "1045",
             "type": "AUTH",
@@ -260,15 +298,14 @@ class TestVendorIDModel(VendorIDTest):
         # is created for one of the patrons.
         encoder = ShortClientTokenEncoder()
         short_client_token = encoder.encode(
-            self.library.short_name, self.library.shared_secret,
-            "patron alias"
+            self.library.short_name, self.library.shared_secret, "patron alias"
         )
 
         # Here at the library registry, we can validate the short
         # client token as authdata and create a
         # DelegatedPatronIdentifier for that patron.
         account_id, label = self.model.authdata_lookup(short_client_token)
-        assert account_id.startswith('urn:uuid:0')
+        assert account_id.startswith("urn:uuid:0")
         assert label == "Delegated account ID %s" % account_id
 
         # The UUID corresponds to a DelegatedPatronIdentifier,
@@ -286,7 +323,7 @@ class TestVendorIDModel(VendorIDTest):
         # token into a 'token' part and a 'signature' part, and
         # passing the token and signature to standard_lookup as
         # username and password.
-        token, signature = short_client_token.rsplit('|', 1)
+        token, signature = short_client_token.rsplit("|", 1)
         credentials = dict(username=token, password=signature)
         new_account_id, new_label = self.model.standard_lookup(credentials)
         assert new_account_id == account_id
@@ -296,17 +333,17 @@ class TestVendorIDModel(VendorIDTest):
         """An invalid short client token will not be turned into an
         Adobe Account ID.
         """
-        assert self.model.standard_lookup(dict(username="bad token", password="bad signature")) == (None, None)
+        assert self.model.standard_lookup(
+            dict(username="bad token", password="bad signature")
+        ) == (None, None)
 
         assert self.model.authdata_lookup(None) == (None, None)
-        assert self.model.authdata_lookup('badauthdata') == (None, None)
+        assert self.model.authdata_lookup("badauthdata") == (None, None)
 
         # This token is correctly formed but the signature doesn't match.
         encoder = ShortClientTokenEncoder()
         bad_signature = encoder.encode(
-            self.library.short_name,
-            self.library.shared_secret + "bad",
-            "patron alias"
+            self.library.short_name, self.library.shared_secret + "bad", "patron alias"
         )
         assert self.model.authdata_lookup(bad_signature) == (None, None)
 
@@ -328,9 +365,7 @@ class TestVendorIDModel(VendorIDTest):
         # a delegate can decode it, that doesn't matter.
         username = self.library.short_name + "|1234|someuser"
 
-        result = model.standard_lookup(
-            dict(username=username, password="password")
-        )
+        result = model.standard_lookup(dict(username=username, password="password"))
         assert result == ("adobe_id", "Delegated account ID adobe_id")
 
         # We tried delegate 1 before getting the answer from delegate 2.

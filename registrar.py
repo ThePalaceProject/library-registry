@@ -72,19 +72,21 @@ class LibraryRegistrar(object):
         auth_response = self._make_request(
             auth_url,
             auth_url,
-            _("No Authentication For OPDS document present at %(url)s",
-              url=auth_url),
+            _("No Authentication For OPDS document present at %(url)s", url=auth_url),
             _("Timeout retrieving auth document %(url)s", url=auth_url),
             _("Error retrieving auth document %(url)s", url=auth_url),
         )
         if isinstance(auth_response, ProblemDetail):
             return auth_response
         try:
-            auth_document = AuthenticationDocument.from_string(self._db, auth_response.content)
+            auth_document = AuthenticationDocument.from_string(
+                self._db, auth_response.content
+            )
         except Exception as e:
             self.log.error(
                 "Registration of %s failed: invalid auth document.",
-                auth_url, exc_info=e
+                auth_url,
+                exc_info=e,
             )
             return INVALID_INTEGRATION_DOCUMENT
         failure_detail = None
@@ -93,16 +95,20 @@ class LibraryRegistrar(object):
         if not auth_document.title:
             failure_detail = _("The OPDS authentication document is missing a title.")
         if auth_document.root:
-            opds_url = auth_document.root['href']
+            opds_url = auth_document.root["href"]
         else:
-            failure_detail = _("The OPDS authentication document is missing a 'start' link to the root OPDS feed.")
+            failure_detail = _(
+                "The OPDS authentication document is missing a 'start' link to the root OPDS feed."
+            )
 
         if auth_document.id != auth_response.url:
-            failure_detail = _("The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).", id=auth_document.id, url=auth_response.url)
-        if failure_detail:
-            self.log.error(
-                "Registration of %s failed: %s", auth_url, failure_detail
+            failure_detail = _(
+                "The OPDS authentication document's id (%(id)s) doesn't match its url (%(url)s).",
+                id=auth_document.id,
+                url=auth_response.url,
             )
+        if failure_detail:
+            self.log.error("Registration of %s failed: %s", auth_url, failure_detail)
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
         # Make sure the authentication document includes a way for
@@ -110,9 +116,11 @@ class LibraryRegistrar(object):
         # links must be stored in the database as Hyperlink objects.
         links = auth_document.links or []
         for rel, problem_title in [
-            ('help', "Invalid or missing patron support email address"),
-            (Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL,
-             "Invalid or missing copyright designated agent email address")
+            ("help", "Invalid or missing patron support email address"),
+            (
+                Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL,
+                "Invalid or missing copyright designated agent email address",
+            ),
         ]:
             uris = self._locate_email_addresses(rel, links, problem_title)
             if isinstance(uris, ProblemDetail):
@@ -127,34 +135,41 @@ class LibraryRegistrar(object):
             _("No OPDS root document present at %(url)s", url=opds_url),
             _("Timeout retrieving OPDS root document at %(url)s", url=opds_url),
             _("Error retrieving OPDS root document at %(url)s", url=opds_url),
-            allow_401 = True
+            allow_401=True,
         )
         if isinstance(opds_response, ProblemDetail):
             return opds_response
 
-        content_type = opds_response.headers.get('Content-Type')
+        content_type = opds_response.headers.get("Content-Type")
         failure_detail = None
         if opds_response.status_code == 401:
             # This is only acceptable if the server returned a copy of
             # the Authentication For OPDS document we just got.
             if content_type != AuthenticationDocument.MEDIA_TYPE:
-                failure_detail = _("401 response at %(url)s did not yield an Authentication For OPDS document", url=opds_url)
-            elif not self.opds_response_links_to_auth_document(
-                    opds_response, auth_url
-            ):
-                failure_detail = _("Authentication For OPDS document guarding %(opds_url)s does not match the one at %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
-        elif content_type not in (OPDSCatalog.OPDS_TYPE,
-                                OPDSCatalog.OPDS_1_TYPE):
-            failure_detail = _("Supposed root document at %(url)s is not an OPDS document", url=opds_url)
-        elif not self.opds_response_links_to_auth_document(
-                opds_response, auth_url
-        ):
-            failure_detail = _("OPDS root document at %(opds_url)s does not link back to authentication document %(auth_url)s", opds_url=opds_url, auth_url=auth_url)
+                failure_detail = _(
+                    "401 response at %(url)s did not yield an Authentication For OPDS document",
+                    url=opds_url,
+                )
+            elif not self.opds_response_links_to_auth_document(opds_response, auth_url):
+                failure_detail = _(
+                    "Authentication For OPDS document guarding %(opds_url)s does not match the one at %(auth_url)s",
+                    opds_url=opds_url,
+                    auth_url=auth_url,
+                )
+        elif content_type not in (OPDSCatalog.OPDS_TYPE, OPDSCatalog.OPDS_1_TYPE):
+            failure_detail = _(
+                "Supposed root document at %(url)s is not an OPDS document",
+                url=opds_url,
+            )
+        elif not self.opds_response_links_to_auth_document(opds_response, auth_url):
+            failure_detail = _(
+                "OPDS root document at %(opds_url)s does not link back to authentication document %(auth_url)s",
+                opds_url=opds_url,
+                auth_url=auth_url,
+            )
 
         if failure_detail:
-            self.log.error(
-                "Registration of %s failed: %s", auth_url, failure_detail
-            )
+            self.log.error("Registration of %s failed: %s", auth_url, failure_detail)
             return INVALID_INTEGRATION_DOCUMENT.detailed(failure_detail)
 
         auth_url = auth_response.url
@@ -185,7 +200,8 @@ class LibraryRegistrar(object):
                 image_url = auth_document.logo_link.get("href")
                 self.log.error(
                     "Registration of %s failed: could not read logo image %s",
-                    auth_url, image_url
+                    auth_url,
+                    image_url,
                 )
                 return INVALID_INTEGRATION_DOCUMENT.detailed(
                     _("Could not read logo image %(image_url)s", image_url=image_url)
@@ -194,7 +210,9 @@ class LibraryRegistrar(object):
             buffer = BytesIO()
             image.save(buffer, format="PNG")
             b64 = base64.b64encode(buffer.getvalue()).decode("utf8")
-            type = logo_response.headers.get("Content-Type") or auth_document.logo_link.get("type")
+            type = logo_response.headers.get(
+                "Content-Type"
+            ) or auth_document.logo_link.get("type")
             if type:
                 library.logo = "data:%s;base64,%s" % (type, b64)
         else:
@@ -203,21 +221,25 @@ class LibraryRegistrar(object):
         if problem:
             self.log.error(
                 "Registration of %s failed: problem during registration: %s/%s/%s/%s",
-                auth_url, problem.uri, problem.title, problem.detail,
-                problem.debug_message
+                auth_url,
+                problem.uri,
+                problem.title,
+                problem.detail,
+                problem.debug_message,
             )
             return problem
 
         return auth_document, hyperlinks_to_create
 
-    def _make_request(self, registration_url, url, on_404, on_timeout, on_exception, allow_401=False):
+    def _make_request(
+        self, registration_url, url, on_404, on_timeout, on_exception, allow_401=False
+    ):
         allowed_codes = ["2xx", "3xx", 404]
         if allow_401:
             allowed_codes.append(401)
         try:
             response = self.do_get(
-                url, allowed_response_codes=allowed_codes,
-                timeout=30
+                url, allowed_response_codes=allowed_codes, timeout=30
             )
             # We only allowed 404 above so that we could return a more
             # specific problem detail document if it happened.
@@ -226,22 +248,26 @@ class LibraryRegistrar(object):
             if not allow_401 and response.status_code == 401:
                 self.log.error(
                     "Registration of %s failed: %s is behind authentication gateway",
-                    auth_url, url
+                    auth_url,
+                    url,
                 )
                 return ERROR_RETRIEVING_DOCUMENT.detailed(
-                    _("%(url)s is behind an authentication gateway",
-                      url=url)
+                    _("%(url)s is behind an authentication gateway", url=url)
                 )
         except RequestTimedOut as e:
             self.log.error(
                 "Registration of %s failed: timeout retrieving %s",
-                registration_url, url, exc_info=e
+                registration_url,
+                url,
+                exc_info=e,
             )
             return TIMEOUT.detailed(on_timeout)
         except Exception as e:
             self.log.error(
                 "Registration of %s failed: error retrieving %s",
-                registration_url, url, exc_info=e
+                registration_url,
+                url,
+                exc_info=e,
             )
             return ERROR_RETRIEVING_DOCUMENT.detailed(on_exception)
         return response
@@ -255,25 +281,25 @@ class LibraryRegistrar(object):
         links = []
         link = response.links.get(rel)
         if link:
-            links.append(link.get('url'))
-        media_type = response.headers.get('Content-Type')
+            links.append(link.get("url"))
+        media_type = response.headers.get("Content-Type")
         if media_type == OPDSCatalog.OPDS_TYPE:
             # Parse as OPDS 2.
             catalog = json.loads(response.content)
             links = []
-            for k,v in catalog.get("links", {}).items():
+            for k, v in catalog.get("links", {}).items():
                 if k == rel:
                     links.append(v.get("href"))
         elif media_type == OPDSCatalog.OPDS_1_TYPE:
             # Parse as OPDS 1.
             feed = feedparser.parse(response.content)
             for link in feed.get("feed", {}).get("links", []):
-                if link.get('rel') == rel:
-                    links.append(link.get('href'))
+                if link.get("rel") == rel:
+                    links.append(link.get("href"))
         elif media_type == AuthenticationDocument.MEDIA_TYPE:
             document = json.loads(response.content)
             if isinstance(document, dict):
-                links.append(document.get('id'))
+                links.append(document.get("id"))
         return [urljoin(response.url, url) for url in links if url]
 
     @classmethod
@@ -308,10 +334,10 @@ class LibraryRegistrar(object):
         """
         candidates = []
         for link in links:
-            if link.get('rel') != rel:
+            if link.get("rel") != rel:
                 # Wrong kind of link.
                 continue
-            uri = link.get('href')
+            uri = link.get("href")
             value = cls._required_email_address(uri, problem_title)
             if isinstance(value, str):
                 candidates.append(value)

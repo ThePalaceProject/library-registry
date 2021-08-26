@@ -10,7 +10,6 @@ from . import DatabaseTest
 
 
 class TestGeometryLoader(DatabaseTest):
-
     def setup(self):
         super(TestGeometryLoader, self).setup()
         self.loader = GeometryLoader(self._db)
@@ -43,7 +42,7 @@ class TestGeometryLoader(DatabaseTest):
         distance_func = func.ST_DistanceSphere(new_york.geometry, texas_zip.geometry)
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
-        assert int(distance/1000) == 2510
+        assert int(distance / 1000) == 2510
 
         [alias] = new_york.aliases
         assert alias.name == "New York State"
@@ -60,13 +59,18 @@ class TestGeometryLoader(DatabaseTest):
         distance_func = func.ST_DistanceSphere(new_york_2.geometry, texas_zip.geometry)
         distance_qu = self._db.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
-        assert int(distance/1000) == 2637
+        assert int(distance / 1000) == 2637
 
     def test_load_ndjson(self):
         # Create a preexisting Place with an alias.
         old_us, is_new = get_one_or_create(
-            self._db, Place, parent=None, external_name="United States",
-            external_id="US", type="nation", geometry='SRID=4326;POINT(-75 43)'
+            self._db,
+            Place,
+            parent=None,
+            external_name="United States",
+            external_id="US",
+            type="nation",
+            geometry="SRID=4326;POINT(-75 43)",
         )
         assert old_us.abbreviated_name is None
         old_alias = get_one_or_create(
@@ -118,4 +122,4 @@ class TestGeometryLoader(DatabaseTest):
         distance_func = func.ST_DistanceSphere(montgomery.geometry, alabama.geometry)
         [[distance]] = self._db.query().add_columns(distance_func).all()
         print(distance)
-        assert int(distance/1000) == 276
+        assert int(distance / 1000) == 276

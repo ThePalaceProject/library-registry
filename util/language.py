@@ -502,24 +502,29 @@ zun|||Zuni|zuni
 zxx|||No linguistic content; Not applicable|pas de contenu linguistique; non applicable
 zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki; kirmanjki; zazaki"""
 
-    NATIVE_NAMES_RAW_DATA =  [
-        {"code":"en","name":"English","nativeName":"English"},
-        {"code":"fr","name":"French","nativeName":"français"},
-        {"code":"de","name":"German","nativeName":"Deutsch"},
-        {"code":"el","name":"Greek, Modern","nativeName":"Ελληνικά"},
-        {"code":"hu","name":"Hungarian","nativeName":"Magyar"},
-        {"code":"it","name":"Italian","nativeName":"Italiano"},
-        {"code":"no","name":"Norwegian","nativeName":"Norsk"},
-        {"code":"pl","name":"Polish","nativeName":"polski"},
-        {"code":"pt","name":"Portuguese","nativeName":"Português"},
-        {"code":"ru","name":"Russian","nativeName":"русский"},
-        {"code":"es","name":"Spanish, Castilian","nativeName":"español, castellano"},
-        {"code":"sv","name":"Swedish","nativeName":"svenska"},
+    NATIVE_NAMES_RAW_DATA = [
+        {"code": "en", "name": "English", "nativeName": "English"},
+        {"code": "fr", "name": "French", "nativeName": "français"},
+        {"code": "de", "name": "German", "nativeName": "Deutsch"},
+        {"code": "el", "name": "Greek, Modern", "nativeName": "Ελληνικά"},
+        {"code": "hu", "name": "Hungarian", "nativeName": "Magyar"},
+        {"code": "it", "name": "Italian", "nativeName": "Italiano"},
+        {"code": "no", "name": "Norwegian", "nativeName": "Norsk"},
+        {"code": "pl", "name": "Polish", "nativeName": "polski"},
+        {"code": "pt", "name": "Portuguese", "nativeName": "Português"},
+        {"code": "ru", "name": "Russian", "nativeName": "русский"},
+        {
+            "code": "es",
+            "name": "Spanish, Castilian",
+            "nativeName": "español, castellano",
+        },
+        {"code": "sv", "name": "Swedish", "nativeName": "svenska"},
     ]
 
     for i in RAW_DATA.split("\n"):
-        (alpha_3, terminologic_code, alpha_2, names,
-         french_names) = i.strip().split("|")
+        (alpha_3, terminologic_code, alpha_2, names, french_names) = i.strip().split(
+            "|"
+        )
         names = [x.strip() for x in names.split(";")]
         if alpha_2:
             three_to_two[alpha_3] = alpha_2
@@ -530,9 +535,9 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
         english_names[alpha_3] = names
 
     for i in NATIVE_NAMES_RAW_DATA:
-        alpha_2 = i['code']
+        alpha_2 = i["code"]
         alpha_3 = two_to_three[alpha_2]
-        names = i['nativeName']
+        names = i["nativeName"]
         names = [x.strip() for x in names.split(",")]
         native_names[alpha_2] = names
         native_names[alpha_3] = names
@@ -540,8 +545,8 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
     @classmethod
     def iso_639_2_for_locale(cls, locale):
         """Turn a locale code into an ISO-639-2 alpha-3 language code."""
-        if '-' in locale:
-            language, place = locale.lower().split("-",1)
+        if "-" in locale:
+            language, place = locale.lower().split("-", 1)
         else:
             language = locale
         if cls.two_to_three[language]:
@@ -594,6 +599,7 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
             return all_names[0]
         return "/".join(all_names)
 
+
 def languages_from_accept(accept_languages):
     """Turn a list of (locale, quality) 2-tuples into a list of language codes."""
     seen = set([])
@@ -604,6 +610,6 @@ def languages_from_accept(accept_languages):
             languages.append(language)
             seen.add(language)
     if not languages:
-        languages = os.environ.get('DEFAULT_LANGUAGES', 'eng')
-        languages = languages.split(',')
+        languages = os.environ.get("DEFAULT_LANGUAGES", "eng")
+        languages = languages.split(",")
     return languages

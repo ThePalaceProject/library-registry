@@ -14,6 +14,7 @@ class AdobeVendorIDController:
     Flask controllers that implement the Account Service and Authorization Service
     portions of the Adobe Vendor ID protocol.
     """
+
     def __init__(self, _db, vendor_id, node_value, delegates=None):
         """Constructor.
 
@@ -32,9 +33,9 @@ class AdobeVendorIDController:
         """Process an incoming signInRequest document."""
         __transaction = self._db.begin_nested()
         output = self.request_handler.handle_signin_request(
-            request.data.decode('utf8'),
+            request.data.decode("utf8"),
             self.model.standard_lookup,
-            self.model.authdata_lookup
+            self.model.authdata_lookup,
         )
         __transaction.commit()
 
@@ -43,8 +44,7 @@ class AdobeVendorIDController:
     def userinfo_handler(self):
         """Process an incoming userInfoRequest document."""
         output = self.request_handler.handle_accountinfo_request(
-            request.data.decode('utf8'),
-            self.model.urn_to_label
+            request.data.decode("utf8"), self.model.urn_to_label
         )
         return Response(output, 200, {"Content-Type": "application/xml"})
 
@@ -62,10 +62,12 @@ class AdobeRequestParser(XMLParser):
         if not requests:
             return None
 
-        return requests[0]  # Return only the first request tag, even if there are multiple
+        return requests[
+            0
+        ]  # Return only the first request tag, even if there are multiple
 
     def _add(self, d, tag, key, namespaces, transform=None):
-        v = self._xpath1(tag, 'adept:' + key, namespaces)
+        v = self._xpath1(tag, "adept:" + key, namespaces)
 
         if v is not None:
             v = v.text
@@ -79,11 +81,11 @@ class AdobeRequestParser(XMLParser):
 
 class AdobeSignInRequestParser(AdobeRequestParser):
     REQUEST_XPATH = "/adept:signInRequest"
-    STANDARD = 'standard'
-    AUTH_DATA = 'authData'
+    STANDARD = "standard"
+    AUTH_DATA = "authData"
 
     def process_one(self, tag, namespaces):
-        method = tag.attrib.get('method')
+        method = tag.attrib.get("method")
 
         if not method:
             raise ValueError("No signin method specified")
@@ -91,8 +93,8 @@ class AdobeSignInRequestParser(AdobeRequestParser):
         data = dict(method=method)
 
         if method == self.STANDARD:
-            self._add(data, tag, 'username', namespaces)
-            self._add(data, tag, 'password', namespaces)
+            self._add(data, tag, "username", namespaces)
+            self._add(data, tag, "password", namespaces)
         elif method == self.AUTH_DATA:
             self._add(data, tag, self.AUTH_DATA, namespaces, base64.b64decode)
         else:
@@ -105,9 +107,9 @@ class AdobeAccountInfoRequestParser(AdobeRequestParser):
     REQUEST_XPATH = "/adept:accountInfoRequest"
 
     def process_one(self, tag, namespaces):
-        method = tag.attrib.get('method')
+        method = tag.attrib.get("method")
         data = dict(method=method)
-        self._add(data, tag, 'user', namespaces)
+        self._add(data, tag, "user", namespaces)
         return data
 
 
@@ -115,15 +117,15 @@ class AdobeVendorIDRequestHandler:
     """Standalone class that can be tested without bringing in Flask or the database schema"""
 
     ##### Class Constants ####################################################  # noqa: E266
-    AUTH_ERROR_TYPE         = "AUTH"                                        # noqa: E221
-    ACCOUNT_INFO_ERROR_TYPE = "ACCOUNT_INFO"                                # noqa: E221
-    TOKEN_FAILURE           = 'Incorrect token.'                            # noqa: E221
-    AUTHENTICATION_FAILURE  = 'Incorrect barcode or PIN.'                   # noqa: E221
-    URN_LOOKUP_FAILURE      = "Could not identify patron from '%s'."        # noqa: E221
+    AUTH_ERROR_TYPE = "AUTH"  # noqa: E221
+    ACCOUNT_INFO_ERROR_TYPE = "ACCOUNT_INFO"  # noqa: E221
+    TOKEN_FAILURE = "Incorrect token."  # noqa: E221
+    AUTHENTICATION_FAILURE = "Incorrect barcode or PIN."  # noqa: E221
+    URN_LOOKUP_FAILURE = "Could not identify patron from '%s'."  # noqa: E221
 
-    SIGN_IN_RESPONSE_TEMPLATE       = t.SIGN_IN_RESPONSE_TEMPLATE           # noqa: E221
-    ACCOUNT_INFO_RESPONSE_TEMPLATE  = t.ACCOUNT_INFO_RESPONSE_TEMPLATE      # noqa: E221
-    ERROR_RESPONSE_TEMPLATE         = t.ERROR_RESPONSE_TEMPLATE             # noqa: E221
+    SIGN_IN_RESPONSE_TEMPLATE = t.SIGN_IN_RESPONSE_TEMPLATE  # noqa: E221
+    ACCOUNT_INFO_RESPONSE_TEMPLATE = t.ACCOUNT_INFO_RESPONSE_TEMPLATE  # noqa: E221
+    ERROR_RESPONSE_TEMPLATE = t.ERROR_RESPONSE_TEMPLATE  # noqa: E221
 
     ##### Public Interface / Magic Methods ###################################  # noqa: E266
     def __init__(self, vendor_id):
@@ -140,15 +142,17 @@ class AdobeVendorIDRequestHandler:
         user_id = label = None
 
         if not data:
-            return self.error_document(self.AUTH_ERROR_TYPE, "Request document in wrong format.")
+            return self.error_document(
+                self.AUTH_ERROR_TYPE, "Request document in wrong format."
+            )
 
-        if 'method' not in data:
+        if "method" not in data:
             return self.error_document(self.AUTH_ERROR_TYPE, "No method specified")
 
-        if data['method'] == parser.STANDARD:
+        if data["method"] == parser.STANDARD:
             (user_id, label) = standard_lookup(data)
             failure = self.AUTHENTICATION_FAILURE
-        elif data['method'] == parser.AUTH_DATA:
+        elif data["method"] == parser.AUTH_DATA:
             authdata = data[parser.AUTH_DATA]
             (user_id, label) = authdata_lookup(authdata)
             failure = self.TOKEN_FAILURE
@@ -165,23 +169,33 @@ class AdobeVendorIDRequestHandler:
         try:
             data = parser.process(data)
             if not data:
-                return self.error_document(self.ACCOUNT_INFO_ERROR_TYPE, "Request document in wrong format.")
+                return self.error_document(
+                    self.ACCOUNT_INFO_ERROR_TYPE, "Request document in wrong format."
+                )
 
-            if 'user' not in data:
-                return self.error_document(self.ACCOUNT_INFO_ERROR_TYPE,
-                                           "Could not find user identifer in request document.")
+            if "user" not in data:
+                return self.error_document(
+                    self.ACCOUNT_INFO_ERROR_TYPE,
+                    "Could not find user identifer in request document.",
+                )
 
-            label = urn_to_label(data['user'])
+            label = urn_to_label(data["user"])
         except Exception as e:
             return self.error_document(self.ACCOUNT_INFO_ERROR_TYPE, str(e))
 
         if label:
             return self.ACCOUNT_INFO_RESPONSE_TEMPLATE % dict(label=label)
         else:
-            return self.error_document(self.ACCOUNT_INFO_ERROR_TYPE, self.URN_LOOKUP_FAILURE % data['user'])
+            return self.error_document(
+                self.ACCOUNT_INFO_ERROR_TYPE, self.URN_LOOKUP_FAILURE % data["user"]
+            )
 
     def error_document(self, type, message):
-        return self.ERROR_RESPONSE_TEMPLATE % {"vendor_id": self.vendor_id, "type": type, "message": message}
+        return self.ERROR_RESPONSE_TEMPLATE % {
+            "vendor_id": self.vendor_id,
+            "type": type,
+            "message": message,
+        }
 
     ##### Private Methods ####################################################  # noqa: E266
 
@@ -205,7 +219,9 @@ class AdobeVendorIDModel:
             else:
                 delegate_objs.append(i)
 
-        self.short_client_token_decoder = ShortClientTokenDecoder(node_value, delegate_objs)
+        self.short_client_token_decoder = ShortClientTokenDecoder(
+            node_value, delegate_objs
+        )
 
     def standard_lookup(self, authorization_data):
         """
@@ -213,12 +229,14 @@ class AdobeVendorIDModel:
         Return an Adobe Account ID and a human-readable label. Create a DelegatedPatronIdentifier
         to hold the Adobe Account ID if necessary.
         """
-        username = authorization_data.get('username')
-        password = authorization_data.get('password')
+        username = authorization_data.get("username")
+        password = authorization_data.get("password")
 
         try:
-            delegated_patron_identifier = self.short_client_token_decoder.decode_two_part(
-                self._db, username, password
+            delegated_patron_identifier = (
+                self.short_client_token_decoder.decode_two_part(
+                    self._db, username, password
+                )
             )
         except ValueError:
             delegated_patron_identifier = None
@@ -228,12 +246,17 @@ class AdobeVendorIDModel:
         else:
             for delegate in self.short_client_token_decoder.delegates:
                 try:
-                    (account_id, label, _) = delegate.sign_in_standard(username, password)
+                    (account_id, label, _) = delegate.sign_in_standard(
+                        username, password
+                    )
                     return account_id, label
                 except Exception:
-                    pass        # This delegate couldn't help us.
+                    pass  # This delegate couldn't help us.
 
-        return (None, None)   # Neither this server nor the delegates were able to do anything.
+        return (
+            None,
+            None,
+        )  # Neither this server nor the delegates were able to do anything.
 
     def authdata_lookup(self, authdata):
         """
@@ -242,7 +265,9 @@ class AdobeVendorIDModel:
         if necessary.
         """
         try:
-            delegated_patron_identifier = self.short_client_token_decoder.decode(self._db, authdata)
+            delegated_patron_identifier = self.short_client_token_decoder.decode(
+                self._db, authdata
+            )
         except ValueError:
             delegated_patron_identifier = None
 
@@ -254,9 +279,12 @@ class AdobeVendorIDModel:
                     (account_id, label, _) = delegate.sign_in_authdata(authdata)
                     return account_id, label
                 except Exception:
-                    pass    # This delegate couldn't help us.
+                    pass  # This delegate couldn't help us.
 
-        return (None, None)  # Neither this server nor the delegates were able to do anything.
+        return (
+            None,
+            None,
+        )  # Neither this server nor the delegates were able to do anything.
 
     def account_id_and_label(self, delegated_patron_identifier):
         """Turn a DelegatedPatronIdentifier into a 2-tuple of (account id, label)"""
@@ -318,7 +346,7 @@ class AdobeVendorIDClient:
         response = requests.get(self.status_url)
         content = response.text
         self.handle_error(response.status_code, content)
-        if content == 'UP':
+        if content == "UP":
             return True
         raise VendorIDServerException("Unexpected response: %s" % content)
 

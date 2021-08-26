@@ -15,6 +15,7 @@ class JSONFormatter(logging.Formatter):
     fqdn = socket.getfqdn()
     if len(fqdn) > len(hostname):
         hostname = fqdn
+
     def format(self, record):
         message = record.msg
         if record.args:
@@ -29,19 +30,20 @@ class JSONFormatter(logging.Formatter):
             level=record.levelname,
             filename=record.filename,
             message=message,
-            timestamp=datetime.datetime.utcnow().isoformat()
+            timestamp=datetime.datetime.utcnow().isoformat(),
         )
         if record.exc_info:
-            data['traceback'] = self.formatException(record.exc_info)
+            data["traceback"] = self.formatException(record.exc_info)
         return json.dumps(data)
 
 
 class StringFormatter(logging.Formatter):
     """Encode all output as a string.
-    
+
     In Python 2, this means a UTF-8 bytestring. In Python 3, it means a
     Unicode string.
     """
+
     def format(self, record):
         data = super(StringFormatter, self).format(record)
         return str(data)
@@ -52,7 +54,9 @@ class LogConfiguration(object):
     configuration from the database.
     """
 
-    DEFAULT_MESSAGE_TEMPLATE = "%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"
+    DEFAULT_MESSAGE_TEMPLATE = (
+        "%(asctime)s:%(name)s:%(levelname)s:%(filename)s:%(message)s"
+    )
     DEFAULT_LOGGLY_URL = "https://logs-01.loggly.com/inputs/%(token)s/tag/python/"
 
     DEBUG = "DEBUG"
@@ -60,14 +64,14 @@ class LogConfiguration(object):
     WARN = "WARN"
     ERROR = "ERROR"
 
-    JSON_LOG_FORMAT = 'json'
-    TEXT_LOG_FORMAT = 'text'
+    JSON_LOG_FORMAT = "json"
+    TEXT_LOG_FORMAT = "text"
 
     # Settings for the integration with protocol=INTERNAL_LOGGING
-    LOG_LEVEL = 'log_level'
-    LOG_FORMAT = 'log_format'
-    DATABASE_LOG_LEVEL = 'database_log_level'
-    LOG_MESSAGE_TEMPLATE = 'message_template'
+    LOG_LEVEL = "log_level"
+    LOG_FORMAT = "log_format"
+    DATABASE_LOG_LEVEL = "database_log_level"
+    LOG_MESSAGE_TEMPLATE = "message_template"
 
     @classmethod
     def initialize(cls, _db, testing=False):
@@ -80,8 +84,8 @@ class LogConfiguration(object):
         :param testing: True if unit tests are currently running; otherwise
         False.
         """
-        log_level, database_log_level, new_handlers = (
-            cls.from_configuration(_db, testing)
+        log_level, database_log_level, new_handlers = cls.from_configuration(
+            _db, testing
         )
 
         # Replace the set of handlers associated with the root logger.
@@ -96,8 +100,9 @@ class LogConfiguration(object):
         # Set the loggers for various verbose libraries to the database
         # log level, which is probably higher than the normal log level.
         for logger in (
-                'sqlalchemy.engine', 'elasticsearch',
-                'requests.packages.urllib3.connectionpool',
+            "sqlalchemy.engine",
+            "elasticsearch",
+            "requests.packages.urllib3.connectionpool",
         ):
             logging.getLogger(logger).setLevel(database_log_level)
 
@@ -109,7 +114,7 @@ class LogConfiguration(object):
             loop_prevention_log_level = cls.ERROR
         else:
             loop_prevention_log_level = cls.WARN
-        for logger in ['urllib3.connectionpool']:
+        for logger in ["urllib3.connectionpool"]:
             logging.getLogger(logger).setLevel(loop_prevention_log_level)
         return log_level
 
@@ -136,19 +141,22 @@ class LogConfiguration(object):
 
         # Establish defaults, in case the database is not initialized or
         # it is initialized but logging is not configured.
-        (internal_log_level, internal_log_format, database_log_level,
-         message_template) = cls._defaults(testing)
+        (
+            internal_log_level,
+            internal_log_format,
+            database_log_level,
+            message_template,
+        ) = cls._defaults(testing)
 
         handlers = []
         from model import ExternalIntegration
+
         if _db and not testing:
             goal = ExternalIntegration.LOGGING_GOAL
             internal = ExternalIntegration.lookup(
                 _db, ExternalIntegration.INTERNAL_LOGGING, goal
             )
-            loggly = ExternalIntegration.lookup(
-                _db, ExternalIntegration.LOGGLY, goal
-            )
+            loggly = ExternalIntegration.lookup(_db, ExternalIntegration.LOGGLY, goal)
             if internal:
                 internal_log_level = internal.setting(cls.LOG_LEVEL).setdefault(
                     internal_log_level
@@ -158,13 +166,13 @@ class LogConfiguration(object):
                     internal_log_format
                 )
 
-                database_log_level = internal.setting(cls.DATABASE_LOG_LEVEL).setdefault(
-                    database_log_level
-                )
+                database_log_level = internal.setting(
+                    cls.DATABASE_LOG_LEVEL
+                ).setdefault(database_log_level)
 
-                message_template = internal.setting(cls.LOG_MESSAGE_TEMPLATE).setdefault(
-                    message_template
-                )
+                message_template = internal.setting(
+                    cls.LOG_MESSAGE_TEMPLATE
+                ).setdefault(message_template)
 
             if loggly:
                 handlers.append(cls.loggly_handler(loggly))
@@ -174,9 +182,7 @@ class LogConfiguration(object):
         handlers.append(logging.StreamHandler())
 
         for handler in handlers:
-            cls.set_formatter(
-                handler, internal_log_format, message_template
-            )
+            cls.set_formatter(handler, internal_log_format, message_template)
 
         return internal_log_level, database_log_level, handlers
 
@@ -184,23 +190,26 @@ class LogConfiguration(object):
     def _defaults(cls, testing=False):
         """Return default log configuration values."""
         if testing:
-            internal_log_level = 'DEBUG'
+            internal_log_level = "DEBUG"
             internal_log_format = cls.TEXT_LOG_FORMAT
         else:
-            internal_log_level = 'INFO'
+            internal_log_level = "INFO"
             internal_log_format = cls.JSON_LOG_FORMAT
-        database_log_level = 'WARN'
+        database_log_level = "WARN"
         message_template = cls.DEFAULT_MESSAGE_TEMPLATE
-        return (internal_log_level, internal_log_format, database_log_level,
-                message_template)
+        return (
+            internal_log_level,
+            internal_log_format,
+            database_log_level,
+            message_template,
+        )
 
     @classmethod
     def set_formatter(cls, handler, log_format, message_template):
         """Tell the given `handler` to format its log messages in a
         certain way.
         """
-        if (log_format==cls.JSON_LOG_FORMAT
-            or isinstance(handler, LogglyHandler)):
+        if log_format == cls.JSON_LOG_FORMAT or isinstance(handler, LogglyHandler):
             formatter = JSONFormatter()
         else:
             formatter = StringFormatter(message_template)
@@ -208,8 +217,7 @@ class LogConfiguration(object):
 
     @classmethod
     def loggly_handler(cls, externalintegration):
-        """Turn a Loggly ExternalIntegration into a log handler.
-        """
+        """Turn a Loggly ExternalIntegration into a log handler."""
         token = externalintegration.password
         url = externalintegration.url or cls.DEFAULT_LOGGLY_URL
         if not url:
@@ -220,19 +228,20 @@ class LogConfiguration(object):
             url = cls._interpolate_loggly_url(url, token)
         except (TypeError, KeyError) as e:
             raise CannotLoadConfiguraiton(
-                "Cannot interpolate token %s into loggly URL %s" % (
-                    token, url,
+                "Cannot interpolate token %s into loggly URL %s"
+                % (
+                    token,
+                    url,
                 )
             )
         return LogglyHandler(url)
 
     @classmethod
     def _interpolate_loggly_url(cls, url, token):
-        if '%s' in url:
+        if "%s" in url:
             return url % token
-        if '%(' in url:
+        if "%(" in url:
             return url % dict(token=token)
 
         # Assume the token is already in the URL.
         return url
-

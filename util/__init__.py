@@ -2,7 +2,7 @@ from geolite2 import geolite2
 from sqlalchemy import func
 
 
-class GeometryUtility():
+class GeometryUtility:
     @classmethod
     def from_geojson(cls, geojson):
         """
@@ -35,7 +35,7 @@ class GeometryUtility():
         if match is None:
             return None
 
-        latitude, longitude = [match['location'][x] for x in ('latitude', 'longitude')]
+        latitude, longitude = [match["location"][x] for x in ("latitude", "longitude")]
         return cls.point(latitude, longitude)
 
     @classmethod
@@ -46,11 +46,11 @@ class GeometryUtility():
         :param s: (str) - Comma separated lat/long pair
         :return: (str) -
         """
-        if not s or ',' not in s:
+        if not s or "," not in s:
             return None
 
         parts = []
-        for i in s.split(',', 1):
+        for i in s.split(",", 1):
             try:
                 i = float(i.strip())
             except ValueError:
@@ -71,4 +71,4 @@ class GeometryUtility():
         :param longitude:
         :return: (str) - Formatted string: 'SRID=4326;POINT({longitude} {latitude})'
         """
-        return 'SRID=4326;POINT(%s %s)' % (longitude, latitude)
+        return "SRID=4326;POINT(%s %s)" % (longitude, latitude)

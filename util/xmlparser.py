@@ -5,6 +5,7 @@ from lxml import etree
 
 class XMLParser:
     """Helper functions to process XML data."""
+
     ##### Class Constants ####################################################  # noqa: E266
     NAMESPACES = {}
 

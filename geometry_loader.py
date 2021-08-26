@@ -15,7 +15,7 @@ class GeometryLoader(object):
 
     def __init__(self, _db):
         self._db = _db
-        self.places_by_external_id=dict()
+        self.places_by_external_id = dict()
 
     def load_ndjson(self, fh):
         while True:
@@ -28,12 +28,12 @@ class GeometryLoader(object):
 
     def load(self, metadata, geometry):
         metadata = json.loads(metadata)
-        external_id = metadata['id']
-        type = metadata['type']
-        parent_external_id = metadata['parent_id']
-        name = metadata['name']
-        aliases = metadata.get('aliases', [])
-        abbreviated_name = metadata.get('abbreviated_name', None)
+        external_id = metadata["id"]
+        type = metadata["type"]
+        parent_external_id = metadata["parent_id"]
+        name = metadata["name"]
+        aliases = metadata.get("aliases", [])
+        abbreviated_name = metadata.get("abbreviated_name", None)
 
         if parent_external_id:
             parent = self.places_by_external_id[parent_external_id]
@@ -44,9 +44,12 @@ class GeometryLoader(object):
         # knows it's using real-world latitude and longitude.
         geometry = GeometryUtility.from_geojson(geometry)
         place, is_new = get_one_or_create(
-            self._db, Place, external_id=external_id, type=type,
+            self._db,
+            Place,
+            external_id=external_id,
+            type=type,
             parent=parent,
-            create_method_kwargs = dict(geometry=geometry)
+            create_method_kwargs=dict(geometry=geometry),
         )
 
         # Set these values, even the ones that were set in
@@ -60,8 +63,8 @@ class GeometryLoader(object):
         # for this place that doesn't show up in the metadata, it
         # may have been created manually.
         for alias in aliases:
-            name = alias['name']
-            language = alias['language']
+            name = alias["name"]
+            language = alias["language"]
             alias, is_new = get_one_or_create(
                 self._db, PlaceAlias, place=place, name=name, language=language
             )

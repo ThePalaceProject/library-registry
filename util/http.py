@@ -8,11 +8,12 @@ from .problem_detail import JSON_MEDIA_TYPE as PROBLEM_DETAIL_JSON_MEDIA_TYPE
 from .problem_detail import ProblemDetail as pd
 
 INTEGRATION_ERROR = pd(
-      "http://librarysimplified.org/terms/problem/remote-integration-failed",
-      502,
-      _("Third-party service failed."),
-      _("A third-party service has failed."),
+    "http://librarysimplified.org/terms/problem/remote-integration-failed",
+    502,
+    _("Third-party service failed."),
+    _("A third-party service has failed."),
 )
+
 
 class IntegrationException(Exception):
     """An exception that happens when the site's connection to a
@@ -48,7 +49,9 @@ class RemoteIntegrationException(IntegrationException):
     """
 
     title = _("Failure contacting external service")
-    detail = _("The server tried to access %(service)s but the third-party service experienced an error.")
+    detail = _(
+        "The server tried to access %(service)s but the third-party service experienced an error."
+    )
     internal_message = "Error accessing %s: %s"
 
     def __init__(self, url_or_service, message, debug_message=None):
@@ -57,8 +60,9 @@ class RemoteIntegrationException(IntegrationException):
         `param url_or_service` The name of the service that failed
            (e.g. "Overdrive"), or the specific URL that had the problem.
         """
-        if (url_or_service and
-            any(url_or_service.startswith(x) for x in ('http:', 'https:'))):
+        if url_or_service and any(
+            url_or_service.startswith(x) for x in ("http:", "https:")
+        ):
             self.url = url_or_service
             self.service = urllib.parse.urlparse(url_or_service).netloc
         else:
@@ -83,17 +87,24 @@ class RemoteIntegrationException(IntegrationException):
 
     def as_problem_detail_document(self, debug):
         return INTEGRATION_ERROR.detailed(
-            detail=self.document_detail(debug), title=self.title,
-            debug_message=self.document_debug_message(debug)
+            detail=self.document_detail(debug),
+            title=self.title,
+            debug_message=self.document_debug_message(debug),
         )
+
 
 class BadResponseException(RemoteIntegrationException):
     """The request seemingly went okay, but we got a bad response."""
+
     title = _("Bad response")
-    detail = _("The server made a request to %(service)s, and got an unexpected or invalid response.")
+    detail = _(
+        "The server made a request to %(service)s, and got an unexpected or invalid response."
+    )
     internal_message = "Bad response from %s: %s"
 
-    BAD_STATUS_CODE_MESSAGE = "Got status code %s from external server, cannot continue."
+    BAD_STATUS_CODE_MESSAGE = (
+        "Got status code %s from external server, cannot continue."
+    )
 
     def __init__(self, url_or_service, message, debug_message=None, status_code=None):
         """Indicate that a remote integration has failed.
@@ -101,7 +112,9 @@ class BadResponseException(RemoteIntegrationException):
         `param url_or_service` The name of the service that failed
            (e.g. "Overdrive"), or the specific URL that had the problem.
         """
-        super(BadResponseException, self).__init__(url_or_service, message, debug_message)
+        super(BadResponseException, self).__init__(
+            url_or_service, message, debug_message
+        )
         # to be set to 500, etc.
         self.status_code = status_code
 
@@ -126,12 +139,14 @@ class BadResponseException(RemoteIntegrationException):
             status_code = response.status_code
             content = response.content
         return BadResponseException(
-            url, message,
+            url,
+            message,
             status_code=status_code,
-            debug_message="Status code: %s\nContent: %s" % (
+            debug_message="Status code: %s\nContent: %s"
+            % (
                 status_code,
                 content,
-            )
+            ),
         )
 
     @classmethod
@@ -145,11 +160,13 @@ class BadResponseException(RemoteIntegrationException):
         )
 
 
-class RequestNetworkException(RemoteIntegrationException,
-                              requests.exceptions.RequestException):
+class RequestNetworkException(
+    RemoteIntegrationException, requests.exceptions.RequestException
+):
     """An exception from the requests module that can be represented as
     a problem detail document.
     """
+
     title = _("Network failure contacting third-party service")
     detail = _("The server experienced a network error while contacting %(service)s.")
     internal_message = "Network error contacting %s: %s"
@@ -176,13 +193,13 @@ class HTTP(object):
     @classmethod
     def post_with_timeout(cls, url, payload, *args, **kwargs):
         """Make a POST request with timeout handling."""
-        kwargs['data'] = payload
+        kwargs["data"] = payload
         return cls.request_with_timeout("POST", url, *args, **kwargs)
 
     @classmethod
     def put_with_timeout(cls, url, payload, *args, **kwargs):
         """Make a PUT request with timeout handling."""
-        kwargs['data'] = payload
+        kwargs["data"] = payload
         return cls.request_with_timeout("PUT", url, *args, **kwargs)
 
     @classmethod
@@ -208,21 +225,21 @@ class HTTP(object):
         :param kwargs: Keyword arguments for the request function.
         """
         process_response_with = kwargs.pop(
-            'process_response_with', cls._process_response
+            "process_response_with", cls._process_response
         )
-        allowed_response_codes = kwargs.pop('allowed_response_codes', [])
-        disallowed_response_codes = kwargs.pop('disallowed_response_codes', [])
-        verbose = kwargs.pop('verbose', False)
+        allowed_response_codes = kwargs.pop("allowed_response_codes", [])
+        disallowed_response_codes = kwargs.pop("disallowed_response_codes", [])
+        verbose = kwargs.pop("verbose", False)
 
-        if not 'timeout' in kwargs:
-            kwargs['timeout'] = 20
+        if not "timeout" in kwargs:
+            kwargs["timeout"] = 20
 
         # Unicode data can't be sent over the wire. Convert it
         # to UTF-8.
-        if 'data' in kwargs and isinstance(kwargs['data'], str):
-            kwargs['data'] = kwargs.get('data').encode("utf8")
-        if 'headers' in kwargs:
-            headers = kwargs['headers']
+        if "data" in kwargs and isinstance(kwargs["data"], str):
+            kwargs["data"] = kwargs.get("data").encode("utf8")
+        if "headers" in kwargs:
+            headers = kwargs["headers"]
             new_headers = {}
             for k, v in list(headers.items()):
                 if isinstance(k, str):
@@ -230,12 +247,13 @@ class HTTP(object):
                 if isinstance(v, str):
                     v = v.encode("utf8")
                 new_headers[k] = v
-            kwargs['headers'] = new_headers
+            kwargs["headers"] = new_headers
 
         try:
             if verbose:
-                logging.info("Sending %s request to %s: kwargs %r",
-                             http_method, url, kwargs)
+                logging.info(
+                    "Sending %s request to %s: kwargs %r", http_method, url, kwargs
+                )
             if len(args) == 1:
                 # requests.request takes two positional arguments,
                 # an HTTP method and a URL. In most cases, the URL
@@ -246,8 +264,10 @@ class HTTP(object):
             if verbose:
                 logging.info(
                     "Response from %s: %s %r %r",
-                    url, response.status_code, response.headers,
-                    response.content
+                    url,
+                    response.status_code,
+                    response.headers,
+                    response.content,
                 )
         except requests.exceptions.Timeout as e:
             # Wrap the requests-specific Timeout exception
@@ -263,8 +283,9 @@ class HTTP(object):
         )
 
     @classmethod
-    def _process_response(cls, url, response, allowed_response_codes=None,
-                          disallowed_response_codes=None):
+    def _process_response(
+        cls, url, response, allowed_response_codes=None, disallowed_response_codes=None
+    ):
         """Raise a RequestNetworkException if the response code indicates a
         server-side failure, or behavior so unpredictable that we can't
         continue.
@@ -277,8 +298,9 @@ class HTTP(object):
         """
         if allowed_response_codes:
             allowed_response_codes = list(map(str, allowed_response_codes))
-            status_code_not_in_allowed = "Got status code %%s from external server, but can only continue on: %s." % (
-                ", ".join(sorted(allowed_response_codes)),
+            status_code_not_in_allowed = (
+                "Got status code %%s from external server, but can only continue on: %s."
+                % (", ".join(sorted(allowed_response_codes)),)
             )
         if disallowed_response_codes:
             disallowed_response_codes = list(map(str, disallowed_response_codes))
@@ -290,24 +312,24 @@ class HTTP(object):
         code = str(code)
 
         if allowed_response_codes and (
-                code in allowed_response_codes
-                or series in allowed_response_codes
+            code in allowed_response_codes or series in allowed_response_codes
         ):
             # The code or series has been explicitly allowed. Allow
             # the request to be processed.
             return response
 
         error_message = None
-        if (series == '5xx' or code in disallowed_response_codes
+        if (
+            series == "5xx"
+            or code in disallowed_response_codes
             or series in disallowed_response_codes
         ):
             # Unless explicitly allowed, the 5xx series always results in
             # an exception.
             error_message = BadResponseException.BAD_STATUS_CODE_MESSAGE
-        elif (allowed_response_codes and not (
-                code in allowed_response_codes
-                or series in allowed_response_codes
-        )):
+        elif allowed_response_codes and not (
+            code in allowed_response_codes or series in allowed_response_codes
+        ):
             error_message = status_code_not_in_allowed
 
         if error_message:
@@ -315,7 +337,7 @@ class HTTP(object):
                 url,
                 error_message % code,
                 status_code=code,
-                debug_message="Response content: %s" % response.content
+                debug_message="Response content: %s" % response.content,
             )
         return response
 
@@ -336,12 +358,11 @@ class HTTP(object):
         """Make a POST request that returns a detailed problem
         detail document on error.
         """
-        kwargs['data'] = payload
+        kwargs["data"] = payload
         return cls.debuggable_request("POST", url, **kwargs)
 
     @classmethod
-    def debuggable_request(cls, http_method, url, make_request_with=None,
-                           **kwargs):
+    def debuggable_request(cls, http_method, url, make_request_with=None, **kwargs):
         """Make a request that returns a detailed problem detail document on
         error, rather than a generic "an integration error occured"
         message.
@@ -353,17 +374,22 @@ class HTTP(object):
         :param kwargs: Keyword arguments for the make_request_with
             function.
         """
-        logging.info("Making debuggable %s request to %s: kwargs %r",
-                     http_method, url, kwargs)
+        logging.info(
+            "Making debuggable %s request to %s: kwargs %r", http_method, url, kwargs
+        )
         make_request_with = make_request_with or requests.request
         return cls._request_with_timeout(
-            url, make_request_with, http_method,
+            url,
+            make_request_with,
+            http_method,
             process_response_with=cls.process_debuggable_response,
             **kwargs
         )
 
     @classmethod
-    def process_debuggable_response(cls, url, response, disallowed_response_codes=None, allowed_response_codes=None):
+    def process_debuggable_response(
+        cls, url, response, disallowed_response_codes=None, allowed_response_codes=None
+    ):
         """If there was a problem with an integration request,
         return an appropriate ProblemDetail. Otherwise, return the
         response to the original request.
@@ -371,7 +397,7 @@ class HTTP(object):
         :param response: A Response object from the requests library.
         """
 
-        allowed_response_codes = allowed_response_codes or ['2xx', '3xx']
+        allowed_response_codes = allowed_response_codes or ["2xx", "3xx"]
         allowed_response_codes = list(map(str, allowed_response_codes))
         code = response.status_code
         series = cls.series(code)
@@ -380,22 +406,22 @@ class HTTP(object):
             # we've been told to let this response code through.
             return response
 
-        content_type = response.headers.get('Content-Type')
+        content_type = response.headers.get("Content-Type")
         if content_type == PROBLEM_DETAIL_JSON_MEDIA_TYPE:
             # The server returned a problem detail document. Wrap it
             # in a new document that represents the integration
             # failure.
             problem = INTEGRATION_ERROR.detailed(
-                _('Remote service returned a problem detail document: %r') % (
-                    response.content
-                )
+                _("Remote service returned a problem detail document: %r")
+                % (response.content)
             )
             problem.debug_message = response.content
             return problem
         # There's been a problem. Return the message we got from the
         # server, verbatim.
         return INTEGRATION_ERROR.detailed(
-            _("%s response from integration server: %r") % (
+            _("%s response from integration server: %r")
+            % (
                 response.status_code,
                 response.content,
             )
