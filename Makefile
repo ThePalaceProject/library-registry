@@ -53,7 +53,7 @@ down:
 	docker-compose down
 
 test:
-	docker exec -it libreg_webapp pipenv run pytest tests
+	docker exec -it libreg_webapp pytest tests
 
 clean:
 	docker-compose down --volumes
@@ -71,7 +71,7 @@ up-active-watch:
 	docker-compose -f docker-compose-cicd.yml up
 
 test-active:
-	docker exec -it libreg_active_webapp pipenv run pytest tests
+	docker exec -it libreg_active_webapp pytest tests
 
 down-active:
 	docker-compose -f docker-compose-cicd.yml down

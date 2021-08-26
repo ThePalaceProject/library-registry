@@ -28,7 +28,8 @@ git clone https://github.com/thepalaceproject/library-registry-admin.git
 
 ## Key Environment Variables
 
-These environment variables are generally applicable, regardless of installation method, and are included here because they are not discussed elsewhere in this document.
+These environment variables are generally applicable, regardless of installation method, and are included here because 
+they are not discussed elsewhere in this document.
 
 - EMAILER_RECIPIENT_OVERRIDE: If set, `emailer` will send all non-test email to this email address.
 
@@ -36,7 +37,10 @@ These environment variables are generally applicable, regardless of installation
 
 If not using Docker, skip to section entitled ["Installation (non-Docker)"](#installation-non-docker)
 
-Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
+Because the Registry runs in a Docker container, the only required software is 
+[Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able 
+to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the 
+`docker-compose.yml` file to add alternate ports.
 
 _Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely 
 convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the 
@@ -45,12 +49,6 @@ corresponding task in the `Makefile` manually. You can run `make help` to see th
 While they won't need to be changed often, there are a couple of environment variables set in the `Dockerfile` that are 
 referenced within the container:
 - `LIBRARY_REGISTRY_DOCKER_HOME` is the app directory.
-- `LIBRARY_REGISTRY_DOCKER_VENV` is the app's virtual environment subdirectory
-  name. It is computed based on the value of `LIBRARY_REGISTRY_DOCKER_HOME`.
-  For more details, see:
-  - https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
-- `WORKON_HOME` is base directory for virtual environments.
-- The effective virtual environment directory for the app will be `$WORKON_HOME/$LIBRARY_REGISTRY_DOCKER_VENV`.
 
 ### Building the Images
 
@@ -163,29 +161,28 @@ set to the appropriate values for your environment.
 
 ### Installing Python Dependencies
 
-The project expects to use [`pipenv`](https://pypi.org/project/pipenv/) for dependency and virtualenv management, so 
-first install that:
+The project expects to use [`poetry`](https://python-poetry.org) for dependency and virtualenv management, so first 
+[install that](https://python-poetry.org/docs/#installation). 
 
-```shell
-pip install pipenv
+Having done so, you should be able to run the following in the project directory to install all dependencies.
+
+For a development environment:
+```
+poetry install --no-root -E pg-binary
 ```
 
-Having done so, you should be able to run the following in the project directory to install all dependencies:
-
+For a production environment:
 ```
-pipenv install --dev
+poetry install --no-dev --no-root -E pg
 ```
 
 ### Running the Registry
 
-To start the registry inside the virtualenv that `pipenv` creates:
+To start the registry inside the virtualenv that `poetry` creates:
 
 ```shell
-FLASK_APP=app.py pipenv run flask run
+FLASK_APP=app.py poetry run flask run
 ```
-
-Pipenv should read in the local `.env` file and supply those database connection strings to the application, which will 
-be run by the Flask development server.
 
 ## Continuous Integration
 

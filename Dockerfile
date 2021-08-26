@@ -33,9 +33,8 @@ EXPOSE 5432
 #
 #  * Installs Nginx from source, mirroring the process used in the official
 #    Nginx Docker images.
-#  * Via the system pip, installs:
-#      * pipenv
-#      * supervisor
+#  * Via the system pip, installs supervisor
+#  * Installs poetry
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
@@ -50,6 +49,9 @@ ENV NGINX_VERSION 1.19.8
 ENV NJS_VERSION   0.5.2
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
+ENV POETRY_VERSION 1.1.8
+ENV POETRY_URL "https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py"
+ENV POETRY_HOME "/etc/poetry"
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
@@ -91,40 +93,28 @@ RUN set -x \
     && mv /tmp/envsubst /usr/local/bin/ \
     && apk add --no-cache tzdata \
     && apk add --no-cache curl ca-certificates \
-    && pip install \
-           supervisor \
-           pipenv \
+    && curl -sSL ${POETRY_URL} | python - \
+    && ln -s ${POETRY_HOME}/bin/poetry /bin/poetry \
+    && pip install supervisor \
     && mkdir /etc/gunicorn \
     && chown nginx:nginx /etc/gunicorn \
     && mkdir /var/log/supervisord \
     && chown nginx:nginx /var/log/supervisord
     
 ##### Set up Gunicorn, Nginx, and Supervisor configurations #####
-
-# This causes pipenv not to spam the build output with extra lines when 
-# running `pipenv install`:
-#   https://github.com/pypa/pipenv/issues/4052#issuecomment-588480867
-ENV CI 1
-
-# Using `pipenv`, the virtual environment for the `Pipfile` at
-# `/apps/library-registry` will be `$WORKON_HOME/library-registry-Qj8ZFxES`.
 # `LIBRARY_REGISTRY_DOCKER_HOME` is the app's directory in the docker container.
-# `LIBRARY_REGISTRY_DOCKER_VENV` is the app's virtual environment name in the docker container.
-# For more details, see:
-# - https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
 ENV LIBRARY_REGISTRY_DOCKER_HOME=/apps/library-registry
-ENV LIBRARY_REGISTRY_DOCKER_VENV=library-registry-Qj8ZFxES
-
-# Setting WORKON_HOME causes pipenv to put its virtualenv in a pre-determined,
-# OS-independent location.
-ENV WORKON_HOME /venv
 
 WORKDIR $LIBRARY_REGISTRY_DOCKER_HOME
 
 # Copy over the dependency files individually. We copy over the entire local
 # directory later in the process, *after* the heavy RUN instructions, so that
 # the docker layer caching isn't impacted by extraneous changes in the repo.
-COPY ./Pipfile* ./
+COPY pyproject.toml ./
+COPY ./poetry.lock ./
+
+# Tell poetry not to use a virtualenv since we are in a container
+ENV POETRY_VIRTUALENVS_CREATE=false
 
 # Install the system dependencies and the Python dependencies. Note that if
 # you want to be able to install new Python dependencies on the fly from
@@ -145,15 +135,14 @@ RUN set -ex \
     libpq \
     jpeg-dev \
     libxcb-dev \
- && mkdir "${WORKON_HOME}" \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
- && pipenv install --dev --skip-lock --clear \
+ && poetry install --no-dev --no-root -E pg \
+ && poetry cache clear -n --all pypi \
  && apk del --no-network .build-deps
 
 COPY ./docker/gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/supervisord-alpine.ini /etc/supervisord.conf
-COPY ./docker/runinvenv /usr/local/bin/runinvenv
 COPY ./docker/docker-entrypoint.sh /docker-entrypoint.sh
 
 ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
@@ -171,6 +160,13 @@ FROM builder AS libreg_local
 
 ENV FLASK_ENV development
 ENV TESTING 1
+# Install development dependancies with poetry
+RUN set -ex \
+ && apk add --no-cache --virtual .build-deps build-base \
+ && poetry install --no-root \
+ && poetry cache clear -n --all pypi \
+ && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
+ && apk del --no-network .build-deps
 
 ##############################################################################
 
