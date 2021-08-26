@@ -5,30 +5,29 @@ import json
 import logging
 import os
 import re
-import requests
 import sys
 
+import requests
+
+from adobe_vendor_id import AdobeVendorIDClient
+from authentication_document import AuthenticationDocument
+from config import Configuration
+from emailer import Emailer, EmailTemplate
 from geometry_loader import GeometryLoader
 from model import (
+    ConfigurationSetting,
+    ExternalIntegration,
+    Library,
+    LibraryAlias,
+    Place,
+    ServiceArea,
     get_one,
     get_one_or_create,
     production_session,
-    Place,
-    Library,
-    LibraryAlias,
-    ServiceArea,
-    ConfigurationSetting,
-    ExternalIntegration,
-)
-from config import Configuration
-from adobe_vendor_id import AdobeVendorIDClient
-from authentication_document import AuthenticationDocument
-from emailer import (
-    Emailer,
-    EmailTemplate,
 )
 from registrar import LibraryRegistrar
 from util.problem_detail import ProblemDetail
+
 
 class Script(object):
 

@@ -1,22 +1,12 @@
-from collections import defaultdict
 import json
+from collections import defaultdict
 
 from flask_babel import lazy_gettext as _
-from sqlalchemy.orm.exc import (
-    MultipleResultsFound,
-    NoResultFound,
-)
-
-from model import (
-    get_one_or_create,
-    Audience,
-    CollectionSummary,
-    Place,
-    ServiceArea,
-)
-
-from problem_details import INVALID_INTEGRATION_DOCUMENT
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.session import Session
+
+from model import Audience, CollectionSummary, Place, ServiceArea, get_one_or_create
+from problem_details import INVALID_INTEGRATION_DOCUMENT
 
 
 class AuthenticationDocument(object):

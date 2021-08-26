@@ -1,12 +1,11 @@
 """Utilities for Flask applications."""
-import re
 import ipaddress
+import re
 
-from flask import request, Response
+from flask import Response, request
 
 from . import problem_detail
 from .language import languages_from_accept
-
 
 IPV4_REGEX = re.compile(r"""(?<![0-9])                # Preceding character if any may not be numeric
                             (?P<address>              # entire address, capturing

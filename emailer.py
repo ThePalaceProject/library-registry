@@ -1,9 +1,9 @@
+import logging
 import os
 from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import logging
 from smtplib import SMTP
 
 from config import CannotLoadConfiguration, CannotSendEmail

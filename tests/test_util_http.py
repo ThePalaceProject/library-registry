@@ -1,8 +1,9 @@
-import requests
 import json
 
 import pytest
+import requests
 
+from testing import MockRequestsResponse
 from util.http import (
     HTTP,
     BadResponseException,
@@ -10,7 +11,6 @@ from util.http import (
     RequestNetworkException,
     RequestTimedOut,
 )
-from testing import MockRequestsResponse
 
 
 class TestHTTP(object):

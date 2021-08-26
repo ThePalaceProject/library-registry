@@ -4,7 +4,6 @@ import multiprocessing
 import os
 from pathlib import Path
 
-
 # The `LIBRARY_REGISTRY_DOCKER_HOME` environment variables is set in the
 # `Dockerfile`. It contains the value of the app directory.
 APP_HOME = os.environ.get("LIBRARY_REGISTRY_DOCKER_HOME")

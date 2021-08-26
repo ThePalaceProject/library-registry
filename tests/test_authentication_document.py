@@ -1,20 +1,15 @@
-from collections import defaultdict
 import json
+from collections import defaultdict
 
-from sqlalchemy.orm.exc import (
-    MultipleResultsFound,
-    NoResultFound,
-)
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+
 from authentication_document import AuthenticationDocument
-from . import DatabaseTest
-from model import (
-    Audience,
-    Place,
-    ServiceArea,
-)
-from util.problem_detail import ProblemDetail
+from model import Audience, Place, ServiceArea
 from problem_details import INVALID_INTEGRATION_DOCUMENT
 from testing import MockPlace
+from util.problem_detail import ProblemDetail
+
+from . import DatabaseTest
 
 # Alias for a long class name
 AuthDoc = AuthenticationDocument

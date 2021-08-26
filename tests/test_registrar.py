@@ -4,10 +4,7 @@ from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
 from problem_details import *
 from registrar import LibraryRegistrar
-from testing import (
-    DatabaseTest,
-    DummyHTTPResponse,
-)
+from testing import DatabaseTest, DummyHTTPResponse
 from util.problem_detail import ProblemDetail
 
 

@@ -1,21 +1,17 @@
-from datetime import datetime
 import logging
 import os
+from datetime import datetime
+from io import BytesIO
 
 from geoalchemy2 import Geometry
 from sqlalchemy import func
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import cast
-from sqlalchemy.orm.exc import (
-    NoResultFound,
-    MultipleResultsFound,
-)
-from io import BytesIO
 
 from config import Configuration
 from log import LogConfiguration
 from model import (
-    get_one_or_create,
     Admin,
     Audience,
     Base,
@@ -27,6 +23,7 @@ from model import (
     PlaceAlias,
     ServiceArea,
     SessionManager,
+    get_one_or_create,
 )
 from util import GeometryUtility
 from util.http import BadResponseException

@@ -3,11 +3,8 @@ import logging
 
 import pytest
 
+from model import DelegatedPatronIdentifier, ShortClientTokenDecoder
 from util.short_client_token import ShortClientTokenEncoder
-from model import (
-    DelegatedPatronIdentifier,
-    ShortClientTokenDecoder,
-)
 
 from . import DatabaseTest
 

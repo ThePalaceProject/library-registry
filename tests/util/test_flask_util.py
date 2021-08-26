@@ -1,8 +1,7 @@
-from flask import Flask
 import pytest
+from flask import Flask
 
 from util.flask_util import originating_ip
-
 
 app = Flask(__name__)
 

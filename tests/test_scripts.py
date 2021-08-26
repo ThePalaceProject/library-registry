@@ -1,6 +1,7 @@
 import json
-import pytest
 from io import StringIO
+
+import pytest
 
 from config import Configuration
 from emailer import Emailer
@@ -30,9 +31,8 @@ from scripts import (
     ShowIntegrationsScript,
 )
 from testing import MockPlace
-from . import (
-    DatabaseTest
-)
+
+from . import DatabaseTest
 
 
 class TestLibraryScript(DatabaseTest):

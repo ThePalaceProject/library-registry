@@ -2,17 +2,11 @@ import logging
 
 import pytest
 
+from log import JSONFormatter, LogConfiguration, LogglyHandler, StringFormatter
+from model import ExternalIntegration
+
 from . import DatabaseTest
-from log import (
-    StringFormatter,
-    JSONFormatter,
-    LogglyHandler,
-    LogConfiguration,
-)
-from model import (
-    ExternalIntegration,
-)
-    
+
 
 class TestLogConfiguration(DatabaseTest):
 

@@ -1,25 +1,21 @@
 import base64
 import datetime
-import os
 import json
+import os
 import random
 from contextlib import contextmanager
 from smtplib import SMTPException
 from urllib.parse import unquote
 
-import pytest
 import flask
+import pytest
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.PublicKey import RSA
 from flask import Response, session
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-
-from . import DatabaseTest
-from testing import DummyHTTPClient
-from util import GeometryUtility
-from util.problem_detail import ProblemDetail
 
 from authentication_document import AuthenticationDocument
+from config import Configuration
 from controller import (
     AdobeVendorIDController,
     BaseController,
@@ -30,11 +26,7 @@ from controller import (
     ValidationController,
 )
 from emailer import Emailer, EmailTemplate
-from opds import OPDSCatalog
 from model import (
-    create,
-    get_one,
-    get_one_or_create,
     ConfigurationSetting,
     DelegatedPatronIdentifier,
     ExternalIntegration,
@@ -43,8 +35,11 @@ from model import (
     Place,
     ServiceArea,
     Validation,
+    create,
+    get_one,
+    get_one_or_create,
 )
-from util.http import RequestTimedOut
+from opds import OPDSCatalog
 from problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
@@ -56,7 +51,12 @@ from problem_details import (
     TIMEOUT,
     UNABLE_TO_NOTIFY,
 )
-from config import Configuration
+from testing import DummyHTTPClient
+from util import GeometryUtility
+from util.http import RequestTimedOut
+from util.problem_detail import ProblemDetail
+
+from . import DatabaseTest
 
 
 class MockLibraryRegistry(LibraryRegistry):

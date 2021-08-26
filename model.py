@@ -1,22 +1,18 @@
-from collections import defaultdict
-from config import Configuration
-from flask_babel import lazy_gettext as _
-from flask_bcrypt import (
-    check_password_hash,
-    generate_password_hash
-)
 import datetime
-import logging
-
-import os
-import re
 import json
+import logging
+import os
 import random
+import re
 import string
-import uszipcode
 import uuid
 import warnings
-from collections import Counter
+from collections import Counter, defaultdict
+
+import uszipcode
+from flask_babel import lazy_gettext as _
+from flask_bcrypt import check_password_hash, generate_password_hash
+from geoalchemy2 import Geography, Geometry
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
     Binary,
@@ -30,57 +26,36 @@ from sqlalchemy import (
     String,
     Table,
     Unicode,
-)
-from sqlalchemy import (
-    create_engine,
-    exc as sa_exc,
-    func,
-    or_,
     UniqueConstraint,
+    create_engine,
 )
-from sqlalchemy.exc import (
-    IntegrityError
-)
-from sqlalchemy.ext.declarative import (
-    declarative_base
-)
-from sqlalchemy.ext.hybrid import (
-    hybrid_property,
-)
-from sqlalchemy.orm import (
-    aliased,
-    backref,
-    relationship,
-    sessionmaker,
-    validates,
-)
-from sqlalchemy.orm.exc import (
-    NoResultFound,
-    MultipleResultsFound,
-)
+from sqlalchemy import exc as sa_exc
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import aliased, backref, relationship, sessionmaker, validates
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql.expression import (
-    cast,
-    literal_column,
-    or_,
     and_,
     case,
-    select,
+    cast,
     join,
+    literal_column,
+    or_,
     outerjoin,
+    select,
 )
-from sqlalchemy.ext.hybrid import hybrid_property
 
-from geoalchemy2 import Geography, Geometry
-
+from config import Configuration
 from emailer import Emailer
+from util import GeometryUtility
 from util.language import LanguageCodes
-from util import (
-    GeometryUtility,
-)
 from util.short_client_token import ShortClientTokenTool
 from util.string_helpers import random_string
+
 
 def production_session():
     url = Configuration.database_url()

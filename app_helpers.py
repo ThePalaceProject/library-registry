@@ -1,11 +1,13 @@
-import flask
 import gzip
-from io import BytesIO
 from functools import wraps
+from io import BytesIO
+
+import flask
 
 from util import GeometryUtility
-from util.problem_detail import ProblemDetail
 from util.flask_util import originating_ip
+from util.problem_detail import ProblemDetail
+
 
 def has_library_factory(app):
     """Create a decorator that extracts a library uuid from request arguments.

@@ -1,19 +1,12 @@
 from io import StringIO
 
-from sqlalchemy import func
 from geoalchemy2 import Geography
-from model import (
-    get_one,
-    get_one_or_create,
-    Place,
-    PlaceAlias,
-)
-
-from . import (
-    DatabaseTest,
-)
+from sqlalchemy import func
 
 from geometry_loader import GeometryLoader
+from model import Place, PlaceAlias, get_one, get_one_or_create
+
+from . import DatabaseTest
 
 
 class TestGeometryLoader(DatabaseTest):

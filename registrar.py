@@ -1,26 +1,18 @@
 import base64
-import feedparser
-from flask_babel import lazy_gettext as _
 import json
 import logging
-
-from PIL import Image
 from io import BytesIO
 from urllib.parse import urljoin
 
+import feedparser
+from flask_babel import lazy_gettext as _
+from PIL import Image
+
 from authentication_document import AuthenticationDocument
+from model import Hyperlink, Library, get_one, get_one_or_create
 from opds import OPDSCatalog
-from model import (
-    get_one,
-    get_one_or_create,
-    Hyperlink,
-    Library,
-)
 from problem_details import *
-from util.http import (
-    HTTP,
-    RequestTimedOut,
-)
+from util.http import HTTP, RequestTimedOut
 from util.problem_detail import ProblemDetail
 
 

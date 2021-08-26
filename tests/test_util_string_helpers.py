@@ -5,11 +5,7 @@ import re
 
 import pytest
 
-from util.string_helpers import (
-    UnicodeAwareBase64,
-    base64,
-    random_string
-)
+from util.string_helpers import UnicodeAwareBase64, base64, random_string
 
 
 class TestUnicodeAwareBase64(object):

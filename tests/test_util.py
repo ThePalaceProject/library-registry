@@ -1,5 +1,6 @@
 from util import GeometryUtility
 
+
 class TestGeometryUtility(object):
 
     def test_point(self):

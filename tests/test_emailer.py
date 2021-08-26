@@ -1,19 +1,16 @@
 import os
-
-from email.mime.text import MIMEText
 import quopri
+import smtplib
+from email.mime.text import MIMEText
 from typing import Optional
 from unittest import mock
 
 import pytest
-import smtplib
+
+from config import CannotLoadConfiguration, CannotSendEmail
+from emailer import Emailer, EmailTemplate
 
 from . import DatabaseTest
-from config import CannotLoadConfiguration, CannotSendEmail
-from emailer import (
-    Emailer,
-    EmailTemplate,
-)
 
 
 class TestEmailTemplate(object):

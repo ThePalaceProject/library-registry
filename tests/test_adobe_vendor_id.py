@@ -2,20 +2,16 @@ import json
 
 import adobe_xml_templates as t
 from adobe_vendor_id import (
-    AdobeSignInRequestParser,
     AdobeAccountInfoRequestParser,
+    AdobeSignInRequestParser,
     AdobeVendorIDClient,
-    AdobeVendorIDRequestHandler,
     AdobeVendorIDModel,
+    AdobeVendorIDRequestHandler,
     VendorIDAuthenticationError,
     VendorIDServerException,
 )
 from config import Configuration
-from model import (
-    DelegatedPatronIdentifier,
-    ExternalIntegration,
-    create,
-)
+from model import DelegatedPatronIdentifier, ExternalIntegration, create
 from util.short_client_token import ShortClientTokenEncoder
 from util.string_helpers import base64
 

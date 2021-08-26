@@ -1,5 +1,6 @@
-from lxml import etree
 from io import StringIO
+
+from lxml import etree
 
 
 class XMLParser:

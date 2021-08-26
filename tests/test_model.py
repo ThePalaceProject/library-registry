@@ -1,6 +1,3 @@
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm.exc import MultipleResultsFound
 import base64
 import datetime
 import json
@@ -8,13 +5,13 @@ import operator
 import random
 
 import pytest
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import MultipleResultsFound
 
 from config import Configuration
 from emailer import Emailer
 from model import (
-    create,
-    get_one,
-    get_one_or_create,
     Admin,
     Audience,
     CollectionSummary,
@@ -28,14 +25,13 @@ from model import (
     Place,
     PlaceAlias,
     Validation,
+    create,
+    get_one,
+    get_one_or_create,
 )
-from util import (
-    GeometryUtility
-)
+from util import GeometryUtility
 
-from . import (
-    DatabaseTest,
-)
+from . import DatabaseTest
 
 
 class TestPlace(DatabaseTest):

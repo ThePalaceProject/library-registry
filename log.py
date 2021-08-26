@@ -1,11 +1,13 @@
 import datetime
-import logging
 import json
+import logging
 import os
 import socket
-from config import Configuration
 from io import StringIO
+
 from loggly.handlers import HTTPSHandler as LogglyHandler
+
+from config import Configuration
 
 
 class JSONFormatter(logging.Formatter):

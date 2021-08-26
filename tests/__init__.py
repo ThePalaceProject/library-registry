@@ -1,6 +1,5 @@
-import sys
 import os
-
+import sys
 
 # Add the parent directory to the path so that import statements will work
 # the same in tests as in code.
@@ -15,9 +14,6 @@ sys.path.insert(0, parent)
 #from pdb import set_trace
 #set_trace()
 
-from testing import (
-    DatabaseTest,
-    package_setup
-)
+from testing import DatabaseTest, package_setup
 
 package_setup()

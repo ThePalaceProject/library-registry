@@ -1,6 +1,7 @@
 # encoding: utf-8
 from collections import defaultdict
 
+
 class LanguageCodes(object):
     """Convert between ISO-639-2 and ISO-693-1 language codes.
 

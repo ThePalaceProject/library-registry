@@ -1,21 +1,19 @@
 import datetime
 import json
 
-from . import (
-    DatabaseTest,
-)
-
 from authentication_document import AuthenticationDocument
 from config import Configuration
 from model import (
-    create,
     ConfigurationSetting,
     Hyperlink,
     Library,
     LibraryType,
     Validation,
+    create,
 )
 from opds import OPDSCatalog
+
+from . import DatabaseTest
 
 
 class TestOPDSCatalog(DatabaseTest):
