@@ -3,21 +3,23 @@
 A discovery service for matching people to the libraries that serve them.
 
 [![Test Library Registry & Build Docker Image](https://github.com/ThePalaceProject/library-registry/actions/workflows/test-build.yml/badge.svg)](https://github.com/ThePalaceProject/library-registry/actions/workflows/test-build.yml)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+![Python: 3.6,3.7,3.8,3.9](https://img.shields.io/badge/Python-3.6%20%7C%203.7%20%7C%203.8%20%7C%203.9-blue)
 
-This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL [Library Simplified](http://www.librarysimplified.org/) Library Registry.
+This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL 
+[Library Simplified](http://www.librarysimplified.org/) Library Registry.
 
 Docker images ar available at:
 - https://github.com/orgs/ThePalaceProject/packages?repo_name=library-registry
 
 ## Cloning the Library Registry Repositories
 
-You will need both this repository and the separate front end repo, in 
-order to build the local development images. The registry front end repo
-should be checked out into a directory named `registry_admin` in the same
-parent directory as the `library-registry` repo itself. If it is not, you
-will need to change the host mount instructions in the `docker-compose.yml`
-file to accommodate its location. To get them both in the same directory, 
-execute the following from that directory:
+You will need both this repository and the separate front end repo, in order to build the local development images. The 
+registry front end repo should be checked out into a directory named `registry_admin` in the same parent directory as 
+the `library-registry` repo itself. If it is not, you will need to change the host mount instructions in the 
+`docker-compose.yml` file to accommodate its location. To get them both in the same directory, execute the following 
+from that directory:
 
 ```shell
 git clone https://github.com/thepalaceproject/library-registry.git
@@ -36,10 +38,12 @@ If not using Docker, skip to section entitled ["Installation (non-Docker)"](#ins
 
 Because the Registry runs in a Docker container, the only required software is [Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the `docker-compose.yml` file to add alternate ports.
 
-_Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the corresponding task in the `Makefile` manually. You can run `make help` to see the full list of commands._
+_Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely 
+convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the 
+corresponding task in the `Makefile` manually. You can run `make help` to see the full list of commands._
 
-While they won't need to be changed often, there are a couple of environment
-variables set in the `Dockerfile` that are referenced within the container:
+While they won't need to be changed often, there are a couple of environment variables set in the `Dockerfile` that are 
+referenced within the container:
 - `LIBRARY_REGISTRY_DOCKER_HOME` is the app directory.
 - `LIBRARY_REGISTRY_DOCKER_VENV` is the app's virtual environment subdirectory
   name. It is computed based on the value of `LIBRARY_REGISTRY_DOCKER_HOME`.
@@ -50,7 +54,8 @@ variables set in the `Dockerfile` that are referenced within the container:
 
 ### Building the Images
 
-Local development uses two Docker images and one persistent Docker volume (for the PostgreSQL data directory). To create the base images:
+Local development uses two Docker images and one persistent Docker volume (for the PostgreSQL data directory). To create
+the base images:
 
 ```shell
 cd library-registry
@@ -89,9 +94,10 @@ While the cluster is running, you can access the containers with these commands:
 
 ### Viewing the Web Interface
 
-The Library Registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a browser at `http://localhost/admin/` and access it with the username/password `admin/admin`.
+The Library Registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a 
+browser at `http://localhost/admin/` and access it with the username/password `admin/admin`.
 
-The [Library Registry Admin](git clone https://github.com/thepalaceproject/library-registry-admin.git)
+The [Library Registry Admin](https://github.com/thepalaceproject/library-registry-admin.git)
 front end is implemented as a Node package. The name and version of this package are configured in
 `admin/config.py`. In addition, either or both may be overridden via environment variables. For example:
 ```shell
@@ -157,7 +163,8 @@ set to the appropriate values for your environment.
 
 ### Installing Python Dependencies
 
-The project expects to use [`pipenv`](https://pypi.org/project/pipenv/) for dependency and virtualenv management, so first install that:
+The project expects to use [`pipenv`](https://pypi.org/project/pipenv/) for dependency and virtualenv management, so 
+first install that:
 
 ```shell
 pip install pipenv
@@ -177,4 +184,112 @@ To start the registry inside the virtualenv that `pipenv` creates:
 FLASK_APP=app.py pipenv run flask run
 ```
 
-Pipenv should read in the local `.env` file and supply those database connection strings to the application, which will be run by the Flask development server.
+Pipenv should read in the local `.env` file and supply those database connection strings to the application, which will 
+be run by the Flask development server.
+
+## Continuous Integration
+
+This project runs all the unit tests through Github Actions for new pull requests and when merging into the default 
+`main` branch. The relevant file can be found in `.github/workflows/test-build.yml`. When contributing updates or fixes,
+it's required for the test Github Action to pass for all python environments. Run the `tox` command locally before 
+pushing changes to make sure you find any failing tests before committing them.
+
+### Linting
+
+We lint our code with [black](https://github.com/psf/black) and [isort](https://pycqa.github.io/isort/). These are 
+automatically run by both `tox` and Github Actions and the linters must pass before code is committed. 
+
+#### isort
+
+You can run `isort` through `tox` with the command:
+```
+tox -e isort
+``` 
+This will lint the code with `isort`, but not make any changes. 
+
+If you want `isort` to automatically reformat your code, you can run
+```
+tox -e isort-reformat
+```
+
+#### black
+
+Similar to `isort`, you can run `black` through `tox` with the command 
+```
+tox -e black
+``` 
+This will lint the code with `black`, but not make any changes. 
+
+If you want `black` to automatically reformat your code, you can run 
+```
+tox -e black-reformat
+```
+
+### Testing
+
+Github Actions runs our unit tests against different Python versions automatically using
+[tox](https://tox.readthedocs.io/en/latest/).
+
+To run `pytest` unit tests locally, install `tox`.
+
+```sh
+pip install tox
+```
+
+Tox has an environment for each python version and an optional `-docker` factor that will automatically use docker to
+deploy service container used for the tests. You can select the environment you would like to test with the tox `-e`
+flag.
+
+#### Environments
+
+| Environment | Python Version |
+| ----------- | -------------- |
+| py36        | Python 3.6     |
+| py37        | Python 3.7     |
+| py38        | Python 3.8     |
+
+All of these environments are tested by default when running tox. To test one specific environment you can use the `-e`
+flag.
+
+Test Python 3.8
+```
+tox -e py38
+```
+
+You need to have the Python versions you are testing against installed on your local system. `tox` searches the system 
+for installed Python versions, but does not install new Python versions. If `tox` doesn't find the Python version its 
+looking for it will give an `InterpreterNotFound` errror.
+
+[Pyenv](https://github.com/pyenv/pyenv) is a useful tool to install multiple Python versions, if you need to install 
+missing Python versions in your system for local testing.
+
+#### Docker
+
+If you install `tox-docker` tox will take care of setting up all the service containers necessary to run the unit tests
+and pass the correct environment variables to configure the tests to use these services. Using `tox-docker` is not 
+required, but it is the recommended way to run the tests locally, since it runs the tests in the same way they are run 
+on Github Actions.
+
+```
+pip install tox-docker
+```
+
+The docker functionality is included in a `docker` factor that can be added to the environment. To run an environment
+with a particular factor you add it to the end of the environment.
+
+Test with Python 3.8 using docker containers for the services.
+```
+tox -e py38-docker
+```
+
+#### Override `pytest` arguments
+
+If you wish to pass additional arguments to `pytest` you can do so through `tox`. The default argument passed to `pytest`
+is `tests`, however you can override this. Every argument passed after a `--` to the `tox` command line will the passed
+to `pytest`, overriding the default.
+
+Only run the `test_app.py` tests with Python 3.6 using docker.
+
+```sh
+tox -e py36-docker -- tests/test_app.py
+```
