@@ -688,8 +688,9 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.search_details()
         libraries = response.get("libraries")
         assert len(libraries) == 2
-        self._is_library(kansas, libraries[0])
-        self._is_library(connecticut, libraries[1])
+        libraries.sort(key=lambda library: library["basic_info"]["name"])
+        self._is_library(connecticut, libraries[0])
+        self._is_library(kansas, libraries[1])
 
         # Searching for a word or phrase found within a library's description returns a dict whose value is a list containing
         # that library.
