@@ -1,6 +1,5 @@
 import contextlib
 import copy
-import json
 import logging
 import os
 from pathlib import Path
@@ -115,7 +114,7 @@ class Configuration(object):
         delegates = []
         try:
             delegates = setting.json_value or []
-        except ValueError as e:
+        except ValueError:
             cls.log.warn("Invalid Adobe Vendor ID delegates configured.")
 
         node = integration.setting(cls.ADOBE_VENDOR_ID_NODE_VALUE).value

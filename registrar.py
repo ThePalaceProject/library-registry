@@ -9,9 +9,16 @@ from flask_babel import lazy_gettext as _
 from PIL import Image
 
 from authentication_document import AuthenticationDocument
-from model import Hyperlink, Library, get_one, get_one_or_create
+from model import Hyperlink
 from opds import OPDSCatalog
-from problem_details import *
+from problem_details import (
+    ERROR_RETRIEVING_DOCUMENT,
+    INTEGRATION_DOCUMENT_NOT_FOUND,
+    INVALID_CONTACT_URI,
+    INVALID_INTEGRATION_DOCUMENT,
+    LIBRARY_ALREADY_IN_PRODUCTION,
+    TIMEOUT,
+)
 from util.http import HTTP, RequestTimedOut
 from util.problem_detail import ProblemDetail
 
@@ -176,7 +183,7 @@ class LibraryRegistrar(object):
 
         try:
             library.library_stage = library_stage
-        except ValueError as e:
+        except ValueError:
             return LIBRARY_ALREADY_IN_PRODUCTION
         library.name = auth_document.title
         if auth_document.website:
@@ -196,7 +203,7 @@ class LibraryRegistrar(object):
             logo_response = self.do_get(url, stream=True)
             try:
                 image = Image.open(logo_response.raw)
-            except Exception as e:
+            except Exception:
                 image_url = auth_document.logo_link.get("href")
                 self.log.error(
                     "Registration of %s failed: could not read logo image %s",
@@ -248,7 +255,7 @@ class LibraryRegistrar(object):
             if not allow_401 and response.status_code == 401:
                 self.log.error(
                     "Registration of %s failed: %s is behind authentication gateway",
-                    auth_url,
+                    registration_url,
                     url,
                 )
                 return ERROR_RETRIEVING_DOCUMENT.detailed(
@@ -315,7 +322,7 @@ class LibraryRegistrar(object):
             links = cls.opds_response_links(
                 opds_response, AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
             )
-        except ValueError as e:
+        except ValueError:
             # The response itself is malformed.
             return False
         return auth_url in links

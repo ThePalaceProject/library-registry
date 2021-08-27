@@ -2,7 +2,7 @@ import json
 
 from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
-from problem_details import *
+from problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
 from registrar import LibraryRegistrar
 from testing import DatabaseTest, DummyHTTPResponse
 from util.problem_detail import ProblemDetail

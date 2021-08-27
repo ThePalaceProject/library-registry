@@ -8,7 +8,6 @@ from smtplib import SMTPException
 from urllib.parse import unquote
 
 import flask
-import pytest
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from flask import Response, session
@@ -217,14 +216,14 @@ class TestLibraryRegistryController(ControllerTest):
         object.
         """
         # Create some places and libraries.
-        nypl = self.nypl
-        ct_state = self.connecticut_state_library
-        ks_state = self.kansas_state_library
+        nypl = self.nypl  # noqa: F841
+        ct_state = self.connecticut_state_library  # noqa: F841
+        ks_state = self.kansas_state_library  # noqa: F841
 
-        nyc = self.new_york_city
-        boston = self.boston_ma
-        manhattan_ks = self.manhattan_ks
-        us = self.crude_us
+        nyc = self.new_york_city  # noqa: F841
+        boston = self.boston_ma  # noqa: F841
+        manhattan_ks = self.manhattan_ks  # noqa: F841
+        us = self.crude_us  # noqa: F841
 
         self.vendor_id_setup()
 
@@ -348,7 +347,7 @@ class TestLibraryRegistryController(ControllerTest):
 
         everywhere = self._place(type=Place.EVERYWHERE)
         ia = self._library("InternetArchive", "IA", [everywhere], has_email=True)
-        in_testing = self._library(
+        self._library(
             name="Testing",
             short_name="test_lib",
             library_stage=Library.TESTING_STAGE,
@@ -400,7 +399,7 @@ class TestLibraryRegistryController(ControllerTest):
         self._is_library(in_testing, libraries[3], False)
 
     def test_libraries_opds_qa(self):
-        library = self._library(
+        self._library(
             name="Test Cancelled Library",
             short_name="test_cancelled_lib",
             library_stage=Library.CANCELLED_STAGE,
@@ -463,7 +462,7 @@ class TestLibraryRegistryController(ControllerTest):
             ]
 
     def test_libraries_opds(self):
-        library = self._library(
+        self._library(
             name="Test Cancelled Library",
             short_name="test_cancelled_lib",
             library_stage=Library.CANCELLED_STAGE,
@@ -618,7 +617,6 @@ class TestLibraryRegistryController(ControllerTest):
             response = self.controller.edit_registration()
             assert response._status_code == 200
             assert response.response[0].decode("utf8") == nypl.internal_urn
-            edited_nypl = get_one(self._db, Library, internal_urn=nypl.internal_urn)
 
     def test_validate_email(self):
 
@@ -775,7 +773,7 @@ class TestLibraryRegistryController(ControllerTest):
             assert session["username"] == "Admin"
 
     def test_log_in_with_error(self):
-        admin = self._admin()
+        self._admin()
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
                 [
@@ -1026,11 +1024,11 @@ class TestLibraryRegistryController(ControllerTest):
         # As we saw in the previous test, this search picks up two
         # libraries when we run it looking for production libraries. If
         # all of the libraries are cancelled, we don't find anything.
-        for l in self._db.query(Library):
-            assert l.registry_stage == Library.PRODUCTION_STAGE
+        for library in self._db.query(Library):
+            assert library.registry_stage == Library.PRODUCTION_STAGE
 
-        for l in self._db.query(Library):
-            l.registry_stage = Library.CANCELLED_STAGE
+        for library in self._db.query(Library):
+            library.registry_stage = Library.CANCELLED_STAGE
         with self.app.test_request_context("/?q=manhattan"):
             response = self.controller.search(self.manhattan, live=True)
             catalog = json.loads(response.data)
@@ -1572,7 +1570,6 @@ class TestLibraryRegistryController(ControllerTest):
         )
         self.queue_opds_success()
 
-        auth_url = "http://circmanager.org/authentication.opds"
         # Send a registration request to the registry.
         with self.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict(
@@ -2026,7 +2023,7 @@ class TestValidationController(ControllerTest):
         secret2 = needs_validation_2.validation.secret
 
         link3, ignore = library.set_hyperlink("rel2", "mailto:3@library.org")
-        not_started = link3.resource
+        not_started = link3.resource  # noqa: F841
 
         # Simple tests for missing fields or failed lookups.
         assert_response(needs_validation.id, "", 404, "No confirmation code provided")

@@ -1,12 +1,8 @@
 import argparse
-import base64
 import json
 import logging
 import os
-import re
 import sys
-
-import requests
 
 from adobe_vendor_id import AdobeVendorIDClient
 from authentication_document import AuthenticationDocument
@@ -278,11 +274,11 @@ class SetCoverageAreaScript(LibraryScript):
         # string will be interpreted as a single place name.
         try:
             service_area = json.loads(service_area)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             pass
         try:
             focus_area = json.loads(focus_area)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             pass
 
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
@@ -366,7 +362,7 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         client = AdobeVendorIDClient(base_url)
 
         print("1. Checking status: %s" % client.status_url)
-        response = client.status()
+        client.status()
         # status() will raise an exception if anything is wrong.
         print("OK Service is up and running.")
 
@@ -400,7 +396,7 @@ class ConfigurationSettingScript(Script):
     @classmethod
     def _parse_setting(self, setting):
         """Parse a command-line setting option into a key-value pair."""
-        if not "=" in setting:
+        if "=" not in setting:
             raise ValueError(
                 'Incorrect format for setting: "%s". Should be "key=value"' % setting
             )
@@ -626,8 +622,9 @@ class ConfigureVendorIDScript(Script):
         c = Configuration
 
         # All node values are string representations of hexidecimal
-        # numbers.
-        hex_node = int(parsed.node_value, 16)
+        # numbers. We parse it here as a basic sanity check. If there
+        # is any issue we will get an exception.
+        int(parsed.node_value, 16)
 
         integration.setting(c.ADOBE_VENDOR_ID).value = parsed.vendor_id
         integration.setting(c.ADOBE_VENDOR_ID_NODE_VALUE).value = parsed.node_value

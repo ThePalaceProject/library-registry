@@ -1,5 +1,4 @@
 """Implement logic common to more than one of the Simplified applications."""
-import json
 import logging
 import sys
 import traceback
@@ -10,11 +9,8 @@ from flask import make_response
 from flask_babel import lazy_gettext as _
 from lxml import etree
 from psycopg2 import DatabaseError
-from sqlalchemy.orm.exc import NoResultFound
-from sqlalchemy.orm.session import Session
 
 from opds import OPDSCatalog
-from util.flask_util import problem
 from util.problem_detail import ProblemDetail
 
 

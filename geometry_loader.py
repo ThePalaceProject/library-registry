@@ -1,9 +1,5 @@
 import json
 
-from geoalchemy2 import Geometry
-from sqlalchemy import func
-from sqlalchemy.sql.expression import cast
-
 from model import Place, PlaceAlias, get_one_or_create
 from util import GeometryUtility
 

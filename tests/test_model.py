@@ -1,7 +1,5 @@
-import base64
 import datetime
 import json
-import operator
 import random
 
 import pytest
@@ -26,7 +24,6 @@ from model import (
     PlaceAlias,
     Validation,
     create,
-    get_one,
     get_one_or_create,
 )
 from util import GeometryUtility
@@ -261,7 +258,6 @@ class TestPlace(DatabaseTest):
         new_york = self.new_york_state
         connecticut = self.connecticut_state
         manhattan_ks = self.manhattan_ks
-        kansas = manhattan_ks.parent
         kings_county = self.crude_kings_county
         zip_12601 = self.zip_12601
 
@@ -453,11 +449,9 @@ class TestLibrary(DatabaseTest):
         lib = self._library("A Library")
         lib.short_name = "abcd"
         assert lib.short_name == "ABCD"
-        try:
+        with pytest.raises(ValueError) as e:
             lib.short_name = "ab|cd"
-            raise Error("Expected exception not raised.")
-        except ValueError as e:
-            assert str(e) == "Short name cannot contain the pipe character."
+        assert "Short name cannot contain the pipe character." in str(e)
 
     def test_for_short_name(self):
         assert Library.for_short_name(self._db, "ABCD") is None
@@ -480,6 +474,7 @@ class TestLibrary(DatabaseTest):
 
         # Reset the random seed so the same name will be generated again.
         random.seed(42)
+
         # Create a duplicate_check implementation that claims QAHFTR
         # has already been used.
         def already_used(name):
@@ -707,7 +702,6 @@ class TestLibrary(DatabaseTest):
         postal = self.zip_10018
         city = self.new_york_city
         state = self.new_york_state
-        county = self.crude_kings_county
         nation = self._place("CA", "Canada", Place.NATION, "CA", None)
         province = self._place("MB", "Manitoba", Place.STATE, "MB", nation)
         everywhere = Place.everywhere(self._db)
@@ -979,7 +973,7 @@ class TestLibrary(DatabaseTest):
             eligibility_areas=[self.new_york_state],
         )
         # This library has no service areas.
-        no_service_area = self._library("Nowhere Library")
+        self._library("Nowhere Library")
 
         self._db.flush()
 
@@ -1070,22 +1064,37 @@ class TestLibrary(DatabaseTest):
         # In Manhattan.
         libraries = Library.relevant(self._db, (40.75, -73.98), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Brooklyn.
         libraries = Library.relevant(self._db, (40.65, -73.94), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [bpl, nypl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            bpl,
+            nypl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Queens.
         libraries = Library.relevant(self._db, (40.76, -73.91), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Albany.
         libraries = Library.relevant(self._db, (42.66, -73.77), "eng").most_common()
         assert len(libraries) == 5
-        assert [l[0] for l in libraries] == [
+        assert [library[0] for library in libraries] == [
             albany,
             nypl,
             bpl,
@@ -1096,37 +1105,54 @@ class TestLibrary(DatabaseTest):
         # In Syracuse (200km west of Albany).
         libraries = Library.relevant(self._db, (43.06, -76.15), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In New Jersey.
         libraries = Library.relevant(self._db, (40.79, -74.43), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Las Cruces, NM. Internet Archive is first at the moment
         # due to its large collection, but maybe it would be better if UNM was.
         libraries = Library.relevant(self._db, (32.32, -106.77), "eng").most_common()
         assert len(libraries) == 2
-        assert set([l[0] for l in libraries]) == set([unm, internet_archive])
+        assert set([library[0] for library in libraries]) == set(
+            [unm, internet_archive]
+        )
 
         # Russian speaker in Albany. Albany doesn't pass the score threshold
         # since it didn't report having any Russian books, but maybe we should
         # consider the total collection size as well as the user's language.
         libraries = Library.relevant(self._db, (42.66, -73.77), "rus").most_common()
         assert len(libraries) == 2
-        assert [l[0] for l in libraries] == [nypl, internet_archive]
+        assert [library[0] for library in libraries] == [nypl, internet_archive]
 
         # Spanish speaker in Manhattan.
         libraries = Library.relevant(self._db, (40.75, -73.98), "spa").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, unm]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            unm,
+        ]
 
         # Patron with a print disability in Manhattan.
         libraries = Library.relevant(
             self._db, (40.75, -73.98), "eng", audiences=[Audience.PRINT_DISABILITY]
         ).most_common()
         assert len(libraries) == 5
-        assert [l[0] for l in libraries] == [
+        assert [library[0] for library in libraries] == [
             bard,
             nypl,
             bpl,
@@ -1183,8 +1209,8 @@ class TestLibrary(DatabaseTest):
             ).count()
 
         # Take all the libraries we found earlier out of production.
-        for l in ct_state, nypl:
-            l.registry_stage = Library.TESTING_STAGE
+        for library in ct_state, nypl:
+            library.registry_stage = Library.TESTING_STAGE
         # Now there are no results.
         assert m(True) == 0
 
@@ -1281,8 +1307,8 @@ class TestLibrary(DatabaseTest):
 
         # By default, search_by_library_name() only finds libraries
         # in production. Put them in the TESTING stage and they disappear.
-        for l in (brooklyn, boston):
-            l.registry_stage = Library.TESTING_STAGE
+        for library in (brooklyn, boston):
+            library.registry_stage = Library.TESTING_STAGE
         assert search("bpl", production=True) == []
 
         # But you can find them by passing in production=False.
@@ -1292,7 +1318,6 @@ class TestLibrary(DatabaseTest):
         # We know about three libraries.
         nypl = self.nypl
         kansas_state = self.kansas_state_library
-        connecticut_state = self.connecticut_state_library
 
         # The NYPL explicitly covers New York City, which has
         # 'Manhattan' as an alias.
@@ -1304,7 +1329,7 @@ class TestLibrary(DatabaseTest):
         [kansas] = [x.place for x in kansas_state.service_areas]
         assert kansas.external_name == "Kansas"
         assert kansas.type == Place.STATE
-        manhattan_ks = self.manhattan_ks
+        manhattan_ks = self.manhattan_ks  # noqa: F841
 
         # A search for 'manhattan' finds both libraries.
         libraries = list(Library.search_by_location_name(self._db, "manhattan"))
@@ -1379,7 +1404,7 @@ class TestLibrary(DatabaseTest):
 
         # Here's a library whose service area includes a place called
         # "New York".
-        nypl = self.nypl
+        nypl = self.nypl  # noqa: F841
 
         libraries = Library.search(self._db, (40.7, -73.9), "NEW YORK")
         # Even though NYPL is closer to the current location, the
@@ -1875,7 +1900,6 @@ class TestValidation(DatabaseTest):
         # Let's imagine that validation succeeded and is being
         # invalidated for some reason.
         email_validation.success = True
-        old_started_at = email_validation.started_at
         old_secret = email_validation.secret
         email_validation_2 = email.restart_validation()
 

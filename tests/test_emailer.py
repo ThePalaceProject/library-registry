@@ -1,6 +1,5 @@
 import os
 import quopri
-import smtplib
 from email.mime.text import MIMEText
 from typing import Optional
 from unittest import mock

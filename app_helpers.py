@@ -82,7 +82,7 @@ def compressible(f):
                 return response
 
             accept_encoding = flask.request.headers.get("Accept-Encoding", "")
-            if not "gzip" in accept_encoding.lower():
+            if "gzip" not in accept_encoding.lower():
                 return response
 
             # At this point we know we're going to be changing the

@@ -152,7 +152,7 @@ class TestHTTP(object):
 
         generator = ResponseGenerator()
         url = "http://foo"
-        response = HTTP._request_with_timeout(
+        HTTP._request_with_timeout(
             url,
             generator.response,
             url,

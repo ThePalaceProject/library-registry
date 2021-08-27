@@ -5,7 +5,7 @@ from sqlalchemy.orm import Query
 
 from authentication_document import AuthenticationDocument
 from config import Configuration
-from model import ConfigurationSetting, Hyperlink, LibraryType, Session, Validation
+from model import ConfigurationSetting, Hyperlink, LibraryType, Validation
 
 
 class Annotator(object):

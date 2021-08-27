@@ -14,6 +14,6 @@ sys.path.insert(0, parent)
 # from pdb import set_trace
 # set_trace()
 
-from testing import DatabaseTest, package_setup
+from testing import DatabaseTest, package_setup  # noqa: E402,F401
 
 package_setup()

@@ -1,7 +1,6 @@
 import datetime
 import json
 import logging
-import os
 import random
 import re
 import string
@@ -15,7 +14,6 @@ from flask_bcrypt import check_password_hash, generate_password_hash
 from geoalchemy2 import Geography, Geometry
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
-    Binary,
     Boolean,
     Column,
     DateTime,
@@ -30,7 +28,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy import exc as sa_exc
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -472,7 +470,7 @@ class Library(Base):
         """
         # The concept of 'patron count' only makes sense for
         # production libraries.
-        library_ids = [l.id for l in libraries if l.in_production]
+        library_ids = [library.id for library in libraries if library.in_production]
 
         # Run the SQL query.
         counts = (
@@ -987,7 +985,7 @@ class Library(Base):
             # Filter out any libraries that show up in both lists.
             for_name = set(libraries_for_name)
             libraries_for_location = [
-                x for x in libraries_for_location if not x in for_name
+                x for x in libraries_for_location if x not in for_name
             ]
 
         # A lot of libraries list their locations only within their description, so it's worth
@@ -1633,7 +1631,6 @@ class Place(Base):
             # uszipcodes keeps track of places in terms of their state.
             return None
 
-        _db = Session.object_session(self)
         search = uszipcode.SearchEngine(
             db_file_dir=Configuration.DATADIR, simple_zipcode=True
         )
@@ -1881,7 +1878,6 @@ class Hyperlink(Base):
         to_address = resource.href
         if to_address.startswith("mailto:"):
             to_address = to_address[7:]
-        deadline = None
 
         # Make sure there's a Validation object associated with this
         # Resource.
@@ -2136,7 +2132,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         """
         if not token:
             raise ValueError("Cannot decode an empty token.")
-        if not "|" in token:
+        if "|" not in token:
             raise ValueError(
                 'Supposed client token "%s" does not contain a pipe.' % token
             )
@@ -2167,7 +2163,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 account_id, label, content = delegate.sign_in_standard(
                     username, password
                 )
-            except Exception as e:
+            except Exception:
                 # This delegate couldn't help us.
                 pass
             if account_id:
@@ -2179,7 +2175,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             # ourselves.
             try:
                 signature = self.adobe_base64_decode(password)
-            except Exception as e:
+            except Exception:
                 raise ValueError("Invalid password: %s" % password)
 
             patron_identifier, account_id = self._decode(_db, username, signature)

@@ -1,5 +1,4 @@
 import base64
-import logging
 
 import pytest
 
@@ -206,7 +205,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
 
     def test_decode_uses_adobe_base64_encoding(self):
 
-        library = self._library()
+        self._library()
 
         # The base64 encoding of this signature has a plus sign in it.
         signature = b"LbU}66%\\-4zt>R>_)\n2Q"

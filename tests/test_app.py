@@ -1,4 +1,3 @@
-import contextlib
 import gzip
 from io import BytesIO
 
@@ -6,7 +5,6 @@ import flask
 
 from app_helpers import compressible, has_library_factory, uses_location_factory
 from problem_details import LIBRARY_NOT_FOUND
-from testing import DatabaseTest
 
 from .test_controller import ControllerTest
 

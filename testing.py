@@ -1,13 +1,10 @@
-import logging
+import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 
-from geoalchemy2 import Geometry
-from sqlalchemy import func
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.session import Session
-from sqlalchemy.sql.expression import cast
 
 from config import Configuration
 from log import LogConfiguration
@@ -324,9 +321,9 @@ class DatabaseTest(object):
             self.new_york_state,
             self.new_york_city_geojson,
         )
-        alias = get_one_or_create(self._db, PlaceAlias, place=place, name="Manhattan")
-        alias = get_one_or_create(self._db, PlaceAlias, place=place, name="Brooklyn")
-        alias = get_one_or_create(self._db, PlaceAlias, place=place, name="New York")
+        get_one_or_create(self._db, PlaceAlias, place=place, name="Manhattan")
+        get_one_or_create(self._db, PlaceAlias, place=place, name="Brooklyn")
+        get_one_or_create(self._db, PlaceAlias, place=place, name="New York")
         return place
 
     @property
@@ -400,7 +397,7 @@ class DatabaseTest(object):
             self.new_york_state,
             self.zip_11212_geojson,
         )
-        alias = get_one_or_create(self._db, PlaceAlias, place=place, name="Brooklyn")
+        get_one_or_create(self._db, PlaceAlias, place=place, name="Brooklyn")
         return place
 
     @property

@@ -219,13 +219,13 @@ class AuthenticationDocument(object):
                             else:
                                 # We couldn't find any place with this name.
                                 unknown[nation].append(place)
-                        except MultipleResultsFound as e:
+                        except MultipleResultsFound:
                             # The place was ambiguously named.
                             ambiguous[nation].append(place)
-            except MultipleResultsFound as e:
+            except MultipleResultsFound:
                 # A nation was ambiguously named -- not very likely.
                 ambiguous[nation] = places
-            except NoResultFound as e:
+            except NoResultFound:
                 # Either this isn't a recognized nation
                 # or we don't have a geography for it.
                 unknown[nation] = places
@@ -323,7 +323,6 @@ class AuthenticationDocument(object):
 
     @classmethod
     def _update_audiences(self, library, audiences):
-        original_audiences = audiences
         if not audiences:
             # Most of the libraries in this system are open to at
             # least some subset of the general public.
@@ -362,8 +361,6 @@ class AuthenticationDocument(object):
     def set_service_areas(cls, library, service_area, focus_area):
         """Replace a library's ServiceAreas with specific new values."""
         service_areas = []
-
-        old_service_areas = list(library.service_areas)
 
         # What service_area or focus_area looks like when
         # no input was specified.

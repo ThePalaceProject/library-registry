@@ -1,10 +1,9 @@
 from io import StringIO
 
-from geoalchemy2 import Geography
 from sqlalchemy import func
 
 from geometry_loader import GeometryLoader
-from model import Place, PlaceAlias, get_one, get_one_or_create
+from model import Place, PlaceAlias, get_one_or_create
 
 from . import DatabaseTest
 

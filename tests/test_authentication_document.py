@@ -1,7 +1,4 @@
-import json
 from collections import defaultdict
-
-from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 
 from authentication_document import AuthenticationDocument
 from model import Audience, Place, ServiceArea
@@ -37,6 +34,7 @@ class TestParseCoverage(DatabaseTest):
         expected_places = expected_places or []
         expected_unknown = expected_unknown or empty
         expected_ambiguous = expected_ambiguous or empty
+
         # TODO PYTHON3 replace eq_sorted() with eq_()
         def eq_sorted(a, b):
             def key(x):
@@ -209,7 +207,7 @@ class TestLinkExtractor(object):
         default values.
         """
         place = MockPlace()
-        everywhere = place.everywhere(None)
+        place.everywhere(None)
         parsed = AuthDoc.from_string(None, "{}", place)
 
         # In the absence of specific information, we assume the most
@@ -289,7 +287,7 @@ class TestLinkExtractor(object):
         }
 
         place = MockPlace()
-        everywhere = place.everywhere(None)
+        place.everywhere(None)
         parsed = AuthDoc.from_dict(None, document, place)
 
         # Information about the OPDS server has been extracted from
@@ -315,7 +313,7 @@ class TestLinkExtractor(object):
         assert parsed.logo_link is None
         assert parsed.anonymous_access is False
 
-    def online_registration_for_one_authentication_mechanism(self):
+    def test_online_registration_for_one_authentication_mechanism(self):
         """An OPDS server offers online registration if _any_ of its
         authentication flows offer online registration.
 
@@ -337,6 +335,9 @@ class TestLinkExtractor(object):
                 },
             ]
         }
+        place = MockPlace()
+        place.everywhere(None)
+        parsed = AuthDoc.from_dict(None, document, place)
         assert parsed.online_registration is True
 
     def test_name_treated_as_title(self):

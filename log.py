@@ -1,13 +1,11 @@
 import datetime
 import json
 import logging
-import os
 import socket
-from io import StringIO
 
 from loggly.handlers import HTTPSHandler as LogglyHandler
 
-from config import Configuration
+from config import CannotLoadConfiguration
 
 
 class JSONFormatter(logging.Formatter):
@@ -226,8 +224,8 @@ class LogConfiguration(object):
             )
         try:
             url = cls._interpolate_loggly_url(url, token)
-        except (TypeError, KeyError) as e:
-            raise CannotLoadConfiguraiton(
+        except (TypeError, KeyError):
+            raise CannotLoadConfiguration(
                 "Cannot interpolate token %s into loggly URL %s"
                 % (
                     token,

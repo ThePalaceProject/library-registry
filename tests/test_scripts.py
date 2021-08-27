@@ -1,4 +1,3 @@
-import json
 from io import StringIO
 
 import pytest
@@ -38,8 +37,8 @@ from . import DatabaseTest
 class TestLibraryScript(DatabaseTest):
     def test_libraries(self):
 
-        library = self._library(name="The Library")
-        ignored = self._library(name="Ignored Library")
+        the_library = self._library(name="The Library")
+        ignored_library = self._library(name="Ignored Library")
 
         class Mock(LibraryScript):
             # Mock of LibraryScript that returns a special value
@@ -54,8 +53,8 @@ class TestLibraryScript(DatabaseTest):
         script = Mock(self._db)
 
         # Any library can be processed if it's identified by name.
-        for l in library, ignored:
-            assert script.libraries(l.name) == [l]
+        for library in the_library, ignored_library:
+            assert script.libraries(library.name) == [library]
         with pytest.raises(ValueError) as exc:
             script.libraries("Nonexistent Library")
         assert "No library with name 'Nonexistent Library'" in str(exc.value)
@@ -68,7 +67,7 @@ class TestLibraryScript(DatabaseTest):
         # Three libraries, one in each state.
         production = self._library()
         testing = self._library(library_stage=Library.TESTING_STAGE)
-        cancelled = self._library(library_stage=Library.CANCELLED_STAGE)
+        self._library(library_stage=Library.CANCELLED_STAGE)
 
         # The all_libraries property omits the cancelled library.
         script = LibraryScript(self._db)
@@ -99,7 +98,7 @@ class TestLoadPlacesScript(DatabaseTest):
 class TestSearchPlacesScript(DatabaseTest):
     def test_run(self):
         nys = self.new_york_state
-        ct = self.connecticut_state
+        ct = self.connecticut_state  # noqa: F841
         nyc = self.new_york_city
 
         # Run the script...
@@ -156,12 +155,12 @@ class TestAddLibraryScript(DatabaseTest):
 
 class TestSearchLibraryScript(DatabaseTest):
     def test_run(self):
-        nys = self.new_york_state
+        nys = self.new_york_state  # noqa: F841
         nypl = self.nypl
-        csl = self.connecticut_state_library
-        zip = self.zip_10018
-        ct = self.connecticut_state
-        nyc = self.new_york_city
+        csl = self.connecticut_state_library  # noqa: F841
+        zip = self.zip_10018  # noqa: F841
+        ct = self.connecticut_state  # noqa: F841
+        nyc = self.new_york_city  # noqa: F841
         nypl.opds_url = "http://opds/"
 
         # Run the script...

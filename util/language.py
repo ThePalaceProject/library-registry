@@ -1,4 +1,5 @@
 # encoding: utf-8
+import os
 from collections import defaultdict
 
 
@@ -585,15 +586,15 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
         all_names = []
         if not languages:
             return ""
-        for l in languages:
-            normalized = cls.string_to_alpha_3(l)
+        for language in languages:
+            normalized = cls.string_to_alpha_3(language)
             native_names = cls.native_names.get(normalized, [])
             if native_names:
                 all_names.append(native_names[0])
             else:
                 names = cls.english_names.get(normalized, [])
                 if not names:
-                    raise ValueError("No native or English name for %s" % l)
+                    raise ValueError("No native or English name for %s" % language)
                 all_names.append(names[0])
         if len(all_names) == 1:
             return all_names[0]

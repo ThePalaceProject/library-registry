@@ -37,7 +37,7 @@ class TestLogConfiguration(DatabaseTest):
         assert isinstance(handler.formatter, JSONFormatter)
 
         # Let's set up a Loggly integration and change the defaults.
-        loggly = self.loggly_integration()
+        self.loggly_integration()
         internal = self._external_integration(
             protocol=ExternalIntegration.INTERNAL_LOGGING,
             goal=ExternalIntegration.LOGGING_GOAL,
@@ -67,7 +67,6 @@ class TestLogConfiguration(DatabaseTest):
 
     def test_defaults(self):
         cls = LogConfiguration
-        template = cls.DEFAULT_MESSAGE_TEMPLATE
 
         # Normally the default log level is INFO and log messages are
         # emitted in JSON format.

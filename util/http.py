@@ -231,7 +231,7 @@ class HTTP(object):
         disallowed_response_codes = kwargs.pop("disallowed_response_codes", [])
         verbose = kwargs.pop("verbose", False)
 
-        if not "timeout" in kwargs:
+        if "timeout" not in kwargs:
             kwargs["timeout"] = 20
 
         # Unicode data can't be sent over the wire. Convert it
@@ -251,6 +251,7 @@ class HTTP(object):
 
         try:
             if verbose:
+                http_method = args[0] if len(args) > 0 else None
                 logging.info(
                     "Sending %s request to %s: kwargs %r", http_method, url, kwargs
                 )
