@@ -63,11 +63,11 @@ def is_public_ipv4_address(ip_string):
 
     return bool(
         ip_string.is_private is False
-        and ip_string.is_multicast is False  # noqa: E272
-        and ip_string.is_unspecified is False  # noqa: E272
-        and ip_string.is_reserved is False  # noqa: E272
-        and ip_string.is_loopback is False  # noqa: E272
-        and ip_string.is_link_local is False  # noqa: E272  # noqa: E272
+        and ip_string.is_multicast is False
+        and ip_string.is_unspecified is False
+        and ip_string.is_reserved is False
+        and ip_string.is_loopback is False
+        and ip_string.is_link_local is False
     )
 
 

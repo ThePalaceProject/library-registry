@@ -116,18 +116,16 @@ class AdobeAccountInfoRequestParser(AdobeRequestParser):
 class AdobeVendorIDRequestHandler:
     """Standalone class that can be tested without bringing in Flask or the database schema"""
 
-    ##### Class Constants ####################################################  # noqa: E266
-    AUTH_ERROR_TYPE = "AUTH"  # noqa: E221
-    ACCOUNT_INFO_ERROR_TYPE = "ACCOUNT_INFO"  # noqa: E221
-    TOKEN_FAILURE = "Incorrect token."  # noqa: E221
-    AUTHENTICATION_FAILURE = "Incorrect barcode or PIN."  # noqa: E221
-    URN_LOOKUP_FAILURE = "Could not identify patron from '%s'."  # noqa: E221
+    AUTH_ERROR_TYPE = "AUTH"
+    ACCOUNT_INFO_ERROR_TYPE = "ACCOUNT_INFO"
+    TOKEN_FAILURE = "Incorrect token."
+    AUTHENTICATION_FAILURE = "Incorrect barcode or PIN."
+    URN_LOOKUP_FAILURE = "Could not identify patron from '%s'."
 
-    SIGN_IN_RESPONSE_TEMPLATE = t.SIGN_IN_RESPONSE_TEMPLATE  # noqa: E221
-    ACCOUNT_INFO_RESPONSE_TEMPLATE = t.ACCOUNT_INFO_RESPONSE_TEMPLATE  # noqa: E221
-    ERROR_RESPONSE_TEMPLATE = t.ERROR_RESPONSE_TEMPLATE  # noqa: E221
+    SIGN_IN_RESPONSE_TEMPLATE = t.SIGN_IN_RESPONSE_TEMPLATE
+    ACCOUNT_INFO_RESPONSE_TEMPLATE = t.ACCOUNT_INFO_RESPONSE_TEMPLATE
+    ERROR_RESPONSE_TEMPLATE = t.ERROR_RESPONSE_TEMPLATE
 
-    ##### Public Interface / Magic Methods ###################################  # noqa: E266
     def __init__(self, vendor_id):
         self.vendor_id = vendor_id
 
@@ -196,14 +194,6 @@ class AdobeVendorIDRequestHandler:
             "type": type,
             "message": message,
         }
-
-    ##### Private Methods ####################################################  # noqa: E266
-
-    ##### Properties and Getters/Setters #####################################  # noqa: E266
-
-    ##### Class Methods ######################################################  # noqa: E266
-
-    ##### Private Class Methods ##############################################  # noqa: E266
 
 
 class AdobeVendorIDModel:

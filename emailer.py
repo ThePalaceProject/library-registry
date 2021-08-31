@@ -20,19 +20,18 @@ class Emailer:
 
     log = logging.getLogger("Emailer")
 
-    ##### Class Constants ####################################################  # noqa: E266
     # Goal and setting names for the ExternalIntegration.
-    GOAL = "email"  # noqa: E221
-    PORT = "port"  # noqa: E221
-    FROM_ADDRESS = "from_address"  # noqa: E221
-    FROM_NAME = "from_name"  # noqa: E221
-    DEFAULT_FROM_NAME = "Library Simplified registry support"  # noqa: E221
+    GOAL = "email"
+    PORT = "port"
+    FROM_ADDRESS = "from_address"
+    FROM_NAME = "from_name"
+    DEFAULT_FROM_NAME = "Library Simplified registry support"
 
     ENV_RECIPIENT_OVERRIDE_ADDRESS = "EMAILER_RECIPIENT_OVERRIDE"
 
     # Constants for different types of email.
-    ADDRESS_DESIGNATED = "address_designated"  # noqa: E221
-    ADDRESS_NEEDS_CONFIRMATION = "address_needs_confirmation"  # noqa: E221
+    ADDRESS_DESIGNATED = "address_designated"
+    ADDRESS_NEEDS_CONFIRMATION = "address_needs_confirmation"
 
     EMAIL_TYPES = [ADDRESS_DESIGNATED, ADDRESS_NEEDS_CONFIRMATION]
 
@@ -89,7 +88,6 @@ class Emailer:
         "from_address",
     ]
 
-    ##### Public Interface / Magic Methods ###################################  # noqa: E266
     def __init__(
         self,
         smtp_username,
@@ -180,7 +178,6 @@ class Emailer:
         except Exception as exc:
             raise CannotSendEmail(exc)
 
-    ##### Private Methods ####################################################  # noqa: E266
     def _effective_recipient(self, default: str = None) -> str:
         """Override the recipient's email address, when applicable."""
         return self.recipient_address_override or default
@@ -194,9 +191,6 @@ class Emailer:
         smtp.sendmail(self.from_address, to_address, body)
         smtp.quit()
 
-    ##### Properties and Getters/Setters #####################################  # noqa: E266
-
-    ##### Class Methods ######################################################  # noqa: E266
     @classmethod
     def from_sitewide_integration(cls, _db):
         """Create an Emailer from a site-wide email integration.
@@ -232,7 +226,6 @@ class Emailer:
             templates=email_templates,
         )
 
-    ##### Private Class Methods ##############################################  # noqa: E266
     @classmethod
     def _sitewide_integration(cls, _db):
         """Find the ExternalIntegration for the emailer."""
@@ -256,9 +249,6 @@ class Emailer:
 class EmailTemplate:
     """A template for email messages."""
 
-    ##### Class Constants ####################################################  # noqa: E266
-
-    ##### Public Interface / Magic Methods ###################################  # noqa: E266
     def __init__(self, subject_template, body_template):
         self.subject_template = subject_template
         self.body_template = body_template
@@ -290,11 +280,3 @@ class EmailTemplate:
         message.attach(text_part)
 
         return message.as_string()
-
-    ##### Private Methods ####################################################  # noqa: E266
-
-    ##### Properties and Getters/Setters #####################################  # noqa: E266
-
-    ##### Class Methods ######################################################  # noqa: E266
-
-    ##### Private Class Methods ##############################################  # noqa: E266
