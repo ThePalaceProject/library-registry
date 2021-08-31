@@ -115,7 +115,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         if: env.IMAGE_PUSH_ENABLED == 'true'
 
-      - name: Generate tags for library-registry image
+      - name: Generate tags
         id: library-registry-tags
         uses: docker/metadata-action@v3
         with:
@@ -126,7 +126,7 @@ jobs:
             type=ref,event=branch,priority=30
             type=sha,priority=40
 
-      - name: Build and push library-registry image
+      - name: Build image
         uses: docker/build-push-action@v2
         with:
           context: .
