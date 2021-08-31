@@ -5,15 +5,10 @@ import re
 
 import pytest
 
-from util.string_helpers import (
-    UnicodeAwareBase64,
-    base64,
-    random_string
-)
+from util.string_helpers import UnicodeAwareBase64, base64, random_string
 
 
 class TestUnicodeAwareBase64(object):
-
     def test_encoding(self):
         test_string = u"םולש"
 
@@ -35,9 +30,9 @@ class TestUnicodeAwareBase64(object):
 
         # Test all supported methods of the base64 API.
         for encode, decode in [
-            ('b64encode', 'b64decode'),
-            ('standard_b64encode', 'standard_b64decode'),
-            ('urlsafe_b64encode', 'urlsafe_b64decode'),
+            ("b64encode", "b64decode"),
+            ("standard_b64encode", "standard_b64decode"),
+            ("urlsafe_b64encode", "urlsafe_b64decode"),
         ]:
             encode_method = getattr(base64, encode)
             decode_method = getattr(base64, decode)
@@ -79,7 +74,6 @@ class TestUnicodeAwareBase64(object):
 
 
 class TestRandomstring(object):
-
     def test_random_string(self):
         assert random_string(0) == ""
 
@@ -101,4 +95,4 @@ class TestRandomstring(object):
 
             # Each byte is represented as two digits, so the length of the
             # string is twice the length passed in to the function.
-            assert len(x) == size*2
+            assert len(x) == size * 2

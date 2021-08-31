@@ -1,20 +1,15 @@
-from io import BytesIO
-import contextlib
-import flask
 import gzip
-from app_helpers import (
-    compressible,
-    has_library_factory,
-    uses_location_factory,
-)
-from problem_details import (
-    LIBRARY_NOT_FOUND
-)
+from io import BytesIO
+
+import flask
+
+from app_helpers import compressible, has_library_factory, uses_location_factory
+from problem_details import LIBRARY_NOT_FOUND
+
 from .test_controller import ControllerTest
-from testing import DatabaseTest
+
 
 class TestAppHelpers(ControllerTest):
-
     def test_has_library(self):
         has_library = has_library_factory(self.app)
 
@@ -30,10 +25,7 @@ class TestAppHelpers(ControllerTest):
         assert_not_found(uuid="no such library")
         library = self.nypl
 
-        urns = [
-            library.internal_urn,
-            library.internal_urn[len("urn:uuid:"):]
-        ]
+        urns = [library.internal_urn, library.internal_urn[len("urn:uuid:") :]]
         for urn in urns:
             with self.app.test_request_context():
                 response = route_function(uuid=urn)
@@ -50,20 +42,22 @@ class TestAppHelpers(ControllerTest):
             assert route_function() == "Called with location None"
 
         with self.app.test_request_context("/?_location=-10,10"):
-            assert route_function() == "Called with location SRID=4326;POINT(10.0 -10.0)"
+            assert (
+                route_function() == "Called with location SRID=4326;POINT(10.0 -10.0)"
+            )
 
     def test_compressible(self):
         # Prepare a value and a gzipped version of the value.
         value = b"Compress me! (Or not.)"
 
         buffer = BytesIO()
-        gzipped = gzip.GzipFile(mode='wb', fileobj=buffer)
+        gzipped = gzip.GzipFile(mode="wb", fileobj=buffer)
         gzipped.write(value)
         gzipped.close()
         compressed = buffer.getvalue()
 
         # Spot-check the compressed value
-        assert b'-(J-.V' in compressed
+        assert b"-(J-.V" in compressed
 
         # This compressible controller function always returns the
         # same value.
@@ -71,7 +65,7 @@ class TestAppHelpers(ControllerTest):
         def function():
             return value
 
-        def ask_for_compression(compression, header='Accept-Encoding'):
+        def ask_for_compression(compression, header="Accept-Encoding"):
             """This context manager simulates the entire Flask
             request-response cycle, including a call to
             process_response(), which triggers the @after_this_request
@@ -91,22 +85,22 @@ class TestAppHelpers(ControllerTest):
         # representation is compressed.
         response = ask_for_compression("gzip")
         assert response.data == compressed
-        assert response.headers['Content-Encoding'] == "gzip"
+        assert response.headers["Content-Encoding"] == "gzip"
 
         # If the client doesn't ask for compression, the value is
         # passed through unchanged.
         response = ask_for_compression(None)
         assert response.data == value
-        assert 'Content-Encoding' not in response.headers
+        assert "Content-Encoding" not in response.headers
 
         # Similarly if the client asks for an unsupported compression
         # mechanism.
-        response = ask_for_compression('compress')
+        response = ask_for_compression("compress")
         assert response.data == value
-        assert 'Content-Encoding' not in response.headers
+        assert "Content-Encoding" not in response.headers
 
         # Or if the client asks for a compression mechanism through
         # Accept-Transfer-Encoding, which is currently unsupported.
         response = ask_for_compression("gzip", "Accept-Transfer-Encoding")
         assert response.data == value
-        assert 'Content-Encoding' not in response.headers
+        assert "Content-Encoding" not in response.headers

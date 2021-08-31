@@ -1,30 +1,28 @@
 from collections import defaultdict
-import json
 
-from sqlalchemy.orm.exc import (
-    MultipleResultsFound,
-    NoResultFound,
-)
 from authentication_document import AuthenticationDocument
-from . import DatabaseTest
-from model import (
-    Audience,
-    Place,
-    ServiceArea,
-)
-from util.problem_detail import ProblemDetail
+from model import Audience, Place, ServiceArea
 from problem_details import INVALID_INTEGRATION_DOCUMENT
 from testing import MockPlace
+from util.problem_detail import ProblemDetail
+
+from . import DatabaseTest
 
 # Alias for a long class name
 AuthDoc = AuthenticationDocument
+
 
 class TestParseCoverage(DatabaseTest):
 
     EVERYWHERE = AuthenticationDocument.COVERAGE_EVERYWHERE
 
-    def parse_places(self, coverage_object, expected_places=None,
-                     expected_unknown=None, expected_ambiguous=None):
+    def parse_places(
+        self,
+        coverage_object,
+        expected_places=None,
+        expected_unknown=None,
+        expected_ambiguous=None,
+    ):
         """Call AuthenticationDocument.parse_coverage. Verify that the parsed
         list of places, as well as the dictionaries of unknown and
         ambiguous place names, are as expected.
@@ -36,11 +34,14 @@ class TestParseCoverage(DatabaseTest):
         expected_places = expected_places or []
         expected_unknown = expected_unknown or empty
         expected_ambiguous = expected_ambiguous or empty
+
         # TODO PYTHON3 replace eq_sorted() with eq_()
         def eq_sorted(a, b):
             def key(x):
                 return id(x)
+
             assert sorted(a, key=key) == sorted(b, key=key)
+
         eq_sorted(expected_places, place_objs)
         eq_sorted(expected_unknown, unknown)
         eq_sorted(expected_ambiguous, ambiguous)
@@ -48,19 +49,14 @@ class TestParseCoverage(DatabaseTest):
     def test_universal_coverage(self):
         # Test an authentication document that says a library covers the
         # whole universe.
-        self.parse_places(
-            self.EVERYWHERE, [MockPlace.EVERYWHERE]
-        )
+        self.parse_places(self.EVERYWHERE, [MockPlace.EVERYWHERE])
 
     def test_entire_country(self):
         # Test an authentication document that says a library covers an
         # entire country.
         us = MockPlace()
         MockPlace.by_name["US"] = us
-        self.parse_places(
-            {"US": self.EVERYWHERE },
-            expected_places=[us]
-        )
+        self.parse_places({"US": self.EVERYWHERE}, expected_places=[us])
 
     def test_ambiguous_country(self):
         # Test the unlikely scenario where an authentication document says a
@@ -71,9 +67,9 @@ class TestParseCoverage(DatabaseTest):
         MockPlace.by_name["CA"] = canada
         MockPlace.by_name["Europe I think?"] = MockPlace.AMBIGUOUS
         self.parse_places(
-            {"Europe I think?": self.EVERYWHERE, "CA": self.EVERYWHERE },
+            {"Europe I think?": self.EVERYWHERE, "CA": self.EVERYWHERE},
             expected_places=[canada],
-            expected_ambiguous={"Europe I think?": self.EVERYWHERE}
+            expected_ambiguous={"Europe I think?": self.EVERYWHERE},
         )
 
     def test_unknown_country(self):
@@ -84,9 +80,9 @@ class TestParseCoverage(DatabaseTest):
         canada = MockPlace()
         MockPlace.by_name["CA"] = canada
         self.parse_places(
-            {"Memory Alpha": self.EVERYWHERE, "CA": self.EVERYWHERE },
+            {"Memory Alpha": self.EVERYWHERE, "CA": self.EVERYWHERE},
             expected_places=[canada],
-            expected_unknown={"Memory Alpha": self.EVERYWHERE}
+            expected_unknown={"Memory Alpha": self.EVERYWHERE},
         )
 
     def test_places_within_country(self):
@@ -113,10 +109,7 @@ class TestParseCoverage(DatabaseTest):
 
         # AuthenticationDocument.parse_coverage is able to turn those
         # three place names into place objects.
-        self.parse_places(
-            doc,
-            expected_places=[place1, place3, place4]
-        )
+        self.parse_places(doc, expected_places=[place1, place3, place4])
 
     def test_ambiguous_place_within_country(self):
         # Test an authentication document that names an ambiguous
@@ -125,8 +118,7 @@ class TestParseCoverage(DatabaseTest):
         MockPlace.by_name["US"] = us
 
         self.parse_places(
-            {"US": ["Springfield"]},
-            expected_ambiguous={"US": ["Springfield"]}
+            {"US": ["Springfield"]}, expected_ambiguous={"US": ["Springfield"]}
         )
 
     def test_unknown_place_within_country(self):
@@ -137,8 +129,7 @@ class TestParseCoverage(DatabaseTest):
         MockPlace.by_name["US"] = us
 
         self.parse_places(
-            {"US": "Nowheresville"},
-            expected_unknown={"US": ["Nowheresville"]}
+            {"US": "Nowheresville"}, expected_unknown={"US": ["Nowheresville"]}
         )
 
     def test_unscoped_place_is_in_default_nation(self):
@@ -151,9 +142,7 @@ class TestParseCoverage(DatabaseTest):
         # sense of these place names.
         self.parse_places("CA", expected_unknown={"??": "CA"})
 
-        self.parse_places(
-            ["CA", "UT"], expected_unknown={"??": ["CA", "UT"]}
-        )
+        self.parse_places(["CA", "UT"], expected_unknown={"??": ["CA", "UT"]})
 
         us = MockPlace(inside={"CA": ca, "UT": ut})
         us.abbreviated_name = "US"
@@ -176,46 +165,56 @@ class TestLinkExtractor(object):
         links = [dict(rel="alternate", href="http://foo/", type="text/html")]
 
         # There is no link with the given relation.
-        assert AuthDoc._extract_link(links, rel='self') is None
+        assert AuthDoc._extract_link(links, rel="self") is None
 
         # There is a link with the given relation, but the type is wrong.
-        assert AuthDoc._extract_link(links, 'alternate', require_type="text/plain") is None
+        assert (
+            AuthDoc._extract_link(links, "alternate", require_type="text/plain") is None
+        )
 
     def test_prefer_type(self):
         """Test that prefer_type holds out for the link you're
         looking for.
         """
-        first_link = dict(
-            rel="alternate", href="http://foo/", type="text/html"
-        )
+        first_link = dict(rel="alternate", href="http://foo/", type="text/html")
         second_link = dict(
-            rel="alternate", href="http://bar/",
-            type="text/plain;charset=utf-8"
+            rel="alternate", href="http://bar/", type="text/plain;charset=utf-8"
         )
         links = [first_link, second_link]
 
         # We would prefer the second link.
-        assert AuthDoc._extract_link(links, 'alternate', prefer_type="text/plain") == second_link
-        
+        assert (
+            AuthDoc._extract_link(links, "alternate", prefer_type="text/plain")
+            == second_link
+        )
+
         # We would prefer the first link.
-        assert AuthDoc._extract_link(links, 'alternate', prefer_type="text/html") == first_link
+        assert (
+            AuthDoc._extract_link(links, "alternate", prefer_type="text/html")
+            == first_link
+        )
 
         # The type we prefer is not available, so we get the first link.
-        assert AuthDoc._extract_link(links, 'alternate', prefer_type="application/xhtml+xml") == first_link
+        assert (
+            AuthDoc._extract_link(
+                links, "alternate", prefer_type="application/xhtml+xml"
+            )
+            == first_link
+        )
 
     def test_empty_document(self):
         """Provide an empty Authentication For OPDS document to test
         default values.
         """
         place = MockPlace()
-        everywhere = place.everywhere(None)
+        place.everywhere(None)
         parsed = AuthDoc.from_string(None, "{}", place)
 
         # In the absence of specific information, we assume the most
         # common case: a public library that simply hasn't specified
         # its service area.
         assert parsed.service_area == ([], {}, {})
-        assert parsed.focus_area== ([], {}, {})
+        assert parsed.focus_area == ([], {}, {})
         assert parsed.audiences == [parsed.PUBLIC_AUDIENCE]
 
         assert parsed.id is None
@@ -240,30 +239,55 @@ class TestLinkExtractor(object):
             "id": "http://library/authentication-for-opds-file",
             "title": "Ansonia Public Library",
             "links": [
-                {"rel": "logo", "href": "data:image/png;base64,some-image-data", "type": "image/png"},
-                {"rel": "alternate", "href": "http://ansonialibrary.org", "type": "text/html"},
-                {"rel": "register", "href": "http://example.com/get-a-card/", "type": "text/html"},
-                {"rel": "start", "href": "http://catalog.example.com/", "type": "text/html/"},
-                {"rel": "start", "href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}
+                {
+                    "rel": "logo",
+                    "href": "data:image/png;base64,some-image-data",
+                    "type": "image/png",
+                },
+                {
+                    "rel": "alternate",
+                    "href": "http://ansonialibrary.org",
+                    "type": "text/html",
+                },
+                {
+                    "rel": "register",
+                    "href": "http://example.com/get-a-card/",
+                    "type": "text/html",
+                },
+                {
+                    "rel": "start",
+                    "href": "http://catalog.example.com/",
+                    "type": "text/html/",
+                },
+                {
+                    "rel": "start",
+                    "href": "http://opds.example.com/",
+                    "type": "application/atom+xml;profile=opds-catalog",
+                },
             ],
             "service_description": "Serving Ansonia, CT",
             "color_scheme": "gold",
             "collection_size": {"eng": 100, "spa": 20},
             "public_key": "a public key",
-            "features": {"disabled": [], "enabled": ["https://librarysimplified.org/rel/policy/reservations"]},
+            "features": {
+                "disabled": [],
+                "enabled": ["https://librarysimplified.org/rel/policy/reservations"],
+            },
             "authentication": [
                 {
                     "type": "http://opds-spec.org/auth/basic",
                     "description": "Log in with your library barcode",
-                    "inputs": {"login": {"keyboard": "Default"},
-                               "password": {"keyboard": "Default"}},
-                    "labels": {"login": "Barcode", "password": "PIN"}
+                    "inputs": {
+                        "login": {"keyboard": "Default"},
+                        "password": {"keyboard": "Default"},
+                    },
+                    "labels": {"login": "Barcode", "password": "PIN"},
                 }
-            ]
+            ],
         }
 
         place = MockPlace()
-        everywhere = place.everywhere(None)
+        place.everywhere(None)
         parsed = AuthDoc.from_dict(None, document, place)
 
         # Information about the OPDS server has been extracted from
@@ -274,14 +298,22 @@ class TestLinkExtractor(object):
         assert parsed.color_scheme == "gold"
         assert parsed.collection_size == {"eng": 100, "spa": 20}
         assert parsed.public_key == "a public key"
-        assert parsed.website == {'rel': 'alternate', 'href': 'http://ansonialibrary.org', 'type': 'text/html'}
+        assert parsed.website == {
+            "rel": "alternate",
+            "href": "http://ansonialibrary.org",
+            "type": "text/html",
+        }
         assert parsed.online_registration is True
-        assert parsed.root == {"rel": "start", "href": "http://opds.example.com/", "type": "application/atom+xml;profile=opds-catalog"}
+        assert parsed.root == {
+            "rel": "start",
+            "href": "http://opds.example.com/",
+            "type": "application/atom+xml;profile=opds-catalog",
+        }
         assert parsed.logo == "data:image/png;base64,some-image-data"
         assert parsed.logo_link is None
         assert parsed.anonymous_access is False
 
-    def online_registration_for_one_authentication_mechanism(self):
+    def test_online_registration_for_one_authentication_mechanism(self):
         """An OPDS server offers online registration if _any_ of its
         authentication flows offer online registration.
 
@@ -292,21 +324,21 @@ class TestLinkExtractor(object):
             "authentication": [
                 {
                     "description": "You'll never guess the secret code.",
-                    "type": "http://opds-spec.org/auth/basic"
+                    "type": "http://opds-spec.org/auth/basic",
                 },
                 {
                     "description": "But anyone can get a library card.",
                     "type": "http://opds-spec.org/auth/basic",
                     "links": [
-                        { "rel": "register",
-                          "href": "http://get-a-library-card/"
-                        }
-                    ]
-                }
+                        {"rel": "register", "href": "http://get-a-library-card/"}
+                    ],
+                },
             ]
         }
+        place = MockPlace()
+        place.everywhere(None)
+        parsed = AuthDoc.from_dict(None, document, place)
         assert parsed.online_registration is True
-
 
     def test_name_treated_as_title(self):
         """Some invalid documents put the library name in 'name' instead of title.
@@ -320,11 +352,7 @@ class TestLinkExtractor(object):
         """You can link to your logo, instead of including it in the
         document.
         """
-        document = {
-            "links": [
-                dict(rel="logo", href="http://logo.com/logo.jpg")
-            ]
-        }
+        document = {"links": [dict(rel="logo", href="http://logo.com/logo.jpg")]}
         auth = AuthDoc.from_dict(None, document, MockPlace())
         assert auth.logo is None
         assert auth.logo_link == {"href": "http://logo.com/logo.jpg", "rel": "logo"}
@@ -339,16 +367,17 @@ class TestLinkExtractor(object):
         """You can signal that your OPDS server allows anonymous access by
         including it as an authentication type.
         """
-        document = dict(authentication=[
-            dict(type="http://opds-spec.org/auth/basic"),
-            dict(type="https://librarysimplified.org/rel/auth/anonymous")
-        ])
+        document = dict(
+            authentication=[
+                dict(type="http://opds-spec.org/auth/basic"),
+                dict(type="https://librarysimplified.org/rel/auth/anonymous"),
+            ]
+        )
         auth = AuthDoc.from_dict(None, document, MockPlace())
         assert auth.anonymous_access == True
 
 
 class TestUpdateServiceAreas(DatabaseTest):
-
     def test_set_service_areas(self):
         # Test the method that replaces a Library's ServiceAreas.
         m = AuthenticationDocument.set_service_areas
@@ -358,12 +387,16 @@ class TestUpdateServiceAreas(DatabaseTest):
         p2 = self._place()
 
         def eligibility_areas():
-            return [x.place for x in library.service_areas
-                    if x.type==ServiceArea.ELIGIBILITY]
+            return [
+                x.place
+                for x in library.service_areas
+                if x.type == ServiceArea.ELIGIBILITY
+            ]
 
         def focus_areas():
-            return [x.place for x in library.service_areas
-                    if x.type==ServiceArea.FOCUS]
+            return [
+                x.place for x in library.service_areas if x.type == ServiceArea.FOCUS
+            ]
 
         # Try a successful case.
         p1_only = [[p1], {}, {}]
@@ -388,7 +421,6 @@ class TestUpdateServiceAreas(DatabaseTest):
         assert eligibility_areas() == []
         assert focus_areas() == [p2]
 
-
     def test_known_place_becomes_servicearea(self):
         """Test the helper method in a successful case."""
         library = self._library()
@@ -406,12 +438,11 @@ class TestUpdateServiceAreas(DatabaseTest):
         # This will use those places to create new ServiceAreas,
         # which will be gathered in the 'areas' array.
         problem = AuthenticationDocument._update_service_areas(
-            library, [valid, unknown, ambiguous], ServiceArea.FOCUS,
-            areas
+            library, [valid, unknown, ambiguous], ServiceArea.FOCUS, areas
         )
         assert problem is None
 
-        [a1, a2] = sorted(library.service_areas, key = lambda x: x.place_id)
+        [a1, a2] = sorted(library.service_areas, key=lambda x: x.place_id)
         assert a1.place == p1
         assert a1.type == ServiceArea.FOCUS
 
@@ -420,7 +451,6 @@ class TestUpdateServiceAreas(DatabaseTest):
 
         # The ServiceArea IDs were added to the `ids` list.
         assert set([a1, a2]) == set(areas)
-
 
     def test_ambiguous_and_unknown_places_become_problemdetail(self):
         """Test the helper method in a case that ends in failure."""
@@ -435,14 +465,16 @@ class TestUpdateServiceAreas(DatabaseTest):
 
         ids = []
         problem = AuthenticationDocument._update_service_areas(
-            library, [valid, unknown, ambiguous], ServiceArea.ELIGIBILITY,
-            ids
+            library, [valid, unknown, ambiguous], ServiceArea.ELIGIBILITY, ids
         )
 
         # We got a ProblemDetail explaining the problem
         assert isinstance(problem, ProblemDetail)
         assert problem.uri == INVALID_INTEGRATION_DOCUMENT.uri
-        assert problem.detail == 'The following service area was unknown: ["Unknown 1", "Unknown 2"]. The following service area was ambiguous: ["Ambiguous"].'
+        assert (
+            problem.detail
+            == 'The following service area was unknown: ["Unknown 1", "Unknown 2"]. The following service area was ambiguous: ["Ambiguous"].'
+        )
 
         # No IDs were added to the list.
         assert ids == []
@@ -458,8 +490,10 @@ class TestUpdateServiceAreas(DatabaseTest):
         everywhere = AuthenticationDocument.COVERAGE_EVERYWHERE
         doc_dict = dict(
             service_area=everywhere,
-            focus_area = { country1.abbreviated_name : everywhere,
-                           country2.abbreviated_name : everywhere }
+            focus_area={
+                country1.abbreviated_name: everywhere,
+                country2.abbreviated_name: everywhere,
+            },
         )
         doc = AuthenticationDocument.from_dict(self._db, doc_dict)
         problem = doc.update_service_areas(library)
@@ -468,25 +502,26 @@ class TestUpdateServiceAreas(DatabaseTest):
 
         # Now this Library has three associated ServiceAreas.
         [a1, a2, a3] = sorted(
-            [(x.type, x.place.abbreviated_name)
-             for x in library.service_areas]
+            [(x.type, x.place.abbreviated_name) for x in library.service_areas]
         )
         everywhere_place = Place.everywhere(self._db)
 
         # Anyone is eligible for access.
-        assert a1 == ('eligibility', everywhere_place.abbreviated_name)
+        assert a1 == ("eligibility", everywhere_place.abbreviated_name)
 
         # But people in two particular countries are the focus.
-        assert a2 == ('focus', country1.abbreviated_name)
-        assert a3 == ('focus', country2.abbreviated_name)
+        assert a2 == ("focus", country1.abbreviated_name)
+        assert a3 == ("focus", country2.abbreviated_name)
 
         # Remove one of the countries from the focus, add a new one,
         # and try again.
         country3 = self._place(abbreviated_name="C3", type=Place.NATION)
         doc_dict = dict(
             service_area=everywhere,
-            focus_area = { country1.abbreviated_name : everywhere,
-                           country3.abbreviated_name : everywhere }
+            focus_area={
+                country1.abbreviated_name: everywhere,
+                country3.abbreviated_name: everywhere,
+            },
         )
         doc = AuthenticationDocument.from_dict(self._db, doc_dict)
         doc.update_service_areas(library)
@@ -497,12 +532,11 @@ class TestUpdateServiceAreas(DatabaseTest):
         assert not any(a.place == country2 for a in library.service_areas)
 
         [a1, a2, a3] = sorted(
-            [(x.type, x.place.abbreviated_name)
-             for x in library.service_areas]
+            [(x.type, x.place.abbreviated_name) for x in library.service_areas]
         )
-        assert a1 == ('eligibility', everywhere_place.abbreviated_name)
-        assert a2 == ('focus', country1.abbreviated_name)
-        assert a3 == ('focus', country3.abbreviated_name)
+        assert a1 == ("eligibility", everywhere_place.abbreviated_name)
+        assert a2 == ("focus", country1.abbreviated_name)
+        assert a3 == ("focus", country3.abbreviated_name)
 
     def test_service_area_registered_as_focus_area_if_no_focus_area(self):
 
@@ -522,7 +556,6 @@ class TestUpdateServiceAreas(DatabaseTest):
         [area] = library.service_areas
         assert area.place.type == Place.EVERYWHERE
         assert area.type == ServiceArea.FOCUS
-
 
     def test_service_area_registered_as_focus_area_if_identical_to_focus_area(self):
         library = self._library()
@@ -547,16 +580,13 @@ class TestUpdateServiceAreas(DatabaseTest):
 
 
 class TestUpdateAudiences(DatabaseTest):
-
     def setup(self):
         super(TestUpdateAudiences, self).setup()
         self.library = self._library()
 
     def update(self, audiences):
         """Wrapper around AuthenticationDocument._update_audiences."""
-        result = AuthenticationDocument._update_audiences(
-            self.library, audiences
-        )
+        result = AuthenticationDocument._update_audiences(self.library, audiences)
 
         # If there's a problem detail document, it must be of the type
         # INVALID_INTEGRATION_DOCUMENT. The caller may perform additional
@@ -576,9 +606,7 @@ class TestUpdateAudiences(DatabaseTest):
         assert set(audiences) == set([x.name for x in self.library.audiences])
 
         # Set them again to different but partially overlapping values.
-        audiences = [
-            Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY
-        ]
+        audiences = [Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY]
         problem = self.update(audiences)
         assert set(audiences) == set([x.name for x in self.library.audiences])
 
@@ -599,7 +627,9 @@ class TestUpdateAudiences(DatabaseTest):
         # Audience.OTHER.
         audiences = ["Some random audience", Audience.PUBLIC]
         self.update(audiences)
-        assert set([Audience.OTHER, Audience.PUBLIC]) == set([x.name for x in self.library.audiences])
+        assert set([Audience.OTHER, Audience.PUBLIC]) == set(
+            [x.name for x in self.library.audiences]
+        )
 
     def test_audience_defaults_to_public(self):
         # If a library doesn't specify its audience, we assume it's open
@@ -609,15 +639,12 @@ class TestUpdateAudiences(DatabaseTest):
 
 
 class TestUpdateCollectionSize(DatabaseTest):
-
     def setup(self):
         super(TestUpdateCollectionSize, self).setup()
         self.library = self._library()
 
     def update(self, value):
-        result = AuthenticationDocument._update_collection_size(
-            self.library, value
-        )
+        result = AuthenticationDocument._update_collection_size(self.library, value)
         # If there's a problem detail document, it must be of the type
         # INVALID_INTEGRATION_DOCUMENT. The caller may perform additional
         # checks.
@@ -634,7 +661,9 @@ class TestUpdateCollectionSize(DatabaseTest):
 
         # Two CollectionSummaries have been created, for the English
         # collection and the (empty) Japanese collection.
-        assert [('eng', 100), ('jpn', 0)] == sorted([(x.language, x.size) for x in self.library.collections])
+        assert [("eng", 100), ("jpn", 0)] == sorted(
+            [(x.language, x.size) for x in self.library.collections]
+        )
 
         # Update the library with new data.
         self.update({"eng": "200"})
@@ -672,14 +701,17 @@ class TestUpdateCollectionSize(DatabaseTest):
         # Here's a tricky case with multiple unknown languages.  They
         # all get grouped together into a single 'unknown language'
         # collection.
-        self.update({None: 100, "mmmmm":200, "zzzzz":300})
+        self.update({None: 100, "mmmmm": 200, "zzzzz": 300})
         [unknown] = self.library.collections
         assert unknown.language is None
-        assert unknown.size == 100+200+300
+        assert unknown.size == 100 + 200 + 300
 
     def test_invalid_collection_size(self):
-        problem = self.update([1,2,3])
-        assert problem.detail == "'collection_size' must be a number or an object mapping language codes to numbers"
+        problem = self.update([1, 2, 3])
+        assert (
+            problem.detail
+            == "'collection_size' must be a number or an object mapping language codes to numbers"
+        )
 
     def test_negative_collection_size(self):
         problem = self.update(-100)

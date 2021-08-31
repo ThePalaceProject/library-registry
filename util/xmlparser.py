@@ -1,13 +1,13 @@
-from lxml import etree
 from io import StringIO
+
+from lxml import etree
 
 
 class XMLParser:
     """Helper functions to process XML data."""
-    ##### Class Constants ####################################################  # noqa: E266
+
     NAMESPACES = {}
 
-    ##### Public Interface / Magic Methods ###################################  # noqa: E266
     def process_all(self, xml, xpath, namespaces=None, handler=None, parser=None):
         if not parser:
             parser = etree.XMLParser()
@@ -29,17 +29,11 @@ class XMLParser:
         """Abstract, should be overridden by child class"""
         return None
 
-    ##### Private Methods ####################################################  # noqa: E266
     def _cls(self, tag_name, class_name):
         """Return an XPath expression that will find a tag with the given CSS class."""
         fmt_string = 'descendant-or-self::node()/%s[contains(concat(" ", normalize-space(@class), " "), " %s ")]'
         return fmt_string % (tag_name, class_name)
 
-    ##### Properties and Getters/Setters #####################################  # noqa: E266
-
-    ##### Class Methods ######################################################  # noqa: E266
-
-    ##### Private Class Methods ##############################################  # noqa: E266
     @classmethod
     def _xpath(cls, tag, expression, namespaces=None):
         """Wrapper to do a namespaced XPath expression."""

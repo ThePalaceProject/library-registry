@@ -1,25 +1,19 @@
-from collections import defaultdict
-from config import Configuration
-from flask_babel import lazy_gettext as _
-from flask_bcrypt import (
-    check_password_hash,
-    generate_password_hash
-)
 import datetime
-import logging
-
-import os
-import re
 import json
+import logging
 import random
+import re
 import string
-import uszipcode
 import uuid
 import warnings
-from collections import Counter
+from collections import Counter, defaultdict
+
+import uszipcode
+from flask_babel import lazy_gettext as _
+from flask_bcrypt import check_password_hash, generate_password_hash
+from geoalchemy2 import Geography, Geometry
 from psycopg2.extensions import adapt as sqlescape
 from sqlalchemy import (
-    Binary,
     Boolean,
     Column,
     DateTime,
@@ -30,57 +24,36 @@ from sqlalchemy import (
     String,
     Table,
     Unicode,
-)
-from sqlalchemy import (
-    create_engine,
-    exc as sa_exc,
-    func,
-    or_,
     UniqueConstraint,
+    create_engine,
 )
-from sqlalchemy.exc import (
-    IntegrityError
-)
-from sqlalchemy.ext.declarative import (
-    declarative_base
-)
-from sqlalchemy.ext.hybrid import (
-    hybrid_property,
-)
-from sqlalchemy.orm import (
-    aliased,
-    backref,
-    relationship,
-    sessionmaker,
-    validates,
-)
-from sqlalchemy.orm.exc import (
-    NoResultFound,
-    MultipleResultsFound,
-)
+from sqlalchemy import exc as sa_exc
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import aliased, backref, relationship, sessionmaker, validates
+from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql.expression import (
-    cast,
-    literal_column,
-    or_,
     and_,
     case,
-    select,
+    cast,
     join,
+    literal_column,
+    or_,
     outerjoin,
+    select,
 )
-from sqlalchemy.ext.hybrid import hybrid_property
 
-from geoalchemy2 import Geography, Geometry
-
+from config import Configuration
 from emailer import Emailer
+from util import GeometryUtility
 from util.language import LanguageCodes
-from util import (
-    GeometryUtility,
-)
 from util.short_client_token import ShortClientTokenTool
 from util.string_helpers import random_string
+
 
 def production_session():
     url = Configuration.database_url()
@@ -95,14 +68,18 @@ def production_session():
     # unit tests, and 2) package_setup() will call initialize() again
     # with the right arguments.
     from log import LogConfiguration
+
     LogConfiguration.initialize(_db)
     return _db
 
+
 DEBUG = False
+
 
 def generate_secret():
     """Generate a random secret."""
     return random_string(24)
+
 
 class SessionManager(object):
 
@@ -128,7 +105,6 @@ class SessionManager(object):
 
         Base.metadata.create_all(engine)
 
-
         cls.engine_for_url[url] = engine
         return engine, engine.connect()
 
@@ -147,14 +123,15 @@ class SessionManager(object):
     def initialize_data(cls, session):
         pass
 
-def get_one(db, model, on_multiple='error', **kwargs):
+
+def get_one(db, model, on_multiple="error", **kwargs):
     q = db.query(model).filter_by(**kwargs)
     try:
         return q.one()
     except MultipleResultsFound as e:
-        if on_multiple == 'error':
+        if on_multiple == "error":
             raise e
-        elif on_multiple == 'interchangeable':
+        elif on_multiple == "interchangeable":
             # These records are interchangeable so we can use
             # whichever one we want.
             #
@@ -165,6 +142,7 @@ def get_one(db, model, on_multiple='error', **kwargs):
     except NoResultFound:
         return None
 
+
 def dump_query(query):
     dialect = query.session.bind.dialect
     statement = query.statement
@@ -172,44 +150,48 @@ def dump_query(query):
     comp.compile()
     enc = dialect.encoding
     params = {}
-    for k,v in comp.params.items():
+    for k, v in comp.params.items():
         if isinstance(v, str):
             v = v.encode(enc)
         params[k] = sqlescape(v)
     return (comp.string.encode(enc) % params).decode(enc)
 
-def get_one_or_create(db, model, create_method='',
-                      create_method_kwargs=None,
-                      **kwargs):
+
+def get_one_or_create(db, model, create_method="", create_method_kwargs=None, **kwargs):
     one = get_one(db, model, **kwargs)
     if one:
         return one, False
     else:
         __transaction = db.begin_nested()
         try:
-            if 'on_multiple' in kwargs:
+            if "on_multiple" in kwargs:
                 # This kwarg is supported by get_one() but not by create().
-                del kwargs['on_multiple']
+                del kwargs["on_multiple"]
             obj = create(db, model, create_method, create_method_kwargs, **kwargs)
             __transaction.commit()
             return obj
         except IntegrityError as e:
             logging.info(
-                "INTEGRITY ERROR on %r %r, %r: %r", model, create_method_kwargs,
-                kwargs, e)
+                "INTEGRITY ERROR on %r %r, %r: %r",
+                model,
+                create_method_kwargs,
+                kwargs,
+                e,
+            )
             __transaction.rollback()
             return db.query(model).filter_by(**kwargs).one(), False
 
-def create(db, model, create_method='',
-           create_method_kwargs=None,
-           **kwargs):
+
+def create(db, model, create_method="", create_method_kwargs=None, **kwargs):
     kwargs.update(create_method_kwargs or {})
     created = getattr(model, create_method, model)(**kwargs)
     db.add(created)
     db.flush()
     return created, True
 
+
 Base = declarative_base()
+
 
 class LibraryType(object):
     """Constant container for library types.
@@ -232,7 +214,7 @@ class LibraryType(object):
     # the library type vocabulary.
     ADMINISTRATIVE_DIVISION_TYPES = {
         "US": STATE,
-        "CA" : PROVINCE,
+        "CA": PROVINCE,
     }
 
     NAME_FOR_CODE = {
@@ -244,6 +226,7 @@ class LibraryType(object):
         UNIVERSAL: "Online library",
     }
 
+
 class Library(Base):
     """An entry in this table corresponds more or less to an OPDS server.
 
@@ -251,7 +234,8 @@ class Library(Base):
     Places. Libraries may also focus on a subset of the places they
     serve, and may restrict their service to certain audiences.
     """
-    __tablename__ = 'libraries'
+
+    __tablename__ = "libraries"
 
     id = Column(Integer, primary_key=True)
 
@@ -269,8 +253,11 @@ class Library(Base):
     # URN to identify a given library, even if the library's OPDS
     # server changes.
     internal_urn = Column(
-        Unicode, nullable=False, index=True, unique=True,
-        default=lambda: "urn:uuid:" + str(uuid.uuid4())
+        Unicode,
+        nullable=False,
+        index=True,
+        unique=True,
+        default=lambda: "urn:uuid:" + str(uuid.uuid4()),
     )
 
     # The URL to the library's Authentication for OPDS document. This
@@ -287,9 +274,12 @@ class Library(Base):
     web_url = Column(Unicode)
 
     # When our record of this library was last updated.
-    timestamp = Column(DateTime, index=True,
-                       default=lambda: datetime.datetime.utcnow(),
-                       onupdate=lambda: datetime.datetime.utcnow())
+    timestamp = Column(
+        DateTime,
+        index=True,
+        default=lambda: datetime.datetime.utcnow(),
+        onupdate=lambda: datetime.datetime.utcnow(),
+    )
 
     # The library's logo, as a data: URI.
     logo = Column(Unicode)
@@ -307,17 +297,20 @@ class Library(Base):
     # TESTING_STAGE.
     #
     # Otherwise, the library is in PRODUCTION_STAGE.
-    TESTING_STAGE = 'testing'       # Library should show up in test feed
-    PRODUCTION_STAGE = 'production' # Library should show up in production feed
-    CANCELLED_STAGE = 'cancelled'   # Library should not show up in any feed
+    TESTING_STAGE = "testing"  # Library should show up in test feed
+    PRODUCTION_STAGE = "production"  # Library should show up in production feed
+    CANCELLED_STAGE = "cancelled"  # Library should not show up in any feed
     stage_enum = Enum(
-        TESTING_STAGE, PRODUCTION_STAGE, CANCELLED_STAGE, name='library_stage'
+        TESTING_STAGE, PRODUCTION_STAGE, CANCELLED_STAGE, name="library_stage"
     )
 
     # The library's opinion about which stage a library should be in.
     _library_stage = Column(
-        stage_enum, index=True, nullable=False, default=TESTING_STAGE,
-        name="library_stage"
+        stage_enum,
+        index=True,
+        nullable=False,
+        default=TESTING_STAGE,
+        name="library_stage",
     )
 
     # The registry's opinion about which stage a library should be in.
@@ -348,20 +341,21 @@ class Library(Base):
 
     # A library may have alternate names, e.g. "BPL" for the Brooklyn
     # Public Library.
-    aliases = relationship("LibraryAlias", backref='library')
+    aliases = relationship("LibraryAlias", backref="library")
 
     # A library may serve one or more geographic areas.
-    service_areas = relationship('ServiceArea', backref='library')
+    service_areas = relationship("ServiceArea", backref="library")
 
     # A library may serve one or more specific audiences.
-    audiences = relationship('Audience', secondary='libraries_audiences',
-                            back_populates="libraries")
+    audiences = relationship(
+        "Audience", secondary="libraries_audiences", back_populates="libraries"
+    )
 
     # The registry may have information about the library's
     # collections of materials. The registry doesn't need to know
     # details, but it's useful to know approximate counts when finding
     # libraries that serve specific language communities.
-    collections = relationship("CollectionSummary", backref='library')
+    collections = relationship("CollectionSummary", backref="library")
 
     # The registry may keep delegated patron identifiers (basically,
     # Adobe IDs) for a library's patrons. This allows the library's
@@ -369,17 +363,19 @@ class Library(Base):
     # license separate Adobe Vendor ID and without the registry
     # knowing anything about the patrons.
     delegated_patron_identifiers = relationship(
-        "DelegatedPatronIdentifier", backref='library'
+        "DelegatedPatronIdentifier", backref="library"
     )
 
     # A library may have miscellaneous URIs associated with it. Generally
     # speaking, the registry is only concerned about these URIs insofar as
     # it needs to verify that they work.
-    hyperlinks = relationship("Hyperlink", backref='library')
+    hyperlinks = relationship("Hyperlink", backref="library")
 
     settings = relationship(
-        "ConfigurationSetting", backref="library",
-        lazy="joined", cascade="all, delete",
+        "ConfigurationSetting",
+        backref="library",
+        lazy="joined",
+        cascade="all, delete",
     )
 
     # The PLS (Public Library Surveys) ID comes from the IMLS' annual survey
@@ -387,14 +383,12 @@ class Library(Base):
     # such as number of covered branches and size of service population.
     PLS_ID = "pls_id"
 
-    @validates('short_name')
+    @validates("short_name")
     def validate_short_name(self, key, value):
         if not value:
             return value
-        if '|' in value:
-            raise ValueError(
-                'Short name cannot contain the pipe character.'
-            )
+        if "|" in value:
+            raise ValueError("Short name cannot contain the pipe character.")
         return value.upper()
 
     @classmethod
@@ -421,10 +415,7 @@ class Library(Base):
         attempts = 0
         choice = None
         while choice is None and attempts < max_attempts:
-            choice = "".join(
-                [random.choice(string.ascii_uppercase)
-                 for i in range(6)]
-            )
+            choice = "".join([random.choice(string.ascii_uppercase) for i in range(6)])
             if duplicate_check and duplicate_check(choice):
                 choice = None
             attempts += 1
@@ -462,8 +453,9 @@ class Library(Base):
         if not self.in_production:
             return 0
         query = db.query(DelegatedPatronIdentifier).filter(
-            DelegatedPatronIdentifier.type==DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
-            DelegatedPatronIdentifier.library_id==self.id
+            DelegatedPatronIdentifier.type
+            == DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            DelegatedPatronIdentifier.library_id == self.id,
         )
         return query.count()
 
@@ -478,21 +470,25 @@ class Library(Base):
         """
         # The concept of 'patron count' only makes sense for
         # production libraries.
-        library_ids = [l.id for l in libraries if l.in_production]
+        library_ids = [library.id for library in libraries if library.in_production]
 
         # Run the SQL query.
-        counts = select(
-            [
-                DelegatedPatronIdentifier.library_id,
-                func.count(DelegatedPatronIdentifier.id)
-            ],
-        ).where(
-            and_(DelegatedPatronIdentifier.type==DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
-                 DelegatedPatronIdentifier.library_id.in_(library_ids))
-        ).group_by(
-            DelegatedPatronIdentifier.library_id
-        ).select_from(
-            DelegatedPatronIdentifier
+        counts = (
+            select(
+                [
+                    DelegatedPatronIdentifier.library_id,
+                    func.count(DelegatedPatronIdentifier.id),
+                ],
+            )
+            .where(
+                and_(
+                    DelegatedPatronIdentifier.type
+                    == DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+                    DelegatedPatronIdentifier.library_id.in_(library_ids),
+                )
+            )
+            .group_by(DelegatedPatronIdentifier.library_id)
+            .select_from(DelegatedPatronIdentifier)
         )
         rows = _db.execute(counts)
 
@@ -612,13 +608,12 @@ class Library(Base):
         if production:
             # Both parties must agree that this library is
             # production-ready.
-            return and_(library_field==prod, registry_field==prod)
+            return and_(library_field == prod, registry_field == prod)
         else:
             # Both parties must agree that this library is _either_
             # in the production stage or the testing stage.
             return and_(
-                library_field.in_((prod, test)),
-                registry_field.in_((prod, test))
+                library_field.in_((prod, test)), registry_field.in_((prod, test))
             )
 
     @classmethod
@@ -659,46 +654,53 @@ class Library(Base):
 
         # Set up an alias for libraries and collection summaries for use in subqueries.
         libraries_collections = outerjoin(
-            Library, CollectionSummary,
-            Library.id==CollectionSummary.library_id
+            Library, CollectionSummary, Library.id == CollectionSummary.library_id
         ).alias("libraries_collections")
 
         # Check if each library has a public audience.
-        public_audiences_subquery = select(
-            [func.count()]
-        ).where(
-            and_(
-                Audience.name==Audience.PUBLIC,
-                libraries_audiences.c.library_id==libraries_collections.c.libraries_id,
+        public_audiences_subquery = (
+            select([func.count()])
+            .where(
+                and_(
+                    Audience.name == Audience.PUBLIC,
+                    libraries_audiences.c.library_id
+                    == libraries_collections.c.libraries_id,
+                )
             )
-        ).select_from(
-            libraries_audiences.join(Audience)
-        ).lateral("public_audiences")
+            .select_from(libraries_audiences.join(Audience))
+            .lateral("public_audiences")
+        )
 
         # Check if each library has a non-public audience from
         # the user's audiences.
-        non_public_audiences_subquery = select(
-            [func.count()]
-        ).where(
-            and_(
-                Audience.name!=Audience.PUBLIC,
-                Audience.name.in_(audiences),
-                libraries_audiences.c.library_id==libraries_collections.c.libraries_id,
+        non_public_audiences_subquery = (
+            select([func.count()])
+            .where(
+                and_(
+                    Audience.name != Audience.PUBLIC,
+                    Audience.name.in_(audiences),
+                    libraries_audiences.c.library_id
+                    == libraries_collections.c.libraries_id,
+                )
             )
-        ).select_from(
-            libraries_audiences.join(Audience)
-        ).lateral("non_public_audiences")
+            .select_from(libraries_audiences.join(Audience))
+            .lateral("non_public_audiences")
+        )
 
         # Increase the score if there was an audience match other than
         # public, and set it to 0 if there's no match at all.
         score = case(
             [
-             # Audience match other than public.
-             (non_public_audiences_subquery!=literal_column(str(0)),
-              literal_column(str(base_score * audience_factor))),
-             # Public audience.
-             (public_audiences_subquery!=literal_column(str(0)),
-              literal_column(str(base_score)))
+                # Audience match other than public.
+                (
+                    non_public_audiences_subquery != literal_column(str(0)),
+                    literal_column(str(base_score * audience_factor)),
+                ),
+                # Public audience.
+                (
+                    public_audiences_subquery != literal_column(str(0)),
+                    literal_column(str(base_score)),
+                ),
             ],
             # No match.
             else_=literal_column(str(0)),
@@ -710,15 +712,20 @@ class Library(Base):
             # Prevent underflow and overflow errors by ensuring
             # the exponent is between -500 and 500.
             exponent = case(
-                [(original_exponent > 500, literal_column(str(500))),
-                 (original_exponent < -500, literal_column(str(-500)))],
-                else_=original_exponent)
+                [
+                    (original_exponent > 500, literal_column(str(500))),
+                    (original_exponent < -500, literal_column(str(-500))),
+                ],
+                else_=original_exponent,
+            )
             return func.exp(exponent)
 
         # Get the maximum collection size for the user's language.
-        collections_by_size = _db.query(CollectionSummary).filter(
-            CollectionSummary.language==language_code).order_by(
-            CollectionSummary.size.desc())
+        collections_by_size = (
+            _db.query(CollectionSummary)
+            .filter(CollectionSummary.language == language_code)
+            .order_by(CollectionSummary.size.desc())
+        )
 
         if collections_by_size.count() == 0:
             max = 0
@@ -734,27 +741,32 @@ class Library(Base):
             # Maybe this should be larger, or should consider languages other than
             # the user's language.
             estimated_size = case(
-                [(libraries_collections.c.collectionsummaries_id==None, literal_column("1"))],
-                else_=libraries_collections.c.collectionsummaries_size
+                [
+                    (
+                        libraries_collections.c.collectionsummaries_id == None,
+                        literal_column("1"),
+                    )
+                ],
+                else_=libraries_collections.c.collectionsummaries_size,
             )
-            score_multiplier = (1 - exponential_decrease(1.0 * collection_size_factor * estimated_size / max))
+            score_multiplier = 1 - exponential_decrease(
+                1.0 * collection_size_factor * estimated_size / max
+            )
             score = score * score_multiplier
 
         # Create a subquery for a type of service area.
         def service_area_subquery(type):
-            return select(
-                [Place.geometry, Place.type]
-            ).where(
-                and_(
-                    ServiceArea.library_id==libraries_collections.c.libraries_id,
-                    ServiceArea.type==type,
+            return (
+                select([Place.geometry, Place.type])
+                .where(
+                    and_(
+                        ServiceArea.library_id == libraries_collections.c.libraries_id,
+                        ServiceArea.type == type,
+                    )
                 )
-            ).select_from(
-                join(
-                    ServiceArea, Place,
-                    ServiceArea.place_id==Place.id
-                )
-            ).lateral()
+                .select_from(join(ServiceArea, Place, ServiceArea.place_id == Place.id))
+                .lateral()
+            )
 
         # Find each library's eligibility areas.
         eligibility_areas_subquery = service_area_subquery(ServiceArea.ELIGIBILITY)
@@ -766,12 +778,15 @@ class Library(Base):
         # by the subquery, in km. If a service area is "everywhere", the distance
         # is 0.
         def min_distance(subquery):
-            return func.min(
-                case(
-                    [(subquery.c.type==Place.EVERYWHERE, literal_column(str(0)))],
-                    else_=func.ST_DistanceSphere(target, subquery.c.geometry)
+            return (
+                func.min(
+                    case(
+                        [(subquery.c.type == Place.EVERYWHERE, literal_column(str(0)))],
+                        else_=func.ST_DistanceSphere(target, subquery.c.geometry),
+                    )
                 )
-            ) / 1000
+                / 1000
+            )
 
         # Minimum distance to any eligibility area.
         eligibility_min_distance = min_distance(eligibility_areas_subquery)
@@ -780,61 +795,79 @@ class Library(Base):
         focus_min_distance = min_distance(focus_areas_subquery)
 
         # Decrease the score based on how far away the library's eligibility area is.
-        score = score * exponential_decrease(1.0 * eligibility_area_distance_factor * eligibility_min_distance)
+        score = score * exponential_decrease(
+            1.0 * eligibility_area_distance_factor * eligibility_min_distance
+        )
 
         # Decrease the score based on how far away the library's focus area is.
-        score = score * exponential_decrease(1.0 * focus_area_distance_factor * focus_min_distance)
+        score = score * exponential_decrease(
+            1.0 * focus_area_distance_factor * focus_min_distance
+        )
 
         # Decrease the score based on the sum of the sizes of the library's focus areas, in km^2.
         # This currently  assumes that the library's focus areas don't overlap, which may not be true.
         # If a focus area is "everywhere", the size is the area of Earth (510 million km^2).
-        focus_area_size = func.sum(
-            case(
-                [(focus_areas_subquery.c.type==Place.EVERYWHERE, literal_column(str(510000000000000)))],
-                else_=func.ST_Area(focus_areas_subquery.c.geometry)
+        focus_area_size = (
+            func.sum(
+                case(
+                    [
+                        (
+                            focus_areas_subquery.c.type == Place.EVERYWHERE,
+                            literal_column(str(510000000000000)),
+                        )
+                    ],
+                    else_=func.ST_Area(focus_areas_subquery.c.geometry),
+                )
             )
-        ) / 1000000
-        score = score * exponential_decrease(1.0 * focus_area_size_factor * focus_area_size)
+            / 1000000
+        )
+        score = score * exponential_decrease(
+            1.0 * focus_area_size_factor * focus_area_size
+        )
 
         # Rank the libraries by score, and remove any libraries
         # that are below the score threshold.
-        library_id_and_score = select(
-            [libraries_collections.c.libraries_id,
-             score.label("score"),
-            ]
-        ).having(
-            score > literal_column(str(score_threshold))
-        ).where(
-            and_(
-                # Query for either the production feed or the testing feed.
-                cls._feed_restriction(
-                    production,
-                    libraries_collections.c.libraries_library_stage,
-                    libraries_collections.c.libraries_registry_stage
-                ),
-
-                # Limit to the collection summaries for the user's
-                # language. If a library has no collection for the
-                # language, it's still included.
-                or_(
-                    libraries_collections.c.collectionsummaries_language==language_code,
-                    libraries_collections.c.collectionsummaries_language==None
+        library_id_and_score = (
+            select(
+                [
+                    libraries_collections.c.libraries_id,
+                    score.label("score"),
+                ]
+            )
+            .having(score > literal_column(str(score_threshold)))
+            .where(
+                and_(
+                    # Query for either the production feed or the testing feed.
+                    cls._feed_restriction(
+                        production,
+                        libraries_collections.c.libraries_library_stage,
+                        libraries_collections.c.libraries_registry_stage,
+                    ),
+                    # Limit to the collection summaries for the user's
+                    # language. If a library has no collection for the
+                    # language, it's still included.
+                    or_(
+                        libraries_collections.c.collectionsummaries_language
+                        == language_code,
+                        libraries_collections.c.collectionsummaries_language == None,
+                    ),
                 )
             )
-        ).select_from(
-            libraries_collections
-        ).group_by(
-            libraries_collections.c.libraries_id,
-            libraries_collections.c.collectionsummaries_id,
-            libraries_collections.c.collectionsummaries_size,
-        ).order_by(
-            score.desc()
+            .select_from(libraries_collections)
+            .group_by(
+                libraries_collections.c.libraries_id,
+                libraries_collections.c.collectionsummaries_id,
+                libraries_collections.c.collectionsummaries_size,
+            )
+            .order_by(score.desc())
         )
 
         result = _db.execute(library_id_and_score)
         library_ids_and_scores = {r[0]: r[1] for r in result}
         # Look up the Library objects and return them with the scores.
-        libraries = _db.query(Library).filter(Library.id.in_(list(library_ids_and_scores.keys())))
+        libraries = _db.query(Library).filter(
+            Library.id.in_(list(library_ids_and_scores.keys()))
+        )
         c = Counter()
         for library in libraries:
             c[library] = library_ids_and_scores[library.id]
@@ -865,7 +898,7 @@ class Library(Base):
         # Find another point on the globe that's 150 kilometers
         # northeast of Point A. Call this Point B.
         other_point = func.ST_Project(
-            target_geography, max_radius*1000, func.radians(90.0)
+            target_geography, max_radius * 1000, func.radians(90.0)
         )
         other_point = cast(other_point, Geometry)
 
@@ -876,22 +909,21 @@ class Library(Base):
 
         # Find all Places that are no further away from A than that
         # number of radians.
-        nearby = func.ST_DWithin(target,
-                                 Place.geometry,
-                                 distance_to_other_point)
+        nearby = func.ST_DWithin(target, Place.geometry, distance_to_other_point)
 
         # For each library served by such a place, calculate the
         # minimum distance between the library's service area and
         # Point A in meters.
         min_distance = func.min(func.ST_DistanceSphere(target, Place.geometry))
 
-        qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place)
+        qu = _db.query(Library).join(Library.service_areas).join(ServiceArea.place)
         qu = qu.filter(cls._feed_restriction(production))
         qu = qu.filter(nearby)
-        qu = qu.add_columns(
-                min_distance).group_by(Library.id).order_by(
-                min_distance.asc())
+        qu = (
+            qu.add_columns(min_distance)
+            .group_by(Library.id)
+            .order_by(min_distance.asc())
+        )
         return qu
 
     @classmethod
@@ -929,17 +961,23 @@ class Library(Base):
         library_query, place_query, place_type = cls.query_parts(query)
         # We start with libraries that match the name query.
         if library_query:
-            libraries_for_name = cls.search_by_library_name(
-                _db, library_query, here, production).limit(
-                    max_libraries).all()
+            libraries_for_name = (
+                cls.search_by_library_name(_db, library_query, here, production)
+                .limit(max_libraries)
+                .all()
+            )
         else:
             libraries_for_name = []
 
         # We tack on any additional libraries that match a place query.
         if place_query:
-            libraries_for_location = cls.search_by_location_name(
-                _db, place_query, place_type, here, production
-            ).limit(max_libraries).all()
+            libraries_for_location = (
+                cls.search_by_location_name(
+                    _db, place_query, place_type, here, production
+                )
+                .limit(max_libraries)
+                .all()
+            )
         else:
             libraries_for_location = []
 
@@ -947,14 +985,16 @@ class Library(Base):
             # Filter out any libraries that show up in both lists.
             for_name = set(libraries_for_name)
             libraries_for_location = [
-                x for x in libraries_for_location if not x in for_name
+                x for x in libraries_for_location if x not in for_name
             ]
 
         # A lot of libraries list their locations only within their description, so it's worth
         # checking the description for the search term.
-        libraries_for_description = cls.search_within_description(
-            _db, query, here, production
-        ).limit(max_libraries).all()
+        libraries_for_description = (
+            cls.search_within_description(_db, query, here, production)
+            .limit(max_libraries)
+            .all()
+        )
 
         return libraries_for_name + libraries_for_location + libraries_for_description
 
@@ -970,11 +1010,12 @@ class Library(Base):
         name_matches = cls.fuzzy_match(Library.name, name)
         alias_matches = cls.fuzzy_match(LibraryAlias.name, name)
         partial_matches = cls.partial_match(Library.name, name)
-        return cls.create_query(_db, here, production, name_matches, alias_matches, partial_matches)
+        return cls.create_query(
+            _db, here, production, name_matches, alias_matches, partial_matches
+        )
 
     @classmethod
-    def search_by_location_name(cls, _db, query, type=None, here=None,
-                                production=True):
+    def search_by_location_name(cls, _db, query, type=None, here=None, production=True):
         """Find libraries whose service area overlaps a place with
         the given name.
 
@@ -987,18 +1028,19 @@ class Library(Base):
         # For a library to match, the Place named by the query must
         # intersect a Place served by that library.
         named_place = aliased(Place)
-        qu = _db.query(Library).join(
-            Library.service_areas).join(
-                ServiceArea.place).join(
-                    named_place,
-                    func.ST_Intersects(Place.geometry, named_place.geometry)
-                ).outerjoin(named_place.aliases)
+        qu = (
+            _db.query(Library)
+            .join(Library.service_areas)
+            .join(ServiceArea.place)
+            .join(named_place, func.ST_Intersects(Place.geometry, named_place.geometry))
+            .outerjoin(named_place.aliases)
+        )
         qu = qu.filter(cls._feed_restriction(production))
         name_match = cls.fuzzy_match(named_place.external_name, query)
         alias_match = cls.fuzzy_match(PlaceAlias.name, query)
         qu = qu.filter(or_(name_match, alias_match))
         if type:
-            qu = qu.filter(named_place.type==type)
+            qu = qu.filter(named_place.type == type)
         if here:
             min_distance = func.min(func.ST_DistanceSphere(here, named_place.geometry))
             qu = qu.add_columns(min_distance)
@@ -1020,9 +1062,7 @@ class Library(Base):
         if here:
             # Order by the minimum distance between one of the
             # library's service areas and the current location.
-            min_distance = func.min(
-                func.ST_DistanceSphere(here, Place.geometry)
-            )
+            min_distance = func.min(func.ST_DistanceSphere(here, Place.geometry))
             qu = qu.add_columns(min_distance)
             qu = qu.group_by(Library.id)
             qu = qu.order_by(min_distance.asc())
@@ -1039,7 +1079,9 @@ class Library(Base):
         """
         description_matches = cls.fuzzy_match(Library.description, query)
         partial_matches = cls.partial_match(Library.description, query)
-        return cls.create_query(_db, here, production, description_matches, partial_matches)
+        return cls.create_query(
+            _db, here, production, description_matches, partial_matches
+        )
 
     @classmethod
     def query_cleanup(cls, query):
@@ -1088,9 +1130,9 @@ class Library(Base):
         # in the name, but there are no such places in the US.
         place_query = query
         place_type = None
-        for indicator in 'public library', 'library':
+        for indicator in "public library", "library":
             if indicator in place_query:
-                place_query = place_query.replace(indicator, '').strip()
+                place_query = place_query.replace(indicator, "").strip()
 
         place_query, place_type = Place.parse_name(place_query)
 
@@ -1108,7 +1150,7 @@ class Library(Base):
         """
         is_long = func.length(field) >= 6
         close_enough = func.levenshtein(func.lower(field), value) <= 2
-        long_value_is_approximate_match = (is_long & close_enough)
+        long_value_is_approximate_match = is_long & close_enough
         exact_match = field.ilike(value)
         return or_(long_value_is_approximate_match, exact_match)
 
@@ -1140,7 +1182,10 @@ class Library(Base):
         default_href = hrefs[0]
         _db = Session.object_session(self)
         hyperlink, is_modified = get_one_or_create(
-            _db, Hyperlink, library=self, rel=rel,
+            _db,
+            Hyperlink,
+            library=self,
+            rel=rel,
         )
 
         if hyperlink.href not in hrefs:
@@ -1155,19 +1200,19 @@ class Library(Base):
         if len(link) > 0:
             return link[0]
 
+
 class LibraryAlias(Base):
 
     """An alternate name for a library."""
-    __tablename__ = 'libraryalias'
+
+    __tablename__ = "libraryalias"
 
     id = Column(Integer, primary_key=True)
-    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
+    library_id = Column(Integer, ForeignKey("libraries.id"), index=True)
     name = Column(Unicode, index=True)
     language = Column(Unicode(3), index=True)
 
-    __table_args__ = (
-        UniqueConstraint('library_id', 'name', 'language'),
-    )
+    __table_args__ = (UniqueConstraint("library_id", "name", "language"),)
 
 
 class ServiceArea(Base):
@@ -1176,35 +1221,29 @@ class ServiceArea(Base):
     A ServiceArea maps a Library to a Place. People living in this
     Place have service from the Library.
     """
-    __tablename__ = 'serviceareas'
+
+    __tablename__ = "serviceareas"
 
     id = Column(Integer, primary_key=True)
-    library_id = Column(
-        Integer, ForeignKey('libraries.id'), index=True
-    )
+    library_id = Column(Integer, ForeignKey("libraries.id"), index=True)
 
-    place_id = Column(
-        Integer, ForeignKey('places.id'), index=True
-    )
+    place_id = Column(Integer, ForeignKey("places.id"), index=True)
 
     # A library may have a ServiceArea because people in that area are
     # eligible for service, or because the library specifically
     # focuses on that area.
-    ELIGIBILITY = 'eligibility'
-    FOCUS = 'focus'
-    servicearea_type_enum = Enum(
-        ELIGIBILITY, FOCUS, name='servicearea_type'
+    ELIGIBILITY = "eligibility"
+    FOCUS = "focus"
+    servicearea_type_enum = Enum(ELIGIBILITY, FOCUS, name="servicearea_type")
+    type = Column(
+        servicearea_type_enum, index=True, nullable=False, default=ELIGIBILITY
     )
-    type = Column(servicearea_type_enum,
-                  index=True, nullable=False, default=ELIGIBILITY)
 
-    __table_args__ = (
-        UniqueConstraint('library_id', 'place_id', 'type'),
-    )
+    __table_args__ = (UniqueConstraint("library_id", "place_id", "type"),)
 
 
 class Place(Base):
-    __tablename__ = 'places'
+    __tablename__ = "places"
 
     # These are the kinds of places we keep track of. These are not
     # supposed to be precise terms. Each census-designated place is
@@ -1212,13 +1251,13 @@ class Place(Base):
     # Countries that call their top-level administrative divisions something
     # other than 'states' can still use 'state' as their type. (But see
     # LibraryType.ADMINISTRATIVE_DIVISION_TYPES.)
-    NATION = 'nation'
-    STATE = 'state'
-    COUNTY = 'county'
-    CITY = 'city'
-    POSTAL_CODE = 'postal_code'
-    LIBRARY_SERVICE_AREA = 'library_service_area'
-    EVERYWHERE = 'everywhere'
+    NATION = "nation"
+    STATE = "state"
+    COUNTY = "county"
+    CITY = "city"
+    POSTAL_CODE = "postal_code"
+    LIBRARY_SERVICE_AREA = "library_service_area"
+    EVERYWHERE = "everywhere"
 
     id = Column(Integer, primary_key=True)
 
@@ -1241,14 +1280,10 @@ class Place(Base):
     # places the most convenient parent will be a state. For states,
     # the best parent will be a nation. A nation has no parent; neither
     # does 'everywhere'.
-    parent_id = Column(
-        Integer, ForeignKey('places.id'), index=True
-    )
+    parent_id = Column(Integer, ForeignKey("places.id"), index=True)
 
     children = relationship(
-        "Place",
-        backref=backref("parent", remote_side = [id]),
-        lazy="joined"
+        "Place", backref=backref("parent", remote_side=[id]), lazy="joined"
     )
 
     # The geography of the place itself. It is stored internally as a
@@ -1256,7 +1291,7 @@ class Place(Base):
     # calculations.
     geometry = Column(Geometry(srid=4326), nullable=True)
 
-    aliases = relationship("PlaceAlias", backref='place')
+    aliases = relationship("PlaceAlias", backref="place")
 
     service_areas = relationship("ServiceArea", backref="place")
 
@@ -1268,9 +1303,12 @@ class Place(Base):
         geographic comparisons will fail.
         """
         place, is_new = get_one_or_create(
-            _db, Place, type=cls.EVERYWHERE,
-            create_method_kwargs=dict(external_id="Everywhere",
-                                      external_name="Everywhere")
+            _db,
+            Place,
+            type=cls.EVERYWHERE,
+            create_method_kwargs=dict(
+                external_id="Everywhere", external_name="Everywhere"
+            ),
         )
         return place
 
@@ -1284,7 +1322,7 @@ class Place(Base):
         :return: The default nation, if one can be found. Otherwise, None.
         """
         default_nation = None
-        abbreviation=ConfigurationSetting.sitewide(
+        abbreviation = ConfigurationSetting.sitewide(
             _db, Configuration.DEFAULT_NATION_ABBREVIATION
         ).value
         if abbreviation:
@@ -1292,9 +1330,7 @@ class Place(Base):
                 _db, Place, type=Place.NATION, abbreviated_name=abbreviation
             )
             if not default_nation:
-                logging.error(
-                    "Could not look up default nation %s", abbreviation
-                )
+                logging.error("Could not look up default nation %s", abbreviation)
         return default_nation
 
     @classmethod
@@ -1329,27 +1365,33 @@ class Place(Base):
         """
         check = place_name.lower()
         place_type = None
-        if check.endswith(' county'):
+        if check.endswith(" county"):
             place_name = place_name[:-7]
             place_type = Place.COUNTY
 
-        if check.endswith(' state'):
+        if check.endswith(" state"):
             place_name = place_name[:-6]
             place_type = Place.STATE
         return place_name, place_type
 
     @classmethod
     def lookup_by_name(cls, _db, name, place_type=None):
-        """Look up one or more Places by name.
-        """
+        """Look up one or more Places by name."""
         if not place_type:
             name, place_type = cls.parse_name(name)
-        qu = _db.query(Place).outerjoin(PlaceAlias).filter(
-            or_(Place.external_name==name, Place.abbreviated_name==name,
-                PlaceAlias.name==name)
+        qu = (
+            _db.query(Place)
+            .outerjoin(PlaceAlias)
+            .filter(
+                or_(
+                    Place.external_name == name,
+                    Place.abbreviated_name == name,
+                    PlaceAlias.name == name,
+                )
+            )
         )
         if place_type:
-            qu = qu.filter(Place.type==place_type)
+            qu = qu.filter(Place.type == place_type)
         else:
             # The place type "county" is excluded unless it was
             # explicitly asked for (e.g. "Cook County"). This is to
@@ -1359,7 +1401,7 @@ class Place(Base):
             # service area is referring to the city of Foo, not Foo
             # County -- if they want Foo County they can say "Foo
             # County".
-            qu = qu.filter(Place.type!=Place.COUNTY)
+            qu = qu.filter(Place.type != Place.COUNTY)
         return qu
 
     @classmethod
@@ -1371,9 +1413,7 @@ class Place(Base):
         """Convert one or more Place objects to a dictionary that will become
         a GeoJSON document when converted to JSON.
         """
-        geojson = select(
-            [func.ST_AsGeoJSON(Place.geometry)]
-        ).where(
+        geojson = select([func.ST_AsGeoJSON(Place.geometry)]).where(
             Place.id.in_([x.id for x in places])
         )
         results = [x[0] for x in _db.execute(geojson)]
@@ -1384,8 +1424,10 @@ class Place(Base):
 
         # We have either more or less than one valid item.
         # In either case, a GeometryCollection is appropriate.
-        body = { "type": "GeometryCollection",
-                 "geometries" : [json.loads(x) for x in results] }
+        body = {
+            "type": "GeometryCollection",
+            "geometries": [json.loads(x) for x in results],
+        }
         return body
 
     @classmethod
@@ -1467,7 +1509,7 @@ class Place(Base):
         """
         intersects = Place.geometry.intersects(self.geometry)
         touches = func.ST_Touches(Place.geometry, self.geometry)
-        return qu.filter(intersects).filter(touches==False)
+        return qu.filter(intersects).filter(touches == False)
 
     def lookup_inside(self, name, using_overlap=False, using_external_source=True):
 
@@ -1527,14 +1569,14 @@ class Place(Base):
         # "Springfield" or "Lake County" within the United States,
         # instead of specifying which state you're talking about.
         _db = Session.object_session(self)
-        qu = Place.lookup_by_name(_db, name).filter(Place.type!=self.type)
+        qu = Place.lookup_by_name(_db, name).filter(Place.type != self.type)
 
         # Don't look in a place type known to be 'bigger' than this
         # place.
         exclude_types = Place.larger_place_types(self.type)
         qu = qu.filter(~Place.type.in_(exclude_types))
 
-        if self.type==self.EVERYWHERE:
+        if self.type == self.EVERYWHERE:
             # The concept of 'inside' is not relevant because every
             # place is 'inside' EVERYWHERE. We are really trying to
             # find one and only one place with a certain name.
@@ -1545,18 +1587,17 @@ class Place(Base):
             else:
                 parent = aliased(Place)
                 grandparent = aliased(Place)
-                qu = qu.join(parent, Place.parent_id==parent.id)
-                qu = qu.outerjoin(grandparent, parent.parent_id==grandparent.id)
+                qu = qu.join(parent, Place.parent_id == parent.id)
+                qu = qu.outerjoin(grandparent, parent.parent_id == grandparent.id)
 
                 # For postal codes, but no other types of places, we
                 # allow the lookup to skip a level. This lets you look
                 # up "93203" within a state *or* within the nation.
                 postal_code_grandparent_match = and_(
-                    Place.type==Place.POSTAL_CODE, grandparent.id==self.id,
+                    Place.type == Place.POSTAL_CODE,
+                    grandparent.id == self.id,
                 )
-                qu = qu.filter(
-                    or_(Place.parent==self, postal_code_grandparent_match)
-                )
+                qu = qu.filter(or_(Place.parent == self, postal_code_grandparent_match))
 
         places = qu.all()
         if len(places) == 0:
@@ -1572,9 +1613,7 @@ class Place(Base):
                 return None
         if len(places) > 1:
             raise MultipleResultsFound(
-                "More than one place called %s inside %s." % (
-                    name, self.external_name
-                )
+                "More than one place called %s inside %s." % (name, self.external_name)
             )
         return places[0]
 
@@ -1592,20 +1631,18 @@ class Place(Base):
             # uszipcodes keeps track of places in terms of their state.
             return None
 
-        _db = Session.object_session(self)
         search = uszipcode.SearchEngine(
-            db_file_dir=Configuration.DATADIR,
-            simple_zipcode=True
+            db_file_dir=Configuration.DATADIR, simple_zipcode=True
         )
         state = self.abbreviated_name
         uszipcode_matches = []
-        if (state in search.state_to_city_mapper
-            and name in search.state_to_city_mapper[state]):
+        if (
+            state in search.state_to_city_mapper
+            and name in search.state_to_city_mapper[state]
+        ):
             # The given name is an exact match for one of the
             # cities. Let's look up every ZIP code for that city.
-            uszipcode_matches = search.by_city_and_state(
-                name, state, returns=None
-            )
+            uszipcode_matches = search.by_city_and_state(name, state, returns=None)
 
         # Look up a Place object for each ZIP code and return the
         # first one we actually know about.
@@ -1614,9 +1651,7 @@ class Place(Base):
         # possibility of wasted effort or (I don't think this can
         # happen) infinite recursion.
         for match in uszipcode_matches:
-            place = self.lookup_inside(
-                match.zipcode, using_external_source=False
-            )
+            place = self.lookup_inside(match.zipcode, using_external_source=False)
             if place:
                 return place
 
@@ -1630,8 +1665,7 @@ class Place(Base):
         state.
         """
         _db = Session.object_session(self)
-        qu = _db.query(Library).join(Library.service_areas).join(
-            ServiceArea.place)
+        qu = _db.query(Library).join(Library.service_areas).join(ServiceArea.place)
         qu = self.overlaps_not_counting_border(qu)
         return qu
 
@@ -1643,9 +1677,13 @@ class Place(Base):
         if self.abbreviated_name:
             abbr = "abbr=%s " % self.abbreviated_name
         else:
-            abbr = ''
+            abbr = ""
         output = "<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
-            self.external_name, self.type, abbr, self.external_id, parent
+            self.external_name,
+            self.type,
+            abbr,
+            self.external_id,
+            parent,
         )
         return str(output)
 
@@ -1653,21 +1691,21 @@ class Place(Base):
 class PlaceAlias(Base):
 
     """An alternate name for a place."""
-    __tablename__ = 'placealiases'
+
+    __tablename__ = "placealiases"
 
     id = Column(Integer, primary_key=True)
-    place_id = Column(Integer, ForeignKey('places.id'), index=True)
+    place_id = Column(Integer, ForeignKey("places.id"), index=True)
     name = Column(Unicode, index=True)
     language = Column(Unicode(3), index=True)
 
-    __table_args__ = (
-        UniqueConstraint('place_id', 'name', 'language'),
-    )
+    __table_args__ = (UniqueConstraint("place_id", "name", "language"),)
 
 
 class Audience(Base):
     """A class of person served by a library."""
-    __tablename__ = 'audiences'
+
+    __tablename__ = "audiences"
 
     # The general public
     PUBLIC = "public"
@@ -1688,15 +1726,20 @@ class Audience(Base):
     OTHER = "other"
 
     KNOWN_AUDIENCES = [
-        PUBLIC, EDUCATIONAL_PRIMARY, EDUCATIONAL_SECONDARY, RESEARCH,
-        PRINT_DISABILITY, OTHER
+        PUBLIC,
+        EDUCATIONAL_PRIMARY,
+        EDUCATIONAL_SECONDARY,
+        RESEARCH,
+        PRINT_DISABILITY,
+        OTHER,
     ]
 
     id = Column(Integer, primary_key=True)
     name = Column(Unicode, index=True, unique=True)
 
-    libraries = relationship("Library", secondary='libraries_audiences',
-                             back_populates="audiences")
+    libraries = relationship(
+        "Library", secondary="libraries_audiences", back_populates="audiences"
+    )
 
     @classmethod
     def lookup(cls, _db, name):
@@ -1705,16 +1748,18 @@ class Audience(Base):
         audience, is_new = get_one_or_create(_db, Audience, name=name)
         return audience
 
+
 class CollectionSummary(Base):
     """A summary of a collection held by a library.
 
     We only need to know the language of the collection and
     approximately how big it is.
     """
-    __tablename__ = 'collectionsummaries'
+
+    __tablename__ = "collectionsummaries"
 
     id = Column(Integer, primary_key=True)
-    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
+    library_id = Column(Integer, ForeignKey("libraries.id"), index=True)
     language = Column(Unicode)
     size = Column(Integer)
 
@@ -1738,13 +1783,17 @@ class CollectionSummary(Base):
         language_code = LanguageCodes.string_to_alpha_3(language)
 
         summary, is_new = get_one_or_create(
-            _db, CollectionSummary, library=library,
-            language=language_code
+            _db, CollectionSummary, library=library, language=language_code
         )
         summary.size = size
         return summary
 
-Index("ix_collectionsummary_language_size", CollectionSummary.language, CollectionSummary.size)
+
+Index(
+    "ix_collectionsummary_language_size",
+    CollectionSummary.language,
+    CollectionSummary.size,
+)
 
 
 class Hyperlink(Base):
@@ -1755,8 +1804,11 @@ class Hyperlink(Base):
     registration, or by putting a link in its Authentication For OPDS
     document.
     """
+
     INTEGRATION_CONTACT_REL = "http://librarysimplified.org/rel/integration-contact"
-    COPYRIGHT_DESIGNATED_AGENT_REL = "http://librarysimplified.org/rel/designated-agent/copyright"
+    COPYRIGHT_DESIGNATED_AGENT_REL = (
+        "http://librarysimplified.org/rel/designated-agent/copyright"
+    )
     HELP_REL = "help"
 
     # Descriptions of the link relations, used in emails.
@@ -1769,18 +1821,16 @@ class Hyperlink(Base):
     # Hyperlinks with these relations are not for public consumption.
     PRIVATE_RELS = [INTEGRATION_CONTACT_REL]
 
-    __tablename__ = 'hyperlinks'
+    __tablename__ = "hyperlinks"
 
     id = Column(Integer, primary_key=True)
     rel = Column(Unicode, index=True, nullable=False)
-    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
-    resource_id = Column(Integer, ForeignKey('resources.id'), index=True)
+    library_id = Column(Integer, ForeignKey("libraries.id"), index=True)
+    resource_id = Column(Integer, ForeignKey("resources.id"), index=True)
 
     # A Library can have multiple links with the same rel, but we only
     # need to keep track of one.
-    __table_args__ = (
-        UniqueConstraint('library_id', 'rel'),
-    )
+    __table_args__ = (UniqueConstraint("library_id", "rel"),)
 
     @hybrid_property
     def href(self):
@@ -1826,9 +1876,8 @@ class Hyperlink(Base):
         # link.
         email_type = Emailer.ADDRESS_DESIGNATED
         to_address = resource.href
-        if to_address.startswith('mailto:'):
+        if to_address.startswith("mailto:"):
             to_address = to_address[7:]
-        deadline = None
 
         # Make sure there's a Validation object associated with this
         # Resource.
@@ -1848,16 +1897,16 @@ class Hyperlink(Base):
         # Create values for all the variables expected by the default
         # templates.
         template_args = dict(
-            rel_desc = Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
+            rel_desc=Hyperlink.REL_DESCRIPTIONS.get(self.rel, self.rel),
             library=library.name,
-            library_web_url = library.web_url,
+            library_web_url=library.web_url,
             email=to_address,
             registry_support=ConfigurationSetting.sitewide(
                 _db, Configuration.REGISTRY_CONTACT_EMAIL
             ).value,
         )
         if email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION:
-            template_args['confirmation_link'] = url_for(
+            template_args["confirmation_link"] = url_for(
                 "confirm_resource", resource_id=resource.id, secret=validation.secret
             )
         body = emailer.send(email_type, to_address, **template_args)
@@ -1872,7 +1921,8 @@ class Resource(Base):
     patron help address and the integration contact address for all of
     its libraries. That address only needs to be validated once.
     """
-    __tablename__ = 'resources'
+
+    __tablename__ = "resources"
 
     id = Column(Integer, primary_key=True)
     href = Column(Unicode, nullable=False, index=True, unique=True)
@@ -1880,8 +1930,7 @@ class Resource(Base):
 
     # Every Resource may have at most one Validation. There's no
     # need to validate it separately for every relationship.
-    validation_id = Column(Integer, ForeignKey('validations.id'),
-                           index=True)
+    validation_id = Column(Integer, ForeignKey("validations.id"), index=True)
 
     def restart_validation(self):
         """Start or restart the validation process for this resource."""
@@ -1896,14 +1945,19 @@ class Validation(Base):
     """An attempt (successful, in-progress, or failed) to validate a
     Resource.
     """
-    __tablename__ = 'validations'
+
+    __tablename__ = "validations"
 
     EXPIRES_AFTER = datetime.timedelta(days=1)
 
     id = Column(Integer, primary_key=True)
     success = Column(Boolean, index=True, default=False)
-    started_at = Column(DateTime, index=True, nullable=False,
-                        default = lambda x: datetime.datetime.utcnow())
+    started_at = Column(
+        DateTime,
+        index=True,
+        nullable=False,
+        default=lambda x: datetime.datetime.utcnow(),
+    )
 
     # Used in OPDS catalogs to convey the status of a validation attempt.
     STATUS_PROPERTY = "https://schema.org/reservationStatus"
@@ -1921,7 +1975,6 @@ class Validation(Base):
     resource = relationship(
         "Resource", backref=backref("validation", uselist=False), uselist=False
     )
-
 
     def restart(self):
         """Start a new validation attempt, cancelling any previous attempt.
@@ -1969,12 +2022,13 @@ class DelegatedPatronIdentifier(Base):
 
     This is probably an Adobe Account ID.
     """
-    ADOBE_ACCOUNT_ID = 'Adobe Account ID'
 
-    __tablename__ = 'delegatedpatronidentifiers'
+    ADOBE_ACCOUNT_ID = "Adobe Account ID"
+
+    __tablename__ = "delegatedpatronidentifiers"
     id = Column(Integer, primary_key=True)
     type = Column(String(255), index=True)
-    library_id = Column(Integer, ForeignKey('libraries.id'), index=True)
+    library_id = Column(Integer, ForeignKey("libraries.id"), index=True)
 
     # This is the ID the foreign library gives us when referring to
     # this patron.
@@ -1984,14 +2038,16 @@ class DelegatedPatronIdentifier(Base):
     # foreign library is trying to look up.
     delegated_identifier = Column(String)
 
-    __table_args__ = (
-        UniqueConstraint('type', 'library_id', 'patron_identifier'),
-    )
+    __table_args__ = (UniqueConstraint("type", "library_id", "patron_identifier"),)
 
     @classmethod
     def get_one_or_create(
-            cls, _db, library, patron_identifier, identifier_type,
-            identifier_or_identifier_factory
+        cls,
+        _db,
+        library,
+        patron_identifier,
+        identifier_type,
+        identifier_or_identifier_factory,
     ):
         """Look up the delegated identifier for the given patron. If there is
         none, create one.
@@ -2019,8 +2075,11 @@ class DelegatedPatronIdentifier(Base):
 
         """
         identifier, is_new = get_one_or_create(
-            _db, DelegatedPatronIdentifier, library=library,
-            patron_identifier=patron_identifier, type=identifier_type
+            _db,
+            DelegatedPatronIdentifier,
+            library=library,
+            patron_identifier=patron_identifier,
+            type=identifier_type,
         )
         if is_new:
             if callable(identifier_or_identifier_factory):
@@ -2030,7 +2089,7 @@ class DelegatedPatronIdentifier(Base):
                 # We haven't heard of this patron before, but some
                 # other server does know about them, and they told us
                 # this is the delegated identifier.
-                delegated_identifier=identifier_or_identifier_factory
+                delegated_identifier = identifier_or_identifier_factory
             identifier.delegated_identifier = delegated_identifier
         return identifier, is_new
 
@@ -2057,7 +2116,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         if isinstance(node_value, str):
             # The node value may be stored in hex form (that's how
             # Adobe gives it out) or as the equivalent decimal number.
-            if node_value.startswith('0x'):
+            if node_value.startswith("0x"):
                 node_value = int(node_value, 16)
             else:
                 node_value = int(node_value)
@@ -2073,12 +2132,12 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         """
         if not token:
             raise ValueError("Cannot decode an empty token.")
-        if not '|' in token:
+        if "|" not in token:
             raise ValueError(
                 'Supposed client token "%s" does not contain a pipe.' % token
             )
 
-        username, password = token.rsplit('|', 1)
+        username, password = token.rsplit("|", 1)
         return self.decode_two_part(_db, username, password)
 
     def decode_two_part(self, _db, username, password):
@@ -2095,9 +2154,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # If this username/password is not actually a Short Client
         # Token, this will raise an exception, which gives us a quick
         # way to bail out.
-        library, expires, patron_identifier = self._split_token(
-            _db, username
-        )
+        library, expires, patron_identifier = self._split_token(_db, username)
 
         # First see if a delegate can give us an Adobe ID (account_id)
         # for this patron.
@@ -2106,7 +2163,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
                 account_id, label, content = delegate.sign_in_standard(
                     username, password
                 )
-            except Exception as e:
+            except Exception:
                 # This delegate couldn't help us.
                 pass
             if account_id:
@@ -2118,20 +2175,22 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             # ourselves.
             try:
                 signature = self.adobe_base64_decode(password)
-            except Exception as e:
+            except Exception:
                 raise ValueError("Invalid password: %s" % password)
 
-            patron_identifier, account_id = self._decode(
-                _db, username, signature
-            )
+            patron_identifier, account_id = self._decode(_db, username, signature)
 
         # If we got this far, we have a Library, a patron_identifier,
         # and an account_id.
-        delegated_patron_identifier, is_new = (
-            DelegatedPatronIdentifier.get_one_or_create(
-                _db, library, patron_identifier,
-                DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, account_id
-            )
+        (
+            delegated_patron_identifier,
+            is_new,
+        ) = DelegatedPatronIdentifier.get_one_or_create(
+            _db,
+            library,
+            patron_identifier,
+            DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            account_id,
         )
         return delegated_patron_identifier
 
@@ -2140,7 +2199,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
         :return: A 3-tuple (Library, expiration, foreign patron identifier)
         """
-        if token.count('|') < 2:
+        if token.count("|") < 2:
             raise ValueError("Invalid client token: %s" % token)
         library_short_name, expiration, patron_identifier = token.split("|", 2)
         library_short_name = library_short_name.upper()
@@ -2149,7 +2208,8 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         library = get_one(_db, Library, short_name=library_short_name)
         if not library:
             raise ValueError(
-                "I don't know how to handle tokens from library \"%s\"" % library_short_name
+                'I don\'t know how to handle tokens from library "%s"'
+                % library_short_name
             )
         try:
             expiration = float(expiration)
@@ -2167,9 +2227,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # We don't police the content of the patron identifier but there
         # has to be _something_ there.
         if not patron_identifier:
-            raise ValueError(
-                "Token %s has empty patron identifier." % token
-            )
+            raise ValueError("Token %s has empty patron identifier." % token)
 
         # Don't bother checking an expired token.
         #
@@ -2182,18 +2240,14 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # this will break.
         if expiration < 1500000000:
             # This is a number of minutes since the start of 2017.
-            expiration = self.SCT_EPOCH + datetime.timedelta(
-                minutes=expiration
-            )
+            expiration = self.SCT_EPOCH + datetime.timedelta(minutes=expiration)
         else:
             # This is a number of seconds since the start of 1970.
             expiration = self.JWT_EPOCH + datetime.timedelta(seconds=expiration)
 
         if expiration < now:
             raise ValueError(
-                "Token %s expired at %s (now is %s)." % (
-                    token, expiration, now
-                )
+                "Token %s expired at %s (now is %s)." % (token, expiration, now)
             )
 
         # Sign the token and check against the provided signature.
@@ -2202,13 +2256,12 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         actual_signature = self.signer.sign(token_bytes, key)
 
         if actual_signature != supposed_signature:
-            raise ValueError(
-                "Invalid signature for %s." % token
-            )
+            raise ValueError("Invalid signature for %s." % token)
 
         # We have a Library, and a patron identifier which we know is valid.
         # Find or create a DelegatedPatronIdentifier for this person.
         return patron_identifier, self.uuid
+
 
 class ExternalIntegration(Base):
 
@@ -2220,24 +2273,24 @@ class ExternalIntegration(Base):
 
     # These integrations are associated with external services such as
     # Adobe Vendor ID, which manage access to DRM-dependent content.
-    DRM_GOAL = 'drm'
+    DRM_GOAL = "drm"
 
     # Integrations with DRM_GOAL
-    ADOBE_VENDOR_ID = 'Adobe Vendor ID'
+    ADOBE_VENDOR_ID = "Adobe Vendor ID"
 
     # These integrations are associated with external services that
     # collect logs of server-side events.
-    LOGGING_GOAL = 'logging'
+    LOGGING_GOAL = "logging"
 
     # Integrations with LOGGING_GOAL
-    INTERNAL_LOGGING = 'Internal logging'
-    LOGGLY = 'Loggly'
+    INTERNAL_LOGGING = "Internal logging"
+    LOGGLY = "Loggly"
 
     # These integrations are for sending email.
-    EMAIL_GOAL = 'email'
+    EMAIL_GOAL = "email"
 
     # Integrations with EMAIL_GOAL
-    SMTP = 'SMTP'
+    SMTP = "SMTP"
 
     # If there is a special URL to use for access to this API,
     # put it here.
@@ -2250,7 +2303,7 @@ class ExternalIntegration(Base):
     USERNAME = "username"
     PASSWORD = "password"
 
-    __tablename__ = 'externalintegrations'
+    __tablename__ = "externalintegrations"
     id = Column(Integer, primary_key=True)
 
     # Each integration should have a protocol (explaining what type of
@@ -2268,19 +2321,23 @@ class ExternalIntegration(Base):
     # Any additional configuration information goes into
     # ConfigurationSettings.
     settings = relationship(
-        "ConfigurationSetting", backref="external_integration",
-        lazy="joined", cascade="save-update, merge, delete, delete-orphan",
+        "ConfigurationSetting",
+        backref="external_integration",
+        lazy="joined",
+        cascade="save-update, merge, delete, delete-orphan",
     )
 
     def __repr__(self):
         return "<ExternalIntegration: protocol=%s goal='%s' settings=%d ID=%d>" % (
-            self.protocol, self.goal, len(self.settings), self.id)
+            self.protocol,
+            self.goal,
+            len(self.settings),
+            self.id,
+        )
 
     @classmethod
     def lookup(cls, _db, protocol, goal):
-        integrations = _db.query(cls).filter(
-            cls.protocol==protocol, cls.goal==goal
-        )
+        integrations = _db.query(cls).filter(cls.protocol == protocol, cls.goal == goal)
 
         integrations = integrations.all()
         if len(integrations) > 1:
@@ -2326,9 +2383,7 @@ class ExternalIntegration(Base):
         :param key: Name of the setting.
         :return: A ConfigurationSetting
         """
-        return ConfigurationSetting.for_externalintegration(
-            key, self
-        )
+        return ConfigurationSetting.for_externalintegration(key, self)
 
     def explain(self, include_secrets=False):
         """Create a series of human-readable strings to explain an
@@ -2349,11 +2404,13 @@ class ExternalIntegration(Base):
             if setting.library:
                 return setting.key, setting.library.name
             return (setting.key, None)
+
         for setting in sorted(self.settings, key=key):
             explanation = "%s='%s'" % (setting.key, setting.value)
             if setting.library:
                 explanation = "%s (applies only to %s)" % (
-                    explanation, setting.library.name
+                    explanation,
+                    setting.library.name,
                 )
             if include_secrets or not setting.is_secret:
                 lines.append(explanation)
@@ -2382,24 +2439,20 @@ class ConfigurationSetting(Base):
       is a patron of, is associated with both a Library and an
       ExternalIntegration.
     """
-    __tablename__ = 'configurationsettings'
+
+    __tablename__ = "configurationsettings"
     id = Column(Integer, primary_key=True)
     external_integration_id = Column(
-        Integer, ForeignKey('externalintegrations.id'), index=True
+        Integer, ForeignKey("externalintegrations.id"), index=True
     )
-    library_id = Column(
-        Integer, ForeignKey('libraries.id'), index=True
-    )
+    library_id = Column(Integer, ForeignKey("libraries.id"), index=True)
     key = Column(Unicode, index=True)
     _value = Column(Unicode, name="value")
 
-    __table_args__ = (
-        UniqueConstraint('external_integration_id', 'library_id', 'key'),
-    )
+    __table_args__ = (UniqueConstraint("external_integration_id", "library_id", "key"),)
 
     def __repr__(self):
-        return '<ConfigurationSetting: key=%s, ID=%d>' % (
-            self.key, self.id)
+        return "<ConfigurationSetting: key=%s, ID=%d>" % (self.key, self.id)
 
     @classmethod
     def sitewide_secret(cls, _db, key):
@@ -2421,9 +2474,11 @@ class ConfigurationSetting(Base):
         lines = []
         site_wide_settings = []
 
-        for setting in _db.query(ConfigurationSetting).filter(
-                ConfigurationSetting.library_id==None).filter(
-                    ConfigurationSetting.external_integration==None):
+        for setting in (
+            _db.query(ConfigurationSetting)
+            .filter(ConfigurationSetting.library_id == None)
+            .filter(ConfigurationSetting.external_integration == None)
+        ):
             if not include_secrets and setting.key.endswith("_secret"):
                 continue
             site_wide_settings.append(setting)
@@ -2457,7 +2512,7 @@ class ConfigurationSetting(Base):
 
     @classmethod
     def for_library_and_externalintegration(
-            cls, _db, key, library, external_integration
+        cls, _db, key, library, external_integration
     ):
         """Find or create a ConfigurationSetting associated with a Library
         and an ExternalIntegration.
@@ -2466,9 +2521,11 @@ class ConfigurationSetting(Base):
         if library:
             library_id = library.id
         setting, ignore = get_one_or_create(
-            _db, ConfigurationSetting,
-            library_id=library_id, external_integration=external_integration,
-            key=key
+            _db,
+            ConfigurationSetting,
+            library_id=library_id,
+            external_integration=external_integration,
+            key=key,
         )
         return setting
 
@@ -2494,7 +2551,8 @@ class ConfigurationSetting(Base):
             # ExternalIntegration. Treat the value set on the
             # ExternalIntegration as a default.
             return self.for_externalintegration(
-                self.key, self.external_integration).value
+                self.key, self.external_integration
+            ).value
         elif self.library_id:
             # This is a library-specific setting. Treat the site-wide
             # value as a default.
@@ -2522,11 +2580,11 @@ class ConfigurationSetting(Base):
         saying that a specific setting should be treated as secret.
         """
         return any(
-            key == x or
-            key.startswith('%s_' % x) or
-            key.endswith('_%s' % x) or
-            ("_%s_" %x) in key
-            for x in ('secret', 'password')
+            key == x
+            or key.startswith("%s_" % x)
+            or key.endswith("_%s" % x)
+            or ("_%s_" % x) in key
+            for x in ("secret", "password")
         )
 
     @property
@@ -2542,7 +2600,8 @@ class ConfigurationSetting(Base):
             self.value = default
         return self.value
 
-    MEANS_YES = set(['true', 't', 'yes', 'y'])
+    MEANS_YES = set(["true", "t", "yes", "y"])
+
     @property
     def bool_value(self):
         """Turn the value into a boolean if possible.
@@ -2591,30 +2650,31 @@ class ConfigurationSetting(Base):
             return json.loads(self.value)
         return None
 
+
 # Join tables for many-to-many relationships
 
 libraries_audiences = Table(
-    'libraries_audiences', Base.metadata,
-     Column(
-         'library_id', Integer, ForeignKey('libraries.id'),
-         index=True, nullable=False
-     ),
-     Column(
-         'audience_id', Integer, ForeignKey('audiences.id'),
-         index=True, nullable=False
-     ),
-     UniqueConstraint('library_id', 'audience_id'),
- )
+    "libraries_audiences",
+    Base.metadata,
+    Column(
+        "library_id", Integer, ForeignKey("libraries.id"), index=True, nullable=False
+    ),
+    Column(
+        "audience_id", Integer, ForeignKey("audiences.id"), index=True, nullable=False
+    ),
+    UniqueConstraint("library_id", "audience_id"),
+)
+
 
 class Admin(Base):
-    __tablename__ = 'admins'
+    __tablename__ = "admins"
     id = Column(Integer, primary_key=True)
     username = Column(Unicode, index=True, unique=True, nullable=False)
     password = Column(Unicode, index=True)
 
     @classmethod
     def make_password(cls, raw_password):
-        return generate_password_hash(raw_password).decode('utf-8')
+        return generate_password_hash(raw_password).decode("utf-8")
 
     def check_password(self, raw_password):
         return check_password_hash(self.password, raw_password)
@@ -2625,9 +2685,7 @@ class Admin(Base):
         :return: Admin or None
         """
         setting_up = _db.query(Admin).count() == 0
-        admin, is_new = get_one_or_create(
-            _db, Admin, username=username
-        )
+        admin, is_new = get_one_or_create(_db, Admin, username=username)
         if setting_up:
             admin.password = cls.make_password(password)
             return admin

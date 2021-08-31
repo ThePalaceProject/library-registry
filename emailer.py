@@ -1,9 +1,9 @@
+import logging
 import os
 from email import charset
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import logging
 from smtplib import SMTP
 
 from config import CannotLoadConfiguration, CannotSendEmail
@@ -12,7 +12,7 @@ from config import CannotLoadConfiguration, CannotSendEmail
 # Otherwise, the bodies of email messages will be encoded with base64
 # and they'll be hard to read. This way, only the non-ASCII characters
 # need to be encoded.
-charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
+charset.add_charset("utf-8", charset.QP, charset.QP, "utf-8")
 
 
 class Emailer:
@@ -20,24 +20,27 @@ class Emailer:
 
     log = logging.getLogger("Emailer")
 
-    ##### Class Constants ####################################################  # noqa: E266
     # Goal and setting names for the ExternalIntegration.
-    GOAL                = 'email'                                   # noqa: E221
-    PORT                = 'port'                                    # noqa: E221
-    FROM_ADDRESS        = 'from_address'                            # noqa: E221
-    FROM_NAME           = 'from_name'                               # noqa: E221
-    DEFAULT_FROM_NAME   = 'Library Simplified registry support'     # noqa: E221
+    GOAL = "email"
+    PORT = "port"
+    FROM_ADDRESS = "from_address"
+    FROM_NAME = "from_name"
+    DEFAULT_FROM_NAME = "Library Simplified registry support"
 
-    ENV_RECIPIENT_OVERRIDE_ADDRESS = 'EMAILER_RECIPIENT_OVERRIDE'
+    ENV_RECIPIENT_OVERRIDE_ADDRESS = "EMAILER_RECIPIENT_OVERRIDE"
 
     # Constants for different types of email.
-    ADDRESS_DESIGNATED          = 'address_designated'              # noqa: E221
-    ADDRESS_NEEDS_CONFIRMATION  = 'address_needs_confirmation'      # noqa: E221
+    ADDRESS_DESIGNATED = "address_designated"
+    ADDRESS_NEEDS_CONFIRMATION = "address_needs_confirmation"
 
     EMAIL_TYPES = [ADDRESS_DESIGNATED, ADDRESS_NEEDS_CONFIRMATION]
 
-    DEFAULT_ADDRESS_DESIGNATED_SUBJECT = "This address designated as the %(rel_desc)s for %(library)s"
-    DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT = "Confirm the %(rel_desc)s for %(library)s"
+    DEFAULT_ADDRESS_DESIGNATED_SUBJECT = (
+        "This address designated as the %(rel_desc)s for %(library)s"
+    )
+    DEFAULT_ADDRESS_NEEDS_CONFIRMATION_SUBJECT = (
+        "Confirm the %(rel_desc)s for %(library)s"
+    )
 
     DEFAULT_ADDRESS_DESIGNATED_TEMPLATE = (
         "This email address, %(to_address)s, has been registered with the Library Simplified library registry "
@@ -63,7 +66,9 @@ class Emailer:
 
     BODIES = {
         ADDRESS_DESIGNATED: DEFAULT_ADDRESS_DESIGNATED_TEMPLATE,
-        ADDRESS_NEEDS_CONFIRMATION: DEFAULT_ADDRESS_DESIGNATED_TEMPLATE + "\n\n" + NEEDS_CONFIRMATION_ADDITION
+        ADDRESS_NEEDS_CONFIRMATION: DEFAULT_ADDRESS_DESIGNATED_TEMPLATE
+        + "\n\n"
+        + NEEDS_CONFIRMATION_ADDITION,
     }
 
     SUBJECTS = {
@@ -75,24 +80,41 @@ class Emailer:
     # be able to fill in. This doesn't include from_address and to_address,
     # which are filled in separately.
     KNOWN_TEMPLATE_KEYS = [
-        'rel_desc',
-        'library',
-        'library_web_url',
-        'confirmation_link',
-        'to_address',
-        'from_address',
+        "rel_desc",
+        "library",
+        "library_web_url",
+        "confirmation_link",
+        "to_address",
+        "from_address",
     ]
 
-    ##### Public Interface / Magic Methods ###################################  # noqa: E266
-    def __init__(self, smtp_username, smtp_password, smtp_host, smtp_port, from_name, from_address, templates):
+    def __init__(
+        self,
+        smtp_username,
+        smtp_password,
+        smtp_host,
+        smtp_port,
+        from_name,
+        from_address,
+        templates,
+    ):
         config_errors = []
-        required_parameters = ('smtp_username', 'smtp_password', 'smtp_host', 'smtp_port', 'from_name', 'from_address')
+        required_parameters = (
+            "smtp_username",
+            "smtp_password",
+            "smtp_host",
+            "smtp_port",
+            "from_name",
+            "from_address",
+        )
         for param_name in required_parameters:
             if not locals()[param_name]:
                 config_errors.append(param_name)
 
         if config_errors:
-            msg = "Emailer instantiated with missing params: " + ", ".join(config_errors)
+            msg = "Emailer instantiated with missing params: " + ", ".join(
+                config_errors
+            )
             raise CannotLoadConfiguration(msg)
 
         self.smtp_username = smtp_username
@@ -103,12 +125,12 @@ class Emailer:
         self.from_address = from_address
         self.templates = templates
 
-        self.recipient_address_override = os.environ.get(self.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
+        self.recipient_address_override = os.environ.get(
+            self.ENV_RECIPIENT_OVERRIDE_ADDRESS, None
+        )
 
         # Make sure the templates don't contain any template values we can't handle.
-        test_template_values = dict(
-            (key, "value") for key in self.KNOWN_TEMPLATE_KEYS
-        )
+        test_template_values = dict((key, "value") for key in self.KNOWN_TEMPLATE_KEYS)
         for template in list(self.templates.values()):
             try:
                 template.body("from address", "to address", **test_template_values)
@@ -133,25 +155,29 @@ class Emailer:
         if email_type not in self.templates:
             raise ValueError("No such email template: %s" % email_type)
         template = self.templates[email_type]
-        from_header = '%s <%s>' % (self.from_name, self.from_address)
-        kwargs['from_address'] = self.from_address
+        from_header = "%s <%s>" % (self.from_name, self.from_address)
+        kwargs["from_address"] = self.from_address
         # Check to see if we have an alternative recipient, unless this is a test email.
-        recipient = (self._effective_recipient(default=to_address)
-                     if email_type != 'test'
-                     else to_address)
-        kwargs['to_address'] = to_address
+        recipient = (
+            self._effective_recipient(default=to_address)
+            if email_type != "test"
+            else to_address
+        )
+        kwargs["to_address"] = to_address
         body = template.body(from_header, to_header=recipient, **kwargs)
-        self.log.info('Sending email of type {!r} to {!r}{}'.format(
-            email_type, recipient,
-            f' on behalf of {to_address!r}' if recipient != to_address else '',
-        ))
+        self.log.info(
+            "Sending email of type {!r} to {!r}{}".format(
+                email_type,
+                recipient,
+                f" on behalf of {to_address!r}" if recipient != to_address else "",
+            )
+        )
 
         try:
             self._send_email(recipient, body, smtp_class)
         except Exception as exc:
             raise CannotSendEmail(exc)
 
-    ##### Private Methods ####################################################  # noqa: E266
     def _effective_recipient(self, default: str = None) -> str:
         """Override the recipient's email address, when applicable."""
         return self.recipient_address_override or default
@@ -165,9 +191,6 @@ class Emailer:
         smtp.sendmail(self.from_address, to_address, body)
         smtp.quit()
 
-    ##### Properties and Getters/Setters #####################################  # noqa: E266
-
-    ##### Class Methods ######################################################  # noqa: E266
     @classmethod
     def from_sitewide_integration(cls, _db):
         """Create an Emailer from a site-wide email integration.
@@ -183,43 +206,41 @@ class Emailer:
         email_templates = {}
         for email_type in cls.EMAIL_TYPES:
             subject = (
-                integration.setting(email_type + "_subject").value or
-                cls.SUBJECTS[email_type]
+                integration.setting(email_type + "_subject").value
+                or cls.SUBJECTS[email_type]
             )
             body = (
-                integration.setting(email_type + "_body").value or
-                cls.BODIES[email_type]
+                integration.setting(email_type + "_body").value
+                or cls.BODIES[email_type]
             )
             template = EmailTemplate(subject, body)
             email_templates[email_type] = template
 
-        return cls(smtp_username=integration.username,
-                   smtp_password=integration.password,
-                   smtp_host=host, smtp_port=port, from_name=from_name,
-                   from_address=from_address,
-                   templates=email_templates)
+        return cls(
+            smtp_username=integration.username,
+            smtp_password=integration.password,
+            smtp_host=host,
+            smtp_port=port,
+            from_name=from_name,
+            from_address=from_address,
+            templates=email_templates,
+        )
 
-    ##### Private Class Methods ##############################################  # noqa: E266
     @classmethod
     def _sitewide_integration(cls, _db):
         """Find the ExternalIntegration for the emailer."""
         from model import ExternalIntegration
-        qu = _db.query(ExternalIntegration).filter(
-            ExternalIntegration.goal == cls.GOAL
-        )
+
+        qu = _db.query(ExternalIntegration).filter(ExternalIntegration.goal == cls.GOAL)
         integrations = qu.all()
         if not integrations:
-            raise CannotLoadConfiguration(
-                "No email integration is configured."
-            )
+            raise CannotLoadConfiguration("No email integration is configured.")
             return None
 
         if len(integrations) > 1:
             # If there are multiple integrations configured, none of
             # them can be the 'site-wide' configuration.
-            raise CannotLoadConfiguration(
-                'Multiple email integrations are configured'
-            )
+            raise CannotLoadConfiguration("Multiple email integrations are configured")
 
         [integration] = integrations
         return integration
@@ -227,9 +248,7 @@ class Emailer:
 
 class EmailTemplate:
     """A template for email messages."""
-    ##### Class Constants ####################################################  # noqa: E266
 
-    ##### Public Interface / Magic Methods ###################################  # noqa: E266
     def __init__(self, subject_template, body_template):
         self.subject_template = subject_template
         self.body_template = body_template
@@ -243,29 +262,21 @@ class EmailTemplate:
         :param kwargs: Arguments to use when filling out the template.
         """
 
-        message = MIMEMultipart('mixed')
-        message['From'] = from_header
-        message['To'] = to_header
-        message['Subject'] = Header(self.subject_template % kwargs, 'utf-8')
+        message = MIMEMultipart("mixed")
+        message["From"] = from_header
+        message["To"] = to_header
+        message["Subject"] = Header(self.subject_template % kwargs, "utf-8")
 
         # This might look ugly, because %(from_address)s in a template
         # is expected to be an unadorned email address, whereas this
         # might look like '"Name" <email>', but it's better than
         # nothing.
-        for k, v in (('to_address', to_header), ('from_address', from_header)):
+        for k, v in (("to_address", to_header), ("from_address", from_header)):
             if k not in kwargs:
                 kwargs[k] = v
 
         payload = self.body_template % kwargs
-        text_part = MIMEText(payload, 'plain', 'utf-8')
+        text_part = MIMEText(payload, "plain", "utf-8")
         message.attach(text_part)
 
         return message.as_string()
-
-    ##### Private Methods ####################################################  # noqa: E266
-
-    ##### Properties and Getters/Setters #####################################  # noqa: E266
-
-    ##### Class Methods ######################################################  # noqa: E266
-
-    ##### Private Class Methods ##############################################  # noqa: E266

@@ -1,14 +1,14 @@
 """Utilities for Flask applications."""
-import re
 import ipaddress
+import re
 
-from flask import request, Response
+from flask import Response, request
 
 from . import problem_detail
 from .language import languages_from_accept
 
-
-IPV4_REGEX = re.compile(r"""(?<![0-9])                # Preceding character if any may not be numeric
+IPV4_REGEX = re.compile(
+    r"""(?<![0-9])                # Preceding character if any may not be numeric
                             (?P<address>              # entire address, capturing
                             (?:                       # quads 1-3 and separator, non-capturing
                                 (?:                   # quad value, non-capturing
@@ -28,7 +28,9 @@ IPV4_REGEX = re.compile(r"""(?<![0-9])                # Preceding character if a
                             )
                           )
                           (?![0-9])                   # trailing character if any may not be numeric
-                          """, re.VERBOSE)
+                          """,
+    re.VERBOSE,
+)
 
 
 def problem_raw(type, status, title, detail=None, instance=None, headers=None):
@@ -42,8 +44,7 @@ def problem_raw(type, status, title, detail=None, instance=None, headers=None):
 def problem(type, status, title, detail=None, instance=None, headers=None):
     """Create a Response that includes a Problem Detail Document."""
     headers = headers or {}
-    status, headers, data = problem_raw(
-        type, status, title, detail, instance, headers)
+    status, headers, data = problem_raw(type, status, title, detail, instance, headers)
     return Response(data, status, headers)
 
 
@@ -57,16 +58,16 @@ def is_public_ipv4_address(ip_string):
         try:
             ip_string = ipaddress.ip_address(ip_string)
         except ValueError:
-            pass             # TODO: Log it. Some caller is passing bad values to this fn.
-            return None      # incoming value couldn't be coerced to an IPv4Address object
+            pass  # TODO: Log it. Some caller is passing bad values to this fn.
+            return None  # incoming value couldn't be coerced to an IPv4Address object
 
     return bool(
-        ip_string.is_private     is False and     # noqa: E272
-        ip_string.is_multicast   is False and     # noqa: E272
-        ip_string.is_unspecified is False and     # noqa: E272
-        ip_string.is_reserved    is False and     # noqa: E272
-        ip_string.is_loopback    is False and     # noqa: E272
-        ip_string.is_link_local  is False         # noqa: E272
+        ip_string.is_private is False
+        and ip_string.is_multicast is False
+        and ip_string.is_unspecified is False
+        and ip_string.is_reserved is False
+        and ip_string.is_loopback is False
+        and ip_string.is_link_local is False
     )
 
 
@@ -84,17 +85,17 @@ def originating_ip():
 
     If no valid, public IPv4 address is found in either location, returns None.
     """
-    forwarded_for = request.headers.get('X-Forwarded-For', None)
+    forwarded_for = request.headers.get("X-Forwarded-For", None)
 
     if not forwarded_for and not request.remote_addr:
-        return None     # Nothing to go on from either headers or remote_addr
+        return None  # Nothing to go on from either headers or remote_addr
 
     client_ip = None
 
     if forwarded_for:
         try:
             fwd4_addresses = re.findall(IPV4_REGEX, forwarded_for)
-        except TypeError:   # whatever's in the header isn't a string/bytes-like object
+        except TypeError:  # whatever's in the header isn't a string/bytes-like object
             pass
 
         for ip in fwd4_addresses:

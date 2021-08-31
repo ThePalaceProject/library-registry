@@ -1,6 +1,6 @@
-import json
-import pytest
 from io import StringIO
+
+import pytest
 
 from config import Configuration
 from emailer import Emailer
@@ -30,31 +30,31 @@ from scripts import (
     ShowIntegrationsScript,
 )
 from testing import MockPlace
-from . import (
-    DatabaseTest
-)
+
+from . import DatabaseTest
 
 
 class TestLibraryScript(DatabaseTest):
-
     def test_libraries(self):
 
-        library = self._library(name="The Library")
-        ignored = self._library(name="Ignored Library")
+        the_library = self._library(name="The Library")
+        ignored_library = self._library(name="Ignored Library")
 
         class Mock(LibraryScript):
             # Mock of LibraryScript that returns a special value
             # when all_libraries is called.
 
             all_libraries_return_value = object()
+
             @property
             def all_libraries(self):
                 return self.all_libraries_return_value
+
         script = Mock(self._db)
 
         # Any library can be processed if it's identified by name.
-        for l in library, ignored:
-            assert script.libraries(l.name) == [l]
+        for library in the_library, ignored_library:
+            assert script.libraries(library.name) == [library]
         with pytest.raises(ValueError) as exc:
             script.libraries("Nonexistent Library")
         assert "No library with name 'Nonexistent Library'" in str(exc.value)
@@ -67,7 +67,7 @@ class TestLibraryScript(DatabaseTest):
         # Three libraries, one in each state.
         production = self._library()
         testing = self._library(library_stage=Library.TESTING_STAGE)
-        cancelled = self._library(library_stage=Library.CANCELLED_STAGE)
+        self._library(library_stage=Library.CANCELLED_STAGE)
 
         # The all_libraries property omits the cancelled library.
         script = LibraryScript(self._db)
@@ -75,7 +75,6 @@ class TestLibraryScript(DatabaseTest):
 
 
 class TestLoadPlacesScript(DatabaseTest):
-
     def test_run(self):
         test_ndjson = """{"parent_id": null, "name": "United States", "full_name": null, "aliases": [], "type": "nation", "abbreviated_name": "US", "id": "US"}
 {"type": "Point", "coordinates": [-159.459551, 54.948652]}
@@ -90,15 +89,16 @@ class TestLoadPlacesScript(DatabaseTest):
 
         # ...and import three places into the database.
         places = self._db.query(Place).all()
-        assert set([x.external_name for x in places]) == set(["United States", "Alabama", "Montgomery"])            
+        assert set([x.external_name for x in places]) == set(
+            ["United States", "Alabama", "Montgomery"]
+        )
         assert set([x.external_id for x in places]) == set(["US", "01", "0151000"])
 
 
 class TestSearchPlacesScript(DatabaseTest):
-
     def test_run(self):
         nys = self.new_york_state
-        ct = self.connecticut_state
+        ct = self.connecticut_state  # noqa: F841
         nyc = self.new_york_city
 
         # Run the script...
@@ -111,22 +111,22 @@ class TestSearchPlacesScript(DatabaseTest):
         actual_output = output.getvalue()
         assert repr(nys) in actual_output
         assert repr(nyc) in actual_output
-        assert 'Connecticut' not in actual_output
+        assert "Connecticut" not in actual_output
 
 
 class TestAddLibraryScript(DatabaseTest):
-
     def test_run(self):
         nyc = self.new_york_city
-        args = ['--name=The New York Public Library',
-                '--authentication-url=https://circulation.librarysimplified.org/NYNYPL/authentication_document',
-                '--place=' + nyc.external_id,
-                '--alias=NYPL',
-                '--web=https://nypl.org/',
-                '--opds=https://circulation.librarysimplified.org/',
-                '--description=Serving the five boroughs of New York, NY.',
-                '--short-name=NYNYPL',
-                '--shared-secret=12345',
+        args = [
+            "--name=The New York Public Library",
+            "--authentication-url=https://circulation.librarysimplified.org/NYNYPL/authentication_document",
+            "--place=" + nyc.external_id,
+            "--alias=NYPL",
+            "--web=https://nypl.org/",
+            "--opds=https://circulation.librarysimplified.org/",
+            "--description=Serving the five boroughs of New York, NY.",
+            "--short-name=NYNYPL",
+            "--shared-secret=12345",
         ]
         script = AddLibraryScript(self._db)
         script.run(cmd_args=args)
@@ -136,7 +136,10 @@ class TestAddLibraryScript(DatabaseTest):
 
         assert library.name == "The New York Public Library"
         assert library.internal_urn.startswith("urn:uuid")
-        assert library.authentication_url == "https://circulation.librarysimplified.org/NYNYPL/authentication_document"
+        assert (
+            library.authentication_url
+            == "https://circulation.librarysimplified.org/NYNYPL/authentication_document"
+        )
         assert library.web_url == "https://nypl.org/"
         assert library.opds_url == "https://circulation.librarysimplified.org/"
         assert library.description == "Serving the five boroughs of New York, NY."
@@ -151,14 +154,13 @@ class TestAddLibraryScript(DatabaseTest):
 
 
 class TestSearchLibraryScript(DatabaseTest):
-
     def test_run(self):
-        nys = self.new_york_state
+        nys = self.new_york_state  # noqa: F841
         nypl = self.nypl
-        csl = self.connecticut_state_library
-        zip = self.zip_10018
-        ct = self.connecticut_state
-        nyc = self.new_york_city
+        csl = self.connecticut_state_library  # noqa: F841
+        zip = self.zip_10018  # noqa: F841
+        ct = self.connecticut_state  # noqa: F841
+        nyc = self.new_york_city  # noqa: F841
         nypl.opds_url = "http://opds/"
 
         # Run the script...
@@ -171,18 +173,19 @@ class TestSearchLibraryScript(DatabaseTest):
         actual_output = output.getvalue()
         assert actual_output == "%s: %s\n" % (nypl.name, nypl.opds_url)
 
-class TestConfigureSiteScript(DatabaseTest):
 
+class TestConfigureSiteScript(DatabaseTest):
     def test_settings(self):
         script = ConfigureSiteScript()
         output = StringIO()
         script.do_run(
-            self._db, [
+            self._db,
+            [
                 "--setting=setting1=value1",
-                "--setting=setting2=[1,2,\"3\"]",
+                '--setting=setting2=[1,2,"3"]',
                 "--setting=secret_setting=secretvalue",
             ],
-            output
+            output,
         )
         # The secret was set, but is not shown.
         actual = output.getvalue()
@@ -191,7 +194,10 @@ class TestConfigureSiteScript(DatabaseTest):
 
         assert ConfigurationSetting.sitewide(self._db, "setting1").value == "value1"
         assert ConfigurationSetting.sitewide(self._db, "setting2").value == '[1,2,"3"]'
-        assert ConfigurationSetting.sitewide(self._db, "secret_setting").value == "secretvalue"
+        assert (
+            ConfigurationSetting.sitewide(self._db, "secret_setting").value
+            == "secretvalue"
+        )
 
         # If we run again with --show-secrets, the secret is shown.
         output = StringIO()
@@ -203,7 +209,6 @@ class TestConfigureSiteScript(DatabaseTest):
 
 
 class TestShowIntegrationsScript(DatabaseTest):
-
     def test_with_no_integrations(self):
         output = StringIO()
         ShowIntegrationsScript().do_run(self._db, output=output)
@@ -211,16 +216,18 @@ class TestShowIntegrationsScript(DatabaseTest):
 
     def test_with_multiple_integrations(self):
         i1, ignore = create(
-            self._db, ExternalIntegration,
+            self._db,
+            ExternalIntegration,
             name="Integration 1",
             goal="Goal",
-            protocol=ExternalIntegration.ADOBE_VENDOR_ID
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
         )
         i2, ignore = create(
-            self._db, ExternalIntegration,
+            self._db,
+            ExternalIntegration,
             name="Integration 2",
             goal="Goal",
-            protocol=ExternalIntegration.ADOBE_VENDOR_ID
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
         )
 
         # The output of this script is the result of running explain()
@@ -232,22 +239,17 @@ class TestShowIntegrationsScript(DatabaseTest):
 
         assert output.getvalue() == expect_1 + "\n" + expect_2 + "\n"
 
-
         # We can tell the script to only list a single integration.
         output = StringIO()
         ShowIntegrationsScript().do_run(
-            self._db,
-            cmd_args=["--name=Integration 2"],
-            output=output
+            self._db, cmd_args=["--name=Integration 2"], output=output
         )
         assert output.getvalue() == expect_2 + "\n"
 
         # We can tell the script to include the integration secrets
         output = StringIO()
         ShowIntegrationsScript().do_run(
-            self._db,
-            cmd_args=["--show-secrets"],
-            output=output
+            self._db, cmd_args=["--show-secrets"], output=output
         )
         expect_1 = "\n".join(i1.explain(include_secrets=True))
         expect_2 = "\n".join(i2.explain(include_secrets=True))
@@ -255,13 +257,15 @@ class TestShowIntegrationsScript(DatabaseTest):
 
 
 class TestConfigureIntegrationScript(DatabaseTest):
-
     def test_load_integration(self):
         m = ConfigureIntegrationScript._integration
 
         with pytest.raises(ValueError) as exc:
             m(self._db, None, None, "protocol", None)
-        assert "An integration must by identified by either ID, name, or the combination of protocol and goal." in str(exc.value)
+        assert (
+            "An integration must by identified by either ID, name, or the combination of protocol and goal."
+            in str(exc.value)
+        )
 
         with pytest.raises(ValueError) as exc:
             m(self._db, "notanid", None, None, None)
@@ -269,14 +273,16 @@ class TestConfigureIntegrationScript(DatabaseTest):
 
         with pytest.raises(ValueError) as exc:
             m(self._db, None, "Unknown integration", None, None)
-        assert 'No integration with name "Unknown integration". To create it, you must also provide protocol and goal.' in str(exc.value)
+        assert (
+            'No integration with name "Unknown integration". To create it, you must also provide protocol and goal.'
+            in str(exc.value)
+        )
 
         integration, ignore = create(
-            self._db, ExternalIntegration,
-            protocol="Protocol", goal="Goal"
+            self._db, ExternalIntegration, protocol="Protocol", goal="Goal"
         )
         integration.name = "An integration"
-        assert m(self._db, integration.id, None, None, None) == integration        
+        assert m(self._db, integration.id, None, None, None) == integration
         assert m(self._db, None, integration.name, None, None) == integration
         assert m(self._db, None, None, "Protocol", "Goal") == integration
 
@@ -292,24 +298,27 @@ class TestConfigureIntegrationScript(DatabaseTest):
         output = StringIO()
 
         script.do_run(
-            self._db, [
+            self._db,
+            [
                 "--protocol=aprotocol",
                 "--goal=agoal",
                 "--setting=akey=avalue",
             ],
-            output
+            output,
         )
 
         # An ExternalIntegration was created and configured.
-        integration = get_one(self._db, ExternalIntegration,
-                              protocol="aprotocol", goal="agoal")
+        integration = get_one(
+            self._db, ExternalIntegration, protocol="aprotocol", goal="agoal"
+        )
 
-        expect_output = "Configuration settings stored.\n" + "\n".join(integration.explain()) + "\n"
+        expect_output = (
+            "Configuration settings stored.\n" + "\n".join(integration.explain()) + "\n"
+        )
         assert output.getvalue() == expect_output
 
 
 class TestRegistrationRefreshScript(DatabaseTest):
-
     def test_run(self):
         # Verify that run() instantiates a LibraryRegistrar using .registrar,
         # then calls its reregister() method on every library that it's
@@ -338,6 +347,7 @@ class TestRegistrationRefreshScript(DatabaseTest):
                     return INVALID_INTEGRATION_DOCUMENT
 
         mock_registrar = MockRegistrar()
+
         class MockScript(RegistrationRefreshScript):
             def libraries(self, library_name):
                 # Return a predefined set of libraries.
@@ -348,6 +358,7 @@ class TestRegistrationRefreshScript(DatabaseTest):
             def registrar(self):
                 # Return a fake LibraryRegistrar.
                 return mock_registrar
+
         script = MockScript(self._db)
 
         # Run with no arguments -- this will process all libraries in
@@ -374,8 +385,8 @@ class TestRegistrationRefreshScript(DatabaseTest):
         assert isinstance(registrar, LibraryRegistrar)
         assert registrar._db == self._db
 
-class TestSetCoverageAreaScript(DatabaseTest):
 
+class TestSetCoverageAreaScript(DatabaseTest):
     def test_argument_parsing(self):
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
@@ -387,9 +398,8 @@ class TestSetCoverageAreaScript(DatabaseTest):
     def test_unrecognized_place(self):
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
-        for arg in ['service-area', 'focus-area']:
-            args = ["--library=%s" % library.name,
-                    '--%s={"US": "San Francisco"}' % arg]
+        for arg in ["service-area", "focus-area"]:
+            args = ["--library=%s" % library.name, '--%s={"US": "San Francisco"}' % arg]
             with pytest.raises(ValueError) as exc:
                 s.run(args, place_class=MockPlace)
             assert "Unknown places:" in str(exc.value)
@@ -400,23 +410,21 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
-        for arg in ['service-area', 'focus-area']:
-            args = ["--library=%s" % library.name,
-                    '--%s={"OO": "everywhere"}' % arg]
+        for arg in ["service-area", "focus-area"]:
+            args = ["--library=%s" % library.name, '--%s={"OO": "everywhere"}' % arg]
             with pytest.raises(ValueError) as exc:
                 s.run(args, place_class=MockPlace)
             assert "Ambiguous places:" in str(exc.value)
         MockPlace.by_name = {}
 
     def test_success(self):
-        us = self._place(type=Place.NATION, abbreviated_name='US')
+        us = self._place(type=Place.NATION, abbreviated_name="US")
         library = self._library()
         s = SetCoverageAreaScript(_db=self._db)
 
         # Setting an eligibility area with no focus area assigns that
         # service area to the library.
-        args = ["--library=%s" % library.name,
-                '--service-area={"US": "everywhere"}']
+        args = ["--library=%s" % library.name, '--service-area={"US": "everywhere"}']
         s.run(args)
         [area] = library.service_areas
         assert area.place == us
@@ -427,19 +435,18 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         # Note that running this script a second time replaces the
         # old service areas rather than adding to them.
-        uk = self._place(type=Place.NATION, abbreviated_name='UK')
-        args = ["--library=%s" % library.name,
-                '--focus-area={"UK": "everywhere"}',
-                '--service-area="everywhere"'
+        uk = self._place(type=Place.NATION, abbreviated_name="UK")
+        args = [
+            "--library=%s" % library.name,
+            '--focus-area={"UK": "everywhere"}',
+            '--service-area="everywhere"',
         ]
         s.run(args)
         [focus] = [
-            x.place for x in library.service_areas
-            if x.type==ServiceArea.FOCUS
+            x.place for x in library.service_areas if x.type == ServiceArea.FOCUS
         ]
         [eligibility] = [
-            x.place for x in library.service_areas
-            if x.type==ServiceArea.ELIGIBILITY
+            x.place for x in library.service_areas if x.type == ServiceArea.ELIGIBILITY
         ]
         assert uk == focus
         assert eligibility.type == Place.EVERYWHERE
@@ -449,10 +456,9 @@ class TestSetCoverageAreaScript(DatabaseTest):
         ConfigurationSetting.sitewide(
             self._db, Configuration.DEFAULT_NATION_ABBREVIATION
         ).value = "US"
-        ut = self._place(type=Place.STATE, abbreviated_name='UT', parent=us)
+        ut = self._place(type=Place.STATE, abbreviated_name="UT", parent=us)
 
-        args = ["--library=%s" % library.name,
-                '--service-area=UT']
+        args = ["--library=%s" % library.name, "--service-area=UT"]
         s.run(args)
 
         # Again, running the script completely overwrites your service
@@ -462,10 +468,10 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
 
 class TestConfigureEmailerScript(DatabaseTest):
-
     def test_run(self):
         class Mock(Emailer):
             sent = None
+
             def send(self, template_name, to_address):
                 Mock.sent = (template_name, to_address)
 
@@ -476,14 +482,10 @@ class TestConfigureEmailerScript(DatabaseTest):
             "--password=a_password",
             "--from-address=from@example.com",
             "--from-name=Administrator",
-            "--test-address=you@example.com"
+            "--test-address=you@example.com",
         ]
         script = ConfigureEmailerScript(self._db)
-        script.do_run(
-            self._db,
-            cmd_args=cmd_args,
-            emailer_class=Mock
-        )
+        script.do_run(self._db, cmd_args=cmd_args, emailer_class=Mock)
 
         # The ExternalIntegration is properly configured.
         emailer = Emailer._sitewide_integration(self._db)
@@ -501,7 +503,6 @@ class TestConfigureEmailerScript(DatabaseTest):
 
 
 class TestConfigureVendorIDScript(DatabaseTest):
-
     def test_run(self):
         cmd_args = [
             "--vendor-id=LIBR",
@@ -514,12 +515,16 @@ class TestConfigureVendorIDScript(DatabaseTest):
 
         # The ExternalIntegration is properly configured.
         integration = ExternalIntegration.lookup(
-            self._db, ExternalIntegration.ADOBE_VENDOR_ID,
-            ExternalIntegration.DRM_GOAL
+            self._db, ExternalIntegration.ADOBE_VENDOR_ID, ExternalIntegration.DRM_GOAL
         )
         assert integration.setting(Configuration.ADOBE_VENDOR_ID).value == "LIBR"
-        assert integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value == "abc12"
-        assert integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).json_value == ["http://server1/AdobeAuth/", "http://server2/AdobeAuth/"]
+        assert (
+            integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value
+            == "abc12"
+        )
+        assert integration.setting(
+            Configuration.ADOBE_VENDOR_ID_DELEGATE_URL
+        ).json_value == ["http://server1/AdobeAuth/", "http://server2/AdobeAuth/"]
 
         # It's okay to configure without a delegate.
         cmd_args = [
@@ -531,12 +536,17 @@ class TestConfigureVendorIDScript(DatabaseTest):
 
         # The ExternalIntegration is properly configured.
         integration = ExternalIntegration.lookup(
-            self._db, ExternalIntegration.ADOBE_VENDOR_ID,
-            ExternalIntegration.DRM_GOAL
+            self._db, ExternalIntegration.ADOBE_VENDOR_ID, ExternalIntegration.DRM_GOAL
         )
         assert integration.setting(Configuration.ADOBE_VENDOR_ID).value == "VENDOR"
-        assert integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value == "133715d34d"
-        assert integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).json_value == []
+        assert (
+            integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value
+            == "133715d34d"
+        )
+        assert (
+            integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).json_value
+            == []
+        )
 
         # The script won't run if --node-value or --delegate have obviously
         # wrong values.

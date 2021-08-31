@@ -1,14 +1,14 @@
 from util import GeometryUtility
 
-class TestGeometryUtility(object):
 
+class TestGeometryUtility(object):
     def test_point(self):
         point = GeometryUtility.point("80", "-4")
-        assert point == 'SRID=4326;POINT(-4 80)'
+        assert point == "SRID=4326;POINT(-4 80)"
 
     def test_point_from_ip(self):
         point = GeometryUtility.point_from_ip("65.88.88.124")
-        assert point == 'SRID=4326;POINT(-73.9169 40.8056)'
+        assert point == "SRID=4326;POINT(-73.9169 40.8056)"
 
         point = GeometryUtility.point_from_ip("127.0.0.1")
         assert point is None
@@ -25,5 +25,4 @@ class TestGeometryUtility(object):
 
         # Here are some strings that do.
         for coords in ("40.7769, -73.9813", "40.7769,-73.9813"):
-            assert m(coords) == 'SRID=4326;POINT(-73.9813 40.7769)'
-
+            assert m(coords) == "SRID=4326;POINT(-73.9813 40.7769)"

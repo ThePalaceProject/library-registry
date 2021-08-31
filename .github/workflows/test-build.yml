@@ -1,31 +1,22 @@
-name: Test Library Registry & Build Docker Image
+name: Lint, Test & Build
 on: [push, pull_request]
+
 env:
-  POSTGRES_USER: simplified_test
-  POSTGRES_PASSWORD: test
-  POSTGRES_DB: simplified_registry_test
-  SIMPLIFIED_TEST_DATABASE: postgresql://simplified_test:test@localhost:5432/simplified_registry_test
+  POETRY_VERSION: 1.1.8
+  POETRY_URL: https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py
 
 jobs:
-  test-library-registry:
-    name: Run Library Registry Tests
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
 
     # We want to run on external PRs, but not on our own internal PRs as they'll be run
     # by the push to the branch. This prevents duplicated runs on internal PRs.
     # Some discussion of this here:
     # https://github.community/t/duplicate-checks-on-push-and-pull-request-simultaneous-event/18012
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
-
-    services:
-      postgres:
-        image: postgis/postgis:12-3.1
-        env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
-        ports:
-          - 5432:5432
 
     steps:
       - uses: actions/checkout@v2
@@ -38,16 +29,62 @@ jobs:
       - name: Install Python Packages
         run: |
           pip install --upgrade pip
-          pip install pipenv
-          pipenv install
+          pip install tox
+
+      - name: Run isort
+        run: tox -e isort
+
+      - name: Run Black
+        run: tox -e black
+
+      - name: Run Flake8
+        run: tox -e flake8
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
+
+    # We want to run on external PRs, but not on our own internal PRs as they'll be run
+    # by the push to the branch. This prevents duplicated runs on internal PRs.
+    # Some discussion of this here:
+    # https://github.community/t/duplicate-checks-on-push-and-pull-request-simultaneous-event/18012
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache Poetry cache
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pypoetry
+          key: poetry-cache-${{ runner.os }}-${{ matrix.python-version }}-${{ env.POETRY_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: |
+          curl -sSL ${{ env.POETRY_URL }} | python -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install Python Packages
+        run: |
+          pip install --upgrade pip
+          pip install tox tox-gh-actions tox-docker
 
       - name: Run Tests
-        run: pipenv run pytest -x tests
+        run: tox
 
-  build-docker-library-registry:
-    name: Build and push library-registry docker image
+  build:
+    name: Build and push docker image
     runs-on: ubuntu-latest
-    needs: test-library-registry
+    needs: [lint, test]
     env:
       REGISTRY_HOST: ghcr.io
       # Don't push the Docker image if the `NO_DOCKER_IMAGE` secret is set.

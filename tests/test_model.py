@@ -1,20 +1,15 @@
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm.exc import MultipleResultsFound
-import base64
 import datetime
 import json
-import operator
 import random
 
 import pytest
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm.exc import MultipleResultsFound
 
 from config import Configuration
 from emailer import Emailer
 from model import (
-    create,
-    get_one,
-    get_one_or_create,
     Admin,
     Audience,
     CollectionSummary,
@@ -28,50 +23,57 @@ from model import (
     Place,
     PlaceAlias,
     Validation,
+    create,
+    get_one_or_create,
 )
-from util import (
-    GeometryUtility
-)
+from util import GeometryUtility
 
-from . import (
-    DatabaseTest,
-)
+from . import DatabaseTest
 
 
 class TestPlace(DatabaseTest):
-
     def test_creation(self):
         # Create some US states represented by points.
         # (Rather than by multi-polygons, as they will be represented in
         # the actual application.)
         new_york, is_new = get_one_or_create(
-            self._db, Place, type=Place.STATE, external_id='04',
-            external_name='New York',
-            create_method_kwargs=dict(geometry='SRID=4326;POINT(-75 43)')
+            self._db,
+            Place,
+            type=Place.STATE,
+            external_id="04",
+            external_name="New York",
+            create_method_kwargs=dict(geometry="SRID=4326;POINT(-75 43)"),
         )
         assert is_new is True
 
         new_mexico, is_new = get_one_or_create(
-            self._db, Place, type=Place.STATE, external_id='21',
-            external_name='New Mexico',
-            create_method_kwargs=dict(geometry='SRID=4326;POINT(-106 34)')
+            self._db,
+            Place,
+            type=Place.STATE,
+            external_id="21",
+            external_name="New Mexico",
+            create_method_kwargs=dict(geometry="SRID=4326;POINT(-106 34)"),
         )
 
         connecticut, is_new = get_one_or_create(
-            self._db, Place, type=Place.STATE, external_id='14',
-            external_name='Connecticut',
-            create_method_kwargs=dict(geometry='SRID=4326;POINT(-73.7 41.6)')
+            self._db,
+            Place,
+            type=Place.STATE,
+            external_id="14",
+            external_name="Connecticut",
+            create_method_kwargs=dict(geometry="SRID=4326;POINT(-73.7 41.6)"),
         )
 
         # Create a city within one of the states, again represented by
         # a point rather than an outline.
         lake_placid, is_new = get_one_or_create(
-            self._db, Place, type=Place.CITY, external_id='1234',
-            external_name='Lake Placid',
+            self._db,
+            Place,
+            type=Place.CITY,
+            external_id="1234",
+            external_name="Lake Placid",
             parent=new_york,
-            create_method_kwargs=dict(
-                geometry='SRID=4326;POINT(-73.59 44.17)'
-            )
+            create_method_kwargs=dict(geometry="SRID=4326;POINT(-73.59 44.17)"),
         )
         assert lake_placid.parent == new_york
         assert new_york.children == [lake_placid]
@@ -79,25 +81,33 @@ class TestPlace(DatabaseTest):
 
         # Query the database to find states ordered by distance from
         # Lake Placid.
-        distance = func.ST_DistanceSphere(
-            lake_placid.geometry, Place.geometry
+        distance = func.ST_DistanceSphere(lake_placid.geometry, Place.geometry)
+        places = (
+            self._db.query(Place)
+            .filter(Place.type == Place.STATE)
+            .order_by(distance)
+            .add_columns(distance)
         )
-        places = self._db.query(Place).filter(
-            Place.type==Place.STATE).order_by(distance).add_columns(distance)
 
         # We can find the distance in kilometers between the 'Lake
         # Placid' point and the points representing the other states.
-        assert [(x[0].external_name, int(x[1]/1000)) for x in places] == [("New York", 172), ("Connecticut", 285), ("New Mexico", 2993)]
+        assert [(x[0].external_name, int(x[1] / 1000)) for x in places] == [
+            ("New York", 172),
+            ("Connecticut", 285),
+            ("New Mexico", 2993),
+        ]
 
     def test_aliases(self):
         new_york, is_new = get_one_or_create(
-            self._db, Place, type=Place.STATE, external_id='04',
-            external_name='New York',
-            create_method_kwargs=dict(geometry='SRID=4326;POINT(-75 43)')
+            self._db,
+            Place,
+            type=Place.STATE,
+            external_id="04",
+            external_name="New York",
+            create_method_kwargs=dict(geometry="SRID=4326;POINT(-75 43)"),
         )
         alias, is_new = get_one_or_create(
-            self._db, PlaceAlias, place=new_york,
-            name='New York State', language='eng'
+            self._db, PlaceAlias, place=new_york, name="New York State", language="eng"
         )
         assert new_york.aliases == [alias]
 
@@ -135,14 +145,14 @@ class TestPlace(DatabaseTest):
         # GeometryCollection document.
         zip2 = self.zip_11212
         geojson = Place.to_geojson(self._db, zip1, zip2)
-        assert geojson['type'] == "GeometryCollection"
+        assert geojson["type"] == "GeometryCollection"
 
         # There are two geometries in this document -- one for each
         # Place we passed in.
-        geometries = geojson['geometries']
+        geometries = geojson["geometries"]
         assert len(geometries) == 2
         for check in [self.zip_10018_geojson, self.zip_11212_geojson]:
-            assert json.loads(check) in geojson['geometries']
+            assert json.loads(check) in geojson["geometries"]
 
     def test_overlaps_not_counting_border(self):
         """Test that overlaps_not_counting_border does not count places
@@ -195,20 +205,25 @@ class TestPlace(DatabaseTest):
         nation = self._place(external_name="United States", type=Place.NATION)
         assert "United States" == nation.human_friendly_name
 
-        state = self._place(external_name="Alabama", abbreviated_name="AL",
-                            type=Place.STATE, parent=nation)
+        state = self._place(
+            external_name="Alabama",
+            abbreviated_name="AL",
+            type=Place.STATE,
+            parent=nation,
+        )
         assert "Alabama" == state.human_friendly_name
 
-        city = self._place(external_name="Montgomery", type=Place.CITY, 
-                           parent=state)
+        city = self._place(external_name="Montgomery", type=Place.CITY, parent=state)
         assert "Montgomery, AL" == city.human_friendly_name
 
-        county = self._place(external_name="Montgomery", type=Place.COUNTY, 
-                             parent=state)
+        county = self._place(
+            external_name="Montgomery", type=Place.COUNTY, parent=state
+        )
         assert "Montgomery County, AL" == county.human_friendly_name
 
-        postal_code = self._place(external_name="36043", type=Place.POSTAL_CODE,
-                                  parent=state)
+        postal_code = self._place(
+            external_name="36043", type=Place.POSTAL_CODE, parent=state
+        )
         assert "36043" == postal_code.human_friendly_name
 
         # This shouldn't happen, but just in case: the state's full
@@ -226,9 +241,7 @@ class TestPlace(DatabaseTest):
         # There are two places in California called 'Santa Barbara': a
         # city, and a county (which includes the city).
         sb_city = self._place(external_name="Santa Barbara", type=Place.CITY)
-        sb_county = self._place(
-            external_name="Santa Barbara", type=Place.COUNTY
-        )
+        sb_county = self._place(external_name="Santa Barbara", type=Place.COUNTY)
 
         # If we look up "Santa Barbara" by name, we get the city.
         m = Place.lookup_by_name
@@ -237,7 +250,7 @@ class TestPlace(DatabaseTest):
         # To get Santa Barbara County, we have to refer to
         # "Santa Barbara County"
         assert m(self._db, "Santa Barbara County").all() == [sb_county]
-        
+
     def test_lookup_inside(self):
         us = self.crude_us
         zip_10018 = self.zip_10018
@@ -245,7 +258,6 @@ class TestPlace(DatabaseTest):
         new_york = self.new_york_state
         connecticut = self.connecticut_state
         manhattan_ks = self.manhattan_ks
-        kansas = manhattan_ks.parent
         kings_county = self.crude_kings_county
         zip_12601 = self.zip_12601
 
@@ -313,13 +325,18 @@ class TestPlace(DatabaseTest):
         #
         # Many county names are ambiguous, but this lets us parse
         # the ones that are not.
-        assert everywhere.lookup_inside("Kings County, US", using_overlap=True) == kings_county
+        assert (
+            everywhere.lookup_inside("Kings County, US", using_overlap=True)
+            == kings_county
+        )
 
         # Neither of these is obviously better.
         assert us.lookup_inside("Manhattan") is None
         with pytest.raises(MultipleResultsFound) as exc:
             us.lookup_inside("Manhattan", using_overlap=True)
-        assert "More than one place called Manhattan inside United States." in str(exc.value)
+        assert "More than one place called Manhattan inside United States." in str(
+            exc.value
+        )
 
         # Now the cases where using_overlap=False performs better.
 
@@ -328,13 +345,17 @@ class TestPlace(DatabaseTest):
         assert us.lookup_inside("New York") == new_york
         with pytest.raises(MultipleResultsFound) as exc:
             us.lookup_inside("New York", using_overlap=True)
-        assert "More than one place called New York inside United States." in str(exc.value)
+        assert "More than one place called New York inside United States." in str(
+            exc.value
+        )
 
         # "New York, New York" can only be parsed by parentage.
         assert us.lookup_inside("New York, New York") == nyc
         with pytest.raises(MultipleResultsFound) as exc:
             us.lookup_inside("New York, New York", using_overlap=True)
-        assert "More than one place called New York inside United States." in str(exc.value)
+        assert "More than one place called New York inside United States." in str(
+            exc.value
+        )
 
         # Using geographic overlap has another problem -- although the
         # name of the method is 'lookup_inside', we're actually
@@ -372,9 +393,8 @@ class TestPlace(DatabaseTest):
         assert m("ZXCVB") is None
 
         # Or if we try to use uszipcode on a place that's not in the US.
-        ontario = self._place('35', 'Ontario', Place.STATE,
-                              'ON', None, None)
-        assert ontario.lookup_one_through_external_source('Hamilton') is None
+        ontario = self._place("35", "Ontario", Place.STATE, "ON", None, None)
+        assert ontario.lookup_one_through_external_source("Hamilton") is None
 
         # Calling this method on a Place that's not a state doesn't
         # make sense (because uszipcode only knows about cities within
@@ -413,14 +433,13 @@ class TestPlace(DatabaseTest):
 
 
 class TestLibrary(DatabaseTest):
-
     def test_timestamp(self):
         """Timestamp gets automatically set on database commit."""
         nypl = self._library("New York Public Library")
         first_modified = nypl.timestamp
         now = datetime.datetime.utcnow()
         self._db.commit()
-        assert (now-first_modified).seconds < 2
+        assert (now - first_modified).seconds < 2
 
         nypl.opds_url = "http://library/"
         self._db.commit()
@@ -428,22 +447,20 @@ class TestLibrary(DatabaseTest):
 
     def test_short_name(self):
         lib = self._library("A Library")
-        lib.short_name = 'abcd'
+        lib.short_name = "abcd"
         assert lib.short_name == "ABCD"
-        try:
-            lib.short_name = 'ab|cd'
-            raise Error("Expected exception not raised.")
-        except ValueError as e:
-            assert str(e) == 'Short name cannot contain the pipe character.'
+        with pytest.raises(ValueError) as e:
+            lib.short_name = "ab|cd"
+        assert "Short name cannot contain the pipe character." in str(e)
 
     def test_for_short_name(self):
-        assert Library.for_short_name(self._db, 'ABCD') is None
+        assert Library.for_short_name(self._db, "ABCD") is None
         lib = self._library("A Library")
-        lib.short_name = 'ABCD'
-        assert Library.for_short_name(self._db, 'ABCD') == lib
+        lib.short_name = "ABCD"
+        assert Library.for_short_name(self._db, "ABCD") == lib
 
     def test_for_urn(self):
-        assert Library.for_urn(self._db, 'ABCD') is None
+        assert Library.for_urn(self._db, "ABCD") is None
         lib = self._library()
         assert Library.for_urn(self._db, lib.internal_urn) == lib
 
@@ -452,15 +469,17 @@ class TestLibrary(DatabaseTest):
         random.seed(42)
         name = Library.random_short_name()
 
-        expect = 'UDAXIH'
+        expect = "UDAXIH"
         assert expect == name
 
         # Reset the random seed so the same name will be generated again.
         random.seed(42)
+
         # Create a duplicate_check implementation that claims QAHFTR
         # has already been used.
         def already_used(name):
             return name == expect
+
         name = Library.random_short_name(duplicate_check=already_used)
 
         # random_short_name now generates `expect`, but it's a
@@ -475,9 +494,12 @@ class TestLibrary(DatabaseTest):
         # 20).
         def theyre_all_duplicates(name):
             return True
+
         with pytest.raises(ValueError) as exc:
             Library.random_short_name(duplicate_check=theyre_all_duplicates)
-        assert "Could not generate random short name after 20 attempts!" in str(exc.value)
+        assert "Could not generate random short name after 20 attempts!" in str(
+            exc.value
+        )
 
     def test_set_library_stage(self):
         lib = self._library()
@@ -486,6 +508,7 @@ class TestLibrary(DatabaseTest):
         # take a library from production to non-production.
         def crash():
             lib.library_stage = Library.TESTING_STAGE
+
         with pytest.raises(ValueError) as exc:
             crash()
         assert "This library is already in production" in str(exc.value)
@@ -523,16 +546,22 @@ class TestLibrary(DatabaseTest):
         production_library = self._library()
         assert production_library.number_of_patrons == 0
         identifier1, is_new = DelegatedPatronIdentifier.get_one_or_create(
-            self._db, production_library, self._str, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
-            None
+            self._db,
+            production_library,
+            self._str,
+            DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            None,
         )
         assert production_library.number_of_patrons == 1
 
         # Identifiers for another library don't count towards the total.
         production_library_2 = self._library()
         identifier1, is_new = DelegatedPatronIdentifier.get_one_or_create(
-            self._db, production_library_2, self._str, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
-            None
+            self._db,
+            production_library_2,
+            self._str,
+            DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            None,
         )
         assert production_library.number_of_patrons == 1
 
@@ -545,8 +574,11 @@ class TestLibrary(DatabaseTest):
         testing_library = self._library(library_stage=Library.TESTING_STAGE)
         assert testing_library.number_of_patrons == 0
         identifier3, is_new = DelegatedPatronIdentifier.get_one_or_create(
-            self._db, testing_library, self._str, DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
-            None
+            self._db,
+            testing_library,
+            self._str,
+            DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID,
+            None,
         )
         assert testing_library.number_of_patrons == 0
 
@@ -556,8 +588,8 @@ class TestLibrary(DatabaseTest):
             self._db, [production_library, production_library_2, testing_library]
         )
         assert counts == {
-            production_library.id : 1,
-            production_library_2.id : 1,
+            production_library.id: 1,
+            production_library_2.id: 1,
         }
 
     def test__feed_restriction(self):
@@ -670,8 +702,7 @@ class TestLibrary(DatabaseTest):
         postal = self.zip_10018
         city = self.new_york_city
         state = self.new_york_state
-        county = self.crude_kings_county
-        nation = self._place('CA', 'Canada', Place.NATION, 'CA', None)
+        nation = self._place("CA", "Canada", Place.NATION, "CA", None)
         province = self._place("MB", "Manitoba", Place.STATE, "MB", nation)
         everywhere = Place.everywhere(self._db)
 
@@ -683,7 +714,7 @@ class TestLibrary(DatabaseTest):
             (state, LibraryType.STATE),
             (province, LibraryType.PROVINCE),
             (nation, LibraryType.NATIONAL),
-            (everywhere, LibraryType.UNIVERSAL)
+            (everywhere, LibraryType.UNIVERSAL),
         ):
 
             library = self._library(self._str, focus_areas=[focus])
@@ -707,95 +738,121 @@ class TestLibrary(DatabaseTest):
         everywhere = Place.everywhere(self._db)
 
         library = self._library(
-            "Internet Archive", eligibility_areas=[everywhere],
-            focus_areas=[everywhere]
+            "Internet Archive", eligibility_areas=[everywhere], focus_areas=[everywhere]
         )
         assert None == library.service_area_name
 
         # A library with a single eligibility area has a
         # straightforward name.
         library = self._library(
-            "test library", eligibility_areas=[everywhere, new_york],
-            focus_areas=[everywhere]
+            "test library",
+            eligibility_areas=[everywhere, new_york],
+            focus_areas=[everywhere],
         )
         assert "New York" == library.service_area_name
 
         # If you somehow specify the same place twice, it's fine.
         library = self._library(
-            "test library", eligibility_areas=[new_york, new_york],
-            focus_areas=[everywhere]
+            "test library",
+            eligibility_areas=[new_york, new_york],
+            focus_areas=[everywhere],
         )
         assert "New York" == library.service_area_name
 
         # If the library has an eligibility area and a focus area,
         # the focus area takes precedence.
         library = self._library(
-            "test library", eligibility_areas=[everywhere, new_york],
-            focus_areas=[nyc, everywhere]
+            "test library",
+            eligibility_areas=[everywhere, new_york],
+            focus_areas=[nyc, everywhere],
         )
         assert "New York, NY" == library.service_area_name
 
         # If there are multiple focus areas and one eligibility area,
         # we're back to using the focus area.
         library = self._library(
-            "test library", eligibility_areas=[everywhere, new_york],
-            focus_areas=[nyc, zip, everywhere]
+            "test library",
+            eligibility_areas=[everywhere, new_york],
+            focus_areas=[nyc, zip, everywhere],
         )
         assert "New York" == library.service_area_name
 
         # If there are multiple focus areas _and_ multiple eligibility areas,
         # there's no one string that describes the service area.
         library = self._library(
-            "test library", eligibility_areas=[everywhere, new_york, zip],
-            focus_areas=[nyc, zip, everywhere]
+            "test library",
+            eligibility_areas=[everywhere, new_york, zip],
+            focus_areas=[nyc, zip, everywhere],
         )
         assert None == library.service_area_name
 
     def test_relevant_audience(self):
         research = self._library(
-            "NYU Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city],
+            "NYU Library",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city],
             audiences=[Audience.RESEARCH],
         )
         public = self._library(
-            "New York Public Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city],
+            "New York Public Library",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city],
             audiences=[Audience.PUBLIC],
         )
         education = self._library(
-            "School", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city],
+            "School",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city],
             audiences=[Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY],
         )
         self._db.flush()
 
-        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.PUBLIC]).most_common()
+        [(lib, s)] = Library.relevant(
+            self._db, (40.65, -73.94), "eng", audiences=[Audience.PUBLIC]
+        ).most_common()
         assert lib == public
 
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.RESEARCH]).most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (40.65, -73.94), "eng", audiences=[Audience.RESEARCH]
+        ).most_common()
         assert lib1 == research
         assert lib2 == public
 
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng', audiences=[Audience.EDUCATIONAL_PRIMARY]).most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (40.65, -73.94), "eng", audiences=[Audience.EDUCATIONAL_PRIMARY]
+        ).most_common()
         assert lib1 == education
         assert lib2 == public
 
     def test_relevant_collection_size(self):
         small = self._library(
-            "Small Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+            "Small Library",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city],
         )
         CollectionSummary.set(small, "eng", 10)
         large = self._library(
-            "Large Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+            "Large Library",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city],
         )
         CollectionSummary.set(large, "eng", 100000)
         empty = self._library(
-            "Empty Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+            "Empty Library",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city],
         )
         CollectionSummary.set(empty, "eng", 0)
         unknown = self._library(
-            "Unknown Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city]
+            "Unknown Library",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city],
         )
         self._db.flush()
 
-        [(lib1, s1), (lib2, s2), (lib3, s3)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
+        [(lib1, s1), (lib2, s2), (lib3, s3)] = Library.relevant(
+            self._db, (40.65, -73.94), "eng"
+        ).most_common()
         assert lib1 == large
         assert lib2 == small
         assert lib3 == unknown
@@ -806,77 +863,103 @@ class TestLibrary(DatabaseTest):
         # the entire state of Connecticut. They have the same focus area
         # so this only tests eligibility area.
         nypl = self._library(
-            "New York Public Library", eligibility_areas=[self.new_york_city], focus_areas=[self.new_york_city, self.connecticut_state],
+            "New York Public Library",
+            eligibility_areas=[self.new_york_city],
+            focus_areas=[self.new_york_city, self.connecticut_state],
         )
         ct_state = self._library(
-            "Connecticut State Library", eligibility_areas=[self.connecticut_state], focus_areas=[self.new_york_city, self.connecticut_state],
+            "Connecticut State Library",
+            eligibility_areas=[self.connecticut_state],
+            focus_areas=[self.new_york_city, self.connecticut_state],
         )
         self._db.flush()
 
         # From this point in Brooklyn, NYPL is the closest library.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (40.65, -73.94), "eng"
+        ).most_common()
         assert lib1 == nypl
         assert lib2 == ct_state
 
         # From this point in Connecticut, CT State is the closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng').most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (41.3, -73.3), "eng"
+        ).most_common()
         assert lib1 == ct_state
         assert lib2 == nypl
 
         # From this point in New Jersey, NYPL is closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng').most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (40.72, -74.47), "eng"
+        ).most_common()
         assert lib1 == nypl
         assert lib2 == ct_state
 
         # From this point in the Indian Ocean, both libraries
         # are so far away they're below the score threshold.
-        assert list(Library.relevant(self._db, (-15, 91), 'eng').most_common()) == []
+        assert list(Library.relevant(self._db, (-15, 91), "eng").most_common()) == []
 
     def test_relevant_focus_area(self):
         # Create two libraries. One serves New York City, and one serves
         # the entire state of Connecticut. They have the same eligibility
         # area, so this only tests focus area.
         nypl = self._library(
-            "New York Public Library", focus_areas=[self.new_york_city], eligibility_areas=[self.new_york_city, self.connecticut_state]
+            "New York Public Library",
+            focus_areas=[self.new_york_city],
+            eligibility_areas=[self.new_york_city, self.connecticut_state],
         )
         ct_state = self._library(
-            "Connecticut State Library", focus_areas=[self.connecticut_state], eligibility_areas=[self.new_york_city, self.connecticut_state]
+            "Connecticut State Library",
+            focus_areas=[self.connecticut_state],
+            eligibility_areas=[self.new_york_city, self.connecticut_state],
         )
         self._db.flush()
 
         # From this point in Brooklyn, NYPL is the closest library.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (40.65, -73.94), "eng"
+        ).most_common()
         assert lib1 == nypl
         assert lib2 == ct_state
 
         # From this point in Connecticut, CT State is the closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (41.3, -73.3), 'eng').most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (41.3, -73.3), "eng"
+        ).most_common()
         assert lib1 == ct_state
         assert lib2 == nypl
 
         # From this point in New Jersey, NYPL is closest.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.72, -74.47), 'eng').most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (40.72, -74.47), "eng"
+        ).most_common()
         assert lib1 == nypl
         assert lib2 == ct_state
 
         # From this point in the Indian Ocean, both libraries
         # are so far away they're below the score threshold.
-        assert list(Library.relevant(self._db, (-15, 91), 'eng').most_common()) == []
+        assert list(Library.relevant(self._db, (-15, 91), "eng").most_common()) == []
 
     def test_relevant_focus_area_size(self):
         # This library serves NYC.
         nypl = self._library(
-            "New York Public Library", focus_areas=[self.new_york_city], eligibility_areas=[self.new_york_state]
+            "New York Public Library",
+            focus_areas=[self.new_york_city],
+            eligibility_areas=[self.new_york_state],
         )
         # This library serves New York state.
         ny_state = self._library(
-            "New York State Library", focus_areas=[self.new_york_state], eligibility_areas=[self.new_york_state]
+            "New York State Library",
+            focus_areas=[self.new_york_state],
+            eligibility_areas=[self.new_york_state],
         )
         self._db.flush()
 
         # This point in Brooklyn is in both libraries' focus areas,
         # but NYPL has a smaller focus area so it wins.
-        [(lib1, s1), (lib2, s2)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
+        [(lib1, s1), (lib2, s2)] = Library.relevant(
+            self._db, (40.65, -73.94), "eng"
+        ).most_common()
         assert lib1 == nypl
         assert lib2 == ny_state
 
@@ -885,23 +968,25 @@ class TestLibrary(DatabaseTest):
 
         # This library serves NYC.
         nypl = self._library(
-            "New York Public Library", focus_areas=[self.new_york_city], eligibility_areas=[self.new_york_state]
+            "New York Public Library",
+            focus_areas=[self.new_york_city],
+            eligibility_areas=[self.new_york_state],
         )
         # This library has no service areas.
-        no_service_area = self._library(
-            "Nowhere Library"
-        )
+        self._library("Nowhere Library")
 
         self._db.flush()
 
-        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), 'eng').most_common()
+        [(lib, s)] = Library.relevant(self._db, (40.65, -73.94), "eng").most_common()
         assert lib == nypl
 
     def test_relevant_all_factors(self):
         # This library serves the general public in NY state, with a focus on Manhattan.
         nypl = self._library(
-            "New York Public Library", focus_areas=[self.crude_new_york_county],
-            eligibility_areas=[self.new_york_state], audiences=[Audience.PUBLIC],
+            "New York Public Library",
+            focus_areas=[self.crude_new_york_county],
+            eligibility_areas=[self.new_york_state],
+            audiences=[Audience.PUBLIC],
         )
         CollectionSummary.set(nypl, "eng", 150000)
         CollectionSummary.set(nypl, "spa", 20000)
@@ -909,52 +994,66 @@ class TestLibrary(DatabaseTest):
 
         # This library serves the general public in NY state, with a focus on Brooklyn.
         bpl = self._library(
-            "Brooklyn Public Library", focus_areas=[self.crude_kings_county],
-            eligibility_areas=[self.new_york_state], audiences=[Audience.PUBLIC],
+            "Brooklyn Public Library",
+            focus_areas=[self.crude_kings_county],
+            eligibility_areas=[self.new_york_state],
+            audiences=[Audience.PUBLIC],
         )
         CollectionSummary.set(bpl, "eng", 75000)
         CollectionSummary.set(bpl, "spa", 10000)
 
         # This library serves the general public in Albany.
         albany = self._library(
-            "Albany Public Library", focus_areas=[self.crude_albany],
-            eligibility_areas=[self.crude_albany], audiences=[Audience.PUBLIC],
+            "Albany Public Library",
+            focus_areas=[self.crude_albany],
+            eligibility_areas=[self.crude_albany],
+            audiences=[Audience.PUBLIC],
         )
         CollectionSummary.set(albany, "eng", 50000)
         CollectionSummary.set(albany, "spa", 5000)
 
         # This library serves NYU students.
         nyu_lib = self._library(
-            "NYU Library", focus_areas=[self.new_york_city],
-            eligibility_areas=[self.new_york_city], audiences=[Audience.EDUCATIONAL_SECONDARY],
+            "NYU Library",
+            focus_areas=[self.new_york_city],
+            eligibility_areas=[self.new_york_city],
+            audiences=[Audience.EDUCATIONAL_SECONDARY],
         )
         CollectionSummary.set(nyu_lib, "eng", 100000)
 
         # These libraries serves the general public, but mostly academics.
         nyu_press = self._library(
-            "NYU Press", focus_areas=[self.new_york_city],
-            eligibility_areas=[Place.everywhere(self._db)], audiences=[Audience.RESEARCH, Audience.PUBLIC],
+            "NYU Press",
+            focus_areas=[self.new_york_city],
+            eligibility_areas=[Place.everywhere(self._db)],
+            audiences=[Audience.RESEARCH, Audience.PUBLIC],
         )
         CollectionSummary.set(nyu_press, "eng", 40)
 
         unm = self._library(
-            "UNM Press", focus_areas=[self.kansas_state],
-            eligibility_areas=[Place.everywhere(self._db)], audiences=[Audience.RESEARCH, Audience.PUBLIC],
+            "UNM Press",
+            focus_areas=[self.kansas_state],
+            eligibility_areas=[Place.everywhere(self._db)],
+            audiences=[Audience.RESEARCH, Audience.PUBLIC],
         )
         CollectionSummary.set(unm, "eng", 60)
         CollectionSummary.set(unm, "spa", 10)
 
         # This library serves people with print disabilities in the US.
         bard = self._library(
-            "BARD", focus_areas=[self.crude_us],
-            eligibility_areas=[self.crude_us], audiences=[Audience.PRINT_DISABILITY],
+            "BARD",
+            focus_areas=[self.crude_us],
+            eligibility_areas=[self.crude_us],
+            audiences=[Audience.PRINT_DISABILITY],
         )
         CollectionSummary.set(bard, "eng", 100000)
 
         # This library serves the general public everywhere.
         internet_archive = self._library(
-            "Internet Archive", focus_areas=[Place.everywhere(self._db)],
-            eligibility_areas=[Place.everywhere(self._db)], audiences=[Audience.PUBLIC],
+            "Internet Archive",
+            focus_areas=[Place.everywhere(self._db)],
+            eligibility_areas=[Place.everywhere(self._db)],
+            audiences=[Audience.PUBLIC],
         )
         CollectionSummary.set(internet_archive, "eng", 10000000)
         CollectionSummary.set(internet_archive, "spa", 1000)
@@ -965,58 +1064,101 @@ class TestLibrary(DatabaseTest):
         # In Manhattan.
         libraries = Library.relevant(self._db, (40.75, -73.98), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
-            
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Brooklyn.
         libraries = Library.relevant(self._db, (40.65, -73.94), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [bpl, nypl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            bpl,
+            nypl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Queens.
         libraries = Library.relevant(self._db, (40.76, -73.91), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Albany.
         libraries = Library.relevant(self._db, (42.66, -73.77), "eng").most_common()
         assert len(libraries) == 5
-        assert [l[0] for l in libraries] == [albany, nypl, bpl, internet_archive, nyu_press]
-            
+        assert [library[0] for library in libraries] == [
+            albany,
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Syracuse (200km west of Albany).
         libraries = Library.relevant(self._db, (43.06, -76.15), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In New Jersey.
         libraries = Library.relevant(self._db, (40.79, -74.43), "eng").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
         # In Las Cruces, NM. Internet Archive is first at the moment
         # due to its large collection, but maybe it would be better if UNM was.
         libraries = Library.relevant(self._db, (32.32, -106.77), "eng").most_common()
         assert len(libraries) == 2
-        assert set([l[0] for l in libraries]) == set([unm, internet_archive])
-            
+        assert set([library[0] for library in libraries]) == set(
+            [unm, internet_archive]
+        )
 
         # Russian speaker in Albany. Albany doesn't pass the score threshold
         # since it didn't report having any Russian books, but maybe we should
         # consider the total collection size as well as the user's language.
         libraries = Library.relevant(self._db, (42.66, -73.77), "rus").most_common()
         assert len(libraries) == 2
-        assert [l[0] for l in libraries] == [nypl, internet_archive]
+        assert [library[0] for library in libraries] == [nypl, internet_archive]
 
         # Spanish speaker in Manhattan.
         libraries = Library.relevant(self._db, (40.75, -73.98), "spa").most_common()
         assert len(libraries) == 4
-        assert [l[0] for l in libraries] == [nypl, bpl, internet_archive, unm]
+        assert [library[0] for library in libraries] == [
+            nypl,
+            bpl,
+            internet_archive,
+            unm,
+        ]
 
         # Patron with a print disability in Manhattan.
-        libraries = Library.relevant(self._db, (40.75, -73.98), "eng", audiences=[Audience.PRINT_DISABILITY]).most_common()
+        libraries = Library.relevant(
+            self._db, (40.75, -73.98), "eng", audiences=[Audience.PRINT_DISABILITY]
+        ).most_common()
         assert len(libraries) == 5
-        assert [l[0] for l in libraries] == [bard, nypl, bpl, internet_archive, nyu_press]
+        assert [library[0] for library in libraries] == [
+            bard,
+            nypl,
+            bpl,
+            internet_archive,
+            nyu_press,
+        ]
 
     def test_nearby(self):
         # Create two libraries. One serves New York City, and one serves
@@ -1037,7 +1179,7 @@ class TestLibrary(DatabaseTest):
         assert d1 == 0
         assert lib1 == nypl
 
-        assert int(d2/1000) == 44
+        assert int(d2 / 1000) == 44
         assert lib2 == ct_state
 
         # From this point in Connecticut, CT State is the closest
@@ -1048,13 +1190,13 @@ class TestLibrary(DatabaseTest):
         assert d1 == 0
 
         assert lib2 == nypl
-        assert int(d2/1000) == 61
+        assert int(d2 / 1000) == 61
 
         # From this point in Pennsylvania, NYPL shows up (142km away) but
         # CT State does not.
         [(lib1, d1)] = Library.nearby(self._db, (40, -75.8))
         assert lib1 == nypl
-        assert int(d1/1000) == 142
+        assert int(d1 / 1000) == 142
 
         # If we only look within a 100km radius, then there are no
         # libraries near that point in Pennsylvania.
@@ -1065,9 +1207,10 @@ class TestLibrary(DatabaseTest):
             return Library.nearby(
                 self._db, (41.3, -73.3), production=production
             ).count()
+
         # Take all the libraries we found earlier out of production.
-        for l in ct_state, nypl:
-            l.registry_stage = Library.TESTING_STAGE
+        for library in ct_state, nypl:
+            library.registry_stage = Library.TESTING_STAGE
         # Now there are no results.
         assert m(True) == 0
 
@@ -1094,21 +1237,28 @@ class TestLibrary(DatabaseTest):
     def test_query_parts(self):
         m = Library.query_parts
         assert m("93203") == (None, "93203", Place.POSTAL_CODE)
-        assert m("new york public library") == ("new york public library", "new york", None)
+        assert m("new york public library") == (
+            "new york public library",
+            "new york",
+            None,
+        )
         assert m("queens library") == ("queens library", "queens", None)
         assert m("kern county library") == ("kern county library", "kern", Place.COUNTY)
-        assert m("new york state library") == ("new york state library", "new york", Place.STATE)
+        assert m("new york state library") == (
+            "new york state library",
+            "new york",
+            Place.STATE,
+        )
         assert m("lapl") == ("lapl", "lapl", None)
 
     def test_search_by_library_name(self):
         def search(name, here=None, **kwargs):
-            return list(
-                Library.search_by_library_name(self._db, name, here, **kwargs)
-            )
+            return list(Library.search_by_library_name(self._db, name, here, **kwargs))
 
         # The Brooklyn Public Library serves New York City.
         brooklyn = self._library(
-            name="Brooklyn Public Library", focus_areas=[self.new_york_city, self.zip_11212]
+            name="Brooklyn Public Library",
+            focus_areas=[self.new_york_city, self.zip_11212],
         )
 
         # We can find the library by its name.
@@ -1118,8 +1268,7 @@ class TestLibrary(DatabaseTest):
         # that is longer than 6 characters.
         assert search("broklyn public library") == [brooklyn]
         get_one_or_create(
-            self._db, LibraryAlias, name="Bklynlib", language=None,
-            library=brooklyn
+            self._db, LibraryAlias, name="Bklynlib", language=None, library=brooklyn
         )
         assert search("zklynlib") == [brooklyn]
 
@@ -1134,27 +1283,32 @@ class TestLibrary(DatabaseTest):
         # Both libraries are known colloquially as 'BPL'.
         for library in (brooklyn, boston):
             get_one_or_create(
-                self._db, LibraryAlias, name="BPL", language=None,
-                library=library
+                self._db, LibraryAlias, name="BPL", language=None, library=library
             )
-        assert set(search("bpl")) == set([brooklyn, boston]) 
-        
+        assert set(search("bpl")) == set([brooklyn, boston])
+
         # We do not tolerate typos in short names, because the chance of
         # ambiguity is so high.
         assert search("opl") == []
 
         # If we're searching for "BPL" from California, Brooklyn shows
         # up first, because it's closer to California.
-        assert [x[0].name for x in search("bpl", GeometryUtility.point(35, -118))] == ["Brooklyn Public Library", "Boston Public Library"]
+        assert [x[0].name for x in search("bpl", GeometryUtility.point(35, -118))] == [
+            "Brooklyn Public Library",
+            "Boston Public Library",
+        ]
 
         # If we're searching for "BPL" from Maine, Boston shows
         # up first, because it's closer to Maine.
-        assert [x[0].name for x in search("bpl", GeometryUtility.point(43, -70))] == ["Boston Public Library", "Brooklyn Public Library"]
+        assert [x[0].name for x in search("bpl", GeometryUtility.point(43, -70))] == [
+            "Boston Public Library",
+            "Brooklyn Public Library",
+        ]
 
         # By default, search_by_library_name() only finds libraries
         # in production. Put them in the TESTING stage and they disappear.
-        for l in (brooklyn, boston):
-            l.registry_stage = Library.TESTING_STAGE
+        for library in (brooklyn, boston):
+            library.registry_stage = Library.TESTING_STAGE
         assert search("bpl", production=True) == []
 
         # But you can find them by passing in production=False.
@@ -1164,7 +1318,6 @@ class TestLibrary(DatabaseTest):
         # We know about three libraries.
         nypl = self.nypl
         kansas_state = self.kansas_state_library
-        connecticut_state = self.connecticut_state_library
 
         # The NYPL explicitly covers New York City, which has
         # 'Manhattan' as an alias.
@@ -1176,7 +1329,7 @@ class TestLibrary(DatabaseTest):
         [kansas] = [x.place for x in kansas_state.service_areas]
         assert kansas.external_name == "Kansas"
         assert kansas.type == Place.STATE
-        manhattan_ks = self.manhattan_ks
+        manhattan_ks = self.manhattan_ks  # noqa: F841
 
         # A search for 'manhattan' finds both libraries.
         libraries = list(Library.search_by_location_name(self._db, "manhattan"))
@@ -1213,15 +1366,31 @@ class TestLibrary(DatabaseTest):
         assert brooklyn_results[0] == nypl
 
         nypl.registry_stage = Library.TESTING_STAGE
-        assert Library.search_by_location_name(self._db, "brooklyn", here=GeometryUtility.point(43, -70), production=True).all() == []
-        
-        assert Library.search_by_location_name(self._db, "brooklyn", here=GeometryUtility.point(43, -70), production=False).count() == 1
-        
+        assert (
+            Library.search_by_location_name(
+                self._db,
+                "brooklyn",
+                here=GeometryUtility.point(43, -70),
+                production=True,
+            ).all()
+            == []
+        )
+
+        assert (
+            Library.search_by_location_name(
+                self._db,
+                "brooklyn",
+                here=GeometryUtility.point(43, -70),
+                production=False,
+            ).count()
+            == 1
+        )
+
     def test_search_within_description(self):
         """Test searching for a phrase within a library's description."""
         library = self._library(
             name="Library With Description",
-            description="We are giving this library a description for testing purposes."
+            description="We are giving this library a description for testing purposes.",
         )
         results = list(Library.search_within_description(self._db, "testing purposes"))
         assert results == [library]
@@ -1235,14 +1404,14 @@ class TestLibrary(DatabaseTest):
 
         # Here's a library whose service area includes a place called
         # "New York".
-        nypl = self.nypl
+        nypl = self.nypl  # noqa: F841
 
         libraries = Library.search(self._db, (40.7, -73.9), "NEW YORK")
         # Even though NYPL is closer to the current location, the
         # Kansas library showed up first because it was a name match,
         # as opposed to a service location match.
-        assert [x[0].name for x in libraries] == ['Now Work', 'NYPL']
-        assert [int(x[1]/1000) for x in libraries] == [1768, 0]
+        assert [x[0].name for x in libraries] == ["Now Work", "NYPL"]
+        assert [int(x[1] / 1000) for x in libraries] == [1768, 0]
 
         # This search query has a Levenshtein distance of 1 from "New
         # York", but a distance of 3 from "Now Work", so only NYPL
@@ -1252,22 +1421,20 @@ class TestLibrary(DatabaseTest):
         # which intersect with NYPL's service area, NYPL only shows up
         # once.
         libraries = Library.search(self._db, (40.7, -73.9), "NEW YORM")
-        assert [x[0].name for x in libraries] == ['NYPL']
+        assert [x[0].name for x in libraries] == ["NYPL"]
 
         # Searching for a place name picks up libraries whose service
         # areas intersect with that place.
         libraries = Library.search(self._db, (40.7, -73.9), "Kansas")
-        assert [x[0].name for x in libraries] == ['Now Work']
+        assert [x[0].name for x in libraries] == ["Now Work"]
 
         # By default, search() only finds libraries in production.
         self.nypl.registry_stage = Library.TESTING_STAGE
         new_work.registry_stage = Library.TESTING_STAGE
+
         def m(production):
-            return len(
-                Library.search(
-                    self._db, (40.7, -73.9), "New York", production
-                )
-            )
+            return len(Library.search(self._db, (40.7, -73.9), "New York", production))
+
         assert m(True) == 0
 
         # But you can find libraries that are in the testing stage
@@ -1288,7 +1455,6 @@ class TestLibrary(DatabaseTest):
 
 
 class TestCollectionSummary(DatabaseTest):
-
     def test_set(self):
         library = self._library()
         summary = CollectionSummary.set(library, "eng", 100)
@@ -1308,13 +1474,13 @@ class TestCollectionSummary(DatabaseTest):
         assert summary.size == 100
 
     def test_size_must_be_integerable(self):
-        library  = self._library()
+        library = self._library()
         with pytest.raises(ValueError) as exc:
             CollectionSummary.set(library, "eng", "fruit")
         assert "invalid literal for" in str(exc.value)
 
     def test_negative_size_is_not_allowed(self):
-        library  = self._library()
+        library = self._library()
         with pytest.raises(ValueError) as exc:
             CollectionSummary.set(library, "eng", "-1")
         assert "Collection size cannot be negative." in str(exc.value)
@@ -1328,16 +1494,16 @@ class TestAudience(DatabaseTest):
 
 
 class TestDelegatedPatronIdentifier(DatabaseTest):
-
     def test_get_one_or_create(self):
         library = self._library()
         patron_identifier = self._str
         identifier_type = DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID
+
         def make_id():
             return "id1"
+
         identifier, is_new = DelegatedPatronIdentifier.get_one_or_create(
-            self._db, library, patron_identifier, identifier_type,
-            make_id
+            self._db, library, patron_identifier, identifier_type, make_id
         )
         assert is_new is True
         assert identifier.library == library
@@ -1349,6 +1515,7 @@ class TestDelegatedPatronIdentifier(DatabaseTest):
         # that raises an exception if called.
         def explode():
             raise Exception("I should never be called.")
+
         identifier2, is_new = DelegatedPatronIdentifier.get_one_or_create(
             self._db, library, patron_identifier, identifier_type, explode
         )
@@ -1358,8 +1525,8 @@ class TestDelegatedPatronIdentifier(DatabaseTest):
         # id_2() was not called.
         assert identifier2.delegated_identifier == "id1"
 
-class TestExternalIntegration(DatabaseTest):
 
+class TestExternalIntegration(DatabaseTest):
     def setup(self):
         super(TestExternalIntegration, self).setup()
         self.external_integration, ignore = create(
@@ -1386,17 +1553,19 @@ class TestExternalIntegration(DatabaseTest):
 
     def test_explain(self):
         integration, ignore = create(
-            self._db, ExternalIntegration,
-            protocol="protocol", goal="goal"
+            self._db, ExternalIntegration, protocol="protocol", goal="goal"
         )
         integration.name = "The Integration"
         integration.setting("somesetting").value = "somevalue"
         integration.setting("password").value = "somepass"
 
-        expect = """ID: %s
+        expect = (
+            """ID: %s
 Name: The Integration
 Protocol/Goal: protocol/goal
-somesetting='somevalue'""" % integration.id
+somesetting='somevalue'"""
+            % integration.id
+        )
         actual = integration.explain()
         assert expect == "\n".join(actual)
 
@@ -1404,19 +1573,19 @@ somesetting='somevalue'""" % integration.id
         with_secrets = integration.explain(include_secrets=True)
         assert "password='somepass'" in with_secrets
 
-class TestConfigurationSetting(DatabaseTest):
 
+class TestConfigurationSetting(DatabaseTest):
     def test_is_secret(self):
         """Some configuration settings are considered secrets,
         and some are not.
         """
         m = ConfigurationSetting._is_secret
-        assert m('secret') is True
-        assert m('password') is True
-        assert m('its_a_secret_to_everybody') is True
-        assert m('the_password') is True
-        assert m('password_for_the_account') is True
-        assert m('public_information') is False
+        assert m("secret") is True
+        assert m("password") is True
+        assert m("its_a_secret_to_everybody") is True
+        assert m("the_password") is True
+        assert m("password_for_the_account") is True
+        assert m("public_information") is False
 
         assert ConfigurationSetting.sitewide(self._db, "secret_key").is_secret is True
         assert ConfigurationSetting.sitewide(self._db, "public_key").is_secret is False
@@ -1457,8 +1626,10 @@ class TestConfigurationSetting(DatabaseTest):
 
         # Here's an integration, let's say the Adobe Vendor ID setup.
         adobe, ignore = create(
-            self._db, ExternalIntegration,
-            goal=ExternalIntegration.DRM_GOAL, protocol="Adobe Vendor ID"
+            self._db,
+            ExternalIntegration,
+            goal=ExternalIntegration.DRM_GOAL,
+            protocol="Adobe Vendor ID",
         )
 
         # It happens to a ConfigurationSetting for the same key used
@@ -1493,8 +1664,10 @@ class TestConfigurationSetting(DatabaseTest):
         # Now let's consider a setting like on the combination of a library and an
         # integration integration.
         key = "patron_identifier_prefix"
-        library_patron_prefix_conf = ConfigurationSetting.for_library_and_externalintegration(
-            self._db, key, library, adobe
+        library_patron_prefix_conf = (
+            ConfigurationSetting.for_library_and_externalintegration(
+                self._db, key, library, adobe
+            )
         )
         assert library_patron_prefix_conf.value is None
 
@@ -1538,7 +1711,13 @@ class TestConfigurationSetting(DatabaseTest):
         )
         assert setting2 == setting
         with pytest.raises(IntegrityError):
-            create(self._db, ConfigurationSetting, key=key, library_id=library.id, external_integration=integration)
+            create(
+                self._db,
+                ConfigurationSetting,
+                key=key,
+                library_id=library.id,
+                external_integration=integration,
+            )
         # We really screwed up the database session there -- roll it back
         # so that test cleanup can proceed.
         self._db.rollback()
@@ -1570,7 +1749,7 @@ class TestConfigurationSetting(DatabaseTest):
         assert jsondata.int_value is None
 
         jsondata.value = "[1,2]"
-        assert jsondata.json_value == [1,2]
+        assert jsondata.json_value == [1, 2]
 
         jsondata.value = "tra la la"
         with pytest.raises(ValueError):
@@ -1578,8 +1757,7 @@ class TestConfigurationSetting(DatabaseTest):
 
     def test_explain(self):
         integration, ignore = create(
-            self._db, ExternalIntegration,
-            protocol="protocol", goal="goal"
+            self._db, ExternalIntegration, protocol="protocol", goal="goal"
         )
         integration.name = "The Integration"
         integration.setting("somesetting").value = "somevalue"
@@ -1600,7 +1778,6 @@ class TestConfigurationSetting(DatabaseTest):
 
 
 class TestHyperlink(DatabaseTest):
-
     def test_notify(self):
         class Mock(Emailer):
             sent = []
@@ -1645,18 +1822,18 @@ class TestHyperlink(DatabaseTest):
 
         # These arguments were created to fill in the ADDRESS_NEEDS_CONFIRMATION
         # template.
-        assert kwargs['registry_support'] == "me@registry"
-        assert kwargs['email'] == "you@library"
-        assert kwargs['rel_desc'] == "copyright designated agent"
-        assert kwargs['library'] == library.name
-        assert kwargs['library_web_url'] == library.web_url
-        assert kwargs['confirmation_link'] == "http://url/"
+        assert kwargs["registry_support"] == "me@registry"
+        assert kwargs["email"] == "you@library"
+        assert kwargs["rel_desc"] == "copyright designated agent"
+        assert kwargs["library"] == library.name
+        assert kwargs["library_web_url"] == library.web_url
+        assert kwargs["confirmation_link"] == "http://url/"
 
         # url_for was called to create the confirmation link.
         controller, kwargs = emailer.url_for_calls.pop()
         assert controller == "confirm_resource"
-        assert kwargs['secret'] == secret
-        assert kwargs['resource_id'] == link.resource.id
+        assert kwargs["secret"] == secret
+        assert kwargs["resource_id"] == link.resource.id
 
         # If a Resource we already know about is associated with
         # a new Hyperlink, an ADDRESS_DESIGNATED email is sent instead.
@@ -1665,7 +1842,7 @@ class TestHyperlink(DatabaseTest):
 
         (type, href, kwargs) = emailer.sent.pop()
         assert type == emailer.ADDRESS_DESIGNATED
-        assert kwargs['rel_desc'] == "patron help contact address"
+        assert kwargs["rel_desc"] == "patron help contact address"
 
         # url_for was not called again, since an ADDRESS_DESIGNATED
         # email does not include a validation link.
@@ -1684,11 +1861,11 @@ class TestHyperlink(DatabaseTest):
         # However, if a Hyperlink's Validation has expired, it's reset and a new
         # ADDRESS_NEEDS_CONFIRMATION email is sent out.
         now = datetime.datetime.utcnow()
-        link.resource.validation.started_at = (now - datetime.timedelta(days=10))
+        link.resource.validation.started_at = now - datetime.timedelta(days=10)
         link.notify(emailer, emailer.url_for)
         (type, href, kwargs) = emailer.sent.pop()
         assert type == emailer.ADDRESS_NEEDS_CONFIRMATION
-        assert 'confirmation_link' in kwargs
+        assert "confirmation_link" in kwargs
 
         # The Validation has been reset.
         assert link.resource.validation == validation
@@ -1723,7 +1900,6 @@ class TestValidation(DatabaseTest):
         # Let's imagine that validation succeeded and is being
         # invalidated for some reason.
         email_validation.success = True
-        old_started_at = email_validation.started_at
         old_secret = email_validation.secret
         email_validation_2 = email.restart_validation()
 
@@ -1755,9 +1931,7 @@ class TestValidation(DatabaseTest):
 
         # A validation that has expired cannot be marked as successful.
         validation.restart()
-        validation.started_at = (
-            datetime.datetime.utcnow() - datetime.timedelta(days=7)
-        )
+        validation.started_at = datetime.datetime.utcnow() - datetime.timedelta(days=7)
         assert validation.active is False
         with pytest.raises(Exception) as exc:
             validation.mark_as_successful()

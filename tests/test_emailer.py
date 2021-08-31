@@ -1,19 +1,15 @@
 import os
-
-from email.mime.text import MIMEText
 import quopri
+from email.mime.text import MIMEText
 from typing import Optional
 from unittest import mock
 
 import pytest
-import smtplib
+
+from config import CannotLoadConfiguration, CannotSendEmail
+from emailer import Emailer, EmailTemplate
 
 from . import DatabaseTest
-from config import CannotLoadConfiguration, CannotSendEmail
-from emailer import (
-    Emailer,
-    EmailTemplate,
-)
 
 
 class TestEmailTemplate(object):
@@ -21,16 +17,17 @@ class TestEmailTemplate(object):
 
     def test_body(self):
         template = EmailTemplate(
-            "A %(color)s subject",
-            "The subject is %(color)s but the body is %(number)d"
+            "A %(color)s subject", "The subject is %(color)s but the body is %(number)d"
         )
-        body = template.body("me@example.com", "you@example.com", color="red", number=22)
+        body = template.body(
+            "me@example.com", "you@example.com", color="red", number=22
+        )
 
         # We always generate a MIME multipart message because
         # that's how we handle non-ASCII characters.
         for expect in (
-                "Content-Type: multipart/mixed;",
-                "Content-Transfer-Encoding: quoted-printable"
+            "Content-Type: multipart/mixed;",
+            "Content-Transfer-Encoding: quoted-printable",
         ):
             assert expect in body
 
@@ -42,7 +39,7 @@ class TestEmailTemplate(object):
         for expect in (
             "From: me@example.com\nTo: you@example.com",
             "Subject: =?utf-8?q?A_red_subject",
-            "\n\nThe subject is red but the body is 22"
+            "\n\nThe subject is red but the body is 22",
         ):
             assert expect in body
 
@@ -51,26 +48,25 @@ class TestEmailTemplate(object):
         # its subject and body.
         snowman = "\N{SNOWMAN}"
         template = EmailTemplate(
-            "A snowman for you! %s" % snowman,
-            "Here he is: %s" % snowman
+            "A snowman for you! %s" % snowman, "Here he is: %s" % snowman
         )
         body = template.body("me@example.com", "you@example.com")
         # The SNOWMAN character is encoded as quoted-printable in both
         # the subject and the message contents.
-        quoted_printable_snowman = quopri.encodestring(
-            snowman.encode("utf8")
-        ).decode("utf8")
+        quoted_printable_snowman = quopri.encodestring(snowman.encode("utf8")).decode(
+            "utf8"
+        )
         for template in (
             "Subject: =?utf-8?q?A_snowman_for_you!_%(snowman)s?=",
-            "\n\nHere he is: %(snowman)s"
+            "\n\nHere he is: %(snowman)s",
         ):
             expect = template % dict(snowman=quoted_printable_snowman)
             assert expect in body
 
 
-
 class MockEmailer(Emailer):
     """Store outgoing emails in a list."""
+
     emails = []
 
     def _send_email(self, to_address, body, smtp):
@@ -85,7 +81,6 @@ class MockBrokenEmailer(Emailer):
 
 
 class TestEmailer(DatabaseTest):
-
     @staticmethod
     def _set_env(key: str, value: Optional[str]):
         if value:
@@ -100,9 +95,9 @@ class TestEmailer(DatabaseTest):
         integration.username = "smtp_username"
         integration.password = "smtp_password"
         integration.url = "smtp_host"
-        integration.setting(Emailer.PORT).value = '234'
-        integration.setting(Emailer.FROM_NAME).value = 'Me'
-        integration.setting(Emailer.FROM_ADDRESS).value = 'me@registry'
+        integration.setting(Emailer.PORT).value = "234"
+        integration.setting(Emailer.FROM_NAME).value = "Me"
+        integration.setting(Emailer.FROM_ADDRESS).value = "me@registry"
         return integration
 
     def test__sitewide_integration(self):
@@ -114,7 +109,7 @@ class TestEmailer(DatabaseTest):
         # _sitewide_integration raises an exception.
         with pytest.raises(CannotLoadConfiguration) as exc:
             m(self._db)
-        assert 'No email integration is configured' in str(exc.value)
+        assert "No email integration is configured" in str(exc.value)
 
         # If there's only one, _sitewide_integration finds it.
         integration = self._integration()
@@ -125,7 +120,7 @@ class TestEmailer(DatabaseTest):
         self._integration()
         with pytest.raises(CannotLoadConfiguration) as exc:
             m(self._db)
-        assert 'Multiple email integrations are configured' in str(exc.value)
+        assert "Multiple email integrations are configured" in str(exc.value)
 
     def test_from_sitewide_integration(self):
         """Test the ability to load an Emailer from a sitewide integration."""
@@ -150,9 +145,7 @@ class TestEmailer(DatabaseTest):
             integration.setting(email_type + "_subject").value = (
                 "subject %s" % email_type
             )
-            integration.setting(email_type + "_body").value = (
-                "body %s" % email_type
-            )
+            integration.setting(email_type + "_body").value = "body %s" % email_type
         emailer = Emailer.from_sitewide_integration(self._db)
         for email_type in Emailer.EMAIL_TYPES:
             template = emailer.templates[email_type]
@@ -164,39 +157,49 @@ class TestEmailer(DatabaseTest):
         arguments are missing.
         """
         args = dict(
-            [(x, None) for x in (
-                'smtp_username', 'smtp_password', 'smtp_host', 'smtp_port',
-                'from_name', 'from_address',
-            )]
+            [
+                (x, None)
+                for x in (
+                    "smtp_username",
+                    "smtp_password",
+                    "smtp_host",
+                    "smtp_port",
+                    "from_name",
+                    "from_address",
+                )
+            ]
         )
-        args['templates'] = {}
+        args["templates"] = {}
 
         m = Emailer
         with pytest.raises(CannotLoadConfiguration) as exc:
             m(**args)
         assert "Emailer instantiated with missing params" in str(exc.value)
-        assert 'smtp_username' in str(exc.value)
-        assert 'smtp_password' in str(exc.value)
-        assert 'smtp_host' in str(exc.value)
-        assert 'smtp_port' in str(exc.value)
-        assert 'from_name' in str(exc.value)
-        assert 'from_address' in str(exc.value)
+        assert "smtp_username" in str(exc.value)
+        assert "smtp_password" in str(exc.value)
+        assert "smtp_host" in str(exc.value)
+        assert "smtp_port" in str(exc.value)
+        assert "from_name" in str(exc.value)
+        assert "from_address" in str(exc.value)
 
-        args['smtp_username'] = 'user'
-        args['smtp_password'] = 'password'
-        args['smtp_host'] = 'host'
-        args['smtp_port'] = 'port'
-        args['from_name'] = 'Email Sender'
-        args['from_address'] = 'from@library.org'
+        args["smtp_username"] = "user"
+        args["smtp_password"] = "password"
+        args["smtp_host"] = "host"
+        args["smtp_port"] = "port"
+        args["from_name"] = "Email Sender"
+        args["from_address"] = "from@library.org"
 
         # With all the arguments specified, it works.
         m(**args)
 
         # If one of the templates can't be used, it doesn't work.
-        args['templates']['key'] = EmailTemplate("%(nope)s", "email body")
+        args["templates"]["key"] = EmailTemplate("%(nope)s", "email body")
         with pytest.raises(CannotLoadConfiguration) as exc:
             m(**args)
-        assert r"Template '%(nope)s'/'email body' contains unrecognized key: 'nope'" in str(exc.value)
+        assert (
+            r"Template '%(nope)s'/'email body' contains unrecognized key: 'nope'"
+            in str(exc.value)
+        )
 
     def test_templates(self):
         """Test the emails generated by the default templates."""
@@ -212,15 +215,15 @@ class TestEmailer(DatabaseTest):
 
         # Generate the address-designation template.
         designation_template = emailer.templates[Emailer.ADDRESS_DESIGNATED]
-        body = designation_template.body(
-            "me@registry", "you@library", **args
-        )
+        body = designation_template.body("me@registry", "you@library", **args)
 
         # Verify that the headers were set correctly.
         for phrase in [
             "From: me@registry",
             "To: you@library",
-            "This address designated as the support address for My Public".replace(" ", "_"),  # Part of encoding
+            "This address designated as the support address for My Public".replace(
+                " ", "_"
+            ),  # Part of encoding
         ]:
             assert phrase in body
 
@@ -235,16 +238,14 @@ class TestEmailer(DatabaseTest):
             "If you do work at a public library, but you're not sure what this means, please speak to a technical "
             "point of contact at your library, or contact the Library Simplified support address at me@registry."
         )
-        text_part = MIMEText(expect, 'plain', 'utf-8')
+        text_part = MIMEText(expect, "plain", "utf-8")
         assert text_part.get_payload() in body
 
         # The confirmation template has a couple extra fields that need
         # filling in.
         confirmation_template = emailer.templates[Emailer.ADDRESS_NEEDS_CONFIRMATION]
-        args['confirmation_link'] = "http://registry/confirm"
-        body2 = confirmation_template.body(
-            "me@registry", "you@library", **args
-        )
+        args["confirmation_link"] = "http://registry/confirm"
+        body2 = confirmation_template.body("me@registry", "you@library", **args)
 
         # Verify the subject line
         assert "Confirm_the_" in body2
@@ -253,10 +254,7 @@ class TestEmailer(DatabaseTest):
         # to check the whole thing because expect2 parses into a
         # slightly different Message object than is generated by
         # Emailer.)
-        for phrase in [
-                "\nhttp://registry/confirm\n",
-                "The link will expire"
-        ]:
+        for phrase in ["\nhttp://registry/confirm\n", "The link will expire"]:
             assert phrase in body2
 
     def test_send(self):
@@ -266,7 +264,7 @@ class TestEmailer(DatabaseTest):
         integration.setting("email1_body").value = "body %(arg)s"
 
         emailer = MockEmailer.from_sitewide_integration(self._db)
-        emailer.templates['email1'] = EmailTemplate(
+        emailer.templates["email1"] = EmailTemplate(
             "subject %(arg)s", "Hello, %(to_address)s, this is %(from_address)s."
         )
         mock_smtp = object()
@@ -282,31 +280,38 @@ class TestEmailer(DatabaseTest):
             "From: Me <me@registry>",
             "To: you@library",
             "subject Value".replace(" ", "_"),  # Part of the encoding process.
-            "Hello, you@library, this is me@registry."
+            "Hello, you@library, this is me@registry.",
         ]:
             print(phrase)
             assert phrase in body
         assert smtp == mock_smtp
 
     @pytest.mark.parametrize(
-        'email_type, override_is_specified, expected_recipient',
+        "email_type, override_is_specified, expected_recipient",
         [
-            ('test', True, 'default@example.org'),
-            ('test', False, 'default@example.org'),
-            (Emailer.ADDRESS_DESIGNATED, True, 'override@example.org'),
-            (Emailer.ADDRESS_DESIGNATED, False, 'default@example.org'),
-            (Emailer.ADDRESS_NEEDS_CONFIRMATION, True, 'override@example.org'),
-            (Emailer.ADDRESS_NEEDS_CONFIRMATION, False, 'default@example.org'),
-        ])
-    def test_override_recipient(self, email_type: str, override_is_specified: bool, expected_recipient):
+            ("test", True, "default@example.org"),
+            ("test", False, "default@example.org"),
+            (Emailer.ADDRESS_DESIGNATED, True, "override@example.org"),
+            (Emailer.ADDRESS_DESIGNATED, False, "default@example.org"),
+            (Emailer.ADDRESS_NEEDS_CONFIRMATION, True, "override@example.org"),
+            (Emailer.ADDRESS_NEEDS_CONFIRMATION, False, "default@example.org"),
+        ],
+    )
+    def test_override_recipient(
+        self, email_type: str, override_is_specified: bool, expected_recipient
+    ):
         """Except for test email, recipient should be overridden when an override is specified in the environment."""
 
-        default_recipient = 'default@example.org'
-        override_recipient = 'override@example.org'
+        default_recipient = "default@example.org"
+        override_recipient = "override@example.org"
 
         # Setup the environment appropriately.
-        environment_override_value = override_recipient if override_is_specified else None
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, environment_override_value)
+        environment_override_value = (
+            override_recipient if override_is_specified else None
+        )
+        self._set_env(
+            Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, environment_override_value
+        )
 
         # Configure the Emailer.
         _ = self._integration()
@@ -319,11 +324,10 @@ class TestEmailer(DatabaseTest):
         emailer.templates[email_type] = EmailTemplate("Email", "This is an email.")
 
         # Send the email and ensure that we used the correct recipient.
-        with mock.patch.object(Emailer, '_send_email', autospec=True) as send_email:
+        with mock.patch.object(Emailer, "_send_email", autospec=True) as send_email:
             emailer.send(email_type, default_recipient)
             send_email.assert_called_once()
             assert expected_recipient == send_email.call_args_list[0][0][1]
-
 
     def test_send_failure(self):
         """
@@ -333,18 +337,18 @@ class TestEmailer(DatabaseTest):
         """
         self._integration()
         emailer = MockBrokenEmailer.from_sitewide_integration(self._db)
-        emailer.templates['some_email'] = EmailTemplate("subject", "Hello.")
+        emailer.templates["some_email"] = EmailTemplate("subject", "Hello.")
         with pytest.raises(CannotSendEmail):
             emailer.send("some_email", "me@domain.tld")
 
-    @mock.patch('smtplib.SMTP', autospec=True)
+    @mock.patch("smtplib.SMTP", autospec=True)
     def test__send_email2(self, mock_class):
         """Verify that send_email calls certain methods on smtplib.SMTP."""
 
         _ = self._integration()
         emailer = Emailer.from_sitewide_integration(self._db)
-        email_recipient = 'you@library'
-        email_body = 'email body'
+        email_recipient = "you@library"
+        email_body = "email body"
 
         expected_calls = [
             mock.call(host=emailer.smtp_host, port=emailer.smtp_port),

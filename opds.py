@@ -3,21 +3,15 @@ import json
 import flask
 from sqlalchemy.orm import Query
 
-from model import (
-    ConfigurationSetting,
-    Hyperlink,
-    LibraryType,
-    Session,
-    Validation,
-)
-
 from authentication_document import AuthenticationDocument
 from config import Configuration
+from model import ConfigurationSetting, Hyperlink, LibraryType, Validation
+
 
 class Annotator(object):
-
     def annotate_catalog(self, catalog, live=True):
         pass
+
 
 class OPDSCatalog(object):
     """Represents an OPDS 2 Catalog Document.
@@ -30,7 +24,7 @@ class OPDSCatalog(object):
     have the same semantics as in the overall OPDS 2 Catalog spec.
     """
 
-    TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ%z'
+    TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ%z"
 
     OPDS_TYPE = "application/opds+json"
     OPDS_1_TYPE = "application/atom+xml;profile=opds-catalog;kind=acquisition"
@@ -60,8 +54,9 @@ class OPDSCatalog(object):
         image = dict(**kwargs)
         catalog.setdefault("images", []).append(image)
 
-    def __init__(self, _db, title, url, libraries, annotator=None,
-                 live=True, url_for=None):
+    def __init__(
+        self, _db, title, url, libraries, annotator=None, live=True, url_for=None
+    ):
         """Turn a list of libraries into a catalog."""
         if not annotator:
             annotator = Annotator()
@@ -76,8 +71,9 @@ class OPDSCatalog(object):
         )
         self.catalog = dict(metadata=dict(title=title), catalogs=[])
 
-        self.add_link_to_catalog(self.catalog, rel="self",
-                                 href=url, type=self.OPDS_TYPE)
+        self.add_link_to_catalog(
+            self.catalog, rel="self", href=url, type=self.OPDS_TYPE
+        )
         web_client_uri_template = ConfigurationSetting.sitewide(
             _db, Configuration.WEB_CLIENT_URL
         ).value
@@ -86,7 +82,8 @@ class OPDSCatalog(object):
                 library = (library,)
             self.catalog["catalogs"].append(
                 self.library_catalog(
-                    *library, url_for=url_for,
+                    *library,
+                    url_for=url_for,
                     include_logo=include_logos,
                     web_client_uri_template=web_client_uri_template,
                     include_service_area=include_service_areas
@@ -118,12 +115,14 @@ class OPDSCatalog(object):
 
     @classmethod
     def library_catalog(
-            cls, library, distance=None,
-            include_private_information=False,
-            include_logo=True,
-            url_for=None,
-            web_client_uri_template=None,
-            include_service_area=False,
+        cls,
+        library,
+        distance=None,
+        include_private_information=False,
+        include_logo=True,
+        url_for=None,
+        web_client_uri_template=None,
+        include_service_area=False,
     ):
 
         """Create an OPDS catalog for a library.
@@ -151,13 +150,13 @@ class OPDSCatalog(object):
             id=library.internal_urn,
             title=library.name,
             modified=modified,
-            updated=modified, # For backwards compatibility with earlier
-                              # clients.
+            updated=modified,  # For backwards compatibility with earlier
+            # clients.
         )
         if distance is not None:
             # 'distance' for backwards compatibility.
-            value = "%d km." % (distance/1000)
-            for key in 'schema:distance', 'distance':
+            value = "%d km." % (distance / 1000)
+            for key in "schema:distance", "distance":
                 metadata[key] = value
 
         if library.description:
@@ -166,39 +165,47 @@ class OPDSCatalog(object):
         if include_service_area:
             service_area_name = library.service_area_name
             if service_area_name is not None:
-                metadata['schema:areaServed'] = service_area_name
+                metadata["schema:areaServed"] = service_area_name
 
             subjects = []
             for code in library.types:
                 subjects.append(
-                    dict(code=code, name=LibraryType.NAME_FOR_CODE[code],
-                         scheme=LibraryType.SCHEME_URI)
+                    dict(
+                        code=code,
+                        name=LibraryType.NAME_FOR_CODE[code],
+                        scheme=LibraryType.SCHEME_URI,
+                    )
                 )
             if subjects:
-                metadata['subject'] = subjects
+                metadata["subject"] = subjects
 
         catalog = dict(metadata=metadata)
 
         if library.opds_url:
             # TODO: Keep track of whether each library uses OPDS 1 or 2?
-            cls.add_link_to_catalog(catalog, rel=cls.CATALOG_REL,
-                                    href=library.opds_url,
-                                    type=cls.OPDS_1_TYPE)
+            cls.add_link_to_catalog(
+                catalog,
+                rel=cls.CATALOG_REL,
+                href=library.opds_url,
+                type=cls.OPDS_1_TYPE,
+            )
 
         if library.authentication_url:
-            cls.add_link_to_catalog(catalog,
-                                    href=library.authentication_url,
-                                    type=AuthenticationDocument.MEDIA_TYPE)
+            cls.add_link_to_catalog(
+                catalog,
+                href=library.authentication_url,
+                type=AuthenticationDocument.MEDIA_TYPE,
+            )
 
         if library.web_url:
-            cls.add_link_to_catalog(catalog, rel="alternate",
-                                    href=library.web_url,
-                                    type="text/html")
+            cls.add_link_to_catalog(
+                catalog, rel="alternate", href=library.web_url, type="text/html"
+            )
 
         if include_logo and library.logo:
-            cls.add_image_to_catalog(catalog, rel=cls.THUMBNAIL_REL,
-                                     href=library.logo,
-                                     type="image/png")
+            cls.add_image_to_catalog(
+                catalog, rel=cls.THUMBNAIL_REL, href=library.logo, type="image/png"
+            )
 
         # Add links that allow clients to discover the library's
         # focus and eligibility area.
@@ -211,19 +218,21 @@ class OPDSCatalog(object):
                 catalog, rel=rel, href=url, type="application/geo+json"
             )
         for hyperlink in library.hyperlinks:
-            if (not include_private_information and hyperlink.rel in
-                Hyperlink.PRIVATE_RELS):
+            if (
+                not include_private_information
+                and hyperlink.rel in Hyperlink.PRIVATE_RELS
+            ):
                 continue
             args = cls._hyperlink_args(hyperlink)
             if not args:
                 # Not enough information to create a link.
                 continue
-            cls.add_link_to_catalog(
-                catalog, **args
-            )
+            cls.add_link_to_catalog(catalog, **args)
         # Add a link for the registry's web client, if it has one.
         if web_client_uri_template:
-            web_client_url = web_client_uri_template.replace('{uuid}', library.internal_urn)
+            web_client_url = web_client_uri_template.replace(
+                "{uuid}", library.internal_urn
+            )
             cls.add_link_to_catalog(
                 catalog, href=web_client_url, rel="self", type="text/html"
             )
@@ -257,7 +266,7 @@ class OPDSCatalog(object):
                 status = Validation.INACTIVE
             properties[Validation.STATUS_PROPERTY] = status
         if properties:
-            args['properties'] = properties
+            args["properties"] = properties
         return args
 
     def __str__(self):

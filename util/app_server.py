@@ -1,26 +1,23 @@
 """Implement logic common to more than one of the Simplified applications."""
-from psycopg2 import DatabaseError
-import flask
-import json
+import logging
 import sys
-from lxml import etree
+import traceback
 from functools import wraps
+
+import flask
 from flask import make_response
 from flask_babel import lazy_gettext as _
-from util.flask_util import problem
-from util.problem_detail import ProblemDetail
-import traceback
-import logging
-from opds import OPDSCatalog
+from lxml import etree
+from psycopg2 import DatabaseError
 
-from sqlalchemy.orm.session import Session
-from sqlalchemy.orm.exc import (
-    NoResultFound,
-)
+from opds import OPDSCatalog
+from util.problem_detail import ProblemDetail
+
 
 def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):
     content_type = OPDSCatalog.OPDS_TYPE
     return _make_response(catalog, content_type, cache_for)
+
 
 def _make_response(content, content_type, cache_for):
     if isinstance(content, etree._Element):
@@ -34,12 +31,16 @@ def _make_response(content, content_type, cache_for):
         client_cache = cache_for
         cdn_cache = cache_for / 2
         cache_control = "public, no-transform, max-age: %d, s-maxage: %d" % (
-            client_cache, cdn_cache)
+            client_cache,
+            cdn_cache,
+        )
     else:
         cache_control = "private, no-cache"
 
-    return make_response(content, 200, {"Content-Type": content_type,
-                                        "Cache-Control": cache_control})
+    return make_response(
+        content, 200, {"Content-Type": content_type, "Cache-Control": cache_control}
+    )
+
 
 def returns_problem_detail(f):
     @wraps(f)
@@ -48,7 +49,9 @@ def returns_problem_detail(f):
         if isinstance(v, ProblemDetail):
             return v.response
         return v
+
     return decorated
+
 
 def returns_json_or_response_or_problem_detail(f):
     @wraps(f)
@@ -59,7 +62,9 @@ def returns_json_or_response_or_problem_detail(f):
         if isinstance(v, flask.Response):
             return v
         return flask.jsonify(**v)
+
     return decorated
+
 
 class ErrorHandler(object):
     def __init__(self, app, debug):
@@ -67,7 +72,7 @@ class ErrorHandler(object):
         self.debug = debug
 
     def handle(self, exception):
-        if hasattr(self.app, 'manager') and hasattr(self.app.manager, '_db'):
+        if hasattr(self.app, "manager") and hasattr(self.app.manager, "_db"):
             # There is an active database session. Roll it back.
             self.app.manager._db.rollback()
         tb = traceback.format_exc()
@@ -78,9 +83,10 @@ class ErrorHandler(object):
             # and let uwsgi restart it.
             logging.error(
                 "Database error: %s Treating as fatal to avoid holding on to a tainted session!",
-                exception, exc_info=exception
+                exception,
+                exc_info=exception,
             )
-            shutdown = flask.request.environ.get('werkzeug.server.shutdown')
+            shutdown = flask.request.environ.get("werkzeug.server.shutdown")
             if shutdown:
                 shutdown()
             else:
@@ -91,7 +97,7 @@ class ErrorHandler(object):
 
         # Okay, it's not a database error. Turn it into a useful HTTP error
         # response.
-        if hasattr(exception, 'as_problem_detail_document'):
+        if hasattr(exception, "as_problem_detail_document"):
             # This exception can be turned directly into a problem
             # detail document.
             document = exception.as_problem_detail_document(self.debug)
@@ -116,7 +122,7 @@ class ErrorHandler(object):
             if self.debug:
                 body = tb
             else:
-                body = _('An internal error occured')
+                body = _("An internal error occured")
             response = make_response(str(body), 500, {"Content-Type": "text/plain"})
 
         log_method("Exception in web app: %s", exception, exc_info=exception)
@@ -124,6 +130,5 @@ class ErrorHandler(object):
 
 
 class HeartbeatController(object):
-
     def heartbeat(self):
         return make_response("", 200, {"Content-Type": "application/json"})

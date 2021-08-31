@@ -1,37 +1,30 @@
-
 import argparse
-import base64
 import json
 import logging
 import os
-import re
-import requests
 import sys
 
+from adobe_vendor_id import AdobeVendorIDClient
+from authentication_document import AuthenticationDocument
+from config import Configuration
+from emailer import Emailer, EmailTemplate
 from geometry_loader import GeometryLoader
 from model import (
+    ConfigurationSetting,
+    ExternalIntegration,
+    Library,
+    LibraryAlias,
+    Place,
+    ServiceArea,
     get_one,
     get_one_or_create,
     production_session,
-    Place,
-    Library,
-    LibraryAlias,
-    ServiceArea,
-    ConfigurationSetting,
-    ExternalIntegration,
-)
-from config import Configuration
-from adobe_vendor_id import AdobeVendorIDClient
-from authentication_document import AuthenticationDocument
-from emailer import (
-    Emailer,
-    EmailTemplate,
 )
 from registrar import LibraryRegistrar
 from util.problem_detail import ProblemDetail
 
-class Script(object):
 
+class Script(object):
     @property
     def _db(self):
         if not hasattr(self, "_session"):
@@ -40,8 +33,8 @@ class Script(object):
 
     @property
     def log(self):
-        if not hasattr(self, '_log'):
-            logger_name = getattr(self, 'name', None)
+        if not hasattr(self, "_log"):
+            logger_name = getattr(self, "name", None)
             self._log = logging.getLogger(logger_name)
         return self._log
 
@@ -78,10 +71,7 @@ class Script(object):
         try:
             self.do_run()
         except Exception as e:
-            logging.error(
-                "Fatal exception while running script: %s", e,
-                exc_info=e
-            )
+            logging.error("Fatal exception while running script: %s", e, exc_info=e)
             raise e
 
 
@@ -98,8 +88,9 @@ class LibraryScript(Script):
     def arg_parser(cls):
         parser = super(LibraryScript, cls).arg_parser()
         parser.add_argument(
-            '--library', help='Official name of the library',
-            required=cls.REQUIRES_SINGLE_LIBRARY
+            "--library",
+            help="Official name of the library",
+            required=cls.REQUIRES_SINGLE_LIBRARY,
         )
         return parser
 
@@ -129,7 +120,6 @@ class LibraryScript(Script):
 
 
 class LoadPlacesScript(Script):
-
     @classmethod
     def parse_command_line(cls, _db=None, cmd_args=None, stdin=sys.stdin):
         parser = cls.arg_parser()
@@ -138,16 +128,14 @@ class LoadPlacesScript(Script):
         return parsed, stdin
 
     def run(self, cmd_args=None, stdin=sys.stdin):
-        parsed, stdin = self.parse_command_line(
-            self._db, cmd_args, stdin
-        )
+        parsed, stdin = self.parse_command_line(self._db, cmd_args, stdin)
         loader = GeometryLoader(self._db)
         a = 0
         for place, is_new in loader.load_ndjson(stdin):
             if is_new:
-                what = 'NEW'
+                what = "NEW"
             else:
-                what = 'UPD'
+                what = "UPD"
             print(what, place)
             a += 1
             if not a % 1000:
@@ -159,28 +147,23 @@ class SearchPlacesScript(Script):
     @classmethod
     def arg_parser(cls):
         parser = super(SearchPlacesScript, cls).arg_parser()
-        parser.add_argument(
-            'name', nargs='*', help='Place name to search for'
-        )
+        parser.add_argument("name", nargs="*", help="Place name to search for")
         return parser
 
     def run(self, cmd_args=None, stdout=sys.stdout):
         parsed = self.parse_command_line(self._db, cmd_args)
-        for place in self._db.query(Place).filter(
-                Place.external_name.in_(parsed.name)
-        ):
+        for place in self._db.query(Place).filter(Place.external_name.in_(parsed.name)):
             stdout.write(repr(place))
             stdout.write("\n")
 
 
 class SearchLibraryScript(Script):
     """Command-line interface to the library search."""
+
     @classmethod
     def arg_parser(cls):
         parser = super(SearchLibraryScript, cls).arg_parser()
-        parser.add_argument(
-            'query', nargs=1, help='Search query.'
-        )
+        parser.add_argument("query", nargs=1, help="Search query.")
         return parser
 
     def run(self, cmd_args=None, stdout=sys.stdout):
@@ -191,38 +174,36 @@ class SearchLibraryScript(Script):
 
 
 class AddLibraryScript(Script):
-
     @classmethod
     def arg_parser(cls):
         parser = super(AddLibraryScript, cls).arg_parser()
         parser.add_argument(
-            '--name', help='Official name of the library', required=True
+            "--name", help="Official name of the library", required=True
         )
         parser.add_argument(
-            '--authentication-url',
+            "--authentication-url",
             help="URL to the library's Authentication for OPDS document.",
-            required=True
+            required=True,
         )
         parser.add_argument(
-            '--opds', help="URL of the library's OPDS server.",
-            required=True
+            "--opds", help="URL of the library's OPDS server.", required=True
         )
-        parser.add_argument('--alias', nargs='+', help='Alias for the library')
+        parser.add_argument("--alias", nargs="+", help="Alias for the library")
         parser.add_argument(
-            '--description',
-            help="Human-readable description of the library."
+            "--description", help="Human-readable description of the library."
         )
+        parser.add_argument("--web", help="URL of the library's web server.")
         parser.add_argument(
-            '--web', help="URL of the library's web server."
-        )
-        parser.add_argument(
-            '--short-name', help="Short name of the library for Adobe Vendor ID purposes."
+            "--short-name",
+            help="Short name of the library for Adobe Vendor ID purposes.",
         )
         parser.add_argument(
-            '--shared-secret', help="Shared secret between the library and the registry for Adobe Vendor ID purposes."
+            "--shared-secret",
+            help="Shared secret between the library and the registry for Adobe Vendor ID purposes.",
         )
-        parser.add_argument('--place', nargs='+',
-                            help="External ID of the library's service area.")
+        parser.add_argument(
+            "--place", nargs="+", help="External ID of the library's service area."
+        )
         return parser
 
     def run(self, cmd_args=None):
@@ -253,29 +234,27 @@ class AddLibraryScript(Script):
             library.shared_secret = shared_secret
         if aliases:
             for alias in aliases:
-                get_one_or_create(self._db, LibraryAlias, library=library,
-                                  name=alias, language='eng')
+                get_one_or_create(
+                    self._db, LibraryAlias, library=library, name=alias, language="eng"
+                )
         if places:
             for place_external_id in places:
                 place = get_one(self._db, Place, external_id=place_external_id)
-                get_one_or_create(
-                    self._db, ServiceArea, library=library, place=place
-                )
+                get_one_or_create(self._db, ServiceArea, library=library, place=place)
         self._db.commit()
 
 
 class SetCoverageAreaScript(LibraryScript):
-
     @classmethod
     def arg_parser(cls):
         parser = super(SetCoverageAreaScript, cls).arg_parser()
         parser.add_argument(
-            '--service-area',
-            help="JSON document or string describing the library's service area. If no value is specified, it is assumed to be the same as --focus-area."
+            "--service-area",
+            help="JSON document or string describing the library's service area. If no value is specified, it is assumed to be the same as --focus-area.",
         )
         parser.add_argument(
-            '--focus-area',
-            help="JSON document or string describing the library's focus area. If no value is specified, it is assumed to be the same as --service-area."
+            "--focus-area",
+            help="JSON document or string describing the library's focus area. If no value is specified, it is assumed to be the same as --service-area.",
         )
         return parser
 
@@ -295,11 +274,11 @@ class SetCoverageAreaScript(LibraryScript):
         # string will be interpreted as a single place name.
         try:
             service_area = json.loads(service_area)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             pass
         try:
             focus_area = json.loads(focus_area)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             pass
 
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
@@ -311,9 +290,7 @@ class SetCoverageAreaScript(LibraryScript):
             if ambiguous:
                 raise ValueError("Ambiguous places: %r" % list(unknown.items()))
 
-        AuthenticationDocument.set_service_areas(
-            library, service_area, focus_area
-        )
+        AuthenticationDocument.set_service_areas(library, service_area, focus_area)
         self._db.commit()
         self.report(library)
 
@@ -336,10 +313,14 @@ class RegistrationRefreshScript(LibraryScript):
         for library in self.libraries(parsed.library):
             result = registrar.reregister(library)
             if isinstance(result, ProblemDetail):
-               self.log.error(
+                self.log.error(
                     "FAILURE %s (%s) uri=%s, title=%s, detail=%s, debug=%s",
-                    library.name, library.authentication_url,
-                    result.uri, result.title, result.detail, result.debug_message
+                    library.name,
+                    library.authentication_url,
+                    result.uri,
+                    result.title,
+                    result.detail,
+                    result.debug_message,
                 )
             else:
                 self.log.info(
@@ -361,12 +342,11 @@ class AdobeVendorIDAcceptanceTestScript(Script):
     @classmethod
     def arg_parser(cls):
         parser = super(AdobeVendorIDAcceptanceTestScript, cls).arg_parser()
+        parser.add_argument("--url", help="URL to the library registry", required=True)
         parser.add_argument(
-            '--url', help='URL to the library registry', required=True
-        )
-        parser.add_argument(
-            '--token', help='A short client token obtained from a library',
-            required=True
+            "--token",
+            help="A short client token obtained from a library",
+            required=True,
         )
         return parser
 
@@ -374,17 +354,17 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         parsed = self.parse_command_line(self._db, cmd_args)
 
         base_url = parsed.url
-        if not base_url.endswith('/'):
-            base_url += '/'
-        base_url += 'AdobeAuth/'
+        if not base_url.endswith("/"):
+            base_url += "/"
+        base_url += "AdobeAuth/"
         token = parsed.token
 
         client = AdobeVendorIDClient(base_url)
 
         print("1. Checking status: %s" % client.status_url)
-        response = client.status()
+        client.status()
         # status() will raise an exception if anything is wrong.
-        print('OK Service is up and running.')
+        print("OK Service is up and running.")
 
         print("2. Passing token into SignIn as authdata: %s" % client.signin_url)
         identifier, label, content = client.sign_in_authdata(token)
@@ -395,7 +375,7 @@ class AdobeVendorIDAcceptanceTestScript(Script):
 
         print()
         print("3. Passing token into SignIn as username/password.")
-        username, password = token.rsplit('|', 1)
+        username, password = token.rsplit("|", 1)
         identifier, label, content = client.sign_in_standard(username, password)
         print("OK Found user identifier and label.")
         print("   User identifier: %s" % identifier)
@@ -403,29 +383,31 @@ class AdobeVendorIDAcceptanceTestScript(Script):
         print("   Full content: %s" % content)
 
         print()
-        print("4. Passing identifier into UserInfo to get user info: %s" % client.accountinfo_url)
+        print(
+            "4. Passing identifier into UserInfo to get user info: %s"
+            % client.accountinfo_url
+        )
         user_info, content = client.user_info(identifier)
         print("OK Found user info: %s" % user_info)
         print("   Full content: %s" % content)
 
-class ConfigurationSettingScript(Script):
 
+class ConfigurationSettingScript(Script):
     @classmethod
     def _parse_setting(self, setting):
         """Parse a command-line setting option into a key-value pair."""
-        if not '=' in setting:
+        if "=" not in setting:
             raise ValueError(
-                'Incorrect format for setting: "%s". Should be "key=value"'
-                % setting
+                'Incorrect format for setting: "%s". Should be "key=value"' % setting
             )
-        return setting.split('=', 1)
+        return setting.split("=", 1)
 
     @classmethod
     def add_setting_argument(self, parser, help):
         """Modify an ArgumentParser to indicate that the script takes
         command-line settings.
         """
-        parser.add_argument('--setting', help=help, action="append")
+        parser.add_argument("--setting", help=help, action="append")
 
     def apply_settings(self, settings, obj):
         """Treat `settings` as a list of command-line argument settings,
@@ -446,15 +428,15 @@ class ConfigureSiteScript(ConfigurationSettingScript):
         parser = argparse.ArgumentParser()
 
         parser.add_argument(
-            '--show-secrets',
+            "--show-secrets",
             help="Include secrets when displaying site settings.",
             action="store_true",
-            default=False
+            default=False,
         )
 
         cls.add_setting_argument(
             parser,
-            'Set a site-wide setting, such as base_url. Format: --setting="base_url=http://localhost:7000"'
+            'Set a site-wide setting, such as base_url. Format: --setting="base_url=http://localhost:7000"',
         )
         return parser
 
@@ -465,31 +447,35 @@ class ConfigureSiteScript(ConfigurationSettingScript):
             for setting in args.setting:
                 key, value = self._parse_setting(setting)
                 ConfigurationSetting.sitewide(_db, key).value = value
-        settings = _db.query(ConfigurationSetting).filter(
-            ConfigurationSetting.library_id==None).filter(
-                ConfigurationSetting.external_integration==None
-            ).order_by(ConfigurationSetting.key)
+        settings = (
+            _db.query(ConfigurationSetting)
+            .filter(ConfigurationSetting.library_id == None)
+            .filter(ConfigurationSetting.external_integration == None)
+            .order_by(ConfigurationSetting.key)
+        )
         output.write("Current site-wide settings:\n")
         for setting in settings:
             if args.show_secrets or not setting.is_secret:
                 output.write("%s='%s'\n" % (setting.key, setting.value))
         _db.commit()
 
+
 class ShowIntegrationsScript(Script):
     """Show information about the external integrations on a server."""
 
     name = "List the external integrations on this server."
+
     @classmethod
     def arg_parser(cls):
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            '--name',
-            help='Only display information for the integration with the given name or ID',
+            "--name",
+            help="Only display information for the integration with the given name or ID",
         )
         parser.add_argument(
-            '--show-secrets',
-            help='Display secret values such as passwords.',
-            action='store_true'
+            "--show-secrets",
+            help="Display secret values such as passwords.",
+            action="store_true",
         )
         return parser
 
@@ -504,25 +490,26 @@ class ShowIntegrationsScript(Script):
             if integration:
                 integrations = [integration]
             else:
-                output.write(
-                    "Could not locate integration by name or ID: %s\n" % args
-                )
+                output.write("Could not locate integration by name or ID: %s\n" % args)
                 integrations = []
         else:
-            integrations = _db.query(ExternalIntegration).order_by(
-                ExternalIntegration.name, ExternalIntegration.id).all()
+            integrations = (
+                _db.query(ExternalIntegration)
+                .order_by(ExternalIntegration.name, ExternalIntegration.id)
+                .all()
+            )
         if not integrations:
             output.write("No integrations found.\n")
         for integration in integrations:
             output.write(
-                "\n".join(
-                    integration.explain(include_secrets=args.show_secrets)
-                )
+                "\n".join(integration.explain(include_secrets=args.show_secrets))
             )
             output.write("\n")
 
+
 class ConfigureIntegrationScript(ConfigurationSettingScript):
     """Create a integration or change its settings."""
+
     name = "Create a site-wide integration or change an integration's settings"
 
     @classmethod
@@ -534,22 +521,24 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
     def arg_parser(cls, _db):
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            '--name',
-            help='Name of the integration',
+            "--name",
+            help="Name of the integration",
         )
         parser.add_argument(
-            '--id',
-            help='ID of the integration, if it has no name',
+            "--id",
+            help="ID of the integration, if it has no name",
         )
         parser.add_argument(
-            '--protocol', help='Protocol used by the integration.',
+            "--protocol",
+            help="Protocol used by the integration.",
         )
         parser.add_argument(
-            '--goal', help='Goal of the integration',
+            "--goal",
+            help="Goal of the integration",
         )
         cls.add_setting_argument(
             parser,
-            'Set a configuration value on the integration. Format: --setting="key=value"'
+            'Set a configuration value on the integration. Format: --setting="key=value"',
         )
         return parser
 
@@ -563,7 +552,7 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
         integration = None
         if id:
             integration = get_one(
-                _db, ExternalIntegration, ExternalIntegration.id==id
+                _db, ExternalIntegration, ExternalIntegration.id == id
             )
             if not integration:
                 raise ValueError("No integration with ID %s." % id)
@@ -571,7 +560,8 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
             integration = get_one(_db, ExternalIntegration, name=name)
             if not integration and not (protocol and goal):
                 raise ValueError(
-                    'No integration with name "%s". To create it, you must also provide protocol and goal.' % name
+                    'No integration with name "%s". To create it, you must also provide protocol and goal.'
+                    % name
                 )
         if not integration and (protocol and goal):
             integration, is_new = get_one_or_create(
@@ -601,6 +591,7 @@ class ConfigureIntegrationScript(ConfigurationSettingScript):
 
 class ConfigureVendorIDScript(Script):
     """Configure the site-wide Adobe Vendor ID configuration."""
+
     @classmethod
     def arg_parser(cls):
         parser = argparse.ArgumentParser()
@@ -611,7 +602,9 @@ class ConfigureVendorIDScript(Script):
             "--node-value", help="Node value issued by Adobe", required=True
         )
         parser.add_argument(
-            "--delegate", action="append", default=[],
+            "--delegate",
+            action="append",
+            default=[],
             help="Delegate Adobe IDs to this URL if no local answer found",
         )
         return parser
@@ -621,14 +614,17 @@ class ConfigureVendorIDScript(Script):
         parsed = self.parse_command_line(_db, cmd_args=cmd_args)
 
         integration, is_new = get_one_or_create(
-            _db, ExternalIntegration, goal=ExternalIntegration.DRM_GOAL,
-            protocol=ExternalIntegration.ADOBE_VENDOR_ID
+            _db,
+            ExternalIntegration,
+            goal=ExternalIntegration.DRM_GOAL,
+            protocol=ExternalIntegration.ADOBE_VENDOR_ID,
         )
         c = Configuration
 
         # All node values are string representations of hexidecimal
-        # numbers.
-        hex_node = int(parsed.node_value, 16)
+        # numbers. We parse it here as a basic sanity check. If there
+        # is any issue we will get an exception.
+        int(parsed.node_value, 16)
 
         integration.setting(c.ADOBE_VENDOR_ID).value = parsed.vendor_id
         integration.setting(c.ADOBE_VENDOR_ID_NODE_VALUE).value = parsed.node_value
@@ -636,11 +632,12 @@ class ConfigureVendorIDScript(Script):
         for delegate in delegates:
             if not delegate.endswith("/AdobeAuth/"):
                 raise ValueError(
-                    'Invalid delegate: %s. Expected something ending with "/AdobeAuth/"' % delegate
+                    'Invalid delegate: %s. Expected something ending with "/AdobeAuth/"'
+                    % delegate
                 )
-        integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = (
-            json.dumps(delegates)
-        )
+        integration.setting(
+            Configuration.ADOBE_VENDOR_ID_DELEGATE_URL
+        ).value = json.dumps(delegates)
         _db.commit()
 
 
@@ -656,9 +653,17 @@ class ConfigureEmailerScript(Script):
         parser.add_argument("--port", help="SMTP port", default=587, type=int)
         parser.add_argument("--username", help="SMTP username", required=True)
         parser.add_argument("--password", help="SMTP password", required=True)
-        parser.add_argument("--from-address", help="Email sent will come from this address", required=True)
-        parser.add_argument("--from-name", help="Name associated with the from-address", required=True)
-        parser.add_argument("--test-address", help="Send a test email to this address", required=True)
+        parser.add_argument(
+            "--from-address",
+            help="Email sent will come from this address",
+            required=True,
+        )
+        parser.add_argument(
+            "--from-name", help="Name associated with the from-address", required=True
+        )
+        parser.add_argument(
+            "--test-address", help="Send a test email to this address", required=True
+        )
         return parser
 
     def do_run(self, _db=None, cmd_args=None, output=sys.stdout, emailer_class=Emailer):
@@ -666,8 +671,10 @@ class ConfigureEmailerScript(Script):
         parsed = self.parse_command_line(_db, cmd_args=cmd_args)
 
         integration, is_new = get_one_or_create(
-            _db, ExternalIntegration, goal=ExternalIntegration.EMAIL_GOAL,
-            protocol=ExternalIntegration.SMTP
+            _db,
+            ExternalIntegration,
+            goal=ExternalIntegration.EMAIL_GOAL,
+            protocol=ExternalIntegration.SMTP,
         )
         integration.setting(Emailer.PORT).value = parsed.port
         integration.username = parsed.username

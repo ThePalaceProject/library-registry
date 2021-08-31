@@ -1,9 +1,0 @@
-# Configuration for the Pull app.
-# https://github.com/wei/pull#readme
-
-version: "1"
-rules:
-  - base: develop
-    upstream: NYPL-Simplified:develop
-    mergeMethod: none
-conflictLabel: "merge-conflict"

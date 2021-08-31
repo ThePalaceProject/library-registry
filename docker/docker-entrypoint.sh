@@ -10,7 +10,7 @@ COUNT=0
 RETRIES=10
 
 pg_is_ready () {
-    pipenv run python > /dev/null 2>&1 <<EOF
+    python > /dev/null 2>&1 <<EOF
 import os,sys,psycopg2
 try:
   psycopg2.connect(os.environ.get('SIMPLIFIED_PRODUCTION_DATABASE'))
