@@ -91,7 +91,7 @@ jobs:
       # Push the built docker image only in the following cases:
       #  - The `NO_DOCKER_IMAGE` secret is not set. (Useful if you want to disable pushing
       #    of docker images in local forks of this repo).
-      #  - The branch name does not start with `dependabot/`. The dependabot service doesn not
+      #  - The branch name does not start with `dependabot/`. The dependabot service does not
       #    have the proper security token to push to github packages.
       #  - The event that triggered this action was a `push`. If it was a PR the github action
       #    context will not have permissions to push the image to github packages.
