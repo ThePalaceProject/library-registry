@@ -21,14 +21,9 @@ group = "nginx"
 bind = ["127.0.0.1:8000"]  # listen on 8000, only on the loopback address
 workers = (2 * multiprocessing.cpu_count()) + 1
 threads = 2
-pythonpath = ",".join(
-    [
-        APP_HOME,
-    ]
-)
+pythonpath = APP_HOME
 
 # Env-Specific Settings
-
 if os.environ.get("FLASK_ENV", None) == "development":
     reload = True  # restart workers when app code changes
     loglevel = "debug"  # default loglevel is 'info'
