@@ -82,17 +82,24 @@ jobs:
         run: tox
 
   build:
-    name: Build and push docker image
+    name: Docker build
     runs-on: ubuntu-latest
     needs: [lint, test]
     env:
       REGISTRY_HOST: ghcr.io
-      # Don't push the Docker image if the `NO_DOCKER_IMAGE` secret is set.
-      IMAGE_PUSH_ENABLED: ${{ secrets.NO_DOCKER_IMAGE == null }}
 
-    # Only build docker containers on a branch push. PRs are run in the context of the repository
-    # they are made from, so they don't have the secrets necessary to push to docker hub.
-    if: github.event_name == 'push'
+      # Push the built docker image only in the following cases:
+      #  - The `NO_DOCKER_IMAGE` secret is not set. (Useful if you want to disable pushing
+      #    of docker images in local forks of this repo).
+      #  - The branch name does not start with `dependabot/`. The dependabot service doesn not
+      #    have the proper security token to push to github packages.
+      #  - The event that triggered this action was a `push`. If it was a PR the github action
+      #    context will not have permissions to push the image to github packages.
+      IMAGE_PUSH_ENABLED: ${{
+          secrets.NO_DOCKER_IMAGE == null &&
+          !startsWith(github.ref, 'refs/heads/dependabot/') &&
+          github.event_name == 'push'
+        }}
 
     steps:
       - uses: actions/checkout@v2
@@ -106,6 +113,7 @@ jobs:
           registry: ${{ env.REGISTRY_HOST }}
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+        if: ${{ env.IMAGE_PUSH_ENABLED }}
 
       - name: Generate tags for library-registry image
         id: library-registry-tags
