@@ -1,4 +1,7 @@
-from util import GeometryUtility
+import pytest
+
+from library_registry.util import GeometryUtility
+
 
 class TestGeometryUtility(object):
 

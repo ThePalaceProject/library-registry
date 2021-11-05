@@ -17,6 +17,7 @@ help:
 	@echo "    stop             - Stop the cluster without removing containers"
 	@echo "    down             - Take down the local cluster"
 	@echo "    test             - Run the python test suite on the webapp container"
+	@echo "    test-x           - Run the python test suite, exit at first failure"
 	@echo "    clean            - Take down the local cluster and removes the db volume"
 	@echo "    full-clean       - Take down the local cluster and remove containers, volumes, and images"
 	@echo ""
@@ -54,6 +55,9 @@ down:
 
 test:
 	docker exec -it libreg_webapp pipenv run pytest tests
+
+test-x:
+	docker exec -it libreg_webapp pipenv run pytest -x tests
 
 clean:
 	docker-compose down --volumes

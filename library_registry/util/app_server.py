@@ -1,0 +1,124 @@
+"""Implement logic common to more than one of the Simplified applications."""
+import logging
+import sys
+import traceback
+
+import flask
+from lxml import etree
+from psycopg2 import DatabaseError
+from psycopg2.extensions import adapt as sqlescape
+from flask import make_response
+from flask_babel import lazy_gettext as lgt
+from sqlalchemy.sql import compiler
+
+from library_registry.opds import OPDSCatalog
+
+
+def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):
+    content_type = OPDSCatalog.OPDS_TYPE
+    return _make_response(catalog, content_type, cache_for)
+
+
+def _make_response(content, content_type, cache_for):
+    if isinstance(content, etree._Element):
+        content = etree.tostring(content)
+    elif not isinstance(content, str):
+        content = str(content)
+
+    if isinstance(cache_for, int):
+        # A CDN should hold on to the cached representation only half
+        # as long as the end-user.
+        client_cache = cache_for
+        cdn_cache = cache_for / 2
+        cache_control = "public, no-transform, max-age: %d, s-maxage: %d" % (
+            client_cache, cdn_cache)
+    else:
+        cache_control = "private, no-cache"
+
+    return make_response(content, 200, {"Content-Type": content_type,
+                                        "Cache-Control": cache_control})
+
+
+class ErrorHandler:
+    def __init__(self, app, debug):
+        self.app = app
+        self.debug = debug
+
+    def handle(self, exception):
+        if hasattr(self.app, 'manager') and hasattr(self.app.manager, '_db'):
+            # There is an active database session. Roll it back.
+            self.app.manager._db.rollback()
+        tb = traceback.format_exc()
+
+        if isinstance(exception, DatabaseError):
+            # The database session may have become tainted. For now
+            # the simplest thing to do is to kill the entire process
+            # and let uwsgi restart it.
+            logging.error(
+                "Database error: %s Treating as fatal to avoid holding on to a tainted session!",
+                exception, exc_info=exception
+            )
+            shutdown = flask.request.environ.get('werkzeug.server.shutdown')
+            if shutdown:
+                shutdown()
+            else:
+                sys.exit()
+
+        # By default, the error will be logged at log level ERROR.
+        log_method = logging.error
+
+        # Okay, it's not a database error. Turn it into a useful HTTP error
+        # response.
+        if hasattr(exception, 'as_problem_detail_document'):
+            # This exception can be turned directly into a problem
+            # detail document.
+            document = exception.as_problem_detail_document(self.debug)
+            if not self.debug:
+                document.debug_message = None
+            else:
+                if document.debug_message:
+                    document.debug_message += "\n\n" + tb
+                else:
+                    document.debug_message = tb
+            if document.status_code == 502:
+                # This is an error in integrating with some upstream
+                # service. It's a serious problem, but probably not
+                # indicative of a bug in our software. Log it at log level
+                # WARN.
+                log_method = logging.warn
+            response = make_response(document.response)
+        else:
+            # There's no way to turn this exception into a problem
+            # document. This is probably indicative of a bug in our
+            # software.
+            if self.debug:
+                body = tb
+            else:
+                body = lgt('An internal error occured')
+            response = make_response(str(body), 500, {"Content-Type": "text/plain"})
+
+        log_method("Exception in web app: %s", exception, exc_info=exception)
+        return response
+
+
+class HeartbeatController:
+
+    def heartbeat(self):
+        return make_response("", 200, {"Content-Type": "application/json"})
+
+
+def dump_query(query):
+    dialect = query.session.bind.dialect
+    statement = query.statement
+    comp = compiler.SQLCompiler(dialect, statement)
+    comp.compile()
+    enc = dialect.encoding
+    params = {}
+
+    for (k, v) in comp.params.items():
+        if isinstance(v, str):
+            v = v.encode(enc)
+
+        params[k] = sqlescape(v)
+
+    return (comp.string.encode(enc) % params).decode(enc)

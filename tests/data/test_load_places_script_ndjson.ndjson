@@ -1,0 +1,6 @@
+{"parent_id": null, "name": "United States", "full_name": null, "aliases": [], "type": "nation", "abbreviated_name": "US", "id": "US"}
+{"type": "Point", "coordinates": [-159.459551, 54.948652]}
+{"parent_id": "US", "name": "Alabama", "full_name": null, "aliases": [], "type": "state", "abbreviated_name": "AL", "id": "01"}
+{"type": "Point", "coordinates": [-88.053375, 30.506987]}
+{"parent_id": "01", "name": "Montgomery", "full_name": null, "aliases": [], "type": "city", "abbreviated_name": null, "id": "0151000"}
+{"type": "Point", "coordinates": [-86.034128, 32.302979]}
