@@ -100,6 +100,10 @@ def adobe_integration(db_session, create_test_external_integration):
 
 class TestLibraryRegistryAnnotator:
     def test_annotate_catalog(self, app, db_session, adobe_integration):
+        # If we don't do this, the db session that the annotator has access to
+        # will be different from the session in the db_session fixture, and the
+        # annotator won't be able to find the adobe vendor id.
+        app.library_registry._db = db_session
         annotator = LibraryRegistryAnnotator(app.library_registry)
 
         with app.test_request_context("/"):
