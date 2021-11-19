@@ -57,21 +57,8 @@ def init_test_db():
     engine.dispose()
 
 
-@pytest.fixture(scope="session")
-def app():
-    app = create_app(testing=True)
-    app.secret_key = "SUPER SECRET TESTING SECRET"
-    yield app
-
-
 @pytest.fixture
-def client(app):
-    with app.test_client() as client:
-        yield client
-
-
-@pytest.fixture
-def db_engine(app):
+def db_engine():
     engine = create_engine(test_db_url)
     yield engine
     engine.dispose()
@@ -85,6 +72,19 @@ def db_session(db_engine):
         yield session
         transaction.rollback()
         session.close()
+
+
+@pytest.fixture
+def app(db_session):
+    app = create_app(testing=True, db_session_obj=db_session)
+    app.secret_key = "SUPER SECRET TESTING SECRET"
+    yield app
+
+
+@pytest.fixture
+def client(app):
+    with app.test_client() as client:
+        yield client
 
 
 @pytest.fixture
