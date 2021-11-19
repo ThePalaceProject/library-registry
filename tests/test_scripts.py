@@ -34,7 +34,7 @@ from .mocks import MockPlace
 
 class TestLibraryScript:
     @pytest.mark.needsdocstring
-    def test_libraries(self, db_session, create_test_library, destroy_test_library):
+    def test_libraries(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -65,11 +65,8 @@ class TestLibraryScript:
         # If no library is identified by name, the output of all_libraries is used as the list of libraries.
         assert script.libraries() == script.all_libraries_return_value
 
-        for library_object in [library, ignored]:
-            destroy_test_library(db_session, library_object)
-
     @pytest.mark.needsdocstring
-    def test_all_libraries(self, db_session, create_test_library, destroy_test_library):
+    def test_all_libraries(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -83,9 +80,6 @@ class TestLibraryScript:
         # The all_libraries property omits the cancelled library.
         script = LibraryScript(db_session)
         assert set(script.all_libraries) == set([production, testing])
-
-        for library_obj in (production, testing, cancelled):
-            destroy_test_library(db_session, library_obj)
 
 
 class TestLoadPlacesScript:
@@ -369,7 +363,7 @@ class TestConfigureIntegrationScript:
 
 class TestRegistrationRefreshScript:
     @pytest.mark.needsdocstring
-    def test_run(self, db_session, create_test_library, destroy_test_library):
+    def test_run(self, db_session, create_test_library):
         """
         Verify that run() instantiates a LibraryRegistrar using .registrar, then calls its
         reregister() method on every library that it's been asked to handle.
@@ -426,9 +420,6 @@ class TestRegistrationRefreshScript:
         script.run(cmd_args=["--library=Library1"])
         assert script.libraries_called_with == "Library1"
 
-        for library_obj in [success_library, failure_library]:
-            destroy_test_library(db_session, library_obj)
-
     @pytest.mark.needsdocstring
     def test_registrar(self, db_session):
         """
@@ -446,7 +437,7 @@ class TestRegistrationRefreshScript:
 
 class TestSetCoverageAreaScript:
     @pytest.mark.needsdocstring
-    def test_argument_parsing(self, db_session, create_test_library, destroy_test_library):
+    def test_argument_parsing(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -457,10 +448,9 @@ class TestSetCoverageAreaScript:
 
         # You can run the script without specifying any areas, to see a library's current areas.
         s.run(["--library=%s" % library.name], place_class=MockPlace)
-        destroy_test_library(db_session, library)
 
     @pytest.mark.needsdocstring
-    def test_unrecognized_place(self, db_session, create_test_library, destroy_test_library):
+    def test_unrecognized_place(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -476,10 +466,8 @@ class TestSetCoverageAreaScript:
 
             assert "Unknown places:" in str(exc.value)
 
-        destroy_test_library(db_session, library)
-
     @pytest.mark.needsdocstring
-    def test_ambiguous_place(self, db_session, create_test_library, destroy_test_library):
+    def test_ambiguous_place(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -495,12 +483,9 @@ class TestSetCoverageAreaScript:
                 s.run(args, place_class=MockPlace)
             assert "Ambiguous places:" in str(exc.value)
         MockPlace.by_name = {}
-        destroy_test_library(db_session, library)
 
     @pytest.mark.needsdocstring
-    def test_success(
-        self, db_session, create_test_library, create_test_place, destroy_test_library
-    ):
+    def test_success(self, db_session, create_test_library, create_test_place):
         """
         GIVEN:
         WHEN:
@@ -546,8 +531,6 @@ class TestSetCoverageAreaScript:
             db_session.delete(place_obj)
 
         db_session.commit()
-
-        destroy_test_library(db_session, library)
 
 
 class TestConfigureEmailerScript:

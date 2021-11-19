@@ -80,8 +80,10 @@ def db_engine(app):
 @pytest.fixture
 def db_session(db_engine):
     with db_engine.connect() as connection:
+        transaction = connection.begin_nested()
         session = Session(connection)
         yield session
+        transaction.rollback()
         session.close()
 
 
@@ -658,7 +660,7 @@ def places(
 
 
 @pytest.fixture
-def nypl(db_session, create_test_library, destroy_test_library, new_york_city, zip_11212):
+def nypl(db_session, create_test_library, new_york_city, zip_11212):
     """The New York Public Library"""
     library = create_test_library(
         db_session, library_name="NYPL", short_name="nypl",
@@ -666,11 +668,9 @@ def nypl(db_session, create_test_library, destroy_test_library, new_york_city, z
     )
     db_session.commit()
     yield library
-    destroy_test_library(db_session, library)
-
 
 @pytest.fixture
-def connecticut_state_library(db_session, create_test_library, destroy_test_library, connecticut_state):
+def connecticut_state_library(db_session, create_test_library, connecticut_state):
     """The Connecticut State Library"""
     library = create_test_library(
         db_session, library_name="Connecticut State Library", short_name="CT",
@@ -678,11 +678,10 @@ def connecticut_state_library(db_session, create_test_library, destroy_test_libr
     )
     db_session.commit()
     yield library
-    destroy_test_library(db_session, library)
 
 
 @pytest.fixture
-def kansas_state_library(db_session, create_test_library, destroy_test_library, kansas_state, manhattan_ks):
+def kansas_state_library(db_session, create_test_library, kansas_state, manhattan_ks):
     """The Kansas State Library"""
     library = create_test_library(
         db_session, library_name="Kansas State Library", short_name="KS",
@@ -690,7 +689,6 @@ def kansas_state_library(db_session, create_test_library, destroy_test_library, 
     )
     db_session.commit()
     yield library
-    destroy_test_library(db_session, library)
 
 
 @pytest.fixture

@@ -204,12 +204,6 @@ class TestConfigurationSettingModel:
 
         assert cs_copy.id == cs_original.id
 
-        db_session.rollback()
-        db_session.delete(cs_original)
-        db_session.delete(shared_library)
-        db_session.delete(shared_integration)
-        db_session.commit()
-
     @pytest.mark.parametrize(
         "value,result",
         [

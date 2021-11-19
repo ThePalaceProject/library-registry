@@ -22,7 +22,7 @@ GENERATED_SHORT_NAME_REGEX = re.compile(r'^[A-Z]{6}$')
 class TestLibraryModel:
     ##### Public Method Tests ################################################  # noqa: E266
 
-    def test_set_hyperlink_exceptions(self, db_session, create_test_library, destroy_test_library):
+    def test_set_hyperlink_exceptions(self, db_session, create_test_library):
         """
         GIVEN: An existing Library
         WHEN:  The .set_hyperlink() method is called without all necessary parameters
@@ -38,9 +38,7 @@ class TestLibraryModel:
             library.set_hyperlink(None, ["href"])
         assert "No link relation was specified" in str(exc.value)
 
-        destroy_test_library(db_session, library)
-
-    def test_set_hyperlink(self, db_session, create_test_library, destroy_test_library):
+    def test_set_hyperlink(self, db_session, create_test_library):
         """
         GIVEN: An existing Library object
         WHEN:  .set_hyperlink is called with sufficient arguments
@@ -54,9 +52,7 @@ class TestLibraryModel:
         assert link.href == "href1"
         assert link.library_id == library.id
 
-        destroy_test_library(db_session, library)
-
-    def test_set_hyperlink_multiple_calls(self, db_session, create_test_library, destroy_test_library):
+    def test_set_hyperlink_multiple_calls(self, db_session, create_test_library):
         """
         GIVEN: An existing Library object
         WHEN:  .set_hyperlink is called multiple times, with href parameters in different orders
@@ -71,9 +67,7 @@ class TestLibraryModel:
         assert link_new.href == "href1"
         assert is_modified is False
 
-        destroy_test_library(db_session, library)
-
-    def test_set_hyperlink_overwrite_href(self, db_session, create_test_library, destroy_test_library):
+    def test_set_hyperlink_overwrite_href(self, db_session, create_test_library):
         """
         GIVEN: An existing Library object with a hyperlink with a specific href value
         WHEN:  A subsequent call to .set_hyperlink() provides hrefs which do not include the existing href value
@@ -87,9 +81,7 @@ class TestLibraryModel:
         assert link_modified.rel == "rel"
         assert link_modified.href == "href2"
 
-        destroy_test_library(db_session, library)
-
-    def test_set_hyperlink_one_link_rel_per_library(self, db_session, create_test_library, destroy_test_library):
+    def test_set_hyperlink_one_link_rel_per_library(self, db_session, create_test_library):
         """
         GIVEN: An existing Library object with a hyperlink for a specific rel name
         WHEN:  A second call to .set_hyperlink() is made with the same rel name
@@ -102,10 +94,8 @@ class TestLibraryModel:
 
         assert library.hyperlinks == [link_modified]
 
-        destroy_test_library(db_session, library)
-
     def test_set_hyperlink_multiple_hyperlinks_same_resource(
-        self, db_session, create_test_library, destroy_test_library
+        self, db_session, create_test_library
     ):
         """
         GIVEN: An existing Library object with a hyperlink for a specific rel name
@@ -118,10 +108,8 @@ class TestLibraryModel:
         assert link_original.resource == link_new.resource
         assert modified is True
 
-        destroy_test_library(db_session, library)
-
     def test_set_hyperlink_two_libraries_link_same_resource_same_rel(
-        self, db_session, create_test_library, destroy_test_library
+        self, db_session, create_test_library
     ):
         """
         GIVEN: Two different Library objects:
@@ -146,9 +134,6 @@ class TestLibraryModel:
 
         assert link_alpha.href == link_bravo.href
         assert link_alpha.rel == link_bravo.rel
-
-        for library_obj in [library_alpha, library_bravo]:
-            destroy_test_library(db_session, library_obj)
 
     ##### Private Method Tests ################################################  # noqa: E266
 
@@ -210,7 +195,7 @@ class TestLibraryModel:
         nypl.registry_stage = Library.PRODUCTION_STAGE
         assert nypl.in_production is False
 
-    def test_number_of_patrons(self, db_session, create_test_library, destroy_test_library):
+    def test_number_of_patrons(self, db_session, create_test_library):
         """
         GIVEN: A newly created Library in Production stage
         WHEN:  A DelegatedPatronIdentifier with an Adobe Account ID is associated with that Library
@@ -224,9 +209,7 @@ class TestLibraryModel:
         )
         assert library.number_of_patrons == 1
 
-        destroy_test_library(db_session, library)
-
-    def test_number_of_patrons_non_adobe(self, db_session, create_test_library, destroy_test_library):
+    def test_number_of_patrons_non_adobe(self, db_session, create_test_library):
         """
         GIVEN: A newly created Library in Production stage
         WHEN:  A DelegatedPatronIdentifier without an Adobe Account ID is associated with that Library
@@ -239,9 +222,7 @@ class TestLibraryModel:
         )
         assert library.number_of_patrons == 0
 
-        destroy_test_library(db_session, library)
-
-    def test_number_of_patrons_non_production_stage(self, db_session, create_test_library, destroy_test_library):
+    def test_number_of_patrons_non_production_stage(self, db_session, create_test_library):
         """
         GIVEN: A newly created Library in Testing stage
         WHEN:  A DelegatedPatronIdentifier is created referencing that Library
@@ -254,8 +235,6 @@ class TestLibraryModel:
             db_session, library, str(uuid.uuid4()), DelegatedPatronIdentifier.ADOBE_ACCOUNT_ID, None
         )
         assert library.number_of_patrons == 0
-
-        destroy_test_library(db_session, library)
 
     def test_service_area_single(self, db_session, create_test_library, create_test_place):
         """
@@ -274,7 +253,7 @@ class TestLibraryModel:
         db_session.delete(a_place)
         db_session.commit()
 
-    def test_service_area_multiple(self, db_session, create_test_library, create_test_place, destroy_test_library):
+    def test_service_area_multiple(self, db_session, create_test_library, create_test_place):
         """
         GIVEN: A Library with multiple service areas
         WHEN:  That Library instance's .service_area property is accessed
@@ -283,13 +262,12 @@ class TestLibraryModel:
         (place_alpha, place_bravo) = [create_test_place(db_session) for _ in range(2)]
         library = create_test_library(db_session, eligibility_areas=[place_alpha, place_bravo])
         assert library.service_area is None
-        destroy_test_library(db_session, library)
         for place_obj in [place_alpha, place_bravo]:
             db_session.delete(place_obj)
         db_session.commit()
 
     def test_service_area_everywhere(
-        self, db_session, create_test_library, create_test_place, destroy_test_library
+        self, db_session, create_test_library, create_test_place
     ):
         """
         GIVEN: A Library with one service area, of type Place.EVERYWHERE
@@ -299,12 +277,11 @@ class TestLibraryModel:
         everywhere = create_test_place(db_session, place_type=Place.EVERYWHERE)
         library = create_test_library(db_session, eligibility_areas=[everywhere])
         assert library.service_area is everywhere
-        destroy_test_library(db_session, library)
         db_session.delete(everywhere)
         db_session.commit()
 
     def test_service_area_name(
-        self, db_session, create_test_library, create_test_place, destroy_test_library
+        self, db_session, create_test_library, create_test_place
     ):
         """
         GIVEN: A Library with one service area, with a human friendly name
@@ -315,13 +292,12 @@ class TestLibraryModel:
         library = create_test_library(db_session, eligibility_areas=[place])
         expected = place.human_friendly_name
         assert library.service_area_name == expected
-        destroy_test_library(db_session, library)
         db_session.delete(place)
         db_session.commit()
 
     def test_types(
         self, db_session, create_test_place, create_test_library, zip_10018,
-        new_york_city, new_york_state, destroy_test_library
+        new_york_city, new_york_state
     ):
         """
         GIVEN:
@@ -349,12 +325,10 @@ class TestLibraryModel:
             library = create_test_library(db_session, focus_areas=[focus])
             assert focus.library_type == type
             assert [type] == list(library.types)
-            destroy_test_library(db_session, library)
 
         # If a library's service area is ambiguous, it has no service area-related type.
         library = create_test_library(db_session, library_name="library", focus_areas=[postal, province])
         assert [] == list(library.types)
-        destroy_test_library(db_session, library)
         db_session.delete(nation)
         db_session.delete(province)
         db_session.commit()
@@ -413,7 +387,7 @@ class TestLibraryModel:
             Library.random_short_name(duplicate_check=lambda x: True)
         assert "Could not generate random short name after 20 attempts!" in str(exc.value)
 
-    def test_get_hyperlink(self, db_session, create_test_library, destroy_test_library):
+    def test_get_hyperlink(self, db_session, create_test_library):
         """
         GIVEN: An existing Library object
         WHEN:  A hyperlink is created associated with that Library for a given rel name
@@ -432,9 +406,7 @@ class TestLibraryModel:
         assert isinstance(help_link, Hyperlink)
         assert link2 == help_link
 
-        destroy_test_library(db_session, library)
-
-    def test_patron_counts_by_library(self, db_session, create_test_library, destroy_test_library):
+    def test_patron_counts_by_library(self, db_session, create_test_library):
         """
         GIVEN: Multiple existing Libraries, each with some number of patrons
         WHEN:  Library.patron_counts_by_library() is passed a list of instances representing those Libraries
@@ -462,8 +434,6 @@ class TestLibraryModel:
             library_bravo.id: 3,
         }
 
-        for library_obj in (library_alpha, library_bravo, library_charlie):
-            destroy_test_library(db_session, library_obj)
 
     @pytest.mark.needsdocstring
     def test_nearby(
@@ -577,7 +547,7 @@ class TestLibraryModel:
 
     @pytest.mark.needsdocstring
     def test_search_by_library_name(
-        self, db_session, create_test_library, new_york_city, zip_11212, boston_ma, destroy_test_library
+        self, db_session, create_test_library, new_york_city, zip_11212, boston_ma
     ):
         """
         GIVEN:
@@ -636,9 +606,6 @@ class TestLibraryModel:
         # But you can find them by passing in production=False.
         assert len(search("bpl", production=False)) == 2
 
-        for lib in (brooklyn, boston):
-            destroy_test_library(db_session, lib)
-
     @pytest.mark.needsdocstring
     def test_search_by_location(
         self, db_session, nypl, kansas_state_library, connecticut_state_library, manhattan_ks
@@ -692,7 +659,7 @@ class TestLibraryModel:
         ).count() == 1
 
     @pytest.mark.needsdocstring
-    def test_search_within_description(self, db_session, create_test_library, destroy_test_library):
+    def test_search_within_description(self, db_session, create_test_library):
         """
         Test searching for a phrase within a library's description.
 
@@ -708,10 +675,8 @@ class TestLibraryModel:
         results = list(Library.search_within_description(db_session, "testing purposes"))
         assert results == [library]
 
-        destroy_test_library(db_session, library)
-
     @pytest.mark.needsdocstring
-    def test_search(self, db_session, create_test_library, destroy_test_library, kansas_state, nypl):
+    def test_search(self, db_session, create_test_library, kansas_state, nypl):
         """
         Test the overall search method.
 
@@ -758,11 +723,9 @@ class TestLibraryModel:
         # But you can find libraries that are in the testing stage by passing in production=False.
         assert m(False) == 2
 
-        destroy_test_library(db_session, new_work)
-
     @pytest.mark.needsdocstring
     def test_search_excludes_duplicates(
-        self, db_session, create_test_library, destroy_test_library, kansas_state
+        self, db_session, create_test_library, kansas_state
     ):
         """
         GIVEN:
@@ -779,11 +742,9 @@ class TestLibraryModel:
         [(result, distance)] = Library.search(db_session, (0, 0), "Kansas")
         assert result == library
 
-        destroy_test_library(db_session, library)
-
     ##### Private Class Method Tests ##########################################  # noqa: E266
 
-    def test__feed_restriction_production_stage(self, db_session, create_test_library, destroy_test_library):
+    def test__feed_restriction_production_stage(self, db_session, create_test_library):
         """
         GIVEN: A Library object whose .registry_stage and .library_stage are both PRODUCTION_STAGE
         WHEN:  The Library._feed_restriction() method is used to filter a Library query
@@ -800,9 +761,7 @@ class TestLibraryModel:
         assert q.filter(Library._feed_restriction(production=True)).all() == [library]
         assert q.filter(Library._feed_restriction(production=False)).all() == [library]
 
-        destroy_test_library(db_session, library)
-
-    def test__feed_restriction_mixed_stages(self, db_session, create_test_library, destroy_test_library):
+    def test__feed_restriction_mixed_stages(self, db_session, create_test_library):
         """
         GIVEN: A Library object with:
                 - .registry_stage set to TESTING_STAGE
@@ -819,9 +778,7 @@ class TestLibraryModel:
         assert q.filter(Library._feed_restriction(production=True)).all() == []
         assert q.filter(Library._feed_restriction(production=False)).all() == [library]
 
-        destroy_test_library(db_session, library)
-
-    def test__feed_restriction_testing_stage(self, db_session, create_test_library, destroy_test_library):
+    def test__feed_restriction_testing_stage(self, db_session, create_test_library):
         """
         GIVEN: A Library object in TESTING_STAGE for both .library_stage and .registry_stage
         WHEN:  The Library._feed_restriction() method is used to filter a Library query
@@ -835,9 +792,7 @@ class TestLibraryModel:
         assert q.filter(Library._feed_restriction(production=True)).all() == []
         assert q.filter(Library._feed_restriction(production=False)).all() == [library]
 
-        destroy_test_library(db_session, library)
-
-    def test__feed_restriction_cancelled_stage(self, db_session, create_test_library, destroy_test_library):
+    def test__feed_restriction_cancelled_stage(self, db_session, create_test_library):
         """
         GIVEN: A Library object in CANCELLED_STAGE (for either or both of registry_stage/library_stage)
         WHEN:  The Library._feed_restriction() method is used to filter a Library query
@@ -849,5 +804,3 @@ class TestLibraryModel:
         q = db_session.query(Library)
         assert q.filter(Library._feed_restriction(production=True)).all() == []
         assert q.filter(Library._feed_restriction(production=False)).all() == []
-
-        destroy_test_library(db_session, library)

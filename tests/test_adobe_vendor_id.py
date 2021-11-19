@@ -346,10 +346,9 @@ class TestVendorIDRequestHandler:
 
 
 @pytest.fixture
-def vendor_id_model_library(db_session, create_test_library, destroy_test_library):
+def vendor_id_model_library(db_session, create_test_library):
     library_obj = create_test_library(db_session)
     yield library_obj
-    destroy_test_library(db_session, library_obj)
 
 
 @pytest.fixture

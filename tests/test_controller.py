@@ -133,7 +133,7 @@ class TestLibraryRegistryAnnotator:
 
 
 class TestBaseController:
-    def test_library_for_request(self, app, db_session, create_test_library, destroy_test_library, mock_registry):
+    def test_library_for_request(self, app, db_session, create_test_library, mock_registry):
         # Test the code that looks up a library by its UUID and sets it as flask.request.library.
         controller = BaseController(mock_registry)
         f = controller.library_for_request
@@ -149,8 +149,6 @@ class TestBaseController:
             flask.request.library = None
             assert f(library.internal_urn[len("urn:uuid:"):]) == library
             assert flask.request.library == library
-
-        destroy_test_library(db_session, library)
 
 
 class TestLibraryRegistry:
@@ -315,7 +313,7 @@ class TestLibraryRegistryController:
 
     def test_libraries(
         self, db_session, nypl, kansas_state_library, connecticut_state_library, create_test_place,
-        create_test_library, destroy_test_library, mock_registry_controller
+        create_test_library, mock_registry_controller
     ):
         # Test that the controller returns a specific set of information for each library.
         ct = connecticut_state_library
@@ -349,13 +347,11 @@ class TestLibraryRegistryController:
         self._is_library(ks, libraries[2])
         self._is_library(nypl, libraries[3])
 
-        destroy_test_library(db_session, ia)
-        destroy_test_library(db_session, in_testing)
         db_session.delete(everywhere)
         db_session.commit()
 
     def test_libraries_qa_admin(
-        self, db_session, create_test_library, destroy_test_library, nypl,
+        self, db_session, create_test_library, nypl,
         connecticut_state_library, kansas_state_library, mock_registry_controller
     ):
         # Test that the controller returns a specific set of information for each library.
@@ -381,10 +377,8 @@ class TestLibraryRegistryController:
         self._is_library(nypl, libraries[2])
         self._is_library(in_testing, libraries[3], False)
 
-        destroy_test_library(db_session, in_testing)
-
     def test_libraries_opds_qa(
-        self, db_session, create_test_library, destroy_test_library, mock_registry_controller, app,
+        self, db_session, create_test_library, mock_registry_controller, app,
         nypl, connecticut_state_library, kansas_state_library
     ):
         library = create_test_library(db_session, library_name="Test Cancelled Library",
@@ -440,10 +434,8 @@ class TestLibraryRegistryController:
             # The other libraries are still in alphabetical order.
             assert titles == ['Kansas State Library', 'Connecticut State Library', 'NYPL']
 
-        destroy_test_library(db_session, library)
-
     def test_libraries_opds(
-        self, db_session, create_test_library, destroy_test_library, mock_registry_controller, app,
+        self, db_session, create_test_library, mock_registry_controller, app,
         nypl, connecticut_state_library, kansas_state_library
     ):
         library = create_test_library(db_session, library_name="Test Cancelled Library",
@@ -503,8 +495,6 @@ class TestLibraryRegistryController:
             # The other libraries are still in alphabetical order.
             assert titles == ['Kansas State Library', 'Connecticut State Library', 'NYPL']
 
-        destroy_test_library(db_session, library)
-
     def test_library_details(self, db_session, app, nypl, mock_registry_controller):
         # Test that the controller can look up the complete information for one specific library.
         def check(has_email=True):
@@ -535,7 +525,7 @@ class TestLibraryRegistryController:
         assert response.uri == LIBRARY_NOT_FOUND.uri
 
     def test_edit_registration(
-        self, db_session, create_test_library, destroy_test_library, app, mock_registry_controller
+        self, db_session, create_test_library, app, mock_registry_controller
     ):
         # Test that a specific library's stages can be edited via submitting a form.
         library = create_test_library(db_session, library_name="Test Library", short_name="test_lib",
@@ -556,8 +546,6 @@ class TestLibraryRegistryController:
         edited_library = get_one(db_session, Library, short_name=library.short_name)
         assert edited_library.library_stage == Library.TESTING_STAGE
         assert edited_library.registry_stage == Library.PRODUCTION_STAGE
-
-        destroy_test_library(db_session, library)
 
     def test_edit_registration_with_error(self, app, mock_registry_controller):
         uuid = "not a real UUID!"
@@ -618,7 +606,7 @@ class TestLibraryRegistryController:
         assert validation.success is True
 
     def test_missing_email_error(
-        self, db_session, create_test_library, destroy_test_library, app, mock_registry_controller
+        self, db_session, create_test_library, app, mock_registry_controller
     ):
         library_without_email = create_test_library(db_session)
         uuid = library_without_email.internal_urn.split("uuid:")[1]
@@ -633,8 +621,6 @@ class TestLibraryRegistryController:
         assert response.status_code == 400
         assert response.detail == 'The contact URI for this library is missing or invalid'
         assert response.uri == 'http://librarysimplified.org/terms/problem/invalid-contact-uri'
-
-        destroy_test_library(db_session, library_without_email)
 
     def test_add_or_edit_pls_id(self, db_session, nypl, app, mock_registry_controller):
         # Test that the user can input a new PLS ID
@@ -675,7 +661,7 @@ class TestLibraryRegistryController:
         assert response.uri == LIBRARY_NOT_FOUND.uri
 
     def test_search_details(
-        self, db_session, create_test_library, destroy_test_library, app, mock_registry_controller,
+        self, db_session, create_test_library, app, mock_registry_controller,
         nypl, kansas_state_library, connecticut_state_library
     ):
         library = nypl
@@ -727,8 +713,6 @@ class TestLibraryRegistryController:
             response = mock_registry_controller.search_details()
 
         assert response == LIBRARY_NOT_FOUND
-
-        destroy_test_library(db_session, with_description)
 
     def test_log_in(self, app, mock_registry_controller):
         with app.test_request_context("/", method="POST"):
@@ -1382,7 +1366,7 @@ class TestLibraryRegistryController:
 
     def test_register_succeeds_on_401_if_authentication_document_ids_match(
         self, app, registration_form, http_client, mock_registry_controller,
-        generate_auth_document, destroy_test_library, db_session
+        generate_auth_document, db_session
     ):
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
@@ -1395,7 +1379,6 @@ class TestLibraryRegistryController:
             assert response.status_code == 201
 
         [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
-        destroy_test_library(db_session, test_library_to_destroy)
 
     # NOTE: This is commented out until we can say that registration
     # requires providing a contact email and expect every new library
@@ -1449,7 +1432,7 @@ class TestLibraryRegistryController:
 
     def test_registration_fails_if_email_server_fails(
         self, mock_registry_controller, http_client, app, generate_auth_document,
-        db_session, destroy_test_library
+        db_session
     ):
         """
         Even if everything looks good, registration can fail if the library registry
@@ -1484,11 +1467,9 @@ class TestLibraryRegistryController:
         assert response.detail == "SMTP error while sending email to mailto:help@library.org"
 
         [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
-        destroy_test_library(db_session, test_library_to_destroy)
 
     def test_registration_fails_if_email_server_unusable(
         self, db_session, mock_registry_controller, http_client, app, generate_auth_document,
-        destroy_test_library
     ):
         """
         GIVEN: An email integration which is missing or not responding
@@ -1539,12 +1520,11 @@ class TestLibraryRegistryController:
         assert response.uri == UNABLE_TO_NOTIFY.uri
 
         [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
-        destroy_test_library(db_session, test_library_to_destroy)
 
     @pytest.mark.needsdecomposition
     def test_register_success(
         self, db_session, app, mock_registry_controller, http_client, generate_auth_document,
-        destroy_test_library, kansas_state, connecticut_state
+        kansas_state, connecticut_state
     ):
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
 
@@ -1831,10 +1811,9 @@ class TestLibraryRegistryController:
                 assert library.shared_secret == old_secret
 
         [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
-        destroy_test_library(db_session, test_library_to_destroy)
 
     def test_register_with_secret_changes_authentication_url_and_opds_url(
-        self, db_session, create_test_library, destroy_test_library, http_client, app,
+        self, db_session, create_test_library, http_client, app,
         mock_registry_controller, generate_auth_document
     ):
         # This Library was created previously with a certain shared
@@ -1866,8 +1845,6 @@ class TestLibraryRegistryController:
         assert library.authentication_url == new_auth_url
         assert library.opds_url == new_opds_url
 
-        destroy_test_library(db_session, library)
-
 
 class TestValidationController:
     def test_html_response(self, mock_registry):
@@ -1878,9 +1855,7 @@ class TestValidationController:
         assert response.headers['Content-Type'] == "text/html"
         assert response.data.decode("utf8") == controller.MESSAGE_TEMPLATE % dict(message="a message")
 
-    def test_validate(
-        self, mock_registry, db_session, create_test_library, destroy_test_library
-    ):
+    def test_validate(self, mock_registry, db_session, create_test_library):
         class Mock(ValidationController):
             def html_response(self, status_code, message):
                 return (status_code, message)
@@ -1944,8 +1919,6 @@ class TestValidationController:
         # A Resource can't be validated twice.
         assert_response(needs_validation.id, secret, 200, "This URI has already been validated.")
 
-        destroy_test_library(db_session, library)
-
 
 class TestCoverageController:
     def parse_to(
@@ -1999,7 +1972,7 @@ class TestCoverageController:
         self.parse_to(app, db_session, controller, "Kansas", [], ambiguous={"US": ["Kansas"]})
 
     def test_library_eligibility_and_focus(
-        self, db_session, create_test_library, destroy_test_library, app, new_york_state, new_york_city
+        self, db_session, create_test_library, app, new_york_state, new_york_city
     ):
         # focus_for_library() and eligibility_for_library() represent a library's service area as GeoJSON.
 
@@ -2035,5 +2008,3 @@ class TestCoverageController:
 
             eligibility = json.loads(eligibility.data)
             assert eligibility == Place.to_geojson(db_session, new_york_state)
-
-        destroy_test_library(db_session, library)
