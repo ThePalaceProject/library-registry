@@ -166,40 +166,6 @@ def create_test_library():
 
 
 @pytest.fixture
-def destroy_test_library():
-    """Returns a function that will remove a library object and its subsidiary objects from the database."""
-    def _destroy_test_library(db_session_obj, library_obj):
-        for alias in library_obj.aliases:
-            db_session_obj.delete(alias)
-
-        for svc_area in library_obj.service_areas:
-            db_session_obj.delete(svc_area)
-
-        for audience in library_obj.audiences:
-            db_session_obj.delete(audience)
-
-        for collection in library_obj.collections:
-            db_session_obj.delete(collection)
-
-        for dpi in library_obj.delegated_patron_identifiers:
-            db_session_obj.delete(dpi)
-
-        for hyperlink in library_obj.hyperlinks:
-            db_session_obj.delete(hyperlink)
-
-        for setting in library_obj.settings:
-            db_session_obj.delete(setting)
-
-        for setting in db_session_obj.query(ConfigurationSetting).filter(Library.id == library_obj.id):
-            db_session_obj.delete(setting)
-
-        db_session_obj.delete(library_obj)
-        db_session_obj.commit()
-
-    return _destroy_test_library
-
-
-@pytest.fixture
 def create_test_place():
     """
     Returns a constructor function for creating a Place object.
