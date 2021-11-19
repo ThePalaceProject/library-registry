@@ -231,11 +231,8 @@ def generate_auth_document(kansas_state):
 
 
 @pytest.fixture(scope="function", autouse=True)
-def teardown(db_session, destroy_test_library, capsys):
+def teardown(db_session, capsys):
     yield 1
-    for library in db_session.query(Library).all():
-        destroy_test_library(db_session, library)
-
     for resource in db_session.query(Resource).all():
         db_session.delete(resource)
 
