@@ -24,7 +24,7 @@ def mock_url_for(route, uuid, **kwargs):
 class TestOPDSCatalog:
 
     @pytest.mark.needsdocstring
-    def test_library_catalogs(self, db_session, create_test_library, destroy_test_library):
+    def test_library_catalogs(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -67,9 +67,6 @@ class TestOPDSCatalog:
 
         [l2_web] = [link['href'] for link in l2_links if link['type'] == 'text/html']
         assert template.replace("{uuid}", l2.internal_urn) == l2_web
-
-        destroy_test_library(db_session, l1)
-        destroy_test_library(db_session, l2)
 
         db_session.delete(web_client_url_setting)
         db_session.commit()
@@ -120,7 +117,7 @@ class TestOPDSCatalog:
         db_session.commit()
 
     @pytest.mark.needsdocstring
-    def test_feed_is_large(self, db_session, create_test_library, destroy_test_library):
+    def test_feed_is_large(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -143,13 +140,11 @@ class TestOPDSCatalog:
         assert OPDSCatalog._feed_is_large(db_session, [1, 2]) is True
         assert OPDSCatalog._feed_is_large(db_session, [1]) is False
 
-        destroy_test_library(db_session, l1)
-        destroy_test_library(db_session, l2)
         db_session.delete(setting)
         db_session.commit()
 
     @pytest.mark.needsdocstring
-    def test_library_catalog(self, db_session, create_test_library, new_york_city, destroy_test_library):
+    def test_library_catalog(self, db_session, create_test_library, new_york_city):
         """
         GIVEN:
         WHEN:
@@ -280,10 +275,8 @@ class TestOPDSCatalog:
         for missing_key in ('schema:areaServed', 'schema:distance', 'distance', 'subject'):
             assert missing_key not in catalog['metadata']
 
-        destroy_test_library(db_session, library)
-
     @pytest.mark.needsdocstring
-    def test__hyperlink_args(self, db_session, create_test_library, destroy_test_library):
+    def test__hyperlink_args(self, db_session, create_test_library):
         """
         Verify that _hyperlink_args generates arguments appropriate for an OPDS 2 link.
 
@@ -324,7 +317,3 @@ class TestOPDSCatalog:
         # If for some reason the Resource is removed from the Hyperlink, _hyperlink_args stops working.
         hyperlink.resource = None
         assert OPDSCatalog._hyperlink_args(hyperlink) is None
-
-        destroy_test_library(db_session, library)
-        db_session.delete(validation)
-        db_session.commit()

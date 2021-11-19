@@ -407,7 +407,7 @@ class TestUpdateServiceAreas:
 
     @pytest.mark.needsdocstring
     def test_set_service_areas(
-        self, db_session, create_test_place, create_test_library, destroy_test_library
+        self, db_session, create_test_place, create_test_library
     ):
         """
         Test the method that replaces a Library's ServiceAreas.
@@ -451,14 +451,13 @@ class TestUpdateServiceAreas:
         assert eligibility_areas() == []
         assert focus_areas() == [p2]
 
-        destroy_test_library(db_session, library)
         db_session.delete(p1)
         db_session.delete(p2)
         db_session.commit()
 
     @pytest.mark.needsdocstring
     def test_known_place_becomes_servicearea(
-        self, db_session, create_test_place, create_test_library, destroy_test_library
+        self, db_session, create_test_place, create_test_library
     ):
         """
         Test the helper method in a successful case.
@@ -495,14 +494,13 @@ class TestUpdateServiceAreas:
         # The ServiceArea IDs were added to the `ids` list.
         assert set([a1, a2]) == set(areas)
 
-        destroy_test_library(db_session, library)
         db_session.delete(p1)
         db_session.delete(p2)
         db_session.commit()
 
     @pytest.mark.needsdocstring
     def test_ambiguous_and_unknown_places_become_problemdetail(
-        self, db_session, create_test_library, create_test_place, destroy_test_library
+        self, db_session, create_test_library, create_test_place
     ):
         """
         Test the helper method in a case that ends in failure.
@@ -536,13 +534,12 @@ class TestUpdateServiceAreas:
         # No IDs were added to the list.
         assert ids == []
 
-        destroy_test_library(db_session, library)
         db_session.delete(place)
         db_session.commit()
 
     @pytest.mark.needsdocstring
     def test_update_service_areas(
-        self, db_session, create_test_library, create_test_place, destroy_test_library
+        self, db_session, create_test_library, create_test_place
     ):
         """
         GIVEN:
@@ -598,14 +595,13 @@ class TestUpdateServiceAreas:
         assert a2 == ('focus', country1.abbreviated_name)
         assert a3 == ('focus', country3.abbreviated_name)
 
-        destroy_test_library(db_session, library)
         for db_item in [country1, country2, country3, everywhere_place]:
             db_session.delete(db_item)
         db_session.commit()
 
     @pytest.mark.needsdocstring
     def test_service_area_registered_as_focus_area_if_no_focus_area(
-        self, db_session, create_test_library, destroy_test_library
+        self, db_session, create_test_library
     ):
         """
         GIVEN:
@@ -626,14 +622,13 @@ class TestUpdateServiceAreas:
         assert area.place.type == Place.EVERYWHERE
         assert area.type == ServiceArea.FOCUS
 
-        destroy_test_library(db_session, library)
         for place_obj in db_session.query(Place).all():
             db_session.delete(place_obj)
         db_session.commit()
 
     @pytest.mark.needsdocstring
     def test_service_area_registered_as_focus_area_if_identical_to_focus_area(
-        self, db_session, create_test_library, destroy_test_library
+        self, db_session, create_test_library
     ):
         library = create_test_library(db_session)
 
@@ -650,7 +645,6 @@ class TestUpdateServiceAreas:
         assert area.place.type == Place.EVERYWHERE
         assert area.type == ServiceArea.FOCUS
 
-        destroy_test_library(db_session, library)
         for place_obj in db_session.query(Place).all():
             db_session.delete(place_obj)
         db_session.commit()
@@ -669,7 +663,7 @@ class TestUpdateAudiences:
         return result
 
     @pytest.mark.needsdocstring
-    def test_update_audiences(self, db_session, create_test_library, destroy_test_library):
+    def test_update_audiences(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -689,7 +683,6 @@ class TestUpdateAudiences:
         problem = self.update(library, audiences)
         assert set(audiences) == set([x.name for x in library.audiences])
 
-        destroy_test_library(db_session, library)
         for place_obj in db_session.query(Place).all():
             db_session.delete(place_obj)
         for audience_obj in db_session.query(Audience).all():
@@ -697,7 +690,7 @@ class TestUpdateAudiences:
         db_session.commit()
 
     @pytest.mark.needsdocstring
-    def test_update_audiences_to_invalid_value(self, db_session, create_test_library, destroy_test_library):
+    def test_update_audiences_to_invalid_value(self, db_session, create_test_library):
         """
         You're not supposed to specify a single string as `audience`, but we can handle it.
 
@@ -716,10 +709,8 @@ class TestUpdateAudiences:
         problem = self.update(library, value)
         assert problem.detail == "'audience' must be a list: %r" % value
 
-        destroy_test_library(db_session, library)
-
     @pytest.mark.needsdocstring
-    def test_unrecognized_audiences_become_other(self, db_session, create_test_library, destroy_test_library):
+    def test_unrecognized_audiences_become_other(self, db_session, create_test_library):
         """
         If you specify an audience that we don't recognize, it becomes Audience.OTHER.
 
@@ -733,10 +724,8 @@ class TestUpdateAudiences:
         self.update(library, audiences)
         assert set([Audience.OTHER, Audience.PUBLIC]) == set([x.name for x in library.audiences])
 
-        destroy_test_library(db_session, library)
-
     @pytest.mark.needsdocstring
-    def test_audience_defaults_to_public(self, db_session, create_test_library, destroy_test_library):
+    def test_audience_defaults_to_public(self, db_session, create_test_library):
         """
         If a library doesn't specify its audience, we assume it's open to the general public.
 
@@ -749,9 +738,6 @@ class TestUpdateAudiences:
         self.update(library, None)
         assert [Audience.PUBLIC] == [x.name for x in library.audiences]
 
-        destroy_test_library(db_session, library)
-
-
 class TestUpdateCollectionSize:
     def update(self, library, value):
         result = AuthenticationDocument._update_collection_size(library, value)
@@ -762,7 +748,7 @@ class TestUpdateCollectionSize:
         return result
 
     @pytest.mark.needsdocstring
-    def test_success(self, db_session, create_test_library, destroy_test_library):
+    def test_success(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -790,13 +776,12 @@ class TestUpdateCollectionSize:
         # Now both collections have been removed.
         assert library.collections == []
 
-        destroy_test_library(db_session, library)
         for place_obj in db_session.query(Place).all():
             db_session.delete(place_obj)
         db_session.commit()
 
     @pytest.mark.needsdocstring
-    def test_single_collection(self, db_session, create_test_library, destroy_test_library):
+    def test_single_collection(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -818,11 +803,9 @@ class TestUpdateCollectionSize:
         assert unknown.language is None
         assert unknown.size == 51
 
-        destroy_test_library(db_session, library)
-
     @pytest.mark.needsdocstring
     def test_unknown_language_registered_as_unknown(
-        self, db_session, create_test_library, destroy_test_library
+        self, db_session, create_test_library
     ):
         """
         GIVEN:
@@ -843,10 +826,8 @@ class TestUpdateCollectionSize:
         assert unknown.language is None
         assert unknown.size == 100+200+300
 
-        destroy_test_library(db_session, library)
-
     @pytest.mark.needsdocstring
-    def test_invalid_collection_size(self, db_session, create_test_library, destroy_test_library):
+    def test_invalid_collection_size(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -857,10 +838,9 @@ class TestUpdateCollectionSize:
         assert problem.detail == (
             "'collection_size' must be a number or an object mapping language codes to numbers"
         )
-        destroy_test_library(db_session, library)
 
     @pytest.mark.needsdocstring
-    def test_negative_collection_size(self, db_session, create_test_library, destroy_test_library):
+    def test_negative_collection_size(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -869,4 +849,3 @@ class TestUpdateCollectionSize:
         library = create_test_library(db_session)
         problem = self.update(library, -100)
         assert problem.detail == "Collection size cannot be negative."
-        destroy_test_library(db_session, library)

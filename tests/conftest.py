@@ -57,21 +57,8 @@ def init_test_db():
     engine.dispose()
 
 
-@pytest.fixture(scope="session")
-def app():
-    app = create_app(testing=True)
-    app.secret_key = "SUPER SECRET TESTING SECRET"
-    yield app
-
-
 @pytest.fixture
-def client(app):
-    with app.test_client() as client:
-        yield client
-
-
-@pytest.fixture
-def db_engine(app):
+def db_engine():
     engine = create_engine(test_db_url)
     yield engine
     engine.dispose()
@@ -80,9 +67,24 @@ def db_engine(app):
 @pytest.fixture
 def db_session(db_engine):
     with db_engine.connect() as connection:
+        transaction = connection.begin_nested()
         session = Session(connection)
         yield session
+        transaction.rollback()
         session.close()
+
+
+@pytest.fixture
+def app(db_session):
+    app = create_app(testing=True, db_session_obj=db_session)
+    app.secret_key = "SUPER SECRET TESTING SECRET"
+    yield app
+
+
+@pytest.fixture
+def client(app):
+    with app.test_client() as client:
+        yield client
 
 
 @pytest.fixture
@@ -161,40 +163,6 @@ def create_test_library():
         return library
 
     return _create_test_library
-
-
-@pytest.fixture
-def destroy_test_library():
-    """Returns a function that will remove a library object and its subsidiary objects from the database."""
-    def _destroy_test_library(db_session_obj, library_obj):
-        for alias in library_obj.aliases:
-            db_session_obj.delete(alias)
-
-        for svc_area in library_obj.service_areas:
-            db_session_obj.delete(svc_area)
-
-        for audience in library_obj.audiences:
-            db_session_obj.delete(audience)
-
-        for collection in library_obj.collections:
-            db_session_obj.delete(collection)
-
-        for dpi in library_obj.delegated_patron_identifiers:
-            db_session_obj.delete(dpi)
-
-        for hyperlink in library_obj.hyperlinks:
-            db_session_obj.delete(hyperlink)
-
-        for setting in library_obj.settings:
-            db_session_obj.delete(setting)
-
-        for setting in db_session_obj.query(ConfigurationSetting).filter(Library.id == library_obj.id):
-            db_session_obj.delete(setting)
-
-        db_session_obj.delete(library_obj)
-        db_session_obj.commit()
-
-    return _destroy_test_library
 
 
 @pytest.fixture
@@ -658,7 +626,7 @@ def places(
 
 
 @pytest.fixture
-def nypl(db_session, create_test_library, destroy_test_library, new_york_city, zip_11212):
+def nypl(db_session, create_test_library, new_york_city, zip_11212):
     """The New York Public Library"""
     library = create_test_library(
         db_session, library_name="NYPL", short_name="nypl",
@@ -666,11 +634,9 @@ def nypl(db_session, create_test_library, destroy_test_library, new_york_city, z
     )
     db_session.commit()
     yield library
-    destroy_test_library(db_session, library)
-
 
 @pytest.fixture
-def connecticut_state_library(db_session, create_test_library, destroy_test_library, connecticut_state):
+def connecticut_state_library(db_session, create_test_library, connecticut_state):
     """The Connecticut State Library"""
     library = create_test_library(
         db_session, library_name="Connecticut State Library", short_name="CT",
@@ -678,11 +644,10 @@ def connecticut_state_library(db_session, create_test_library, destroy_test_libr
     )
     db_session.commit()
     yield library
-    destroy_test_library(db_session, library)
 
 
 @pytest.fixture
-def kansas_state_library(db_session, create_test_library, destroy_test_library, kansas_state, manhattan_ks):
+def kansas_state_library(db_session, create_test_library, kansas_state, manhattan_ks):
     """The Kansas State Library"""
     library = create_test_library(
         db_session, library_name="Kansas State Library", short_name="KS",
@@ -690,7 +655,6 @@ def kansas_state_library(db_session, create_test_library, destroy_test_library, 
     )
     db_session.commit()
     yield library
-    destroy_test_library(db_session, library)
 
 
 @pytest.fixture

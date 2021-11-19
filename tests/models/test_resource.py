@@ -46,7 +46,7 @@ def registry_contact_email(db_session):
 
 class TestHyperlinkModel:
     def test_notify_exit_early(
-        self, db_session, create_test_resource, create_test_library, destroy_test_library, registry_contact_email
+        self, db_session, create_test_resource, create_test_library, registry_contact_email
     ):
         """
         GIVEN: A Hyperlink object
@@ -84,14 +84,13 @@ class TestHyperlinkModel:
         hyperlink.notify(emailer=emailer, url_for=emailer.url_for)
         assert emailer.sent and emailer.url_for_calls
 
-        destroy_test_library(db_session, library)
         for db_item in (hyperlink, resource):
             db_session.delete(db_item)
         db_session.commit()
 
     def test_notify_validated_resource(
         self, db_session, create_test_library, create_test_resource, create_test_validation,
-        destroy_test_library, registry_contact_email
+        registry_contact_email
     ):
         """
         GIVEN: - A Hyperlink instance which is associated with a Library and a Resource
@@ -138,13 +137,12 @@ class TestHyperlinkModel:
         # type is Emailer.ADDRESS_NEEDS_CONFIRMATION, so shouldn't be called this time.
         assert emailer.url_for_calls == []
 
-        destroy_test_library(db_session, library)
         db_session.delete(validation)
         db_session.commit()
 
     def test_notify_no_validation(
         self, db_session, create_test_library, create_test_resource, create_test_validation,
-        destroy_test_library, registry_contact_email
+        registry_contact_email
     ):
         """
         GIVEN: - A Hyperlink instance which is associated with a Library and a Resource
@@ -172,8 +170,6 @@ class TestHyperlinkModel:
         assert len(emailer.url_for_calls) == 1
         (email_type, _, _) = emailer.sent[0]
         assert email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION
-
-        destroy_test_library(db_session, library)
 
 
 @pytest.fixture(scope="function")

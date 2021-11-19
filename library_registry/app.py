@@ -27,13 +27,17 @@ db_url = Configuration.database_url(test=TESTING)
 test_db_url = Configuration.database_url(test=True)
 
 
-def create_app(testing=False):
+def create_app(testing=False, db_session_obj=None):
     app = Flask(__name__)
     babel.init_app(app)
 
-    SessionManager.initialize(db_url)
-    session_factory = SessionManager.sessionmaker(db_url)
-    _db = flask_scoped_session(session_factory, app)
+
+    if testing and db_session_obj:
+        _db = db_session_obj
+    else:
+        SessionManager.initialize(db_url)
+        session_factory = SessionManager.sessionmaker(db_url)
+        _db = flask_scoped_session(session_factory, app)
 
     log_level = LogConfiguration.initialize(_db, testing=testing)
     debug = log_level == 'DEBUG'

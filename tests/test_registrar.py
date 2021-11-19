@@ -21,7 +21,7 @@ class TestRegistrar:
     # refactored.
 
     @pytest.mark.needsdocstring
-    def test_reregister(self, db_session, create_test_library, destroy_test_library):
+    def test_reregister(self, db_session, create_test_library):
         """
         GIVEN:
         WHEN:
@@ -47,8 +47,6 @@ class TestRegistrar:
         registrar.RETURN_VALUE = (object(), object(), object())
         result = registrar.reregister(library)
         assert result is None
-
-        destroy_test_library(db_session, library)
 
     @pytest.mark.needsdocstring
     def test_opds_response_links(self):
