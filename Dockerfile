@@ -17,10 +17,11 @@ FROM postgis/postgis:12-3.1 AS libreg_local_db
 
 ENV POSTGRES_PASSWORD="password"
 ENV POSTGRES_USER="postgres"
+ENV PGPORT="5433"
 
 COPY ./docker/postgis_init.sh /docker-entrypoint-initdb.d/postgis-init.sh
 
-EXPOSE 5432
+EXPOSE 5433
 ##############################################################################
 
 
@@ -50,7 +51,6 @@ ENV NGINX_VERSION 1.19.8
 ENV NJS_VERSION   0.5.2
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
-ENV SIMPLYE_RUN_WEBPACK_WATCH 0
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
@@ -107,8 +107,8 @@ RUN set -x \
 #   https://github.com/pypa/pipenv/issues/4052#issuecomment-588480867
 ENV CI 1
 
-# This creates the /simplye_app directory without issuing a separate RUN directive.
-WORKDIR /simplye_app
+# This creates the /simplified_app directory without issuing a separate RUN directive.
+WORKDIR /simplified_app
 
 # Copy over the dependency files individually. We copy over the entire local
 # directory later in the process, *after* the heavy RUN instructions, so that
@@ -116,17 +116,17 @@ WORKDIR /simplye_app
 COPY ./Pipfile* ./
 
 # Setting WORKON_HOME causes pipenv to put its virtualenv in a pre-determined, 
-# OS-independent location. Note that /simplye_venv is NOT the virtualenv, it's 
+# OS-independent location. Note that /simplified_venv is NOT the virtualenv, it's 
 # just the parent directory for virtualenvs created by pipenv. The actual venv
 # is in a directory called something like
-# /simplye_venv/simplye_app-QOci6oRN, which follows the pattern 
+# /simplified_venv/simplified_app-MtL_iG-S, which follows the pattern 
 # '<name-of-project-dir>-<hashval>', where the hashval is deterministic and based on
 # the path to the Pipfile. See this issue comment for a description of how that
 # name is built:
 #
 #   https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
 #
-ENV WORKON_HOME /simplye_venv
+ENV WORKON_HOME /simplified_venv
 
 # Install the system dependencies and the Python dependencies. Note that if 
 # you want to be able to install new Python dependencies on the fly from
@@ -149,9 +149,26 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && mkdir ${WORKON_HOME} \
- && cd /simplye_app \
+ && cd /simplified_app \
  && pipenv install --dev --skip-lock --clear \
  && apk del --no-network .build-deps
+
+# Build a static version of the front end to serve
+COPY ./package*.json ./
+
+RUN set -ex \
+ && apk add --no-cache --virtual .node-build-deps \
+    make \
+    build-base \
+    python2 \
+    npm \
+ && mkdir /tmp/simplified_npm_build \
+ && cp ./package*.json /tmp/simplified_npm_build \
+ && npm install --prefix /tmp/simplified_npm_build \
+ && mkdir -p /simplified_static/static \
+ && cp /tmp/simplified_npm_build/node_modules/simplified-registry-admin/dist/* /simplified_static/static \
+ && rm -rf /tmp/simplified_npm_build \
+ && apk del --no-network .node-build-deps
 
 COPY ./docker/gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
@@ -168,15 +185,11 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 # Build target: libreg_local
 # 
 # Note that this target assumes a host mount is in place to link the current
-# directory into the container at /simplye_app. The production target copies in
+# directory into the container at /simplified_app. The production target copies in
 # the entire project directory since it will remain static.
 FROM builder AS libreg_local
 
 ENV FLASK_ENV development
-ENV SIMPLYE_RUN_WEBPACK_WATCH 1
-ENV TESTING 1
-
-RUN apk add --no-cache npm
 ##############################################################################
 
 
@@ -187,19 +200,5 @@ FROM builder AS libreg_active
 
 ENV FLASK_ENV production
 
-# We'll be building the front end as static, so we need the package files.
-COPY ./package*.json ./
-
-# Compile the front end files and clean up the temporary build directory
-RUN set -ex \
- && apk add --no-cache npm \
- && mkdir /tmp/simplye_npm_build \
- && cp ./package*.json /tmp/simplye_npm_build \
- && npm install --prefix /tmp/simplye_npm_build \
- && mkdir -p /simplye_static/static \
- && cp /tmp/simplye_npm_build/node_modules/simplified-registry-admin/dist/* /simplye_static/static \
- && rm -rf /tmp/simplye_npm_build \
- && apk del npm
-
-COPY . /simplye_app
+COPY . /simplified_app
 ##############################################################################
