@@ -26,6 +26,7 @@ SQLAlchemy = "==1.3.23"
 Pillow = "*"
 bcrypt = "*"
 gunicorn = "*"
+aws-xray-sdk = "<2.9"
 
 [tool.poetry.extras]
 pg = ["psycopg2"]

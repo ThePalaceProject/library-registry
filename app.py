@@ -16,6 +16,7 @@ from util.app_server import (
     returns_json_or_response_or_problem_detail,
     returns_problem_detail,
 )
+from util.xray import PalaceXrayUtils
 
 app = Flask(__name__)
 babel = Babel(app)
@@ -35,6 +36,9 @@ debug = log_level == "DEBUG"
 app.config["DEBUG"] = debug
 app.debug = debug
 app._db = _db
+
+# Setup AWS XRay for the app
+PalaceXrayUtils.configure_app(app)
 
 if os.environ.get("AUTOINITIALIZE") == "False":
     pass
