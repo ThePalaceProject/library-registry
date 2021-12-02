@@ -8,7 +8,7 @@ from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.core.models.segment import Segment
 from aws_xray_sdk.ext.flask.middleware import XRayMiddleware
 from aws_xray_sdk.ext.httplib import add_ignored as httplib_add_ignored
-from flask import Flask, Response, request, session
+from flask import Flask, request
 
 
 class PalaceXrayUtils:
