@@ -35,7 +35,7 @@ class TestPalaceXrayUtils:
         mock_middleware = MagicMock()
 
         monkeypatch.setattr(PalaceXrayUtils, "setup_xray", MagicMock())
-        monkeypatch.setattr("api.util.xray.PalaceXrayMiddleware", mock_middleware)
+        monkeypatch.setattr("util.xray.PalaceXrayMiddleware", mock_middleware)
 
         # Nothing happens if env isn't set
         PalaceXrayUtils.configure_app(mock_app)
