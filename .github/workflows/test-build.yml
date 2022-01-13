@@ -1,45 +1,7 @@
-name: Lint, Test & Build
+name: Test & Build
 on: [push, pull_request]
 
-env:
-  POETRY_VERSION: 1.1.8
-  POETRY_URL: https://raw.githubusercontent.com/python-poetry/poetry/master/install-poetry.py
-
 jobs:
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-
-    # We want to run on external PRs, but not on our own internal PRs as they'll be run
-    # by the push to the branch. This prevents duplicated runs on internal PRs.
-    # Some discussion of this here:
-    # https://github.community/t/duplicate-checks-on-push-and-pull-request-simultaneous-event/18012
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
-      - name: Install Python Packages
-        run: |
-          pip install --upgrade pip
-          pip install tox
-
-      - name: Run isort
-        run: tox -e isort
-
-      - name: Run Black
-        run: tox -e black
-
-      - name: Run Flake8
-        run: tox -e flake8
-
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -57,21 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Cache Poetry cache
-        uses: actions/cache@v2
-        with:
-          path: ~/.cache/pypoetry
-          key: poetry-cache-${{ runner.os }}-${{ matrix.python-version }}-${{ env.POETRY_VERSION }}
-
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install Poetry
-        run: |
-          curl -sSL ${{ env.POETRY_URL }} | python -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        uses: ThePalaceProject/circulation/.github/actions/poetry@main
 
       - name: Install Python Packages
         run: |
@@ -84,7 +38,7 @@ jobs:
   build:
     name: Docker build
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [test]
     env:
       REGISTRY_HOST: ghcr.io
 
