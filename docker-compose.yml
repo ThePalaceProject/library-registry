@@ -15,7 +15,7 @@ services:
 
   libreg_webapp:
     container_name: libreg_webapp
-    depends_on: 
+    depends_on:
       - libreg_local_db
     build:
       context: .

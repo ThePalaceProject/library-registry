@@ -7,7 +7,7 @@ A discovery service for matching people to the libraries that serve them.
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 ![Python: 3.6,3.7,3.8,3.9](https://img.shields.io/badge/Python-3.6%20%7C%203.7%20%7C%203.8%20%7C%203.9-blue)
 
-This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL 
+This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL
 [Library Simplified](http://www.librarysimplified.org/) Library Registry.
 
 Docker images ar available at:
@@ -15,10 +15,10 @@ Docker images ar available at:
 
 ## Cloning the Library Registry Repositories
 
-You will need both this repository and the separate front end repo, in order to build the local development images. The 
-registry front end repo should be checked out into a directory named `registry_admin` in the same parent directory as 
-the `library-registry` repo itself. If it is not, you will need to change the host mount instructions in the 
-`docker-compose.yml` file to accommodate its location. To get them both in the same directory, execute the following 
+You will need both this repository and the separate front end repo, in order to build the local development images. The
+registry front end repo should be checked out into a directory named `registry_admin` in the same parent directory as
+the `library-registry` repo itself. If it is not, you will need to change the host mount instructions in the
+`docker-compose.yml` file to accommodate its location. To get them both in the same directory, execute the following
 from that directory:
 
 ```shell
@@ -28,7 +28,7 @@ git clone https://github.com/thepalaceproject/library-registry-admin.git
 
 ## Key Environment Variables
 
-These environment variables are generally applicable, regardless of installation method, and are included here because 
+These environment variables are generally applicable, regardless of installation method, and are included here because
 they are not discussed elsewhere in this document.
 
 - EMAILER_RECIPIENT_OVERRIDE: If set, `emailer` will send all non-test email to this email address.
@@ -37,16 +37,16 @@ they are not discussed elsewhere in this document.
 
 If not using Docker, skip to section entitled ["Installation (non-Docker)"](#installation-non-docker)
 
-Because the Registry runs in a Docker container, the only required software is 
-[Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able 
-to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the 
+Because the Registry runs in a Docker container, the only required software is
+[Docker Desktop](https://www.docker.com/products/docker-desktop). The database and webapp containers expect to be able
+to operate on ports 5432 and 80, respectively--if those ports are in use already you may need to amend the
 `docker-compose.yml` file to add alternate ports.
 
-_Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely 
-convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the 
+_Note: If you would like to use the `Makefile` commands you will also need `make` in your `PATH`. They're purely
+convenience methods, so it isn't strictly required. If you don't want to use them just run the commands from the
 corresponding task in the `Makefile` manually. You can run `make help` to see the full list of commands._
 
-While they won't need to be changed often, there are a couple of environment variables set in the `Dockerfile` that are 
+While they won't need to be changed often, there are a couple of environment variables set in the `Dockerfile` that are
 referenced within the container:
 - `LIBRARY_REGISTRY_DOCKER_HOME` is the app directory.
 
@@ -92,7 +92,7 @@ While the cluster is running, you can access the containers with these commands:
 
 ### Viewing the Web Interface
 
-The Library Registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a 
+The Library Registry listens (via Nginx) on port 80, so once the cluster is running you should be able to point a
 browser at `http://localhost/admin/` and access it with the username/password `admin/admin`.
 
 The [Library Registry Admin](https://github.com/thepalaceproject/library-registry-admin.git)
@@ -161,8 +161,8 @@ set to the appropriate values for your environment.
 
 ### Installing Python Dependencies
 
-The project expects to use [`poetry`](https://python-poetry.org) for dependency and virtualenv management, so first 
-[install that](https://python-poetry.org/docs/#installation). 
+The project expects to use [`poetry`](https://python-poetry.org) for dependency and virtualenv management, so first
+[install that](https://python-poetry.org/docs/#installation).
 
 Having done so, you should be able to run the following in the project directory to install all dependencies.
 
@@ -186,23 +186,23 @@ FLASK_APP=app.py poetry run flask run
 
 ## Continuous Integration
 
-This project runs all the unit tests through Github Actions for new pull requests and when merging into the default 
+This project runs all the unit tests through Github Actions for new pull requests and when merging into the default
 `main` branch. The relevant file can be found in `.github/workflows/test-build.yml`. When contributing updates or fixes,
-it's required for the test Github Action to pass for all python environments. Run the `tox` command locally before 
+it's required for the test Github Action to pass for all python environments. Run the `tox` command locally before
 pushing changes to make sure you find any failing tests before committing them.
 
 ### Linting
 
-We lint our code with [black](https://github.com/psf/black) and [isort](https://pycqa.github.io/isort/). These are 
-automatically run by both `tox` and Github Actions and the linters must pass before code is committed. 
+We lint our code with [black](https://github.com/psf/black) and [isort](https://pycqa.github.io/isort/). These are
+automatically run by both `tox` and Github Actions and the linters must pass before code is committed.
 
 #### isort
 
 You can run `isort` through `tox` with the command:
 ```
 tox -e isort
-``` 
-This will lint the code with `isort`, but not make any changes. 
+```
+This will lint the code with `isort`, but not make any changes.
 
 If you want `isort` to automatically reformat your code, you can run
 ```
@@ -211,13 +211,13 @@ tox -e isort-reformat
 
 #### black
 
-Similar to `isort`, you can run `black` through `tox` with the command 
+Similar to `isort`, you can run `black` through `tox` with the command
 ```
 tox -e black
-``` 
-This will lint the code with `black`, but not make any changes. 
+```
+This will lint the code with `black`, but not make any changes.
 
-If you want `black` to automatically reformat your code, you can run 
+If you want `black` to automatically reformat your code, you can run
 ```
 tox -e black-reformat
 ```
@@ -253,18 +253,18 @@ Test Python 3.8
 tox -e py38
 ```
 
-You need to have the Python versions you are testing against installed on your local system. `tox` searches the system 
-for installed Python versions, but does not install new Python versions. If `tox` doesn't find the Python version its 
+You need to have the Python versions you are testing against installed on your local system. `tox` searches the system
+for installed Python versions, but does not install new Python versions. If `tox` doesn't find the Python version its
 looking for it will give an `InterpreterNotFound` errror.
 
-[Pyenv](https://github.com/pyenv/pyenv) is a useful tool to install multiple Python versions, if you need to install 
+[Pyenv](https://github.com/pyenv/pyenv) is a useful tool to install multiple Python versions, if you need to install
 missing Python versions in your system for local testing.
 
 #### Docker
 
 If you install `tox-docker` tox will take care of setting up all the service containers necessary to run the unit tests
-and pass the correct environment variables to configure the tests to use these services. Using `tox-docker` is not 
-required, but it is the recommended way to run the tests locally, since it runs the tests in the same way they are run 
+and pass the correct environment variables to configure the tests to use these services. Using `tox-docker` is not
+required, but it is the recommended way to run the tests locally, since it runs the tests in the same way they are run
 on Github Actions.
 
 ```
