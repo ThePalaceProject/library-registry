@@ -5,13 +5,15 @@ A discovery service for matching people to the libraries that serve them.
 [![Test Library Registry & Build Docker Image](https://github.com/ThePalaceProject/library-registry/actions/workflows/test-build.yml/badge.svg)](https://github.com/ThePalaceProject/library-registry/actions/workflows/test-build.yml)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
 ![Python: 3.6,3.7,3.8,3.9](https://img.shields.io/badge/Python-3.6%20%7C%203.7%20%7C%203.8%20%7C%203.9-blue)
 
 This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL
 [Library Simplified](http://www.librarysimplified.org/) Library Registry.
 
-Docker images ar available at:
-- https://github.com/orgs/ThePalaceProject/packages?repo_name=library-registry
+Docker images are available at:
+
+- [library-registry](https://github.com/orgs/ThePalaceProject/packages?repo_name=library-registry)
 
 ## Cloning the Library Registry Repositories
 
@@ -98,6 +100,7 @@ browser at `http://localhost/admin/` and access it with the username/password `a
 The [Library Registry Admin](https://github.com/thepalaceproject/library-registry-admin.git)
 front end is implemented as a Node package. The name and version of this package are configured in
 `admin/config.py`. In addition, either or both may be overridden via environment variables. For example:
+
 ```shell
 TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME=@thepalaceproject/library-registry-admin
 TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_VERSION=1.0.0
@@ -123,10 +126,10 @@ To install the registry locally, you'll need the following:
 - PostGIS 3
 - Python 3.6+ (3.9 is the build target for the Docker install)
 - Appropriate system dependencies to build the Python dependencies, which may include:
-  - `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
-  - Compression libs like `bzip2-dev`, `zlib-dev`, etc.
-  - PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
-  - Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
+    - `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
+    - Compression libs like `bzip2-dev`, `zlib-dev`, etc.
+    - PostgreSQL development libs: `libpq`, `postgresql-dev`, etc., for [`psycopg2`](https://www.psycopg.org)
+    - Image processing libs for [`Pillow`](https://pillow.readthedocs.io/en/stable/) such as `libjpeg-dev`
 
 ### Creating the Databases
 
@@ -151,13 +154,14 @@ CREATE EXTENSION postgis;
 ```
 
 The database configuration is exposed to the application via environment variables.
+
 ```SHELL
 SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@localhost:5432/simplified_registry_test
 SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@localhost:5432/simplified_registry_dev
 ```
+
 For development work, you should create a `.env` file in the project directory that includes these variables
 set to the appropriate values for your environment.
-
 
 ### Installing Python Dependencies
 
@@ -167,12 +171,14 @@ The project expects to use [`poetry`](https://python-poetry.org) for dependency 
 Having done so, you should be able to run the following in the project directory to install all dependencies.
 
 For a development environment:
-```
+
+```shell
 poetry install --no-root -E pg-binary
 ```
 
 For a production environment:
-```
+
+```shell
 poetry install --no-dev --no-root -E pg
 ```
 
@@ -191,36 +197,16 @@ This project runs all the unit tests through Github Actions for new pull request
 it's required for the test Github Action to pass for all python environments. Run the `tox` command locally before
 pushing changes to make sure you find any failing tests before committing them.
 
-### Linting
+### Code Style
 
-We lint our code with [black](https://github.com/psf/black) and [isort](https://pycqa.github.io/isort/). These are
-automatically run by both `tox` and Github Actions and the linters must pass before code is committed.
+Code style on this project is linted using [pre-commit](https://pre-commit.com/). This python application is included
+in our `pyproject.toml` file, so if you have the applications requirements installed it should be available. pre-commit
+is run automatically on each push and PR by our [CI System](#continuous-integration).
 
-#### isort
+You can run it manually on all files with the command: `pre-commit run --all-files`.
 
-You can run `isort` through `tox` with the command:
-```
-tox -e isort
-```
-This will lint the code with `isort`, but not make any changes.
-
-If you want `isort` to automatically reformat your code, you can run
-```
-tox -e isort-reformat
-```
-
-#### black
-
-Similar to `isort`, you can run `black` through `tox` with the command
-```
-tox -e black
-```
-This will lint the code with `black`, but not make any changes.
-
-If you want `black` to automatically reformat your code, you can run
-```
-tox -e black-reformat
-```
+For more details about our code style, see the
+[code style section of the circulation README](https://github.com/ThePalaceProject/circulation#code-style).
 
 ### Testing
 
@@ -229,7 +215,7 @@ Github Actions runs our unit tests against different Python versions automatical
 
 To run `pytest` unit tests locally, install `tox`.
 
-```sh
+```shell
 pip install tox
 ```
 
@@ -244,12 +230,14 @@ flag.
 | py36        | Python 3.6     |
 | py37        | Python 3.7     |
 | py38        | Python 3.8     |
+| py39        | Python 3.9     |
 
 All of these environments are tested by default when running tox. To test one specific environment you can use the `-e`
 flag.
 
 Test Python 3.8
-```
+
+```shell
 tox -e py38
 ```
 
@@ -267,7 +255,7 @@ and pass the correct environment variables to configure the tests to use these s
 required, but it is the recommended way to run the tests locally, since it runs the tests in the same way they are run
 on Github Actions.
 
-```
+```shell
 pip install tox-docker
 ```
 
@@ -275,7 +263,8 @@ The docker functionality is included in a `docker` factor that can be added to t
 with a particular factor you add it to the end of the environment.
 
 Test with Python 3.8 using docker containers for the services.
-```
+
+```shell
 tox -e py38-docker
 ```
 
@@ -287,6 +276,6 @@ to `pytest`, overriding the default.
 
 Only run the `test_app.py` tests with Python 3.6 using docker.
 
-```sh
+```shell
 tox -e py36-docker -- tests/test_app.py
 ```
