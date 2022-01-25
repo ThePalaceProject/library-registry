@@ -11,7 +11,7 @@ services:
 
   libreg_active_webapp:
     container_name: libreg_active_webapp
-    depends_on: 
+    depends_on:
       - libreg_test_db
     build:
       context: .

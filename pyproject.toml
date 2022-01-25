@@ -1,44 +1,55 @@
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]
+
+[tool]
+
+[tool.isort]
+profile = "black"
+
 [tool.poetry]
-name = "library-registry"
-version = "0.0"
-description = ""
-license = "Apache-2.0"
 authors = ["The Palace Project <info@thepalaceproject.org>"]
+description = "The Palace Project library registry"
+homepage = "https://thepalaceproject.org"
+license = "Apache-2.0"
+name = "library-registry"
+readme = "README.md"
+repository = "https://github.com/ThePalaceProject/library-registry"
+version = "0" # Version number is managed with tags in git
 
 [tool.poetry.dependencies]
-python = ">=3.6"
+aws-xray-sdk = "<2.9"
+bcrypt = "*"
 feedparser = "*"
-loggly-python-handler = "*"
-lxml = "*"
-psycopg2 = { version = "*", optional = true }
-psycopg2-binary = { version = "*", optional = true }
-maxminddb-geolite2 = "*"
-requests = "*"
-pycryptodome = "*"
-uszipcode = "==0.2.4"
 Flask = "*"
+Flask-Babel = "*"
 Flask-Bcrypt = "*"
 Flask-SQLAlchemy-Session = "*"
-Flask-Babel = "*"
 GeoAlchemy2 = "*"
-PyJWT = "*"
-SQLAlchemy = "==1.3.23"
-Pillow = "*"
-bcrypt = "*"
 gunicorn = "*"
-aws-xray-sdk = "<2.9"
+loggly-python-handler = "*"
+lxml = "*"
+maxminddb-geolite2 = "*"
+Pillow = "*"
+psycopg2 = { version = "*", optional = true }
+psycopg2-binary = { version = "*", optional = true }
+pycryptodome = "*"
+PyJWT = "*"
+python = ">=3.6.1"
+requests = "*"
+SQLAlchemy = "==1.3.23"
+uszipcode = "==0.2.4"
+
+[tool.poetry.dev-dependencies]
+pre-commit = "~2.16"
+pytest = "^6"
+pytest-datadir = "*"
+pytest-timeout = "*"
 
 [tool.poetry.extras]
 pg = ["psycopg2"]
 pg-binary = ["psycopg2-binary"]
 
-[tool.poetry.dev-dependencies]
-pytest = "*"
-pytest-datadir = "*"
-flake8 = "*"
-black = "*"
-isort = "*"
-
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.pytest.ini_options]
+timeout = "600"
+timeout_method = "thread"

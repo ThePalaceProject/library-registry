@@ -100,7 +100,6 @@ class ControllerTest(DatabaseTest):
         """Configure the site before setup() creates a LibraryRegistry
         object.
         """
-        pass
 
     def vendor_id_setup(self):
         """Configure a basic vendor id service."""

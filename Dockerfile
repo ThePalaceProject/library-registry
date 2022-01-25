@@ -3,7 +3,7 @@
 #   * libreg_local_db
 #   * libreg_local
 #   * libreg_active
-# 
+#
 # For background on multi-stage builds, see:
 #
 #   https://docs.docker.com/develop/develop-images/multistage-build/
@@ -100,7 +100,7 @@ RUN set -x \
     && chown nginx:nginx /etc/gunicorn \
     && mkdir /var/log/supervisord \
     && chown nginx:nginx /var/log/supervisord
-    
+
 ##### Set up Gunicorn, Nginx, and Supervisor configurations #####
 # `LIBRARY_REGISTRY_DOCKER_HOME` is the app's directory in the docker container.
 ENV LIBRARY_REGISTRY_DOCKER_HOME=/apps/library-registry
@@ -129,7 +129,7 @@ RUN set -ex \
 		libxslt-dev \
 		openssl-dev \
 		postgresql-dev \
-		zlib-dev \        
+		zlib-dev \
  # We need to leave these installed for psycopg2 and PIL
  && apk add --no-cache --virtual .runtime-deps \
     libpq \
@@ -152,7 +152,7 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 
 ##############################################################################
 # Build target: libreg_local
-# 
+#
 # Note that this target assumes a host mount is in place to link the current
 # directory into the container at /simplye_app. The production target copies in
 # the entire project directory since it will remain static.
