@@ -1,5 +1,5 @@
 .PHONY: help build clean full-clean \
-		up up-watch start stop down \
+		up up-watch up-webapp up-webapp-watch start stop down \
 		db-session webapp-shell test test-x \
 		active-build active-up active-up-watch active-test active-test-x active-down active-clean active-full-clean
 
@@ -22,6 +22,8 @@ help:
 	@echo ""
 	@echo "    up               - Bring up the local cluster in detached mode"
 	@echo "    up-watch         - Bring up the local cluster, remains attached"
+	@echo "    up-webapp        - Bring up only the webapp container in detached mode"
+	@echo "    up-webapp-watch  - Bring up only the webapp container, remains attached"
 	@echo "    start            - Start a stopped cluster"
 	@echo "    stop             - Stop the cluster without removing containers"
 	@echo "    down             - Take down the local cluster"
@@ -67,6 +69,12 @@ up:
 
 up-watch:
 	docker-compose up
+
+up-webapp:
+	docker-compose up -d registry_webapp
+
+up-webapp-watch:
+	docker-compose up registry_webapp
 
 start:
 	docker-compose start

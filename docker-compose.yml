@@ -23,8 +23,8 @@ services:
     ports:
       - "80:80"
     environment:
-      - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@registry_db:5433/simplified_registry_test
-      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@registry_db:5433/simplified_registry_dev
+      - SIMPLIFIED_TEST_DATABASE=${SIMPLIFIED_TEST_DATABASE-postgresql://simplified_test:simplified_test@registry_db:5433/simplified_registry_test}
+      - SIMPLIFIED_PRODUCTION_DATABASE=${SIMPLIFIED_PRODUCTION_DATABASE-postgresql://simplified:simplified@registry_db:5433/simplified_registry_dev}
     volumes:
       - type: bind
         source: .
