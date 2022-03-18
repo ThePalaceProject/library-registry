@@ -24,7 +24,6 @@ TESTING = 'TESTING' in os.environ
 babel = Babel()
 
 db_url = Configuration.database_url(test=TESTING)
-test_db_url = Configuration.database_url(test=True)
 
 
 def create_app(testing=False, db_session_obj=None):

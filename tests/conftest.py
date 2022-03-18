@@ -8,7 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm.session import Session
 
-from library_registry.app import create_app, test_db_url
+from library_registry.app import create_app
+from library_registry.config import Configuration
 from library_registry.model import (
     Admin,
     Audience,
@@ -27,6 +28,7 @@ from library_registry.model_helpers import get_one_or_create
 from library_registry.util import GeometryUtility
 
 TEST_DATA_DIR = Path(os.path.dirname(__file__)) / "data"
+test_db_url = Configuration.database_url(test=True)
 
 
 def pytest_configure(config):
