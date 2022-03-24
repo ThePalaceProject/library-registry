@@ -413,7 +413,7 @@ class TestLibraryRegistryController:
             [library_link, register_link, search_link, self_link] = sorted(catalog['links'], key=lambda x: x['rel'])
             url_for = app.library_registry.url_for
 
-            assert self_link['href'] == url_for("libraries_opds")
+            assert self_link['href'] == url_for("libr.libraries_opds")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
@@ -473,7 +473,7 @@ class TestLibraryRegistryController:
             )
             url_for = app.library_registry.url_for
 
-            assert self_link['href'] == url_for("libraries_opds")
+            assert self_link['href'] == url_for("libr.libraries_opds")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
@@ -790,21 +790,21 @@ class TestLibraryRegistryController:
             )
             url_for = app.library_registry.url_for
 
-            assert self_link['href'] == url_for("nearby")
+            assert self_link['href'] == url_for("libr.nearby")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
-            assert search_link['href'] == url_for("search")
+            assert search_link['href'] == url_for("libr.search")
             assert search_link['rel'] == "search"
             assert search_link['type'] == "application/opensearchdescription+xml"
 
-            assert register_link["href"] == url_for("register")
+            assert register_link["href"] == url_for("libr.register")
             assert register_link["rel"] == "register"
             assert register_link["type"] == (
                 "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
             )
 
-            assert library_link["href"] == unquote(url_for("library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(url_for("libr.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
             assert library_link["type"] == "application/opds+json"
             assert library_link.get("templated") is True
@@ -841,19 +841,19 @@ class TestLibraryRegistryController:
             )
 
             # The 'register' link is the same as in the main feed.
-            assert register_link["href"] == url_for("register")
+            assert register_link["href"] == url_for("libr.register")
             assert register_link["rel"] == "register"
 
             # So is the 'library' templated link.
-            assert library_link["href"] == unquote(url_for("library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(url_for("libr.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
 
             # This is a QA feed, and the 'search' and 'self' links
             # will give results from the QA feed.
-            assert self_link['href'] == url_for("nearby_qa")
+            assert self_link['href'] == url_for("libr.nearby_qa")
             assert self_link['rel'] == "self"
 
-            assert search_link['href'] == url_for("search_qa")
+            assert search_link['href'] == url_for("libr.search_qa")
             assert search_link['rel'] == "search"
 
     def test_nearby_no_location(self, app, mock_registry_controller):
@@ -890,7 +890,7 @@ class TestLibraryRegistryController:
             assert response.headers['Cache-Control'] == "public, no-transform, max-age: 2592000"
 
             # The search form points the client to the search controller.
-            expect_url = mock_registry.url_for("search")
+            expect_url = mock_registry.url_for("libr.search")
             expect_url_tag = (
                 '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
             )
@@ -902,7 +902,7 @@ class TestLibraryRegistryController:
             response = mock_registry_controller.search(None, live=False)
             assert response.status == "200 OK"
 
-            expect_url = mock_registry.url_for("search_qa")
+            expect_url = mock_registry.url_for("libr.search_qa")
             expect_url_tag = (
                 '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
             )
@@ -928,21 +928,21 @@ class TestLibraryRegistryController:
             url_for = app.library_registry.url_for
 
             # The search results have a self link and a link back to the search form.
-            assert self_link['href'] == url_for("search", q="manhattan")
+            assert self_link['href'] == url_for("libr.search", q="manhattan")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
-            assert search_link['href'] == url_for("search")
+            assert search_link['href'] == url_for("libr.search")
             assert search_link['rel'] == "search"
             assert search_link['type'] == "application/opensearchdescription+xml"
 
-            assert register_link["href"] == url_for("register")
+            assert register_link["href"] == url_for("libr.register")
             assert register_link["rel"] == "register"
             assert register_link["type"] == (
                 "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
             )
 
-            assert library_link["href"] == unquote(url_for("library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(url_for("libr.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
             assert library_link["type"] == "application/opds+json"
             assert library_link.get("templated") is True
