@@ -84,6 +84,14 @@ def app(db_session):
 
 
 @pytest.fixture
+def app_with_blueprints(app):
+    app.register_blueprint(drm)
+    app.register_blueprint(admin)
+    app.register_blueprint(libr)
+    yield app
+
+
+@pytest.fixture
 def client(app):
     with app.test_client() as client:
         yield client
