@@ -8,6 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm.session import Session
 
+from library_registry.blueprints import admin, drm, libr
+
 from library_registry.app import create_app
 from library_registry.config import Configuration
 from library_registry.model import (
