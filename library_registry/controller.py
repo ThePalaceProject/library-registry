@@ -94,20 +94,24 @@ class LibraryRegistryAnnotator(Annotator):
     def annotate_catalog(self, catalog, live=True):
         """Add links and metadata to every catalog."""
         if live:
-            search_controller = "search"
+            search_controller = "libr.search"
         else:
-            search_controller = "search_qa"
+            search_controller = "libr.search_qa"
         search_url = self.app.url_for(search_controller)
         catalog.add_link_to_catalog(
             catalog.catalog, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
         )
-        register_url = self.app.url_for("register")
+        register_url = self.app.url_for("libr.register")
         catalog.add_link_to_catalog(
             catalog.catalog, href=register_url, rel="register", type=OPDS_CATALOG_REGISTRATION_MEDIA_TYPE
         )
 
         # Add a templated link for getting a single library's entry.
-        library_url = unquote(self.app.url_for("library", uuid="{uuid}"))
+        #if not request.blueprint:
+        #    library_url = unquote(self.app.url_for("library", uuid="{uuid}"))
+        #else:
+        #    library_url = unquote(self.app.url_for(".".join((request.blueprint, "library")), uuid="{uuid}"))
+        library_url = unquote(self.app.url_for("libr.library", uuid="{uuid}"))
         catalog.add_link_to_catalog(
             catalog.catalog,
             href=library_url,
@@ -186,9 +190,9 @@ class LibraryRegistryController(BaseController):
         qu = Library.nearby(self._db, location, production=live)
         qu = qu.limit(5)
         if live:
-            nearby_controller = 'nearby'
+            nearby_controller = 'libr.nearby'
         else:
-            nearby_controller = 'nearby_qa'
+            nearby_controller = 'libr.nearby_qa'
         this_url = self.app.url_for(nearby_controller)
         catalog = OPDSCatalog(
             self._db, str(_("Libraries near you")), this_url, qu,
@@ -199,9 +203,9 @@ class LibraryRegistryController(BaseController):
     def search(self, location, live=True):
         query = request.args.get('q')
         if live:
-            search_controller = 'search'
+            search_controller = 'libr.search'
         else:
-            search_controller = 'search_qa'
+            search_controller = 'libr.search_qa'
         if query:
             # Run the query and send the results.
             results = Library.search(
@@ -333,7 +337,7 @@ class LibraryRegistryController(BaseController):
             self.log.info("Fetched libraries far from %s in %.2fsec" %
                           (location, c-b))
 
-        url = self.app.url_for("libraries_opds")
+        url = self.app.url_for("libr.libraries_opds")
         a = time.time()
         catalog = OPDSCatalog(
             self._db, 'Libraries', url, libraries,
@@ -503,13 +507,13 @@ class LibraryRegistryController(BaseController):
         password = request.form.get("password")
         if Admin.authenticate(self._db, username, password):
             session["username"] = username
-            return redirect(url_for('admin_view'))
+            return redirect(url_for('admin.admin_view'))
         else:
             return INVALID_CREDENTIALS
 
     def log_out(self):
         session["username"] = ""
-        return redirect(url_for('admin_view'))
+        return redirect(url_for('admin.admin_view'))
 
     def search_details(self):
         name = request.form.get("name")
@@ -524,7 +528,7 @@ class LibraryRegistryController(BaseController):
     def library(self):
         library = request.library
         this_url = self.app.url_for(
-            'library', uuid=library.internal_urn
+            'libr.library', uuid=library.internal_urn
         )
         catalog = OPDSCatalog(
             self._db, library.name,
