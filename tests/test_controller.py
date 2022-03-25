@@ -152,6 +152,7 @@ class TestBaseController:
 
 
 class TestLibraryRegistry:
+    
     def test_instantiated_controllers_with_adobe(self, db_session, adobe_integration):
         registry_with_adobe = MockLibraryRegistry(db_session, testing=True, emailer_class=MockEmailer)
         assert isinstance(registry_with_adobe.adobe_vendor_id, AdobeVendorIDController)
