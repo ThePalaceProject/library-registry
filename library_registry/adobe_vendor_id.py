@@ -32,28 +32,28 @@ class AdobeVendorIDController:
         self.request_handler = AdobeVendorIDRequestHandler(vendor_id)
         self.model = AdobeVendorIDModel(self._db, node_value, delegates)
 
-    def signin_handler(self):
-        """Process an incoming signInRequest document."""
-        __transaction = self._db.begin_nested()
-        output = self.request_handler.handle_signin_request(
-            request.data.decode('utf8'),
-            self.model.standard_lookup,
-            self.model.authdata_lookup
-        )
-        __transaction.commit()
+#    def signin_handler(self):
+#        """Process an incoming signInRequest document."""
+#        __transaction = self._db.begin_nested()
+#        output = self.request_handler.handle_signin_request(
+#            request.data.decode('utf8'),
+#            self.model.standard_lookup,
+#            self.model.authdata_lookup
+#        )
+#        __transaction.commit()
+#
+#        return Response(output, 200, {"Content-Type": "application/xml"})
 
-        return Response(output, 200, {"Content-Type": "application/xml"})
+#    def userinfo_handler(self):
+#        """Process an incoming userInfoRequest document."""
+#        output = self.request_handler.handle_accountinfo_request(
+#            request.data.decode('utf8'),
+#            self.model.urn_to_label
+#        )
+#        return Response(output, 200, {"Content-Type": "application/xml"})
 
-    def userinfo_handler(self):
-        """Process an incoming userInfoRequest document."""
-        output = self.request_handler.handle_accountinfo_request(
-            request.data.decode('utf8'),
-            self.model.urn_to_label
-        )
-        return Response(output, 200, {"Content-Type": "application/xml"})
-
-    def status_handler(self):
-        return Response("UP", 200, {"Content-Type": "text/plain"})
+#    def status_handler(self):
+#        return Response("UP", 200, {"Content-Type": "text/plain"})
 
     ##### Private Methods ####################################################  # noqa: E266
 
