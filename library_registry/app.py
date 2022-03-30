@@ -7,9 +7,9 @@ from flask import Flask, Response
 from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
-from .blueprints import (
-    admin, drm, libr
-)
+from .admin import admin
+from .drm import drm
+from .library_protocol import libr
 
 from library_registry.config import Configuration
 from library_registry.controller import LibraryRegistry

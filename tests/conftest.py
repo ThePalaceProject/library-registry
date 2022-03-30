@@ -8,7 +8,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm.session import Session
 
-from library_registry.blueprints import admin, drm, libr
+from library_registry.admin import admin
+from library_registry.drm import drm
+from library_registry.library_protocol import libr
 
 from library_registry.app import create_app
 from library_registry.config import Configuration
