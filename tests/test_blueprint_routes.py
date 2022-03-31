@@ -7,7 +7,7 @@ import pytest
 import flask
 from tests.conftest import *
 
-from library_registry.adobe_vendor_id import AdobeVendorIDClient
+from library_registry.drm.adobe_vendor_id import AdobeVendorIDClient
 from library_registry.decorators import has_library, uses_location
 from library_registry.model import (Library)
 from tests.test_controller import MockEmailer, MockLibraryRegistry

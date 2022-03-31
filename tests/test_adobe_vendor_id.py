@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-import library_registry.adobe_xml_templates as t
-from library_registry.adobe_vendor_id import (
+import library_registry.drm.templates.adobe_xml_templates as t
+from library_registry.drm.adobe_vendor_id import (
     AdobeSignInRequestParser,
     AdobeAccountInfoRequestParser,
     AdobeVendorIDClient,

@@ -11,7 +11,7 @@ from flask import (Response, redirect, render_template_string, request, url_for,
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm import (defer, joinedload)
 
-from library_registry.adobe_vendor_id import AdobeVendorIDController
+from library_registry.drm.adobe_vendor_id import AdobeVendorIDController
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.constants import (
     OPENSEARCH_MEDIA_TYPE,

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, Response, current_app
+from flask import Blueprint, current_app
 
 from library_registry.decorators import (
     compressible,

@@ -1,1 +1,1 @@
-from .drm_blueprint import drm
+from .routes import drm

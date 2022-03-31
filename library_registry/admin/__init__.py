@@ -1,1 +1,1 @@
-from .admin_blueprint import admin
+from .routes import admin
