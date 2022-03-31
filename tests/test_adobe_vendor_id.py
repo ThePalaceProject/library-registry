@@ -3,7 +3,7 @@ import json
 import pytest
 
 import library_registry.drm.templates.adobe_xml_templates as t
-from library_registry.drm.adobe_vendor_id import (
+from library_registry.drm.controller import (
     AdobeSignInRequestParser,
     AdobeAccountInfoRequestParser,
     AdobeVendorIDClient,
