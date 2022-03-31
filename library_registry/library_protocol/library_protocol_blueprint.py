@@ -85,5 +85,5 @@ def coverage():
 
 @libr.route('/heartbeat')
 @returns_problem_detail
-def hearbeat():
+def heartbeat():
     return current_app.library_registry.heartbeat.heartbeat()
