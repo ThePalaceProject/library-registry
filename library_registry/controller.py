@@ -33,7 +33,7 @@ from library_registry.model_helpers import (get_one, get_one_or_create)
 from library_registry.config import (Configuration, CannotLoadConfiguration, CannotSendEmail)
 from library_registry.opds import (Annotator, OPDSCatalog)
 from library_registry.registrar import LibraryRegistrar
-from library_registry.templates import admin as admin_template
+from library_registry.admin.templates.templates import admin as admin_template
 from library_registry.util.app_server import (HeartbeatController, catalog_response)
 from library_registry.util.http import HTTP
 from library_registry.util.problem_detail import ProblemDetail
