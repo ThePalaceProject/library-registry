@@ -29,11 +29,12 @@ from library_registry.model import (
     Validation,
     production_session,
 )
+from library_registry.admin.controller import ViewController
+from library_registry.admin.controller import AdminController
 from library_registry.model_helpers import (get_one, get_one_or_create)
 from library_registry.config import (Configuration, CannotLoadConfiguration, CannotSendEmail)
 from library_registry.opds import (Annotator, OPDSCatalog)
 from library_registry.registrar import LibraryRegistrar
-from library_registry.admin.templates.templates import admin as admin_template
 from library_registry.util.app_server import (HeartbeatController, catalog_response)
 from library_registry.util.http import HTTP
 from library_registry.util.problem_detail import ProblemDetail
@@ -66,6 +67,7 @@ class LibraryRegistry:
     def setup_controllers(self, emailer_class=Emailer):
         """Set up all the controllers that will be used by the web app."""
         self.view_controller = ViewController(self)
+        self.admin_controller = AdminController(self)
         self.registry_controller = LibraryRegistryController(
             self, emailer_class
         )
@@ -150,14 +152,14 @@ class StaticFileController(BaseController):
         return flask.send_from_directory(directory, filename, cache_timeout=None)
 
 
-class ViewController(BaseController):
-    def __call__(self):
-        username = session.get('username', '')
-        response = Response(render_template_string(
-            admin_template,
-            username=username
-        ))
-        return response
+#class ViewController(BaseController):
+#    def __call__(self):
+#        username = session.get('username', '')
+#        response = Response(render_template_string(
+#            admin_template,
+#            username=username
+#        ))
+#        return response
 
 
 class LibraryRegistryController(BaseController):
