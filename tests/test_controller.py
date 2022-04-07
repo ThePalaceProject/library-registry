@@ -8,7 +8,7 @@ from urllib.parse import unquote
 
 import pytest       # noqa: F401
 import flask
-from flask import Response, session, current_app
+from flask import Response, session
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
@@ -29,7 +29,6 @@ from library_registry.emailer import Emailer, EmailTemplate
 from library_registry.model import (
     Admin,
     ConfigurationSetting,
-    DelegatedPatronIdentifier,
     ExternalIntegration,
     Hyperlink,
     Library,
