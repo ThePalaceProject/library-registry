@@ -6,7 +6,9 @@ from library_registry.decorators import (
     returns_problem_detail,
 )
 
-admin = Blueprint('admin', __name__)
+admin = Blueprint(
+    'admin', __name__,
+    template_folder='templates')
 
 @admin.route('/admin/', strict_slashes=False)
 def admin_view():
