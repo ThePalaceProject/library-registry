@@ -2,6 +2,7 @@ import uuid
 from werkzeug.datastructures import MultiDict
 #from flask import Flask, Blueprint, Response, Request, request
 from library_registry.controller import LibraryRegistryController
+from library_registry.admin.controller import AdminController
 
 import pytest
 import flask
@@ -56,14 +57,14 @@ class TestAdminBlueprintRoutes:
         ''' See test_controller.py, test_edit_registration()'''
         return True
     
-    def test_admin_pls_id(self, app, mock_registry_controller, nypl):
+    def test_admin_pls_id(self, app, mock_admin_controller, nypl):
         uuid = nypl.internal_urn.split("uuid:")[1]
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict([
                 ("uuid", uuid),
                 ("pls_id", "12345")
             ])
-            response = mock_registry_controller.add_or_edit_pls_id()
+            response = mock_admin_controller.add_or_edit_pls_id()
         assert response.status_code == 200
 
 class TestDRMBlueprintRoutes:
@@ -90,6 +91,10 @@ def mock_registry_controller(mock_registry):
     registry_controller = LibraryRegistryController(mock_registry, emailer_class=MockEmailer)
     yield registry_controller
 
+@pytest.fixture
+def mock_admin_controller(mock_registry):
+    admin_controller = AdminController(mock_registry, emailer_class=MockEmailer)
+    yield admin_controller
 
 class TestLibraryProtocolBlueprintRoutes:
     
