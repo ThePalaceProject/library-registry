@@ -1477,7 +1477,7 @@ class Hyperlink(Base):
         }
 
         if email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION:
-            template_args['confirmation_link'] = url_for("confirm_resource", resource_id=self.resource.id,
+            template_args['confirmation_link'] = url_for("libr.confirm_resource", resource_id=self.resource.id,
                                                          secret=self.resource.validation.secret)
 
         try:
