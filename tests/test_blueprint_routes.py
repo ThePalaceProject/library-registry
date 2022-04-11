@@ -1,6 +1,5 @@
 import uuid
 from werkzeug.datastructures import MultiDict
-#from flask import Flask, Blueprint, Response, Request, request
 from library_registry.controller import LibraryRegistryController
 from library_registry.admin.controller import AdminController
 
@@ -8,8 +7,7 @@ import pytest
 import flask
 from tests.conftest import *
 
-from library_registry.drm.controller import AdobeVendorIDClient
-from library_registry.decorators import has_library, uses_location
+from library_registry.decorators import has_library
 from tests.test_controller import MockEmailer, MockLibraryRegistry
 
 
@@ -41,22 +39,6 @@ class TestAdminBlueprintRoutes:
         status_code = client.get('/admin/libraries/qa').status
         assert status_code == "200 OK"
     
-    def test_admin_library_details(self):
-        ''' See test_controller.py, test_library_details()'''
-        return True
-
-    def test_admin_search_details(self):
-        ''' See test_controller.py, test_search_details()'''
-        return True
-
-    def test_admin_validate_email(self):
-        ''' See test_controller.py, test_validate_email()'''
-        return True
-        
-    def test_admin_edit_registration(self):
-        ''' See test_controller.py, test_edit_registration()'''
-        return True
-    
     def test_admin_pls_id(self, app, mock_admin_controller, nypl):
         uuid = nypl.internal_urn.split("uuid:")[1]
         with app.test_request_context("/", method="POST"):
@@ -67,24 +49,10 @@ class TestAdminBlueprintRoutes:
             response = mock_admin_controller.add_or_edit_pls_id()
         assert response.status_code == 200
 
-class TestDRMBlueprintRoutes:
-    
-    def test_adobe_vendor_id_signin(self):
-        return True
-
-    def test_adobe_vendor_id_accountinfo(self):
-        ''' See test_adobe_vendor_id.py, test_handle_accountinfo_success()'''
-        return True
-
-    def test_adobe_vendor_id_status(self):
-        return True
-
-
 @pytest.fixture
 def mock_registry(db_session):
     library_registry = MockLibraryRegistry(db_session, testing=True, emailer_class=MockEmailer)
     yield library_registry
-
 
 @pytest.fixture
 def mock_registry_controller(mock_registry):
@@ -98,31 +66,10 @@ def mock_admin_controller(mock_registry):
 
 class TestLibraryProtocolBlueprintRoutes:
     
-    def test_library_protocol_nearby(self, app, mock_registry_controller, places):
-        return True
-
-    def test_library_protocol_nearby_qa(self):
-        return True
-    
     def test_library_protocol_register(self, app):
         client = app.test_client()
         status_code = client.get('/register').status
         assert status_code == "200 OK"
-
-    def test_library_protocol_register_post(self, app):
-        #client = app.test_client()
-        #status_code = client.post('/register', data=dict(url="http://nypl.org", contact="test_contact", stage="test_stage")).status
-        #assert status_code == "200 OK"
-        return True
-    
-    def test_library_protocol_search(self):
-        return True
-    
-    def test_library_protocol_search_qa(self):
-        return True
-    
-    def test_library_protocol_confirm_resource(self):
-        return True
     
     def test_library_protocol_libraries_opds(self, app):
         client = app.test_client()
@@ -157,12 +104,6 @@ class TestLibraryProtocolBlueprintRoutes:
         endpoint_url = '/library/' + test_uuid + '/focus'
         status_code = client.get(endpoint_url).status
         assert status_code == "200 OK"
-    
-    def test_library_protocol_coverage(self, app):
-        #client = app.test_client()
-        #status_code = client.get('/coverage').status
-        #assert status_code == "200 OK"
-        return True
     
     def test_library_protocol_heartbeat(self, app):
         client = app.test_client()
