@@ -9,7 +9,8 @@ from flask_sqlalchemy_session import flask_scoped_session
 
 from .admin import admin
 from .drm import drm
-from .library_protocol import libr
+from .library_registration_protocol import libr
+from .library_list import libr_list
 
 from library_registry.config import Configuration
 from library_registry.controller import LibraryRegistry
@@ -36,6 +37,7 @@ def create_app(testing=False, db_session_obj=None):
     app.register_blueprint(drm)
     app.register_blueprint(admin)
     app.register_blueprint(libr)
+    app.register_blueprint(libr_list)
     babel.init_app(app)
 
     if testing and db_session_obj:
