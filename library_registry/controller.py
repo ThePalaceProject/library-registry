@@ -13,7 +13,7 @@ from sqlalchemy.orm import (defer, joinedload)
 
 from library_registry.drm.controller import AdobeVendorIDController
 from library_registry.authentication_document import AuthenticationDocument
-from library_registry.admin.templates.templates import admin_template
+from library_registry.admin.templates.templates import admin as admin_template
 from library_registry.constants import (
     OPENSEARCH_MEDIA_TYPE,
     OPDS_CATALOG_REGISTRATION_MEDIA_TYPE,
