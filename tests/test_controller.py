@@ -20,6 +20,8 @@ from library_registry.controller import (
     BaseController,
     CoverageController,
     LibraryRegistry,
+)
+from library_registry.library_registration_protocol.controller import (
     LibraryRegistryAnnotator,
     LibraryRegistryController,
     ValidationController,

@@ -8,7 +8,7 @@ from library_registry.problem_details import (
     INVALID_CONTACT_URI,
     NO_AUTH_URL,
 )
-from library_registry.registrar import LibraryRegistrar
+from library_registry.library_registration_protocol.registrar import LibraryRegistrar
 from library_registry.util.problem_detail import ProblemDetail
 from .mocks import DummyHTTPResponse
 
