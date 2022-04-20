@@ -294,7 +294,7 @@ class TestLibraryRegistryController:
             )
             url_for = app.library_registry.url_for
 
-            assert self_link['href'] == url_for("libr.libraries_opds")
+            assert self_link['href'] == url_for("libr_list.libraries_opds")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
@@ -361,7 +361,7 @@ class TestLibraryRegistryController:
                 "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
             )
 
-            assert library_link["href"] == unquote(url_for("libr.library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(url_for("libr_list.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
             assert library_link["type"] == "application/opds+json"
             assert library_link.get("templated") is True
@@ -402,7 +402,7 @@ class TestLibraryRegistryController:
             assert register_link["rel"] == "register"
 
             # So is the 'library' templated link.
-            assert library_link["href"] == unquote(url_for("libr.library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(url_for("libr_list.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
 
             # This is a QA feed, and the 'search' and 'self' links
@@ -499,7 +499,7 @@ class TestLibraryRegistryController:
                 "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
             )
 
-            assert library_link["href"] == unquote(url_for("libr.library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(url_for("libr_list.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
             assert library_link["type"] == "application/opds+json"
             assert library_link.get("templated") is True

@@ -77,7 +77,7 @@ class LibraryRegistryAnnotator(Annotator):
         )
 
         # Add a templated link for getting a single library's entry.
-        library_url = unquote(self.app.url_for("libr.library", uuid="{uuid}"))
+        library_url = unquote(self.app.url_for("libr_list.library", uuid="{uuid}"))
         catalog.add_link_to_catalog(
             catalog.catalog,
             href=library_url,
@@ -222,7 +222,7 @@ class LibraryRegistryController(BaseController):
             self.log.info("Fetched libraries far from %s in %.2fsec" %
                           (location, c-b))
 
-        url = self.app.url_for("libr.libraries_opds")
+        url = self.app.url_for("libr_list.libraries_opds")
         a = time.time()
         catalog = OPDSCatalog(
             self._db, 'Libraries', url, libraries,
@@ -235,7 +235,7 @@ class LibraryRegistryController(BaseController):
     def library(self):
         library = request.library
         this_url = self.app.url_for(
-            'libr.library', uuid=library.internal_urn
+            'libr_list.library', uuid=library.internal_urn
         )
         catalog = OPDSCatalog(
             self._db, library.name,
