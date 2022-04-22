@@ -8,58 +8,15 @@ from library_registry.decorators import (
 
 libr = Blueprint('libr', __name__)
 
-@libr.route('/')
-@uses_location
-@returns_problem_detail
-def nearby(_location):
-    return current_app.library_registry.registry_controller.nearby(_location)
-
-@libr.route('/qa')
-@uses_location
-@returns_problem_detail
-def nearby_qa(_location):
-    return current_app.library_registry.registry_controller.nearby(_location, live=False)
-
 @libr.route("/register", methods=["GET", "POST"])
 @returns_problem_detail
 def register():
     return current_app.library_registry.registry_controller.register()
 
-@libr.route('/search')
-@uses_location
-@returns_problem_detail
-def search(_location):
-    return current_app.library_registry.registry_controller.search(_location)
-
-@libr.route('/qa/search')
-@uses_location
-@returns_problem_detail
-def search_qa(_location):
-    return current_app.library_registry.registry_controller.search(
-        _location, live=False
-    )
-
 @libr.route('/confirm/<int:resource_id>/<secret>')
 @returns_problem_detail
 def confirm_resource(resource_id, secret):
     return current_app.library_registry.validation_controller.confirm(resource_id, secret)
-
-@libr.route('/library/<uuid>/eligibility')
-@has_library
-@returns_problem_detail
-def library_eligibility():
-    return current_app.library_registry.coverage_controller.eligibility_for_library()
-
-@libr.route('/library/<uuid>/focus')
-@has_library
-@returns_problem_detail
-def library_focus():
-    return current_app.library_registry.coverage_controller.focus_for_library()
-
-@libr.route('/coverage')
-@returns_problem_detail
-def coverage():
-    return current_app.library_registry.coverage_controller.lookup()
 
 @libr.route('/heartbeat')
 @returns_problem_detail
