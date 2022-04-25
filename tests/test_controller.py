@@ -347,11 +347,11 @@ class TestLibraryRegistryController:
             )
             url_for = app.library_registry.url_for
 
-            assert self_link['href'] == url_for("libr.nearby")
+            assert self_link['href'] == url_for("libr_list.nearby")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
-            assert search_link['href'] == url_for("libr.search")
+            assert search_link['href'] == url_for("libr_list.search")
             assert search_link['rel'] == "search"
             assert search_link['type'] == "application/opensearchdescription+xml"
 
@@ -407,10 +407,10 @@ class TestLibraryRegistryController:
 
             # This is a QA feed, and the 'search' and 'self' links
             # will give results from the QA feed.
-            assert self_link['href'] == url_for("libr.nearby_qa")
+            assert self_link['href'] == url_for("libr_list.nearby_qa")
             assert self_link['rel'] == "self"
 
-            assert search_link['href'] == url_for("libr.search_qa")
+            assert search_link['href'] == url_for("libr_list.search_qa")
             assert search_link['rel'] == "search"
 
     def test_nearby_no_location(self, app, mock_registry_controller):
@@ -447,7 +447,7 @@ class TestLibraryRegistryController:
             assert response.headers['Cache-Control'] == "public, no-transform, max-age: 2592000"
 
             # The search form points the client to the search controller.
-            expect_url = mock_registry.url_for("libr.search")
+            expect_url = mock_registry.url_for("libr_list.search")
             expect_url_tag = (
                 '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
             )
@@ -459,7 +459,7 @@ class TestLibraryRegistryController:
             response = mock_registry_controller.search(None, live=False)
             assert response.status == "200 OK"
 
-            expect_url = mock_registry.url_for("libr.search_qa")
+            expect_url = mock_registry.url_for("libr_list.search_qa")
             expect_url_tag = (
                 '<Url type="application/atom+xml;profile=opds-catalog" template="%s?q={searchTerms}"/>' % expect_url
             )
@@ -485,11 +485,11 @@ class TestLibraryRegistryController:
             url_for = app.library_registry.url_for
 
             # The search results have a self link and a link back to the search form.
-            assert self_link['href'] == url_for("libr.search", q="manhattan")
+            assert self_link['href'] == url_for("libr_list.search", q="manhattan")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
-            assert search_link['href'] == url_for("libr.search")
+            assert search_link['href'] == url_for("libr_list.search")
             assert search_link['rel'] == "search"
             assert search_link['type'] == "application/opensearchdescription+xml"
 

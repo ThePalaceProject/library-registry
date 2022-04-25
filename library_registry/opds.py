@@ -167,7 +167,7 @@ class OPDSCatalog:
             (cls.ELIGIBILITY_REL, "library_eligibility"),
             (cls.FOCUS_REL, "library_focus"),
         ):
-            url = url_for("libr." + route, uuid=library.internal_urn, _external=True)
+            url = url_for("libr_list." + route, uuid=library.internal_urn, _external=True)
             cls.add_link_to_catalog(catalog, rel=rel, href=url, type="application/geo+json")
 
         for hyperlink in library.hyperlinks:

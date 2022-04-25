@@ -229,11 +229,11 @@ class TestOPDSCatalog:
         assert web_self['rel'] == "self"
         assert web_self['type'] == "text/html"
 
-        assert eligibility['href'] == "http://libr.library_eligibility/%s" % library.internal_urn
+        assert eligibility['href'] == "http://libr_list.library_eligibility/%s" % library.internal_urn
         assert eligibility['rel'] == OPDSCatalog.ELIGIBILITY_REL
         assert eligibility['type'] == "application/geo+json"
 
-        assert focus['href'] == "http://libr.library_focus/%s" % library.internal_urn
+        assert focus['href'] == "http://libr_list.library_focus/%s" % library.internal_urn
         assert focus['rel'] == OPDSCatalog.FOCUS_REL
         assert focus['type'] == "application/geo+json"
 

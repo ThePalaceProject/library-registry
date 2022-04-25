@@ -64,9 +64,9 @@ class LibraryRegistryAnnotator(Annotator):
     def annotate_catalog(self, catalog, live=True):
         """Add links and metadata to every catalog."""
         if live:
-            search_controller = "libr.search"
+            search_controller = "libr_list.search"
         else:
-            search_controller = "libr.search_qa"
+            search_controller = "libr_list.search_qa"
         search_url = self.app.url_for(search_controller)
         catalog.add_link_to_catalog(
             catalog.catalog, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
@@ -119,9 +119,9 @@ class LibraryRegistryController(BaseController):
         qu = Library.nearby(self._db, location, production=live)
         qu = qu.limit(5)
         if live:
-            nearby_controller = 'libr.nearby'
+            nearby_controller = 'libr_list.nearby'
         else:
-            nearby_controller = 'libr.nearby_qa'
+            nearby_controller = 'libr_list.nearby_qa'
         this_url = self.app.url_for(nearby_controller)
         catalog = OPDSCatalog(
             self._db, str(_("Libraries near you")), this_url, qu,
@@ -132,9 +132,9 @@ class LibraryRegistryController(BaseController):
     def search(self, location, live=True):
         query = request.args.get('q')
         if live:
-            search_controller = 'libr.search'
+            search_controller = 'libr_list.search'
         else:
-            search_controller = 'libr.search_qa'
+            search_controller = 'libr_list.search_qa'
         if query:
             # Run the query and send the results.
             results = Library.search(
