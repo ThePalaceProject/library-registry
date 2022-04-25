@@ -33,6 +33,7 @@ from library_registry.admin.controller import ViewController
 from library_registry.admin.controller import AdminController
 from library_registry.library_registration_protocol.controller import LibraryRegistryController, ValidationController
 from library_registry.library_list.controller import LibraryListController
+from library_registry.util.shared_controller import BaseController
 from library_registry.model_helpers import (get_one, get_one_or_create)
 from library_registry.config import (Configuration, CannotLoadConfiguration, CannotSendEmail)
 from library_registry.opds import (Annotator, OPDSCatalog)
@@ -87,25 +88,6 @@ class LibraryRegistry:
     def url_for(self, view, *args, **kwargs):
         kwargs['_external'] = True
         return url_for(view, *args, **kwargs)
-
-class BaseController:
-
-    def __init__(self, app):
-        self.app = app
-        self._db = self.app._db
-
-    def library_for_request(self, uuid):
-        """Look up the library the user is trying to access."""
-        if not uuid:
-            return LIBRARY_NOT_FOUND
-        if not uuid.startswith("urn:uuid:"):
-            uuid = "urn:uuid:" + uuid
-        library = Library.for_urn(self._db, uuid)
-        if not library:
-            return LIBRARY_NOT_FOUND
-        request.library = library
-        return library
-
 
 # This static_file function is used only when the app is running locally *without* Docker.
 # In all other cases, nginx serves the static files (see docker/nginx.conf).
