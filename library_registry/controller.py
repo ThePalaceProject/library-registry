@@ -32,6 +32,7 @@ from library_registry.model import (
 from library_registry.admin.controller import ViewController
 from library_registry.admin.controller import AdminController
 from library_registry.library_registration_protocol.controller import LibraryRegistryController, ValidationController
+from library_registry.library_list.controller import LibraryListController
 from library_registry.model_helpers import (get_one, get_one_or_create)
 from library_registry.config import (Configuration, CannotLoadConfiguration, CannotSendEmail)
 from library_registry.opds import (Annotator, OPDSCatalog)
@@ -70,6 +71,7 @@ class LibraryRegistry:
         self.registry_controller = LibraryRegistryController(
             self, emailer_class
         )
+        self.list_controller = LibraryListController(self, emailer_class)
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
         self.static_files = StaticFileController(self)

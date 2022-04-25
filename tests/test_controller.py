@@ -26,6 +26,7 @@ from library_registry.library_registration_protocol.controller import (
     LibraryRegistryController,
     ValidationController,
 )
+from library_registry.library_list.controller import LibraryListController
 from library_registry.admin.controller import AdminController
 from library_registry.emailer import Emailer, EmailTemplate
 from library_registry.model import (
@@ -93,6 +94,10 @@ def mock_admin_controller(mock_registry):
     admin_controller = AdminController(mock_registry, emailer_class=MockEmailer)
     yield admin_controller
 
+@pytest.fixture
+def mock_library_list_controller(mock_registry):
+    library_list_controller = LibraryListController(mock_registry, emailer_class=MockEmailer)
+    yield library_list_controller
 
 @pytest.fixture
 def adobe_integration(db_session, create_test_external_integration):
@@ -107,6 +112,7 @@ def adobe_integration(db_session, create_test_external_integration):
 
 
 class TestLibraryRegistryAnnotator:
+    
     def test_annotate_catalog(self, app, db_session, adobe_integration):
         annotator = LibraryRegistryAnnotator(app.library_registry)
 
@@ -141,6 +147,7 @@ class TestLibraryRegistryAnnotator:
 
 
 class TestBaseController:
+    
     def test_library_for_request(self, app, db_session, create_test_library, mock_registry):
         # Test the code that looks up a library by its UUID and sets it as flask.request.library.
         controller = BaseController(mock_registry)
@@ -172,7 +179,6 @@ class TestLibraryRegistry:
 
         # No Adobe Vendor ID was set up.
         assert mock_registry.adobe_vendor_id is None
-
 
 @pytest.fixture
 def registration_form():
@@ -249,12 +255,11 @@ def teardown(db_session, capsys):
 
     db_session.commit()
 
-
-class TestLibraryRegistryController:
+class TestLibraryListController:
 
     def test_libraries_opds(
-        self, db_session, create_test_library, mock_registry_controller, mock_admin_controller, app,
-        nypl, connecticut_state_library, kansas_state_library
+        self, db_session, create_test_library, mock_registry_controller, mock_library_list_controller, app,
+        nypl, connecticut_state_library, kansas_state_library, mock_admin_controller
     ):
         library = create_test_library(db_session, library_name="Test Cancelled Library",
                                       short_name="test_cancelled_lib",
@@ -267,7 +272,7 @@ class TestLibraryRegistryController:
         assert len(libraries) == 3
 
         with app.test_request_context("/libraries"):
-            response = mock_registry_controller.libraries_opds()
+            response = mock_library_list_controller.libraries_opds()
 
             assert response.status == "200 OK"
             assert response.headers['Content-Type'] == OPDSCatalog.OPDS_TYPE
@@ -304,7 +309,7 @@ class TestLibraryRegistryController:
             # converts normal-looking latitude/longitude into this
             # format.
             with app.test_request_context("/libraries"):
-                response = mock_registry_controller.libraries_opds(location="SRID=4326;POINT(-98 39)")
+                response = mock_library_list_controller.libraries_opds(location="SRID=4326;POINT(-98 39)")
 
             catalog = json.loads(response.data)
             titles = [x['metadata']['title'] for x in catalog['catalogs']]
@@ -312,17 +317,12 @@ class TestLibraryRegistryController:
             # The nearby library is promoted to the top of the list.
             # The other libraries are still in alphabetical order.
             assert titles == ['Kansas State Library', 'Connecticut State Library', 'NYPL']
-
-    def test_instantiate_without_emailer(self, mock_registry):
-        """If there is no emailer configured, the controller will still start up."""
-        controller = LibraryRegistryController(mock_registry)
-        assert controller.emailer is None
-
+    
     def test_nearby(
-        self, app, mock_registry_controller, nypl, connecticut_state_library, manhattan, adobe_integration
+        self, app, mock_library_list_controller, nypl, connecticut_state_library, manhattan, adobe_integration
     ):
         with app.test_request_context("/"):
-            response = mock_registry_controller.nearby(manhattan, live=True)
+            response = mock_library_list_controller.nearby(manhattan, live=True)
             assert isinstance(response, Response)
             assert "200 OK" == response.status
             assert response.headers['Content-Type'] == OPDSCatalog.OPDS_TYPE
@@ -368,20 +368,20 @@ class TestLibraryRegistryController:
 
             assert catalog["metadata"]["adobe_vendor_id"] == "VENDORID"
 
-    def test_nearby_qa(self, db_session, app, mock_registry_controller, manhattan, nypl, connecticut_state_library):
+    def test_nearby_qa(self, db_session, app, mock_library_list_controller, manhattan, nypl, connecticut_state_library):
         # The libraries we used in the previous test are in production.
         # If we move them from production to TESTING, we won't find anything.
         for library in db_session.query(Library):
             library.registry_stage = Library.TESTING_STAGE
 
         with app.test_request_context("/"):
-            response = mock_registry_controller.nearby(manhattan, live=True)
+            response = mock_library_list_controller.nearby(manhattan, live=True)
             catalogs = json.loads(response.data)
             assert catalogs['catalogs'] == []
 
         # However, they will show up in the QA feed.
         with app.test_request_context("/"):
-            response = mock_registry_controller.nearby(manhattan, live=False)
+            response = mock_library_list_controller.nearby(manhattan, live=False)
             catalogs = json.loads(response.data)
             assert len(catalogs['catalogs']) == 2
             [catalog] = [
@@ -413,9 +413,9 @@ class TestLibraryRegistryController:
             assert search_link['href'] == url_for("libr_list.search_qa")
             assert search_link['rel'] == "search"
 
-    def test_nearby_no_location(self, app, mock_registry_controller):
+    def test_nearby_no_location(self, app, mock_library_list_controller):
         with app.test_request_context("/"):
-            response = mock_registry_controller.nearby(None)
+            response = mock_library_list_controller.nearby(None)
             assert isinstance(response, Response)
             assert response.status == "200 OK"
             assert response.headers['Content-Type'] == OPDSCatalog.OPDS_TYPE
@@ -425,9 +425,9 @@ class TestLibraryRegistryController:
             # start with.
             assert catalogs['catalogs'] == []
 
-    def test_nearby_no_libraries(self, app, mock_registry_controller, oakland):
+    def test_nearby_no_libraries(self, app, mock_library_list_controller, oakland):
         with app.test_request_context("/"):
-            response = mock_registry_controller.nearby(oakland)
+            response = mock_library_list_controller.nearby(oakland)
             assert isinstance(response, Response)
             assert response.status == "200 OK"
             assert response.headers['Content-Type'] == OPDSCatalog.OPDS_TYPE
@@ -437,9 +437,9 @@ class TestLibraryRegistryController:
             # country from the only ones in the registry.
             assert catalog['catalogs'] == []
 
-    def test_search_form(self, app, mock_registry_controller, mock_registry):
+    def test_search_form(self, app, mock_library_list_controller, mock_registry):
         with app.test_request_context("/"):
-            response = mock_registry_controller.search(None)
+            response = mock_library_list_controller.search(None)
             assert response.status == "200 OK"
             assert response.headers['Content-Type'] == "application/opensearchdescription+xml"
 
@@ -453,10 +453,10 @@ class TestLibraryRegistryController:
             )
             assert expect_url_tag in response.data.decode("utf8")
 
-    def test_qa_search_form(self, app, mock_registry_controller, mock_registry):
+    def test_qa_search_form(self, app, mock_library_list_controller, mock_registry):
         """The QA search form links to the QA search controller."""
         with app.test_request_context("/"):
-            response = mock_registry_controller.search(None, live=False)
+            response = mock_library_list_controller.search(None, live=False)
             assert response.status == "200 OK"
 
             expect_url = mock_registry.url_for("libr_list.search_qa")
@@ -465,9 +465,9 @@ class TestLibraryRegistryController:
             )
             assert expect_url_tag in response.data.decode("utf8")
 
-    def test_search(self, app, mock_registry_controller, nypl, kansas_state_library, manhattan, adobe_integration):
+    def test_search(self, app, mock_library_list_controller, nypl, kansas_state_library, manhattan, adobe_integration):
         with app.test_request_context("/?q=manhattan"):
-            response = mock_registry_controller.search(manhattan)
+            response = mock_library_list_controller.search(manhattan)
             assert response.status == "200 OK"
             assert response.headers['Content-Type'] == OPDSCatalog.OPDS_TYPE
             catalog = json.loads(response.data)
@@ -506,7 +506,7 @@ class TestLibraryRegistryController:
 
             assert catalog["metadata"]["adobe_vendor_id"] == "VENDORID"
 
-    def test_search_qa(self, db_session, app, mock_registry_controller, manhattan, nypl, kansas_state_library):
+    def test_search_qa(self, db_session, app, mock_library_list_controller, manhattan, nypl, kansas_state_library):
         # As we saw in the previous test, this search picks up two
         # libraries when we run it looking for production libraries. If
         # all of the libraries are cancelled, we don't find anything.
@@ -517,7 +517,7 @@ class TestLibraryRegistryController:
             lib.registry_stage = Library.CANCELLED_STAGE
 
         with app.test_request_context("/?q=manhattan"):
-            response = mock_registry_controller.search(manhattan, live=True)
+            response = mock_library_list_controller.search(manhattan, live=True)
             catalog = json.loads(response.data)
             assert catalog['catalogs'] == []
 
@@ -525,19 +525,27 @@ class TestLibraryRegistryController:
         # stage, we find it.
         kansas_state_library.registry_stage = Library.PRODUCTION_STAGE
         with app.test_request_context("/?q=manhattan"):
-            response = mock_registry_controller.search(manhattan, live=True)
+            response = mock_library_list_controller.search(manhattan, live=True)
             catalog = json.loads(response.data)
             [catalog] = catalog['catalogs']
             assert catalog['metadata']['title'] == 'Kansas State Library'
 
-    def test_library(self, nypl, app, mock_registry_controller):
+    def test_library(self, nypl, app, mock_library_list_controller):
         with app.test_request_context("/"):
             flask.request.library = nypl
-            response = mock_registry_controller.library()
+            response = mock_library_list_controller.library()
 
         [catalog_entry] = json.loads(response.data).get("catalogs")
         assert catalog_entry.get("metadata").get("title") == nypl.name
         assert catalog_entry.get("metadata").get("id") == nypl.internal_urn
+
+
+class TestLibraryRegistryController:
+
+    def test_instantiate_without_emailer(self, mock_registry):
+        """If there is no emailer configured, the controller will still start up."""
+        controller = LibraryRegistryController(mock_registry)
+        assert controller.emailer is None
 
     def queue_opds_success(
         self, http_client_obj, auth_url="http://circmanager.org/authentication.opds", media_type=None
