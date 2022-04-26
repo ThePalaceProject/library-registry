@@ -2,7 +2,6 @@ import base64
 import datetime
 import json
 import random
-import uuid
 from smtplib import SMTPException
 from urllib.parse import unquote
 

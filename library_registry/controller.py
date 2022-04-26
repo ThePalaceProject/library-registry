@@ -2,8 +2,6 @@ import json
 import logging
 
 import flask
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 from flask import (Response, request, url_for)
 from flask_babel import lazy_gettext as _
 
