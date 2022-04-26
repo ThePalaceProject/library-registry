@@ -34,16 +34,6 @@ from library_registry.model import (
 
 class LibraryRegistryController(BaseController):
 
-    OPENSEARCH_TEMPLATE = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">'
-        '<ShortName>%(name)s</ShortName>'
-        '<Description>%(description)s</Description>'
-        '<Tags>%(tags)s</Tags>'
-        '<Url type="application/atom+xml;profile=opds-catalog" template="%(url_template)s"/>'
-        '</OpenSearchDescription>'
-    )
-
     def __init__(self, app, emailer_class=Emailer):
         super(LibraryRegistryController, self).__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)

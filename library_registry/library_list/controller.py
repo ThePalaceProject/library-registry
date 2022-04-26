@@ -7,6 +7,7 @@ from library_registry.opds import OPDSCatalog
 from library_registry.config import CannotLoadConfiguration
 from library_registry.emailer import Emailer
 from library_registry.util.shared_controller import BaseController, LibraryRegistryAnnotator
+from library_registry.library_list.templates.templates import OPENSEARCH_TEMPLATE
 from library_registry.util.app_server import catalog_response
 from library_registry.constants import (
     OPENSEARCH_MEDIA_TYPE,
@@ -17,15 +18,7 @@ from library_registry.model import (
 
 class LibraryListController(BaseController):
 
-    OPENSEARCH_TEMPLATE = (
-        '<?xml version="1.0" encoding="UTF-8"?>'
-        '<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">'
-        '<ShortName>%(name)s</ShortName>'
-        '<Description>%(description)s</Description>'
-        '<Tags>%(tags)s</Tags>'
-        '<Url type="application/atom+xml;profile=opds-catalog" template="%(url_template)s"/>'
-        '</OpenSearchDescription>'
-    )
+    OPENSEARCH_TEMPLATE = OPENSEARCH_TEMPLATE
 
     def __init__(self, app, emailer_class=Emailer):
         super(LibraryListController, self).__init__(app)
