@@ -7,7 +7,6 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from flask import (Response, render_template_string, request)
 from flask_babel import lazy_gettext as _
-from sqlalchemy.orm import (defer, joinedload)
 from library_registry.util.string_helpers import (base64, random_string)
 from library_registry.model_helpers import (get_one, get_one_or_create)
 from library_registry.emailer import Emailer
@@ -16,17 +15,14 @@ from library_registry.opds import OPDSCatalog
 from library_registry.util.problem_detail import ProblemDetail
 from library_registry.util.shared_controller import BaseController, LibraryRegistryAnnotator
 from library_registry.library_registration_protocol.registrar import LibraryRegistrar
-from library_registry.util.app_server import catalog_response
 from library_registry.admin.templates.templates import admin as admin_template
 from library_registry.util.http import HTTP
 from library_registry.constants import (
-    OPENSEARCH_MEDIA_TYPE,
     OPDS_CATALOG_REGISTRATION_MEDIA_TYPE,
 )
 from library_registry.problem_details import (
     AUTHENTICATION_FAILURE,
     INTEGRATION_ERROR,
-    LIBRARY_NOT_FOUND,
     NO_AUTH_URL,
     UNABLE_TO_NOTIFY,
 )

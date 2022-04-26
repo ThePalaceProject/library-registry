@@ -1,32 +1,18 @@
 import json
 import logging
-import time
-from smtplib import SMTPException
-from urllib.parse import unquote
 
 import flask
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
-from flask import (Response, render_template_string, request, url_for)
+from flask import (Response, request, url_for)
 from flask_babel import lazy_gettext as _
-from sqlalchemy.orm import (defer, joinedload)
 
 from library_registry.drm.controller import AdobeVendorIDController
 from library_registry.authentication_document import AuthenticationDocument
-from library_registry.admin.templates.templates import admin as admin_template
-from library_registry.constants import (
-    OPENSEARCH_MEDIA_TYPE,
-    OPDS_CATALOG_REGISTRATION_MEDIA_TYPE,
-)
 from library_registry.emailer import Emailer
 from library_registry.model import (
-    ConfigurationSetting,
-    Hyperlink,
-    Library,
     Place,
-    Resource,
     ServiceArea,
-    Validation,
     production_session,
 )
 from library_registry.admin.controller import ViewController
@@ -34,22 +20,8 @@ from library_registry.admin.controller import AdminController
 from library_registry.library_registration_protocol.controller import LibraryRegistryController, ValidationController
 from library_registry.library_list.controller import LibraryListController
 from library_registry.util.shared_controller import BaseController
-from library_registry.model_helpers import (get_one, get_one_or_create)
-from library_registry.config import (Configuration, CannotLoadConfiguration, CannotSendEmail)
-from library_registry.opds import (Annotator, OPDSCatalog)
-from library_registry.library_registration_protocol.registrar import LibraryRegistrar
-from library_registry.util.app_server import (HeartbeatController, catalog_response)
-from library_registry.util.http import HTTP
-from library_registry.util.problem_detail import ProblemDetail
-from library_registry.util.string_helpers import (base64, random_string)
-from library_registry.problem_details import (
-    AUTHENTICATION_FAILURE,
-    INTEGRATION_ERROR,
-    LIBRARY_NOT_FOUND,
-    NO_AUTH_URL,
-    UNABLE_TO_NOTIFY,
-)
-
+from library_registry.config import Configuration
+from library_registry.util.app_server import HeartbeatController
 
 class LibraryRegistry:
 

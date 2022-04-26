@@ -1,9 +1,7 @@
 from flask import Blueprint, current_app
 
 from library_registry.decorators import (
-    has_library,
     returns_problem_detail,
-    uses_location,
 )
 
 libr = Blueprint('libr', __name__)

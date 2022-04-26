@@ -1,20 +1,15 @@
 import flask
 import time
-from urllib.parse import unquote
 from flask import (Response, request)
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm import (defer, joinedload)
-from library_registry.opds import (Annotator, OPDSCatalog)
-from library_registry.config import (Configuration, CannotLoadConfiguration)
+from library_registry.opds import OPDSCatalog
+from library_registry.config import CannotLoadConfiguration
 from library_registry.emailer import Emailer
 from library_registry.util.shared_controller import BaseController, LibraryRegistryAnnotator
 from library_registry.util.app_server import catalog_response
 from library_registry.constants import (
     OPENSEARCH_MEDIA_TYPE,
-    OPDS_CATALOG_REGISTRATION_MEDIA_TYPE,
-)
-from library_registry.problem_details import (
-    LIBRARY_NOT_FOUND,
 )
 from library_registry.model import (
     Library,
