@@ -1,6 +1,7 @@
 from flask import (Response, render_template_string, session, redirect, request, url_for)
 from sqlalchemy.orm import (defer, joinedload)
 from library_registry.admin.templates.templates import admin as admin_template
+from library_registry.util.shared_controller import BaseController
 from library_registry.util.problem_detail import ProblemDetail
 from library_registry.emailer import Emailer
 from library_registry.model_helpers import (get_one, get_one_or_create)
@@ -16,24 +17,6 @@ from library_registry.model import (
     ServiceArea,
     Validation,
 )
-
-class BaseController:
-
-    def __init__(self, app):
-        self.app = app
-        self._db = self.app._db
-
-    def library_for_request(self, uuid):
-        """Look up the library the user is trying to access."""
-        if not uuid:
-            return LIBRARY_NOT_FOUND
-        if not uuid.startswith("urn:uuid:"):
-            uuid = "urn:uuid:" + uuid
-        library = Library.for_urn(self._db, uuid)
-        if not library:
-            return LIBRARY_NOT_FOUND
-        request.library = library
-        return library
 
 class ViewController(BaseController):
     def __call__(self):

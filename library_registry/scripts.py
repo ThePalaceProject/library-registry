@@ -20,7 +20,7 @@ from library_registry.config import Configuration
 from library_registry.drm.controller import AdobeVendorIDClient
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.emailer import (Emailer, EmailTemplate)
-from library_registry.registrar import LibraryRegistrar
+from library_registry.library_registration_protocol.registrar import LibraryRegistrar
 from library_registry.util.problem_detail import ProblemDetail
 
 
