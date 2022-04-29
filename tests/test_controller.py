@@ -2,6 +2,7 @@ import base64
 import datetime
 import json
 import random
+from contextlib import contextmanager
 from smtplib import SMTPException
 from urllib.parse import unquote
 
@@ -31,6 +32,7 @@ from library_registry.emailer import Emailer, EmailTemplate
 from library_registry.model import (
     Admin,
     ConfigurationSetting,
+    DelegatedPatronIdentifier,
     ExternalIntegration,
     Hyperlink,
     Library,
@@ -1041,7 +1043,6 @@ class TestLibraryRegistryController:
         class UnresponsiveEmailer(Emailer):
             def _send_email(*args):
                 raise Exception("message from UnresponsiveEmailer")
-
         unresponsive_emailer_kwargs = {
             "smtp_username": "library",
             "smtp_password": "library",
