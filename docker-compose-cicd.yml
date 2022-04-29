@@ -11,13 +11,8 @@ services:
     environment:
       - PGPORT=5433
 
-<<<<<<< HEAD
   registry_active_webapp:
     container_name: registry_active_webapp
-=======
-  libreg_active_webapp:
-    container_name: libreg_active_webapp
->>>>>>> origin/nypl-deploy-production
     depends_on: 
       - registry_active_db
     build:
