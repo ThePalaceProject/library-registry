@@ -4,7 +4,9 @@ from library_registry.decorators import (
     returns_problem_detail,
 )
 
-drm = Blueprint('drm', __name__)
+drm = Blueprint(
+    'drm', __name__,
+    template_folder='templates')
 
 # Adobe Vendor ID implementation
 @drm.route('/AdobeAuth/SignIn', methods=['POST'])

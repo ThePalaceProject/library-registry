@@ -8,7 +8,9 @@ from library_registry.decorators import (
     uses_location,
 )
 
-libr_list = Blueprint('libr_list', __name__)
+libr_list = Blueprint(
+    'libr_list', __name__,
+    template_folder='templates')
 
 @libr_list.route('/')
 @uses_location
