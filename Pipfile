@@ -24,6 +24,7 @@ pytest = "*"
 pytest-datadir = "*"
 bcrypt = "*"
 gunicorn = "*"
+werkzeug = "==2.0.3"
 
 [dev-packages]
 future = "*"
