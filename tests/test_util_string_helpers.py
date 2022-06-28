@@ -10,7 +10,7 @@ from util.string_helpers import UnicodeAwareBase64, base64, random_string
 
 class TestUnicodeAwareBase64(object):
     def test_encoding(self):
-        test_string = u"םולש"
+        test_string = "םולש"
 
         # Run the same tests against two different encodings that can
         # handle Hebrew characters.
@@ -62,7 +62,7 @@ class TestUnicodeAwareBase64(object):
         # UnicodeAwareBase64 object that encodes as UTF-8 by default.
         assert isinstance(base64, UnicodeAwareBase64)
         assert base64.encoding == "utf8"
-        snowman = u"☃"
+        snowman = "☃"
         snowman_utf8 = snowman.encode("utf8")
         as_base64 = base64.b64encode(snowman)
         assert as_base64 == "4piD"
