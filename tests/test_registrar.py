@@ -3,7 +3,7 @@ import json
 from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
 from problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
-from registrar import LibraryRegistrar
+from registrar import LibraryRegistrar, VerifyLinkRegexes
 from testing import DatabaseTest, DummyHTTPResponse
 from util.problem_detail import ProblemDetail
 
@@ -168,43 +168,48 @@ class TestRegistrar(DatabaseTest):
             is False
         )
 
-    def test__required_email_address(self):
+    def test__required_link_type(self):
         """Validate the code that makes sure an input is a mailto: URI."""
         uri = INVALID_CONTACT_URI.uri
-        m = LibraryRegistrar._required_email_address
+        m = LibraryRegistrar._required_link_type
 
-        problem = m(None, "a title")
+        problem = m(None, "a title", VerifyLinkRegexes.MAILTO)
         assert problem.uri == uri
         # The custom title is used.
         assert problem.title == "a title"
-        assert problem.detail == "No email address was provided"
+        assert problem.detail == "No link href was provided"
 
         # Changing the title doesn't affect the original ProblemDetail
         # document.
         assert "a title" != INVALID_CONTACT_URI.title
 
-        problem = m("http://not-an-email/", "a title")
+        problem = m("http://not-an-email/", "a title", VerifyLinkRegexes.MAILTO)
         assert problem.uri == uri
-        assert (
-            problem.detail
-            == "URI must start with 'mailto:' (got: http://not-an-email/)"
-        )
+        assert problem.detail == "URI must match '^mailto:' (got: http://not-an-email/)"
 
         mailto = "mailto:me@library.org"
-        success = m(mailto, "a title")
+        success = m(mailto, "a title", VerifyLinkRegexes.MAILTO)
         assert success == mailto
 
-    def test__locate_email_addresses(self):
+        uri = "https://library.org"
+        success = m(uri, "a title", VerifyLinkRegexes.HTTP_OR_MAILTO)
+        assert success == uri
+
+        uri = "mailto:help@library.org"
+        success = m(uri, "a title", VerifyLinkRegexes.HTTP_OR_MAILTO)
+        assert success == uri
+
+    def test__verify_links(self):
         """Test the code that finds an email address in a list of links."""
         uri = INVALID_CONTACT_URI.uri
-        m = LibraryRegistrar._locate_email_addresses
+        m = LibraryRegistrar._verify_links
 
         # No links at all.
         result = m("rel0", [], "a title")
         assert isinstance(result, ProblemDetail)
         assert result.uri == uri
         assert result.title == "a title"
-        assert result.detail == "No valid mailto: links found with rel=rel0"
+        assert result.detail == "No valid '^mailto:' links found with rel=rel0"
 
         # Links exist but none are valid and relevant.
         links = [
@@ -217,7 +222,7 @@ class TestRegistrar(DatabaseTest):
         assert isinstance(result, ProblemDetail)
         assert result.uri == uri
         assert result.title == "a title"
-        assert result.detail == "No valid mailto: links found with rel=rel1"
+        assert result.detail == "No valid '^mailto:' links found with rel=rel1"
 
         # Multiple links that work.
         result = m("rel2", links, "a title")

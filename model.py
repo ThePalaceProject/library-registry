@@ -1879,6 +1879,10 @@ class Hyperlink(Base):
         if to_address.startswith("mailto:"):
             to_address = to_address[7:]
 
+        # Are we an email address type of link
+        if not re.match(r"[^@]+@.+", to_address):
+            return
+
         # Make sure there's a Validation object associated with this
         # Resource.
         if resource.validation is None:

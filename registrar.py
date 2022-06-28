@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import re
 from io import BytesIO
 from urllib.parse import urljoin
 
@@ -21,6 +22,11 @@ from problem_details import (
 )
 from util.http import HTTP, RequestTimedOut
 from util.problem_detail import ProblemDetail
+
+
+class VerifyLinkRegexes:
+    MAILTO = r"^mailto:"
+    HTTP_OR_MAILTO = r"^(http[s]?:|mailto:)"
 
 
 class LibraryRegistrar(object):
@@ -122,14 +128,19 @@ class LibraryRegistrar(object):
         # patrons to get help or file a copyright complaint. These
         # links must be stored in the database as Hyperlink objects.
         links = auth_document.links or []
-        for rel, problem_title in [
-            ("help", "Invalid or missing patron support email address"),
+        for rel, problem_title, regexes in [
+            (
+                "help",
+                "Invalid or missing patron support email address or website",
+                VerifyLinkRegexes.HTTP_OR_MAILTO,
+            ),
             (
                 Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL,
                 "Invalid or missing copyright designated agent email address",
+                VerifyLinkRegexes.MAILTO,
             ),
         ]:
-            uris = self._locate_email_addresses(rel, links, problem_title)
+            uris = self._verify_links(rel, links, problem_title, link_regex=regexes)
             if isinstance(uris, ProblemDetail):
                 return uris
             hyperlinks_to_create.append((rel, uris))
@@ -328,7 +339,9 @@ class LibraryRegistrar(object):
         return auth_url in links
 
     @classmethod
-    def _locate_email_addresses(cls, rel, links, problem_title):
+    def _verify_links(
+        cls, rel, links, problem_title, link_regex=VerifyLinkRegexes.MAILTO
+    ):
         """Find one or more email addresses in a list of links, all with
         a given `rel`.
 
@@ -345,14 +358,14 @@ class LibraryRegistrar(object):
                 # Wrong kind of link.
                 continue
             uri = link.get("href")
-            value = cls._required_email_address(uri, problem_title)
+            value = cls._required_link_type(uri, problem_title, link_regex)
             if isinstance(value, str):
                 candidates.append(value)
 
         # There were no relevant links.
         if not candidates:
             problem = INVALID_CONTACT_URI.detailed(
-                "No valid mailto: links found with rel=%s" % rel
+                "No valid '%s' links found with rel=%s" % (link_regex, rel)
             )
             problem.title = problem_title
             return problem
@@ -360,18 +373,18 @@ class LibraryRegistrar(object):
         return candidates
 
     @classmethod
-    def _required_email_address(cls, uri, problem_title):
-        """Verify that `uri` is a mailto: URI.
+    def _required_link_type(cls, uri, problem_title, link_regex):
+        """Verify that `uri` is a particular type URI.
 
-        :return: Either a mailto: URI or a customized ProblemDetail.
+        :return: Either a verified type URI or a customized ProblemDetail.
         """
         problem = None
         on_error = INVALID_CONTACT_URI
         if not uri:
-            problem = on_error.detailed("No email address was provided")
-        elif not uri.startswith("mailto:"):
+            problem = on_error.detailed("No link href was provided")
+        elif not re.match(link_regex, uri):
             problem = on_error.detailed(
-                _("URI must start with 'mailto:' (got: %s)") % uri
+                _("URI must match '%s' (got: %s)") % (link_regex, uri)
             )
         if problem:
             problem.title = problem_title
