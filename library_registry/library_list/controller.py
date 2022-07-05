@@ -34,6 +34,7 @@ class LibraryListController(BaseController):
             )
         self.emailer = emailer
 
+    # Not currently used
     def nearby(self, location, live=True):
         qu = Library.nearby(self._db, location, production=live)
         qu = qu.limit(5)
