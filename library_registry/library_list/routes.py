@@ -12,12 +12,14 @@ libr_list = Blueprint(
     'libr_list', __name__,
     template_folder='templates')
 
+# Not currently used
 @libr_list.route('/')
 @uses_location
 @returns_problem_detail
 def nearby(_location=None):
     return current_app.library_registry.list_controller.nearby(_location)
 
+# Not currently used
 @libr_list.route('/qa')
 @uses_location
 @returns_problem_detail
@@ -38,18 +40,21 @@ def search_qa(_location=None):
         _location, live=False
     )
 
+# Not currently used
 @libr_list.route('/library/<uuid>/eligibility')
 @has_library
 @returns_problem_detail
 def library_eligibility():
     return current_app.library_registry.coverage_controller.eligibility_for_library()
 
+# Not currently used
 @libr_list.route('/library/<uuid>/focus')
 @has_library
 @returns_problem_detail
 def library_focus():
     return current_app.library_registry.coverage_controller.focus_for_library()
 
+# Not currently used
 @libr_list.route('/coverage')
 @returns_problem_detail
 def coverage():
