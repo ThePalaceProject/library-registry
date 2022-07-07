@@ -85,10 +85,6 @@ def db_session(db_engine):
 def app(db_session):
     app = create_app(testing=True, db_session_obj=db_session)
     app.secret_key = "SUPER SECRET TESTING SECRET"
-    app.register_blueprint(drm)
-    app.register_blueprint(admin)
-    app.register_blueprint(libr)
-    app.register_blueprint(libr_list)
     yield app
 
 
