@@ -33,6 +33,10 @@ db_url = Configuration.database_url(test=TESTING)
 
 def create_app(testing=False, db_session_obj=None):
     
+    # Make test flags errors citing naming collisions around blueprints and suggests adding an additional name argument.
+    # Doing this will fix the tests but will break the app. The app works fine. Currently working to find the correct solution,
+    # but for now, this is a working app even though you see errors when you run the tests.
+    
     app = Flask(__name__)
     app.register_blueprint(drm)
     app.register_blueprint(admin)
