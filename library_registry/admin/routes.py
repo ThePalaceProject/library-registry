@@ -1,4 +1,7 @@
-from flask import Blueprint, current_app
+from flask import Blueprint, current_app, jsonify
+
+from flask_jwt_extended import jwt_required
+
 from library_registry.admin.decorators import check_logged_in
 
 from library_registry.decorators import (
@@ -10,14 +13,32 @@ admin = Blueprint(
     'admin', __name__,
     template_folder='templates')
 
+
 @admin.route('/admin/', strict_slashes=False)
 def admin_view():
     return current_app.library_registry.view_controller()
+
 
 @admin.route('/admin/log_in', methods=["POST"])
 @returns_problem_detail
 def log_in():
     return current_app.library_registry.admin_controller.log_in()
+
+
+@admin.route('/admin/log_in_w_token', methods=['POST'])
+@returns_problem_detail
+def log_in_w_token():
+    return current_app.library_registry.admin_controller.log_in_w_token()
+
+
+# We are using the `refresh=True` options in jwt_required to only allow
+# refresh tokens to access this route.
+@admin.route('/admin/refresh', methods=['POST'])
+@returns_problem_detail
+@jwt_required(refresh=True)
+def refresh():
+    return current_app.library_registry.admin_controller.refresh()
+
 
 @admin.route('/admin/log_out')
 @check_logged_in
@@ -25,11 +46,13 @@ def log_in():
 def log_out():
     return current_app.library_registry.admin_controller.log_out()
 
+
 @admin.route('/admin/libraries')
 @check_logged_in
 @returns_json_or_response_or_problem_detail
 def libraries():
     return current_app.library_registry.admin_controller.libraries()
+
 
 @admin.route('/admin/libraries/qa')
 @check_logged_in
@@ -37,11 +60,13 @@ def libraries():
 def libraries_qa_admin():
     return current_app.library_registry.admin_controller.libraries(live=False)
 
+
 @admin.route('/admin/libraries/<uuid>')
 @check_logged_in
 @returns_json_or_response_or_problem_detail
 def library_details(uuid):
     return current_app.library_registry.admin_controller.library_details(uuid)
+
 
 @admin.route('/admin/libraries/search_details', methods=["POST"])
 @check_logged_in
@@ -49,17 +74,20 @@ def library_details(uuid):
 def search_details():
     return current_app.library_registry.admin_controller.search_details()
 
+
 @admin.route('/admin/libraries/email', methods=["POST"])
 @check_logged_in
 @returns_json_or_response_or_problem_detail
 def validate_email():
     return current_app.library_registry.admin_controller.validate_email()
 
+
 @admin.route('/admin/libraries/registration', methods=["POST"])
 @check_logged_in
 @returns_json_or_response_or_problem_detail
 def edit_registration():
     return current_app.library_registry.admin_controller.edit_registration()
+
 
 @admin.route('/admin/libraries/pls_id', methods=["POST"])
 @check_logged_in

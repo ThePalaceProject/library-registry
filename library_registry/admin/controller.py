@@ -1,4 +1,8 @@
-from flask import (Response, render_template_string, session, redirect, request, url_for)
+from flask import (Response, render_template_string,
+                   session, redirect, request, url_for, jsonify)
+
+from flask_jwt_extended import create_access_token, create_refresh_token, verify_jwt_in_request, get_jwt_identity
+
 from sqlalchemy.orm import (defer, joinedload)
 from library_registry.admin.templates.templates import admin as admin_template
 from library_registry.util.shared_controller import BaseController
@@ -18,6 +22,7 @@ from library_registry.model import (
     Validation,
 )
 
+
 class ViewController(BaseController):
     def __call__(self):
         username = session.get('username', '')
@@ -27,12 +32,13 @@ class ViewController(BaseController):
         ))
         return response
 
+
 class AdminController(BaseController):
 
     def __init__(self, app, emailer_class=Emailer):
         super(AdminController, self).__init__(app)
         self.emailer = emailer_class
-    
+
     def log_in(self):
         username = request.form.get("username")
         password = request.form.get("password")
@@ -41,6 +47,27 @@ class AdminController(BaseController):
             return redirect(url_for('admin.admin_view'))
         else:
             return INVALID_CREDENTIALS
+
+    def log_in_with_token(self):
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if Admin.authenticate(self._db, username, password):
+            access_token = create_access_token(identity=username)
+            refresh_token = create_refresh_token(identity=username)
+            response = redirect(url_for('admin.admin_view'))
+            response.headers = {'Authorization: Bearer %s' % str(
+                access_token), 'Authorization: Refresh %s' % str(refresh_token)}
+            return response
+        else:
+            return INVALID_CREDENTIALS
+
+    def refresh_token(self):
+        if verify_jwt_in_request():
+            identity = get_jwt_identity()
+            access_token = create_access_token(identity=identity)
+            response = Response()
+            response.headers = {'Authorization: Bearer %s' % str(access_token)}
+            return response
 
     def log_out(self):
         session["username"] = ""
@@ -254,6 +281,7 @@ class AdminController(BaseController):
         pls_id = request.form.get(Library.PLS_ID)
         library.pls_id.value = pls_id
         return Response(str(library.internal_urn), 200)
+
 
 class ValidationController(BaseController):
     """Validates Resources based on validation codes.

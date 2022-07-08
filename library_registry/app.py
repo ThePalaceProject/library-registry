@@ -7,6 +7,8 @@ from flask import Flask, Response
 from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
+from flask_jwt_extended import JWTManager
+
 from .admin import admin
 from .drm import drm
 from .library_registration_protocol import libr
@@ -32,13 +34,16 @@ db_url = Configuration.database_url(test=TESTING)
 
 
 def create_app(testing=False, db_session_obj=None):
-    
+
     app = Flask(__name__)
     app.register_blueprint(drm)
     app.register_blueprint(admin)
     app.register_blueprint(libr)
     app.register_blueprint(libr_list)
     babel.init_app(app)
+
+    jwt = JWTManager(app)
+    # app.secret_key = Configuration.SECRET_KEY
 
     if testing and db_session_obj:
         _db = db_session_obj
@@ -59,7 +64,8 @@ def create_app(testing=False, db_session_obj=None):
     @app.before_first_request
     def set_secret_key(_db=None):
         _db = _db or app._db
-        app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
+        app.secret_key = ConfigurationSetting.sitewide_secret(
+            _db, Configuration.SECRET_KEY)
 
     @app.teardown_request
     def shutdown_session(exception):
@@ -87,10 +93,12 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         url = sys.argv[1]
     else:
-        url = ConfigurationSetting.sitewide(app._db, Configuration.BASE_URL).value
+        url = ConfigurationSetting.sitewide(
+            app._db, Configuration.BASE_URL).value
 
     url = url or 'http://localhost:7000/'
-    (scheme, netloc, path, parameters, query, fragment) = urllib.parse.urlparse(url)
+    (scheme, netloc, path, parameters, query,
+     fragment) = urllib.parse.urlparse(url)
 
     if ':' in netloc:
         host, port = netloc.split(':')

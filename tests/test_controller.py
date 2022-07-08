@@ -13,6 +13,8 @@ from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
+from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_unverified_jwt_headers, create_refresh_token
+
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration
 from library_registry.controller import (
@@ -80,25 +82,31 @@ class MockEmailer(Emailer):
 
 @pytest.fixture
 def mock_registry(db_session):
-    library_registry = MockLibraryRegistry(db_session, testing=True, emailer_class=MockEmailer)
+    library_registry = MockLibraryRegistry(
+        db_session, testing=True, emailer_class=MockEmailer)
     yield library_registry
 
 
 @pytest.fixture
 def mock_registry_controller(mock_registry):
-    registry_controller = LibraryRegistryController(mock_registry, emailer_class=MockEmailer)
+    registry_controller = LibraryRegistryController(
+        mock_registry, emailer_class=MockEmailer)
     yield registry_controller
 
 
 @pytest.fixture
 def mock_admin_controller(mock_registry):
-    admin_controller = AdminController(mock_registry, emailer_class=MockEmailer)
+    admin_controller = AdminController(
+        mock_registry, emailer_class=MockEmailer)
     yield admin_controller
+
 
 @pytest.fixture
 def mock_library_list_controller(mock_registry):
-    library_list_controller = LibraryListController(mock_registry, emailer_class=MockEmailer)
+    library_list_controller = LibraryListController(
+        mock_registry, emailer_class=MockEmailer)
     yield library_list_controller
+
 
 @pytest.fixture
 def adobe_integration(db_session, create_test_external_integration):
@@ -113,12 +121,13 @@ def adobe_integration(db_session, create_test_external_integration):
 
 
 class TestLibraryRegistryAnnotator:
-    
+
     def test_annotate_catalog(self, app, db_session, adobe_integration):
         annotator = LibraryRegistryAnnotator(app.library_registry)
 
         with app.test_request_context("/"):
-            catalog = OPDSCatalog(db_session, "Test Catalog", "http://catalog", [])
+            catalog = OPDSCatalog(
+                db_session, "Test Catalog", "http://catalog", [])
             annotator.annotate_catalog(catalog)
 
             # The catalog should have three new links: search, register, and a templated link
@@ -127,16 +136,19 @@ class TestLibraryRegistryAnnotator:
 
             links = catalog.catalog.get("links")
             assert len(links) == 4
-            [opds_link, register_link, search_link, self_link] = sorted(links, key=lambda x: x.get("rel"))
+            [opds_link, register_link, search_link, self_link] = sorted(
+                links, key=lambda x: x.get("rel"))
 
             assert opds_link.get("href") == 'http://localhost/library/{uuid}'
-            assert opds_link.get("rel") == 'http://librarysimplified.org/rel/registry/library'
+            assert opds_link.get(
+                "rel") == 'http://librarysimplified.org/rel/registry/library'
             assert opds_link.get("type") == 'application/opds+json'
             assert opds_link.get("templated") is True
 
             assert search_link.get("href") == 'http://localhost/search'
             assert search_link.get("rel") == "search"
-            assert search_link.get("type") == 'application/opensearchdescription+xml'
+            assert search_link.get(
+                "type") == 'application/opensearchdescription+xml'
 
             assert register_link.get("href") == 'http://localhost/register'
             assert register_link.get('rel') == 'register'
@@ -144,11 +156,12 @@ class TestLibraryRegistryAnnotator:
                 'application/opds+json;profile=https://librarysimplified.org/rel/profile/directory'
             )
 
-            assert catalog.catalog.get("metadata").get('adobe_vendor_id') == "VENDORID"
+            assert catalog.catalog.get("metadata").get(
+                'adobe_vendor_id') == "VENDORID"
 
 
 class TestBaseController:
-    
+
     def test_library_for_request(self, app, db_session, create_test_library, mock_registry):
         # Test the code that looks up a library by its UUID and sets it as flask.request.library.
         controller = BaseController(mock_registry)
@@ -168,18 +181,23 @@ class TestBaseController:
 
 
 class TestLibraryRegistry:
-    
+
     def test_instantiated_controllers_with_adobe(self, db_session, adobe_integration):
-        registry_with_adobe = MockLibraryRegistry(db_session, testing=True, emailer_class=MockEmailer)
-        assert isinstance(registry_with_adobe.adobe_vendor_id, AdobeVendorIDController)
+        registry_with_adobe = MockLibraryRegistry(
+            db_session, testing=True, emailer_class=MockEmailer)
+        assert isinstance(registry_with_adobe.adobe_vendor_id,
+                          AdobeVendorIDController)
 
     def test_instantiated_controllers_without_adobe(self, mock_registry):
         # Verify that the controllers were instantiated and attached to the LibraryRegistry object.
-        assert isinstance(mock_registry.registry_controller, LibraryRegistryController)
-        assert isinstance(mock_registry.validation_controller, ValidationController)
+        assert isinstance(mock_registry.registry_controller,
+                          LibraryRegistryController)
+        assert isinstance(mock_registry.validation_controller,
+                          ValidationController)
 
         # No Adobe Vendor ID was set up.
         assert mock_registry.adobe_vendor_id is None
+
 
 @pytest.fixture
 def registration_form():
@@ -218,7 +236,8 @@ def generate_auth_document(kansas_state):
                 }
             ],
             "links": [
-                {"rel": "alternate", "href": "http://circmanager.org", "type": "text/html"},
+                {"rel": "alternate", "href": "http://circmanager.org",
+                    "type": "text/html"},
                 {"rel": "logo", "href": "data:image/png;imagedata"},
                 {"rel": "register", "href": "http://circmanager.org/new-account"},
                 {"rel": "start", "href": "http://circmanager.org/feed/",
@@ -255,6 +274,7 @@ def teardown(db_session, capsys):
         db_session.delete(admin)
 
     db_session.commit()
+
 
 class TestLibraryListController:
 
@@ -310,20 +330,23 @@ class TestLibraryListController:
             # converts normal-looking latitude/longitude into this
             # format.
             with app.test_request_context("/libraries"):
-                response = mock_library_list_controller.libraries_opds(location="SRID=4326;POINT(-98 39)")
+                response = mock_library_list_controller.libraries_opds(
+                    location="SRID=4326;POINT(-98 39)")
 
             catalog = json.loads(response.data)
             titles = [x['metadata']['title'] for x in catalog['catalogs']]
 
             # The nearby library is promoted to the top of the list.
             # The other libraries are still in alphabetical order.
-            assert titles == ['Kansas State Library', 'Connecticut State Library', 'NYPL']
-    
+            assert titles == ['Kansas State Library',
+                              'Connecticut State Library', 'NYPL']
+
     def test_nearby(
         self, app, mock_library_list_controller, nypl, connecticut_state_library, manhattan, adobe_integration
     ):
         with app.test_request_context("/"):
-            response = mock_library_list_controller.nearby(manhattan, live=True)
+            response = mock_library_list_controller.nearby(
+                manhattan, live=True)
             assert isinstance(response, Response)
             assert "200 OK" == response.status
             assert response.headers['Content-Type'] == OPDSCatalog.OPDS_TYPE
@@ -362,7 +385,8 @@ class TestLibraryListController:
                 "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
             )
 
-            assert library_link["href"] == unquote(url_for("libr_list.library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(
+                url_for("libr_list.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
             assert library_link["type"] == "application/opds+json"
             assert library_link.get("templated") is True
@@ -376,13 +400,15 @@ class TestLibraryListController:
             library.registry_stage = Library.TESTING_STAGE
 
         with app.test_request_context("/"):
-            response = mock_library_list_controller.nearby(manhattan, live=True)
+            response = mock_library_list_controller.nearby(
+                manhattan, live=True)
             catalogs = json.loads(response.data)
             assert catalogs['catalogs'] == []
 
         # However, they will show up in the QA feed.
         with app.test_request_context("/"):
-            response = mock_library_list_controller.nearby(manhattan, live=False)
+            response = mock_library_list_controller.nearby(
+                manhattan, live=False)
             catalogs = json.loads(response.data)
             assert len(catalogs['catalogs']) == 2
             [catalog] = [
@@ -403,7 +429,8 @@ class TestLibraryListController:
             assert register_link["rel"] == "register"
 
             # So is the 'library' templated link.
-            assert library_link["href"] == unquote(url_for("libr_list.library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(
+                url_for("libr_list.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
 
             # This is a QA feed, and the 'search' and 'self' links
@@ -486,7 +513,8 @@ class TestLibraryListController:
             url_for = app.library_registry.url_for
 
             # The search results have a self link and a link back to the search form.
-            assert self_link['href'] == url_for("libr_list.search", q="manhattan")
+            assert self_link['href'] == url_for(
+                "libr_list.search", q="manhattan")
             assert self_link['rel'] == "self"
             assert self_link['type'] == OPDSCatalog.OPDS_TYPE
 
@@ -500,7 +528,8 @@ class TestLibraryListController:
                 "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
             )
 
-            assert library_link["href"] == unquote(url_for("libr_list.library", uuid="{uuid}"))
+            assert library_link["href"] == unquote(
+                url_for("libr_list.library", uuid="{uuid}"))
             assert library_link["rel"] == "http://librarysimplified.org/rel/registry/library"
             assert library_link["type"] == "application/opds+json"
             assert library_link.get("templated") is True
@@ -518,7 +547,8 @@ class TestLibraryListController:
             lib.registry_stage = Library.CANCELLED_STAGE
 
         with app.test_request_context("/?q=manhattan"):
-            response = mock_library_list_controller.search(manhattan, live=True)
+            response = mock_library_list_controller.search(
+                manhattan, live=True)
             catalog = json.loads(response.data)
             assert catalog['catalogs'] == []
 
@@ -526,7 +556,8 @@ class TestLibraryListController:
         # stage, we find it.
         kansas_state_library.registry_stage = Library.PRODUCTION_STAGE
         with app.test_request_context("/?q=manhattan"):
-            response = mock_library_list_controller.search(manhattan, live=True)
+            response = mock_library_list_controller.search(
+                manhattan, live=True)
             catalog = json.loads(response.data)
             [catalog] = catalog['catalogs']
             assert catalog['metadata']['title'] == 'Kansas State Library'
@@ -620,7 +651,8 @@ class TestLibraryRegistryController:
         the registration process can't begin.
         """
         with app.test_request_context("/", method="POST"):
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
 
             assert response == NO_AUTH_URL
 
@@ -630,7 +662,8 @@ class TestLibraryRegistryController:
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
             http_client.queue_response(RequestTimedOut("http://url", "sorry"))
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == TIMEOUT.uri
             assert response.detail == 'Timeout retrieving auth document http://circmanager.org/authentication.opds'
 
@@ -646,21 +679,24 @@ class TestLibraryRegistryController:
 
             # This server isn't working.
             http_client.queue_response(500)
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == ERROR_RETRIEVING_DOCUMENT.uri
             assert response.detail == "Error retrieving auth document http://circmanager.org/authentication.opds"
 
             # This server incorrectly requires authentication to
             # access the authentication document.
             http_client.queue_response(401)
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == ERROR_RETRIEVING_DOCUMENT.uri
             assert response.detail == "Error retrieving auth document http://circmanager.org/authentication.opds"
 
             # This server doesn't have an authentication document
             # at the specified URL.
             http_client.queue_response(404)
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INTEGRATION_DOCUMENT_NOT_FOUND.uri
             assert response.detail == (
                 'No Authentication For OPDS document present at http://circmanager.org/authentication.opds'
@@ -671,10 +707,12 @@ class TestLibraryRegistryController:
     ):
         # The request succeeds but returns something other than
         # an authentication document.
-        http_client.queue_response(200, content="I am not an Authentication For OPDS document.")
+        http_client.queue_response(
+            200, content="I am not an Authentication For OPDS document.")
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response == INVALID_INTEGRATION_DOCUMENT
 
     def test_register_fails_on_non_matching_id(
@@ -692,7 +730,8 @@ class TestLibraryRegistryController:
                 ("url", "http://a-different-url/"),
                 ("contact", "mailto:me@library.org"),
             ])
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
 
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == (
@@ -707,10 +746,12 @@ class TestLibraryRegistryController:
         # a title.
         auth_document = generate_auth_document()
         del auth_document['title']
-        http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+        http_client.queue_response(200, content=json.dumps(
+            auth_document), url=auth_document['id'])
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == "The OPDS authentication document is missing a title."
 
@@ -728,7 +769,8 @@ class TestLibraryRegistryController:
         )
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == (
                 "The OPDS authentication document is missing a 'start' link to the root OPDS feed."
@@ -747,7 +789,8 @@ class TestLibraryRegistryController:
         http_client.queue_response(404)
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INTEGRATION_DOCUMENT_NOT_FOUND.uri
             assert response.detail == "No OPDS root document present at http://circmanager.org/feed/"
 
@@ -757,11 +800,13 @@ class TestLibraryRegistryController:
         # The request returns an authentication document but an attempt
         # to retrieve the corresponding OPDS feed times out.
         auth_document = generate_auth_document()
-        http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+        http_client.queue_response(200, content=json.dumps(
+            auth_document), url=auth_document['id'])
         http_client.queue_response(RequestTimedOut("http://url", "sorry"))
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == TIMEOUT.uri
             assert response.detail == "Timeout retrieving OPDS root document at http://circmanager.org/feed/"
 
@@ -771,11 +816,13 @@ class TestLibraryRegistryController:
         # The request returns an authentication document but an attempt
         # to retrieve the corresponding OPDS feed gives a server-side error.
         auth_document = generate_auth_document()
-        http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+        http_client.queue_response(200, content=json.dumps(
+            auth_document), url=auth_document['id'])
         http_client.queue_response(500)
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == ERROR_RETRIEVING_DOCUMENT.uri
             assert response.detail == "Error retrieving OPDS root document at http://circmanager.org/feed/"
 
@@ -795,7 +842,8 @@ class TestLibraryRegistryController:
         http_client.queue_response(200, "text/html")
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == (
                 "Supposed root document at http://circmanager.org/feed/ is not an OPDS document"
@@ -805,7 +853,8 @@ class TestLibraryRegistryController:
         self, http_client, app, registration_form, mock_registry_controller, generate_auth_document
     ):
         auth_document = generate_auth_document()
-        http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+        http_client.queue_response(200, content=json.dumps(
+            auth_document), url=auth_document['id'])
 
         # The start link returns a 200 response code and the right
         # Content-Type, but there is no Link header and the body is no
@@ -813,7 +862,8 @@ class TestLibraryRegistryController:
         http_client.queue_response(200, OPDSCatalog.OPDS_TYPE, content='{}')
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == (
                 "OPDS root document at http://circmanager.org/feed/ does not link back to "
@@ -844,7 +894,8 @@ class TestLibraryRegistryController:
 
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == "Could not read logo image http://example.com/broken-logo.png"
 
@@ -858,9 +909,11 @@ class TestLibraryRegistryController:
             flask.request.form = registration_form
             auth_document = generate_auth_document()
             auth_document['service_area'] = {"US": ["Somewhere"]}
-            http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+            http_client.queue_response(200, content=json.dumps(
+                auth_document), url=auth_document['id'])
             self.queue_opds_success(http_client)
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == "The following service area was unknown: {\"US\": [\"Somewhere\"]}."
 
@@ -883,7 +936,8 @@ class TestLibraryRegistryController:
                 url=auth_document['id']
             )
             self.queue_opds_success(http_client)
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == "The following service area was ambiguous: {\"US\": [\"Manhattan\"]}."
 
@@ -897,7 +951,8 @@ class TestLibraryRegistryController:
                 200, content=json.dumps(auth_document), url=auth_document['id']
             )
             http_client.queue_response(401)
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == (
                 "401 response at http://circmanager.org/feed/ did not yield an Authentication For OPDS document"
@@ -920,7 +975,8 @@ class TestLibraryRegistryController:
                 url=auth_document['id']
             )
 
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
             assert response.detail == (
                 "Authentication For OPDS document guarding http://circmanager.org/feed/ does not match "
@@ -934,14 +990,17 @@ class TestLibraryRegistryController:
         with app.test_request_context("/", method="POST"):
             flask.request.form = registration_form
             auth_document = generate_auth_document()
-            http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+            http_client.queue_response(200, content=json.dumps(
+                auth_document), url=auth_document['id'])
             http_client.queue_response(401, AuthenticationDocument.MEDIA_TYPE,
                                        content=json.dumps(auth_document), url=auth_document['id'])
 
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.status_code == 201
 
-        [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
+        [test_library_to_destroy] = db_session.query(
+            Library).filter(Library.name == 'A Library').all()
 
     # NOTE: This is commented out until we can say that registration
     # requires providing a contact email and expect every new library
@@ -984,13 +1043,15 @@ class TestLibraryRegistryController:
                 )
                 with app.test_request_context("/", method="POST"):
                     flask.request.form = registration_form
-                    response = mock_registry_controller.register(do_get=http_client.do_get)
+                    response = mock_registry_controller.register(
+                        do_get=http_client.do_get)
                     assert response.title == error
 
             _request_fails()
 
             # Now add the link back but as an http: link.
-            auth_document['links'].append(dict(rel=rel, href="http://not-an-email/"))
+            auth_document['links'].append(
+                dict(rel=rel, href="http://not-an-email/"))
             _request_fails()
 
     def test_registration_fails_if_email_server_fails(
@@ -1010,7 +1071,8 @@ class TestLibraryRegistryController:
 
         # Pretend we are a library with a valid authentication document.
         auth_document = generate_auth_document(None)
-        http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+        http_client.queue_response(200, content=json.dumps(
+            auth_document), url=auth_document['id'])
         self.queue_opds_success(http_client)
 
         auth_url = "http://circmanager.org/authentication.opds"     # noqa: F841
@@ -1020,7 +1082,8 @@ class TestLibraryRegistryController:
                 ("url", auth_document['id']),
                 ("contact", "mailto:me@library.org"),
             ])
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
 
         # We get back a ProblemDetail the first time
         # we got a problem sending an email. In this case, it was
@@ -1029,7 +1092,8 @@ class TestLibraryRegistryController:
         assert response.uri == INTEGRATION_ERROR.uri
         assert response.detail == "SMTP error while sending email to mailto:help@library.org"
 
-        [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
+        [test_library_to_destroy] = db_session.query(
+            Library).filter(Library.name == 'A Library').all()
 
     def test_registration_fails_if_email_server_unusable(
         self, db_session, mock_registry_controller, http_client, app, generate_auth_document,
@@ -1060,11 +1124,13 @@ class TestLibraryRegistryController:
             },
         }
 
-        mock_registry_controller.emailer = UnresponsiveEmailer(**unresponsive_emailer_kwargs)
+        mock_registry_controller.emailer = UnresponsiveEmailer(
+            **unresponsive_emailer_kwargs)
 
         # Pretend we are a library with a valid authentication document.
         auth_document = generate_auth_document(None)
-        http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+        http_client.queue_response(200, content=json.dumps(
+            auth_document), url=auth_document['id'])
         self.queue_opds_success(http_client)
 
         # Send a registration request to the registry.
@@ -1073,7 +1139,8 @@ class TestLibraryRegistryController:
                 ("url", auth_document['id']),
                 ("contact", "mailto:me@library.org"),
             ])
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
 
         # We get back a ProblemDetail the first time
         # we got a problem sending an email. In this case, it was
@@ -1081,7 +1148,8 @@ class TestLibraryRegistryController:
         # library's authentication document.
         assert response.uri == UNABLE_TO_NOTIFY.uri
 
-        [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
+        [test_library_to_destroy] = db_session.query(
+            Library).filter(Library.name == 'A Library').all()
 
     @pytest.mark.needsdecomposition
     def test_register_success(
@@ -1093,7 +1161,8 @@ class TestLibraryRegistryController:
         # Pretend we are a library with a valid authentication document.
         key = RSA.generate(1024)
         auth_document = generate_auth_document(key)
-        http_client.queue_response(200, content=json.dumps(auth_document), url=auth_document['id'])
+        http_client.queue_response(200, content=json.dumps(
+            auth_document), url=auth_document['id'])
         self.queue_opds_success(http_client)
 
         auth_url = "http://circmanager.org/authentication.opds"
@@ -1107,7 +1176,8 @@ class TestLibraryRegistryController:
                 ("url", auth_url),
                 ("contact", "mailto:me@library.org"),
             ])
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.status_code == 201
             assert response.headers.get("Content-Type") == opds_directory
 
@@ -1188,11 +1258,13 @@ class TestLibraryRegistryController:
         assert integration_contact_link.href == "mailto:me@library.org"
 
         # A confirmation email was sent out for each of those addresses.
-        sent = sorted(mock_registry_controller.emailer.sent_out, key=lambda x: x[1])
+        sent = sorted(mock_registry_controller.emailer.sent_out,
+                      key=lambda x: x[1])
         for email in sent:
             assert email[0] == Emailer.ADDRESS_NEEDS_CONFIRMATION
         destinations = [x[1] for x in sent]
-        assert destinations == ["dmca@library.org", "help@library.org", "me@library.org"]
+        assert destinations == ["dmca@library.org",
+                                "help@library.org", "me@library.org"]
         mock_registry_controller.emailer.sent_out = []
 
         # The document sent by the library registry to the library
@@ -1214,7 +1286,8 @@ class TestLibraryRegistryController:
                 {"rel": "start", "href": "http://circmanager.org/feed/",
                  "type": "application/atom+xml;profile=opds-catalog"},
                 {"rel": "help", "href": "mailto:new-help@library.org"},
-                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright", "href": "mailto:me@library.org"},
+                {"rel": "http://librarysimplified.org/rel/designated-agent/copyright",
+                    "href": "mailto:me@library.org"},
 
             ],
             "service_area": {"US": "Connecticut"},
@@ -1230,7 +1303,8 @@ class TestLibraryRegistryController:
             b'\xca\x00\x00\x00\x06PLTE\xffM\x00\x01\x01\x01\x8e\x1e\xe5\x1b\x00\x00\x00\x01tRNS\xcc\xd24V'
             b'\xfd\x00\x00\x00\nIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
         )
-        http_client.queue_response(200, content=image_data, media_type="image/png")
+        http_client.queue_response(
+            200, content=image_data, media_type="image/png")
 
         # So the library re-registers itself, and gets an updated
         # registry entry.
@@ -1244,7 +1318,8 @@ class TestLibraryRegistryController:
                 ("stage", Library.TESTING_STAGE)
             ])
 
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.status_code == 200
             assert response.headers.get("Content-Type") == opds_directory
 
@@ -1293,10 +1368,12 @@ class TestLibraryRegistryController:
             # for me@library.org (which already has an outstanding
             # confirmation request) as designated copyright agent.
             new_dmca, new_help = sorted(
-                [(x[1], x[0]) for x in mock_registry_controller.emailer.sent_out]
+                [(x[1], x[0])
+                 for x in mock_registry_controller.emailer.sent_out]
             )
             assert new_dmca == ("me@library.org", Emailer.ADDRESS_DESIGNATED)
-            assert new_help == ("new-help@library.org", Emailer.ADDRESS_NEEDS_CONFIRMATION)
+            assert new_help == ("new-help@library.org",
+                                Emailer.ADDRESS_NEEDS_CONFIRMATION)
 
             # Commit to update library.service_areas.
             db_session.commit()
@@ -1336,7 +1413,8 @@ class TestLibraryRegistryController:
             )
             self.queue_opds_success(http_client)
 
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             assert response.status_code == 200
             catalog = json.loads(response.data)
             assert library.shared_secret != old_secret
@@ -1344,8 +1422,10 @@ class TestLibraryRegistryController:
             # The registry encrypted the new secret with the public key, and
             # it can be decrypted with the private key.
             encryptor = PKCS1_OAEP.new(key)
-            encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
-            assert encryptor.decrypt(encrypted_secret).decode("utf8") == library.shared_secret
+            encrypted_secret = base64.b64decode(
+                catalog["metadata"]["shared_secret"])
+            assert encryptor.decrypt(encrypted_secret).decode(
+                "utf8") == library.shared_secret
 
         old_secret = library.shared_secret
 
@@ -1372,7 +1452,8 @@ class TestLibraryRegistryController:
                 assert response.status_code == 200
                 assert library.shared_secret == old_secret
 
-        [test_library_to_destroy] = db_session.query(Library).filter(Library.name == 'A Library').all()
+        [test_library_to_destroy] = db_session.query(
+            Library).filter(Library.name == 'A Library').all()
 
     def test_register_with_secret_changes_authentication_url_and_opds_url(
         self, db_session, create_test_library, http_client, app,
@@ -1392,14 +1473,17 @@ class TestLibraryRegistryController:
         # of creating a new one.
         auth_document = generate_auth_document()
         new_auth_url = auth_document['id']
-        [new_opds_url] = [x['href'] for x in auth_document['links'] if x['rel'] == 'start']
-        http_client.queue_response(200, content=json.dumps(auth_document), url=new_auth_url)
+        [new_opds_url] = [x['href']
+                          for x in auth_document['links'] if x['rel'] == 'start']
+        http_client.queue_response(
+            200, content=json.dumps(auth_document), url=new_auth_url)
         self.queue_opds_success(http_client)
 
         with app.test_request_context("/", method="POST"):
             flask.request.headers = {"Authorization": "Bearer %s" % secret}
             flask.request.form = ImmutableMultiDict([("url", new_auth_url)])
-            response = mock_registry_controller.register(do_get=http_client.do_get)
+            response = mock_registry_controller.register(
+                do_get=http_client.do_get)
             # No new library was created.
             assert response.status_code == 200
 
@@ -1415,7 +1499,8 @@ class TestValidationController:
         response = controller.html_response(999, "a message")
         assert response.status_code == 999
         assert response.headers['Content-Type'] == "text/html"
-        assert response.data.decode("utf8") == controller.MESSAGE_TEMPLATE % dict(message="a message")
+        assert response.data.decode(
+            "utf8") == controller.MESSAGE_TEMPLATE % dict(message="a message")
 
     def test_validate(self, mock_registry, db_session, create_test_library):
         class Mock(ValidationController):
@@ -1451,23 +1536,28 @@ class TestValidationController:
         not_started = link3.resource    # noqa: F841
 
         # Simple tests for missing fields or failed lookups.
-        assert_response(needs_validation.id, "", 404, "No confirmation code provided")
+        assert_response(needs_validation.id, "", 404,
+                        "No confirmation code provided")
         assert_response(None, "a code", 404, "No resource ID provided")
         assert_response(-20, secret, 404, "No such resource")
 
         # Secret does not exist.
-        assert_response(needs_validation.id, "nosuchcode", 404, "Confirmation code 'nosuchcode' not found")
+        assert_response(needs_validation.id, "nosuchcode", 404,
+                        "Confirmation code 'nosuchcode' not found")
 
         # Secret exists but is associated with a different Resource.
-        assert_response(needs_validation.id, secret2, 404, "Confirmation code %r not found" % secret2)
+        assert_response(needs_validation.id, secret2, 404,
+                        "Confirmation code %r not found" % secret2)
 
         # Secret exists but is not associated with any Resource (this
         # shouldn't happen).
         needs_validation_2.validation.resource = None
-        assert_response(needs_validation.id, secret2, 404, "Confirmation code %r not found" % secret2)
+        assert_response(needs_validation.id, secret2, 404,
+                        "Confirmation code %r not found" % secret2)
 
         # Secret matches resource but validation has expired.
-        needs_validation.validation.started_at = (datetime.datetime.now() - datetime.timedelta(days=7))
+        needs_validation.validation.started_at = (
+            datetime.datetime.now() - datetime.timedelta(days=7))
         assert_response(
             needs_validation.id, secret, 400,
             "Confirmation code %r has expired. Re-register to get another code." % secret
@@ -1476,10 +1566,12 @@ class TestValidationController:
         # Success.
         needs_validation.restart_validation()
         secret = needs_validation.validation.secret
-        assert_response(needs_validation.id, secret, 200, "You successfully confirmed mailto:1@library.org.")
+        assert_response(needs_validation.id, secret, 200,
+                        "You successfully confirmed mailto:1@library.org.")
 
         # A Resource can't be validated twice.
-        assert_response(needs_validation.id, secret, 200, "This URI has already been validated.")
+        assert_response(needs_validation.id, secret, 200,
+                        "This URI has already been validated.")
 
 
 class TestCoverageController:
@@ -1516,22 +1608,30 @@ class TestCoverageController:
     def test_lookup(self, app, db_session, mock_registry, kansas_state, massachusetts_state, boston_ma):
         controller = CoverageController(mock_registry)
         # Set up a default nation to make it easier to test a variety of coverage area types.
-        ConfigurationSetting.sitewide(db_session, Configuration.DEFAULT_NATION_ABBREVIATION).value = "US"
+        ConfigurationSetting.sitewide(
+            db_session, Configuration.DEFAULT_NATION_ABBREVIATION).value = "US"
 
         # Parse some strings to GeoJSON objects.
-        self.parse_to(app, db_session, controller, "Boston, MA", [boston_ma], to_json=False)
-        self.parse_to(app, db_session, controller, "Boston, MA", [boston_ma], to_json=True)
-        self.parse_to(app, db_session, controller, "Massachusetts", [massachusetts_state])
-        self.parse_to(app, db_session, controller, ["Massachusetts", "Kansas"], [massachusetts_state, kansas_state])
-        self.parse_to(app, db_session, controller, {"US": "Kansas"}, [kansas_state])
+        self.parse_to(app, db_session, controller,
+                      "Boston, MA", [boston_ma], to_json=False)
+        self.parse_to(app, db_session, controller,
+                      "Boston, MA", [boston_ma], to_json=True)
+        self.parse_to(app, db_session, controller,
+                      "Massachusetts", [massachusetts_state])
+        self.parse_to(app, db_session, controller, ["Massachusetts", "Kansas"], [
+                      massachusetts_state, kansas_state])
+        self.parse_to(app, db_session, controller, {
+                      "US": "Kansas"}, [kansas_state])
         self.parse_to(app, db_session, controller, {"US": ["Massachusetts", "Kansas"]},
                       [massachusetts_state, kansas_state])
-        self.parse_to(app, db_session, controller, ["KS", "UT"], [kansas_state], unknown={"US": ["UT"]})
+        self.parse_to(app, db_session, controller, ["KS", "UT"], [
+                      kansas_state], unknown={"US": ["UT"]})
 
         # Creating two states with the same name is the simplest way
         # to create an ambiguity problem.
         massachusetts_state.external_name = "Kansas"
-        self.parse_to(app, db_session, controller, "Kansas", [], ambiguous={"US": ["Kansas"]})
+        self.parse_to(app, db_session, controller, "Kansas",
+                      [], ambiguous={"US": ["Kansas"]})
 
     def test_library_eligibility_and_focus(
         self, db_session, create_test_library, app, new_york_state, new_york_city
@@ -1571,6 +1671,7 @@ class TestCoverageController:
             eligibility = json.loads(eligibility.data)
             assert eligibility == Place.to_geojson(db_session, new_york_state)
 
+
 class TestAdminController:
 
     def _is_library(self, expected, actual, has_email=True):
@@ -1586,12 +1687,14 @@ class TestAdminController:
 
         for k in flattened:
             if k == "library_stage":
-                assert expected._library_stage == flattened.get("library_stage")
+                assert expected._library_stage == flattened.get(
+                    "library_stage")
             elif k == "timestamp":
                 actual_ts = flattened.get("timestamp")
                 expected_ts = expected.timestamp
                 actual_time = [actual_ts.year, actual_ts.month, actual_ts.day]
-                expected_time = [expected_ts.year, expected_ts.month, expected_ts.day]
+                expected_time = [expected_ts.year,
+                                 expected_ts.month, expected_ts.day]
                 assert expected_time == actual_time
             elif k.endswith("_email"):
                 if has_email:
@@ -1603,9 +1706,11 @@ class TestAdminController:
                 elif isinstance(flattened.get(k), datetime.datetime):
                     continue
             elif k == "online_registration":
-                assert str(expected.online_registration) == flattened.get("online_registration")
+                assert str(expected.online_registration) == flattened.get(
+                    "online_registration")
             elif k in ["focus", "service"]:
-                area_type_names = dict(focus=ServiceArea.FOCUS, service=ServiceArea.ELIGIBILITY)
+                area_type_names = dict(
+                    focus=ServiceArea.FOCUS, service=ServiceArea.ELIGIBILITY)
                 actual_areas = flattened.get(k)
                 expected_areas = [x.place.human_friendly_name or 'Everywhere'
                                   for x in expected.service_areas
@@ -1620,7 +1725,8 @@ class TestAdminController:
 
     def _check_keys(self, library):
         # Helper method to check that the controller is sending the right pieces of information about a library.
-        expected_categories = ['uuid', 'basic_info', 'urls_and_contact', 'stages', 'areas']
+        expected_categories = ['uuid', 'basic_info',
+                               'urls_and_contact', 'stages', 'areas']
         assert set(library.keys()) == set(expected_categories)
 
         expected_info_keys = ['name', 'short_name', 'description', 'timestamp', 'internal_urn',
@@ -1630,7 +1736,8 @@ class TestAdminController:
         expected_url_contact_keys = ['contact_email', 'help_email', 'copyright_email', 'web_url',
                                      'authentication_url', 'contact_validated', 'help_validated',
                                      'copyright_validated', 'opds_url']
-        assert set(library.get("urls_and_contact")) == set(expected_url_contact_keys)
+        assert set(library.get("urls_and_contact")) == set(
+            expected_url_contact_keys)
 
         expected_area_keys = ['focus', 'service']
         assert set(library.get("areas")) == set(expected_area_keys)
@@ -1686,7 +1793,8 @@ class TestAdminController:
         assert response._status_code == 200
         assert response.response[0].decode("utf8") == library.internal_urn
 
-        edited_library = get_one(db_session, Library, short_name=library.short_name)
+        edited_library = get_one(
+            db_session, Library, short_name=library.short_name)
         assert edited_library.library_stage == Library.TESTING_STAGE
         assert edited_library.registry_stage == Library.PRODUCTION_STAGE
 
@@ -1779,7 +1887,8 @@ class TestAdminController:
         assert response._status_code == 200
         assert response.response[0].decode("utf8") == nypl.internal_urn
 
-        library_with_pls_id = get_one(db_session, Library, short_name=nypl.short_name)
+        library_with_pls_id = get_one(
+            db_session, Library, short_name=nypl.short_name)
         assert library_with_pls_id.pls_id.value == "12345"
 
         # Test that the user can edit an existing PLS ID
@@ -1838,7 +1947,8 @@ class TestAdminController:
         libraries = response.get("libraries")
         assert len(libraries) == 2
 
-        ct_then_ks = sorted(libraries, key=lambda x: x['basic_info']['short_name'])
+        ct_then_ks = sorted(
+            libraries, key=lambda x: x['basic_info']['short_name'])
         self._is_library(connecticut, ct_then_ks[0])
         self._is_library(kansas, ct_then_ks[1])
 
@@ -1859,7 +1969,8 @@ class TestAdminController:
 
     def test_log_in(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):
-            flask.request.form = MultiDict([("username", "Admin"), ("password", "123")])
+            flask.request.form = MultiDict(
+                [("username", "Admin"), ("password", "123")])
             response = mock_admin_controller.log_in()
             assert response.status == "302 FOUND"
             assert session["username"] == "Admin"
@@ -1889,10 +2000,60 @@ class TestAdminController:
             assert response.status == "302 FOUND"
             assert session["username"] == "New"
 
+    def test_log_in_with_token(self, app, mock_admin_controller):
+        with app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict(
+                [("username", "Admin"), ("password", "123")])
+            response = mock_admin_controller.log_in_with_token()
+            assert response.status == "302 FOUND"
+            assert 'Bearer' in str(response.headers)
+            assert 'Refresh' in str(response.headers)
+
+    def test_log_in_with_token_with_error(self, db_session, app, mock_admin_controller):
+        admin = Admin.authenticate(db_session, "Admin", "123")
+        with app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("username", "Admin"),
+                ("password", "wrong"),
+            ])
+            response = mock_admin_controller.log_in_with_token()
+            assert(isinstance(response, ProblemDetail))
+            assert response.status_code == 401
+            assert response.title == INVALID_CREDENTIALS.title
+            assert response.uri == INVALID_CREDENTIALS.uri
+            db_session.delete(admin)
+            db_session.commit()
+
+    def test_log_in_with_token_new_admin(self, app, mock_admin_controller):
+        with app.test_request_context("/", method="POST"):
+            flask.request.form = MultiDict([
+                ("username", "New"),
+                ("password", "password")
+            ])
+            response = mock_admin_controller.log_in_with_token()
+            headers = str(response.headers)
+            bearer_token_index = headers.find('Bearer') + 7
+            refresh_token_index = headers.find('Refresh') - 15
+            assert response.status == "302 FOUND"
+            assert 'Bearer' in headers
+            assert 'Refresh' in headers
+            assert 'New' in get_unverified_jwt_headers()
+            # if verify_jwt_in_request():
+            #     id = get_jwt_identity()
+            #     assert 'New' in id
+
+    def test_refresh_token(self, app, mock_admin_controller):
+        with app.test_request_context("/", method="POST"):
+            flask.request.headers = {
+                'Authorization: Bearer %s' % create_refresh_token(identity='Admin')}
+            response = mock_admin_controller.refresh_token()
+            assert response.status_code
+
     def test_log_out(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")
         with app.test_request_context("/"):
-            flask.request.form = MultiDict([("username", "Admin"), ("password", "123")])
+            flask.request.form = MultiDict(
+                [("username", "Admin"), ("password", "123")])
             mock_admin_controller.log_in()
 
             assert session["username"] == "Admin"
