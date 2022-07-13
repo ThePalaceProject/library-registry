@@ -42,8 +42,6 @@ def create_app(testing=False, db_session_obj=None):
     app.register_blueprint(libr_list)
     babel.init_app(app)
 
-    app.config['JWT_SECRET_KEY'] = 'super-secret'  # Change this!
-
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_COOKIE_CSRF_PROTECT'] = True
     app.config['JWT_CSRF_CHECK_FORM'] = True
