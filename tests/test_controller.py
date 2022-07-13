@@ -2009,10 +2009,13 @@ class TestAdminController:
             assert response.status == "302 FOUND"
 
             cookiejar = response.headers.getlist('Set-Cookie')
-            assert [
+            access_token = [
                 cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
+            assert access_token
             assert [
                 cookie for cookie in cookiejar if 'refresh_token_cookie' in cookie]
+            decoded_token = decode_token(access_token[0][20:-18])
+            assert 'Admin' in decoded_token.get('sub')
 
     def test_log_in_with_token_with_error(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")
@@ -2028,21 +2031,6 @@ class TestAdminController:
             assert response.uri == INVALID_CREDENTIALS.uri
             db_session.delete(admin)
             db_session.commit()
-
-    def test_log_in_with_token_new_admin(self, app, mock_admin_controller):
-        with app.test_request_context("/", method="POST"):
-            flask.request.form = MultiDict([
-                ("username", "New"),
-                ("password", "password")
-            ])
-            response = mock_admin_controller.log_in_with_token()
-            cookiejar = response.headers.getlist('Set-Cookie')
-            token = [
-                cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
-            print(decode_token(token[0][20:-18]))
-            assert response.status == "302 FOUND"
-            decoded_token = decode_token(token[0][20:-18])
-            assert 'New' in decoded_token.get('sub')
 
     def test_refresh_token(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):

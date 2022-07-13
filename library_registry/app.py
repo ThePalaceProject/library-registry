@@ -42,6 +42,7 @@ def create_app(testing=False, db_session_obj=None):
     app.register_blueprint(libr_list)
     babel.init_app(app)
 
+    # Options for JWT Token Locations ["headers", "cookies", "json", "query_string"]
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_COOKIE_CSRF_PROTECT'] = True
     app.config['JWT_CSRF_CHECK_FORM'] = True
