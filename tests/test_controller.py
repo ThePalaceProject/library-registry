@@ -1,5 +1,6 @@
 import base64
 import datetime
+from http import cookiejar
 import json
 import random
 from contextlib import contextmanager
@@ -8,12 +9,12 @@ from urllib.parse import unquote
 
 import pytest       # noqa: F401
 import flask
-from flask import Response, session
+from flask import Response, session, jsonify
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
-from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_unverified_jwt_headers, create_refresh_token
+from flask_jwt_extended import decode_token, create_refresh_token, set_refresh_cookies
 
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration
@@ -2006,8 +2007,15 @@ class TestAdminController:
                 [("username", "Admin"), ("password", "123")])
             response = mock_admin_controller.log_in_with_token()
             assert response.status == "302 FOUND"
-            assert 'Bearer' in str(response.headers)
-            assert 'Refresh' in str(response.headers)
+
+            cookiejar = response.headers.getlist('Set-Cookie')
+            # ref = [cookie for cookie in cookiejar if 'refresh_token_cookie' in cookie]
+            # print(ref)
+            # assert False
+            assert [
+                cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
+            assert [
+                cookie for cookie in cookiejar if 'refresh_token_cookie' in cookie]
 
     def test_log_in_with_token_with_error(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")
@@ -2031,23 +2039,21 @@ class TestAdminController:
                 ("password", "password")
             ])
             response = mock_admin_controller.log_in_with_token()
-            headers = str(response.headers)
-            bearer_token_index = headers.find('Bearer') + 7
-            refresh_token_index = headers.find('Refresh') - 15
+            cookiejar = response.headers.getlist('Set-Cookie')
+            token = [
+                cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
+            print(decode_token(token[0][20:-18]))
             assert response.status == "302 FOUND"
-            assert 'Bearer' in headers
-            assert 'Refresh' in headers
-            assert 'New' in get_unverified_jwt_headers()
-            # if verify_jwt_in_request():
-            #     id = get_jwt_identity()
-            #     assert 'New' in id
+            decoded_token = decode_token(token[0][20:-18])
+            assert 'New' in decoded_token.get('sub')
 
     def test_refresh_token(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):
-            flask.request.headers = {
-                'Authorization: Bearer %s' % create_refresh_token(identity='Admin')}
+            refresh_token = create_refresh_token(identity='Admin')
+            flask.request.headers.extend(
+                'refresh_token=', refresh_token)
             response = mock_admin_controller.refresh_token()
-            assert response.status_code
+            assert response.status == 201
 
     def test_log_out(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")
