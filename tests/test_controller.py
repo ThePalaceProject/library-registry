@@ -10,11 +10,11 @@ from urllib.parse import unquote
 import pytest       # noqa: F401
 import flask
 from flask import Response, session, jsonify
-from werkzeug.datastructures import ImmutableMultiDict, MultiDict
+from werkzeug.datastructures import ImmutableMultiDict, MultiDict, ImmutableDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
-from flask_jwt_extended import decode_token, create_refresh_token, set_refresh_cookies
+from flask_jwt_extended import decode_token, create_refresh_token, create_access_token
 
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration
@@ -2009,9 +2009,6 @@ class TestAdminController:
             assert response.status == "302 FOUND"
 
             cookiejar = response.headers.getlist('Set-Cookie')
-            # ref = [cookie for cookie in cookiejar if 'refresh_token_cookie' in cookie]
-            # print(ref)
-            # assert False
             assert [
                 cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
             assert [
@@ -2050,10 +2047,13 @@ class TestAdminController:
     def test_refresh_token(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):
             refresh_token = create_refresh_token(identity='Admin')
-            flask.request.headers.extend(
-                'refresh_token=', refresh_token)
+            flask.request.headers = ImmutableDict({'Authorization': 'Bearer %s' %
+                                                   refresh_token})
             response = mock_admin_controller.refresh_token()
-            assert response.status == 201
+            cookiejar = response.headers.getlist('Set-Cookie')
+            assert [
+                cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
+            assert response.status == '201 CREATED'
 
     def test_log_out(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")

@@ -64,12 +64,13 @@ class AdminController(BaseController):
             return INVALID_CREDENTIALS
 
     def refresh_token(self):
-        if verify_jwt_in_request():
-            identity = get_jwt_identity()
-            access_token = create_access_token(identity=identity)
-            response = Response(201)
-            set_access_cookies(response, access_token)
-            return response
+        if not verify_jwt_in_request(refresh=True):
+            return
+        identity = get_jwt_identity()
+        access_token = create_access_token(identity=identity)
+        response = Response([], 201)
+        set_access_cookies(response, access_token)
+        return response
 
     def log_out(self):
         session["username"] = ""
