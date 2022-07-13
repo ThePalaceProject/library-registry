@@ -33,11 +33,11 @@ def log_in_w_token():
 
 # We are using the `refresh=True` options in jwt_required to only allow
 # refresh tokens to access this route.
-@admin.route('/admin/refresh', methods=['POST'])
+@admin.route('/admin/refresh_token', methods=['POST'])
 @returns_problem_detail
 @jwt_required(refresh=True)
-def refresh():
-    return current_app.library_registry.admin_controller.refresh()
+def refresh_token():
+    return current_app.library_registry.admin_controller.refresh_token()
 
 
 @admin.route('/admin/log_out')
