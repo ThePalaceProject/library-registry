@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, current_app
 
 from flask_jwt_extended import jwt_required
 
@@ -43,6 +43,7 @@ def refresh_token():
 @admin.route('/admin/log_out')
 @check_logged_in
 @returns_problem_detail
+@jwt_required(optional=True)
 def log_out():
     return current_app.library_registry.admin_controller.log_out()
 

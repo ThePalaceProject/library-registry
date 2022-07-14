@@ -3,7 +3,7 @@ import os
 import sys
 import urllib.parse
 
-from flask import Flask, Response
+from flask import Flask
 from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
@@ -42,11 +42,15 @@ def create_app(testing=False, db_session_obj=None):
     app.register_blueprint(libr_list)
     babel.init_app(app)
 
+    # =============Flask JWT Config Begin===================
+
     # Options for JWT Token Locations ["headers", "cookies", "json", "query_string"]
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_COOKIE_CSRF_PROTECT'] = True
     app.config['JWT_CSRF_CHECK_FORM'] = True
     jwt = JWTManager(app)
+
+    # =============Flask JWT Config End=====================
 
     if testing and db_session_obj:
         _db = db_session_obj

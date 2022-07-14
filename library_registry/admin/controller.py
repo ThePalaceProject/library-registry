@@ -1,8 +1,9 @@
+from xml.dom import INVALID_ACCESS_ERR
 from flask import (Response, render_template_string,
                    session, redirect, request, url_for, make_response)
 
 from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                verify_jwt_in_request, get_jwt_identity, set_access_cookies, set_refresh_cookies)
+                                verify_jwt_in_request, get_jwt_identity, set_access_cookies, set_refresh_cookies, unset_jwt_cookies)
 
 from sqlalchemy.orm import (defer, joinedload)
 from library_registry.admin.templates.templates import admin as admin_template
@@ -50,6 +51,12 @@ class AdminController(BaseController):
             return INVALID_CREDENTIALS
 
     def log_in_with_token(self):
+        """JWT Token based login to create more RESTful API
+
+        Returns:
+            Response: With valid credentials this will return JWT Access and Refresh tokens as Set-Cookie headers and redirects to 'admin/admin_view
+            Response: With invalid credentials this will return the INVALID CREDENTIALS response
+        """
         username = request.form.get("username")
         password = request.form.get("password")
         if Admin.authenticate(self._db, username, password):
@@ -64,8 +71,14 @@ class AdminController(BaseController):
             return INVALID_CREDENTIALS
 
     def refresh_token(self):
-        if not verify_jwt_in_request(refresh=True):
-            return
+        """End point for getting new JWT access token if the JWT Refresh token is still valid
+
+        Returns:
+            Response: With a valid JWT Refresh token, this will return a new JWT access token as Set-Cookie header
+            Response: With invalid Refresh or no token this will return and INVALID_ACCESS_ERR
+        """
+        if not verify_jwt_in_request(refresh=True, optional=True):
+            return INVALID_CREDENTIALS
         identity = get_jwt_identity()
         access_token = create_access_token(identity=identity)
         response = Response([], 201)
@@ -73,8 +86,18 @@ class AdminController(BaseController):
         return response
 
     def log_out(self):
-        session["username"] = ""
-        return redirect(url_for('admin.admin_view'))
+        """End point for both Flask Session logout and Flask JWT Logout
+
+        Returns:
+            Response: If JWT in request will send unset jwt cookie request in headers for the browser to remove and redirect
+            Response: No JWT in request will set the `session["username"] == ""` to end the flask session and redirect
+        """
+        if not verify_jwt_in_request(optional=True):
+            session["username"] = ""
+            return redirect(url_for('admin.admin_view'))
+        response = make_response(redirect(url_for('admin.admin_view')))
+        unset_jwt_cookies(response)
+        return response
 
     def libraries(self, live=True):
         # Return a specific set of information about all libraries in production;
