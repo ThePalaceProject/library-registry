@@ -1,8 +1,8 @@
 from flask import (Response, render_template_string,
                    session, redirect, request, url_for, make_response)
 
-from flask_jwt_extended import (create_access_token, create_refresh_token,
-                                verify_jwt_in_request, get_jwt_identity, set_access_cookies, set_refresh_cookies, unset_jwt_cookies)
+from flask_jwt_extended import (create_access_token,
+                                verify_jwt_in_request, get_jwt_identity, set_access_cookies, unset_jwt_cookies)
 
 from sqlalchemy.orm import (defer, joinedload)
 from library_registry.admin.templates.templates import admin as admin_template
@@ -57,11 +57,9 @@ class AdminController(BaseController):
             session["username"] = username
             return redirect(url_for('admin.admin_view'))
         access_token = create_access_token(identity=username)
-        refresh_token = create_refresh_token(identity=username)
         response = make_response(
             redirect(url_for('admin.admin_view')), 302)
         set_access_cookies(response, access_token)
-        set_refresh_cookies(response, refresh_token)
         return response
 
     def log_out(self):

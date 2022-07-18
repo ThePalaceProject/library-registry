@@ -16,7 +16,7 @@ from werkzeug.datastructures import ImmutableMultiDict, MultiDict, ImmutableDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
-from flask_jwt_extended import decode_token, create_refresh_token, create_access_token
+from flask_jwt_extended import decode_token, create_access_token
 
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration
@@ -2012,20 +2012,15 @@ class TestAdminController:
             cookiejar = response.headers.getlist('Set-Cookie')
             access_token = [
                 cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
-            refresh_token = [
-                cookie for cookie in cookiejar if 'refresh_token_cookie' in cookie]
             assert len(access_token) > 0
-            assert len(refresh_token) > 0
             decoded_token = decode_token(access_token[0][20:-18])
             assert 'Admin' in decoded_token.get('sub')
 
     def test_refresh_token(self, app, mock_admin_controller):
         with app.test_request_context("/", method="GET"):
-            refresh_token = create_refresh_token(identity='Admin')
             access_token = create_access_token(
                 identity='Admin', expires_delta=timedelta(minutes=10))
             flask.request.headers = ImmutableDict({
-                'Authorization': 'Bearer %s' % refresh_token,
                 'Authorization': 'Bearer %s' % access_token
             })
             response = mock_admin_controller.libraries()
@@ -2065,6 +2060,5 @@ class TestAdminController:
                                                    access_token})
 
             response = mock_admin_controller.log_out()
-            print([x for x in response.headers])
             assert 'access_token_cookie=;' in response.headers.get(
                 'Set-Cookie')
