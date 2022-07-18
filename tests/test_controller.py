@@ -6,10 +6,12 @@ import random
 from contextlib import contextmanager
 from smtplib import SMTPException
 from urllib.parse import unquote
+from datetime import timedelta
+import requests
 
 import pytest       # noqa: F401
 import flask
-from flask import Response, session
+from flask import Response, session, url_for
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict, ImmutableDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
@@ -2004,40 +2006,30 @@ class TestAdminController:
     def test_log_in_with_token(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
-                [("username", "Admin"), ("password", "123")])
-            response = mock_admin_controller.log_in_with_token()
+                [("username", "Admin"), ("password", "123"), ('jwt', True)])
+            response = mock_admin_controller.log_in()
             assert response.status == "302 FOUND"
-
             cookiejar = response.headers.getlist('Set-Cookie')
             access_token = [
                 cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
-            assert access_token
-            assert [
+            refresh_token = [
                 cookie for cookie in cookiejar if 'refresh_token_cookie' in cookie]
+            assert len(access_token) > 0
+            assert len(refresh_token) > 0
             decoded_token = decode_token(access_token[0][20:-18])
             assert 'Admin' in decoded_token.get('sub')
 
-    def test_log_in_with_token_with_wrong_password(self, db_session, app, mock_admin_controller):
-        admin = Admin.authenticate(db_session, "Admin", "123")
-        with app.test_request_context("/", method="POST"):
-            flask.request.form = MultiDict([
-                ("username", "Admin"),
-                ("password", "wrong"),
-            ])
-            response = mock_admin_controller.log_in_with_token()
-            assert(isinstance(response, ProblemDetail))
-            assert response.status_code == 401
-            assert response.title == INVALID_CREDENTIALS.title
-            assert response.uri == INVALID_CREDENTIALS.uri
-            db_session.delete(admin)
-            db_session.commit()
-
     def test_refresh_token(self, app, mock_admin_controller):
-        with app.test_request_context("/", method="POST"):
+        with app.test_request_context("/", method="GET"):
             refresh_token = create_refresh_token(identity='Admin')
-            flask.request.headers = ImmutableDict({'Authorization': 'Bearer %s' %
-                                                   refresh_token})
-            response = mock_admin_controller.refresh_token()
+            access_token = create_access_token(
+                identity='Admin', expires_delta=timedelta(minutes=10))
+            flask.request.headers = ImmutableDict({
+                'Authorization': 'Bearer %s' % refresh_token,
+                'Authorization': 'Bearer %s' % access_token
+            })
+            response = mock_admin_controller.libraries()
+            print(response)
             cookiejar = response.headers.getlist('Set-Cookie')
             assert [
                 cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
@@ -2045,7 +2037,7 @@ class TestAdminController:
 
     def test_refresh_token_no_token_in_request(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):
-            response = mock_admin_controller.refresh_token()
+            response = mock_admin_controller.libraries()
             print(response.status_code)
             assert isinstance(response, ProblemDetail)
             assert response.status_code == 401
@@ -2068,11 +2060,11 @@ class TestAdminController:
     def test_log_out_with_token(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")
         with app.test_request_context("/"):
-            refresh_token = create_access_token(identity='Admin')
+            access_token = create_access_token(identity='Admin')
             flask.request.headers = ImmutableDict({'Authorization': 'Bearer %s' %
-                                                   refresh_token})
+                                                   access_token})
 
             response = mock_admin_controller.log_out()
-            assert 'Set-Cookie' in response.headers
+            print([x for x in response.headers])
             assert 'access_token_cookie=;' in response.headers.get(
                 'Set-Cookie')

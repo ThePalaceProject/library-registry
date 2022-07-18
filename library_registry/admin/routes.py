@@ -1,6 +1,7 @@
-from flask import Blueprint, current_app
+from datetime import datetime, timezone, timedelta
+from flask import Blueprint, current_app, make_response
 
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity, set_access_cookies
 
 from library_registry.admin.decorators import check_logged_in
 
@@ -12,6 +13,25 @@ from library_registry.decorators import (
 admin = Blueprint(
     'admin', __name__,
     template_folder='templates')
+
+# Using an `after_request` callback, we refresh any token that is within 30
+# minutes of expiring. Change the timedeltas to match the needs of your application.
+
+
+@admin.after_request
+def refresh_expiring_jwts(response):
+    try:
+        exp_timestamp = get_jwt()["exp"]
+        now = datetime.now(timezone.utc)
+        target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+        if target_timestamp > exp_timestamp:
+            access_token = create_access_token(identity=get_jwt_identity())
+            response = make_response(response, 201)
+            set_access_cookies(response, access_token)
+        return response
+    except (RuntimeError, KeyError):
+        # Case where there is not a valid JWT. Just return the original response
+        return response
 
 
 @admin.route('/admin/', strict_slashes=False)
@@ -25,21 +45,6 @@ def log_in():
     return current_app.library_registry.admin_controller.log_in()
 
 
-@admin.route('/admin/log_in_w_token', methods=['POST'])
-@returns_problem_detail
-def log_in_w_token():
-    return current_app.library_registry.admin_controller.log_in_w_token()
-
-
-# We are using the `refresh=True` options in jwt_required to only allow
-# refresh tokens to access this route.
-@admin.route('/admin/refresh_token', methods=['POST'])
-@returns_problem_detail
-@jwt_required(refresh=True)
-def refresh_token():
-    return current_app.library_registry.admin_controller.refresh_token()
-
-
 @admin.route('/admin/log_out')
 @check_logged_in
 @returns_problem_detail
@@ -49,6 +54,7 @@ def log_out():
 
 
 @admin.route('/admin/libraries')
+@jwt_required(optional=True)
 @check_logged_in
 @returns_json_or_response_or_problem_detail
 def libraries():
