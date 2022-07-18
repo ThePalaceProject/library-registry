@@ -2060,5 +2060,6 @@ class TestAdminController:
                                                    access_token})
 
             response = mock_admin_controller.log_out()
+            # Assert access token cookie has bee revoked
             assert 'access_token_cookie=;' in response.headers.get(
                 'Set-Cookie')
