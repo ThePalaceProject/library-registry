@@ -1,17 +1,14 @@
 import base64
 import datetime
-from http import cookiejar
 import json
 import random
 from contextlib import contextmanager
 from smtplib import SMTPException
 from urllib.parse import unquote
-from datetime import timedelta
-import requests
 
 import pytest       # noqa: F401
 import flask
-from flask import Response, session, url_for
+from flask import Response, session
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict, ImmutableDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
@@ -2030,8 +2027,7 @@ class TestAdminController:
         db_session.delete(admin)
         db_session.commit()
 
-    def test_log_out_with_token(self, db_session, app, mock_admin_controller):
-        admin = Admin.authenticate(db_session, "Admin", "123")
+    def test_log_out_with_token(self, app, mock_admin_controller):
         with app.test_request_context("/"):
             access_token = create_access_token(identity='Admin')
             flask.request.headers = ImmutableDict({'Authorization': 'Bearer %s' %
