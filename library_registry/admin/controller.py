@@ -26,7 +26,10 @@ from library_registry.model import (
 
 class ViewController(BaseController):
     def __call__(self):
-        username = session.get('username', '')
+        if verify_jwt_in_request(optional=True):
+            username = get_jwt_identity()
+        else:
+            username = session.get('username', '')
         response = Response(render_template_string(
             admin_template,
             username=username
