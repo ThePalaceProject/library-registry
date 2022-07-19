@@ -349,7 +349,5 @@ class TestDecorators:
                     identity='Admin', expires_delta=timedelta(minutes=10))
                 response = client.get(
                     '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
-                cookiejar = response.headers.getlist('Set-Cookie')
-                print(cookiejar)
                 assert response.status == '201 CREATED'
                 assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL

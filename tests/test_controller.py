@@ -2024,7 +2024,6 @@ class TestAdminController:
                 'Authorization': 'Bearer %s' % access_token
             })
             response = mock_admin_controller.libraries()
-            print(response)
             cookiejar = response.headers.getlist('Set-Cookie')
             assert [
                 cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
@@ -2033,7 +2032,6 @@ class TestAdminController:
     def test_refresh_token_no_token_in_request(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):
             response = mock_admin_controller.libraries()
-            print(response.status_code)
             assert isinstance(response, ProblemDetail)
             assert response.status_code == 401
             assert response.title == INVALID_CREDENTIALS.title
