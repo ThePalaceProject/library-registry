@@ -2001,6 +2001,16 @@ class TestAdminController:
             assert session["username"] == "New"
 
     def test_log_in_with_token(self, app, mock_admin_controller):
+        """Test JWT token log in
+
+        Args:
+            app (FlaskApp): Flask testing environment
+            mock_admin_controller (AdminControllerClass): mocked controller for calls
+
+        GIVEN: jwt_preferred=True
+        WHEN: A request is sent to the log_in method
+        THEN: A cookie with the identity of the user will be returned
+        """
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
@@ -2028,6 +2038,16 @@ class TestAdminController:
         db_session.commit()
 
     def test_log_out_with_token(self, app, mock_admin_controller):
+        """Test JWT token log in
+
+        Args:
+            app (FlaskApp): Flask testing environment
+            mock_admin_controller (AdminControllerClass): mocked controller for calls
+
+        GIVEN: An authorized token in headers
+        WHEN: A call to the log_out method
+        THEN: The access token cookie will be unset
+        """
         with app.test_request_context("/"):
             access_token = create_access_token(identity='Admin')
             flask.request.headers = ImmutableDict({'Authorization': 'Bearer %s' %
