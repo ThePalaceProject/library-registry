@@ -5,6 +5,9 @@ from io import BytesIO
 import pytest
 from flask import Flask, Blueprint, g, jsonify, make_response
 from flask_sqlalchemy_session import current_session
+from flask_jwt_extended import create_access_token, JWTManager
+from flask_babel import Babel
+
 
 from library_registry.decorators import (
     compressible,
@@ -13,18 +16,27 @@ from library_registry.decorators import (
     returns_problem_detail,
     uses_location
 )
+
+from library_registry.admin.decorators import check_logged_in
 from library_registry.problem_details import LIBRARY_NOT_FOUND
 from library_registry.util.problem_detail import ProblemDetail
 from library_registry.util.geo import Location
 
-PROBLEM_DETAIL_FOR_TEST = ProblemDetail("http://localhost/", 400, "A problem happened.")
+PROBLEM_DETAIL_FOR_TEST = ProblemDetail(
+    "http://localhost/", 400, "A problem happened.")
 RESPONSE_JSON = {"alpha": "apple", "bravo": "banana"}
 RESPONSE_OBJ_VAL = "This is a Response object."
 
 
 @pytest.fixture
 def app():
-    return Flask(__name__)
+    app = Flask(__name__)
+    babel = Babel()
+    babel.init_app(app)
+    app.config['JWT_SECRET_KEY'] = 'testing'
+    jwt = JWTManager(app)
+    app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
+    return(app)
 
 
 @pytest.fixture
@@ -82,6 +94,12 @@ def app_with_decorated_routes(app):
         response.headers["Content-Encoding"] = "some_encoding"
         return response
 
+    @test_blueprint.route('/check_logged_in')
+    @check_logged_in
+    def returns_logged_in_response():
+        response = make_response(RESPONSE_OBJ_VAL)
+        return response
+
     app.register_blueprint(test_blueprint)
     yield app
     del app
@@ -106,7 +124,8 @@ class TestDecorators:
         THEN:  A geometry string derived from the requesting IP should be placed in g.location
         """
         with app_with_decorated_routes.test_client() as client:
-            client.get("/test/uses_location", headers={"X-Forwarded-For": "1.1.1.1"})
+            client.get("/test/uses_location",
+                       headers={"X-Forwarded-For": "1.1.1.1"})
             assert isinstance(g.location, Location)
             assert g.location.ewkt == 'SRID=4326;POINT(145.1833 -37.7)'
 
@@ -232,7 +251,8 @@ class TestDecorators:
         expected = buffer.getvalue()
 
         with app_with_decorated_routes.test_client() as client:
-            response = client.get("/test/compressible", headers={'Accept-Encoding': 'gzip'})
+            response = client.get("/test/compressible",
+                                  headers={'Accept-Encoding': 'gzip'})
             assert response.headers['Content-Encoding'] == 'gzip'
             assert response.headers['Vary'] == 'Accept-Encoding'
             assert int(response.headers['Content-Length']) == len(expected)
@@ -245,7 +265,8 @@ class TestDecorators:
         THEN:  The response should not be compressed
         """
         with app_with_decorated_routes.test_client() as client:
-            response = client.get("/test/compressible_4xx", headers={'Accept-Encoding': 'gzip'})
+            response = client.get("/test/compressible_4xx",
+                                  headers={'Accept-Encoding': 'gzip'})
             assert response.status_code == 400
             assert 'Content-Encoding' not in response.headers.keys()
             assert 'Vary' not in response.headers.keys()
@@ -257,6 +278,43 @@ class TestDecorators:
         THEN:  The response should not be compressed
         """
         with app_with_decorated_routes.test_client() as client:
-            response = client.get("/test/compressible_already_encoded", headers={'Accept-Encoding': 'gzip'})
+            response = client.get(
+                "/test/compressible_already_encoded", headers={'Accept-Encoding': 'gzip'})
             assert 199 < response.status_code < 300
             assert 'Vary' not in response.headers.keys()
+
+    def test_check_logged_in_with_jwt(self, app_with_decorated_routes):
+        """Test check logged in decorator with JWT token
+
+        Args:
+            app_with_decorated_routes (FlaskApp): Flask test enivironment.
+
+        GIVEN:  A valid JWT token in header
+        WHEN:   The view function  wrapped by @check_logged_in is called
+        THEN:   The response should be received
+        """
+        with app_with_decorated_routes.app_context():
+            with app_with_decorated_routes.test_client() as client:
+                access_token = create_access_token(identity='Admin')
+                response = client.get(
+                    '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
+                print(response)
+                assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
+
+    def test_check_logged_in_no_header(self, app_with_decorated_routes):
+        """Test check logged in decorator with JWT token
+
+        Args:
+            app_with_decorated_routes (FlaskApp): Flask test enivironment.
+
+        GIVEN:  A valid JWT token in header
+        WHEN:   The view function  wrapped by @check_logged_in is called
+        THEN:   The response should be received
+        """
+        with app_with_decorated_routes.app_context():
+            with app_with_decorated_routes.test_client() as client:
+                access_token = create_access_token(identity='Admin')
+                response = client.get(
+                    '/test/check_logged_in')
+                print(response)
+                assert response.status == '401 UNAUTHORIZED'

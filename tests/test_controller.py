@@ -2006,8 +2006,8 @@ class TestAdminController:
     def test_log_in_with_token(self, app, mock_admin_controller):
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
-                [("username", "Admin"), ("password", "123"), ('jwt', True)])
-            response = mock_admin_controller.log_in()
+                [("username", "Admin"), ("password", "123")])
+            response = mock_admin_controller.log_in(jwt_preferred=True)
             assert response.status == "302 FOUND"
             cookiejar = response.headers.getlist('Set-Cookie')
             access_token = [

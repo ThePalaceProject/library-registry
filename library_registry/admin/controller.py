@@ -346,5 +346,5 @@ class ValidationController(BaseController):
         validation.mark_as_successful()
 
         resource = validation.resource
-        message = _("You successfully confirmed %s.") % resource.href
+        message = ("You successfully confirmed %s.") % resource.href
         return self.html_response(200, message)
