@@ -2,6 +2,7 @@ import gzip
 import uuid
 from io import BytesIO
 from datetime import datetime, timedelta, timezone
+import time
 
 import pytest
 from flask import Flask, Blueprint, g, jsonify, make_response
@@ -341,7 +342,7 @@ class TestDecorators:
 
         GIVEN:  A no valid JWT token in header
         WHEN:   The view function  wrapped by @check_logged_in is called
-        THEN:   The a 401 UNAUTHORIZED response should be received
+        THEN:   The a RESPONSE_OBJ_VAL response should be received
         """
         with app_with_decorated_routes.app_context():
             with app_with_decorated_routes.test_client() as client:
@@ -351,3 +352,22 @@ class TestDecorators:
                     '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
                 assert response.status == '201 CREATED'
                 assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
+
+    def test_expired_jwt_token_access(self, app_with_decorated_routes):
+        """Test check logged in decorator without JWT token 
+
+        Args:
+            app_with_decorated_routes (FlaskApp): Flask test enivironment.
+
+        GIVEN:  A no valid JWT token in header
+        WHEN:   The view function  wrapped by @check_logged_in is called
+        THEN:   The a 401 UNAUTHORIZED response should be received
+        """
+        with app_with_decorated_routes.app_context():
+            with app_with_decorated_routes.test_client() as client:
+                access_token = create_access_token(
+                    identity='Admin', expires_delta=timedelta(seconds=1))
+                time.sleep(2)
+                response = client.get(
+                    '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
+                assert response.status == '401 UNAUTHORIZED'
