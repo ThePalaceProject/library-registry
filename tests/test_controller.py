@@ -2016,26 +2016,6 @@ class TestAdminController:
             decoded_token = decode_token(access_token[0][20:-18])
             assert 'Admin' in decoded_token.get('sub')
 
-    def test_refresh_token(self, app, mock_admin_controller):
-        with app.test_request_context("/", method="GET"):
-            access_token = create_access_token(
-                identity='Admin', expires_delta=timedelta(minutes=10))
-            flask.request.headers = ImmutableDict({
-                'Authorization': 'Bearer %s' % access_token
-            })
-            response = mock_admin_controller.libraries()
-            cookiejar = response.headers.getlist('Set-Cookie')
-            assert [
-                cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
-            assert response.status == '201 CREATED'
-
-    def test_refresh_token_no_token_in_request(self, app, mock_admin_controller):
-        with app.test_request_context("/", method="POST"):
-            response = mock_admin_controller.libraries()
-            assert isinstance(response, ProblemDetail)
-            assert response.status_code == 401
-            assert response.title == INVALID_CREDENTIALS.title
-
     def test_log_out(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")
         with app.test_request_context("/"):
