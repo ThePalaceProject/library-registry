@@ -1,11 +1,13 @@
 import gzip
 import uuid
 from io import BytesIO
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from flask import Flask, Blueprint, g, jsonify, make_response
 from flask_sqlalchemy_session import current_session
-from flask_jwt_extended import create_access_token, JWTManager
+from flask_jwt_extended import (
+    create_access_token, JWTManager, get_jwt, set_access_cookies, get_jwt_identity)
 from flask_babel import Babel
 
 
@@ -99,6 +101,21 @@ def app_with_decorated_routes(app):
     def returns_logged_in_response():
         response = make_response(RESPONSE_OBJ_VAL)
         return response
+
+    @test_blueprint.after_request
+    def refresh_expiring_jwts(response):
+        try:
+            exp_timestamp = get_jwt()["exp"]
+            now = datetime.now(timezone.utc)
+            target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+            if target_timestamp > exp_timestamp:
+                access_token = create_access_token(identity=get_jwt_identity())
+                response = make_response(response, 201)
+                set_access_cookies(response, access_token)
+            return response
+        except (RuntimeError, KeyError):
+            # Case where there is not a valid JWT. Just return the original response
+            return response
 
     app.register_blueprint(test_blueprint)
     yield app
@@ -291,30 +308,48 @@ class TestDecorators:
 
         GIVEN:  A valid JWT token in header
         WHEN:   The view function  wrapped by @check_logged_in is called
-        THEN:   The response should be received
+        THEN:   The RESPONSE_OBJ should be received
         """
         with app_with_decorated_routes.app_context():
             with app_with_decorated_routes.test_client() as client:
                 access_token = create_access_token(identity='Admin')
                 response = client.get(
                     '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
-                print(response)
                 assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
 
-    def test_check_logged_in_no_header(self, app_with_decorated_routes):
-        """Test check logged in decorator with JWT token
+    def test_check_logged_in_no_jwt_token(self, app_with_decorated_routes):
+        """Test check logged in decorator without JWT token 
 
         Args:
             app_with_decorated_routes (FlaskApp): Flask test enivironment.
 
-        GIVEN:  A valid JWT token in header
+        GIVEN:  A no valid JWT token in header
         WHEN:   The view function  wrapped by @check_logged_in is called
-        THEN:   The response should be received
+        THEN:   The a 401 UNAUTHORIZED response should be received
         """
         with app_with_decorated_routes.app_context():
             with app_with_decorated_routes.test_client() as client:
-                access_token = create_access_token(identity='Admin')
                 response = client.get(
                     '/test/check_logged_in')
-                print(response)
                 assert response.status == '401 UNAUTHORIZED'
+
+    def test_after_request_jwt_token_refresh(self, app_with_decorated_routes):
+        """Test check logged in decorator without JWT token 
+
+        Args:
+            app_with_decorated_routes (FlaskApp): Flask test enivironment.
+
+        GIVEN:  A no valid JWT token in header
+        WHEN:   The view function  wrapped by @check_logged_in is called
+        THEN:   The a 401 UNAUTHORIZED response should be received
+        """
+        with app_with_decorated_routes.app_context():
+            with app_with_decorated_routes.test_client() as client:
+                access_token = create_access_token(
+                    identity='Admin', expires_delta=timedelta(minutes=10))
+                response = client.get(
+                    '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
+                cookiejar = response.headers.getlist('Set-Cookie')
+                print(cookiejar)
+                assert response.status == '201 CREATED'
+                assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
