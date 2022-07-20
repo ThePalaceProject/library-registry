@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from flask import Blueprint, current_app, make_response
 
-from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity, set_access_cookies
+from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity, set_access_cookies, verify_jwt_in_request
 
 from library_registry.admin.decorators import check_logged_in
 
@@ -19,6 +19,8 @@ admin = Blueprint(
 # minutes of expiring. Change the timedeltas to match the needs of your application.
 @admin.after_request
 def refresh_expiring_jwts(response):
+    if not verify_jwt_in_request(optional=True, locations='cookies'):
+        return response
     try:
         exp_timestamp = get_jwt()["exp"]
         now = datetime.now(timezone.utc)

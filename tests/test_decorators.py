@@ -325,7 +325,7 @@ class TestDecorators:
                     '/test/check_logged_in')
                 assert response.status == '401 UNAUTHORIZED'
 
-    def test_after_request_jwt_token_refresh(self, app_with_decorated_routes):
+    def test_after_request_jwt_cookie_refresh(self, app_with_decorated_routes):
         """Test check logged in decorator without JWT token 
 
         Args:
@@ -339,12 +339,14 @@ class TestDecorators:
             with app_with_decorated_routes.test_client() as client:
                 access_token = create_access_token(
                     identity='Admin', expires_delta=timedelta(minutes=10))
+                client.set_cookie(
+                    'localhost', 'access_token_cookie', access_token)
                 response = client.get(
-                    '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
+                    '/test/check_logged_in')
                 assert response.status == '201 CREATED'
                 assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
 
-    def test_expired_jwt_token_access(self, app_with_decorated_routes):
+    def test_jwt_expired_auth_point_access(self, app_with_decorated_routes):
         """Test check logged in decorator without JWT token 
 
         Args:
@@ -362,3 +364,11 @@ class TestDecorators:
                 response = client.get(
                     '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
                 assert response.status == '401 UNAUTHORIZED'
+
+    def test_jwt_in_header_after_request(self, app_with_decorated_routes):
+        with app_with_decorated_routes.app_context():
+            with app_with_decorated_routes.test_client() as client:
+                access_token = create_access_token(identity='Admin')
+                response = client.get(
+                    '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
+                assert response.status == '200 OK'
