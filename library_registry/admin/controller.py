@@ -63,9 +63,9 @@ class AdminController(BaseController):
             return INVALID_CREDENTIALS
         if not jwt_cookie_boolean:
             session["username"] = username
-            return [], 200
+            return redirect(url_for('admin.admin_view'))
         access_token = create_access_token(identity=username)
-        response = make_response([], 200)
+        response = make_response(redirect(url_for('admin.admin_view')), 302)
         set_access_cookies(response, access_token)
         return response
 

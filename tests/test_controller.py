@@ -2014,7 +2014,7 @@ class TestAdminController:
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
-            response = mock_admin_controller.log_in(jwt_preferred=True)
+            response = mock_admin_controller.log_in(jwt_cookie_boolean=True)
             assert response.status == "302 FOUND"
             cookiejar = response.headers.getlist('Set-Cookie')
             access_token = [
