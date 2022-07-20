@@ -326,14 +326,14 @@ class TestDecorators:
                 assert response.status == '401 UNAUTHORIZED'
 
     def test_after_request_jwt_cookie_refresh(self, app_with_decorated_routes):
-        """Test check logged in decorator without JWT token 
+        """Test after_request decorator with JWT cookie 
 
         Args:
             app_with_decorated_routes (FlaskApp): Flask test enivironment.
 
-        GIVEN:  A no valid JWT token in header
+        GIVEN:  A JWT token in cookies
         WHEN:   The view function  wrapped by @check_logged_in is called
-        THEN:   The a RESPONSE_OBJ_VAL response should be received
+        THEN:   The a RESPONSE_OBJ_VAL response should be received and 201 CREATED code
         """
         with app_with_decorated_routes.app_context():
             with app_with_decorated_routes.test_client() as client:
@@ -347,12 +347,12 @@ class TestDecorators:
                 assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
 
     def test_jwt_expired_auth_point_access(self, app_with_decorated_routes):
-        """Test check logged in decorator without JWT token 
+        """Test check logged in decorator with expired JWT token 
 
         Args:
             app_with_decorated_routes (FlaskApp): Flask test enivironment.
 
-        GIVEN:  A no valid JWT token in header
+        GIVEN:  An expired JWT token in header
         WHEN:   The view function  wrapped by @check_logged_in is called
         THEN:   The a 401 UNAUTHORIZED response should be received
         """
@@ -365,10 +365,20 @@ class TestDecorators:
                     '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
                 assert response.status == '401 UNAUTHORIZED'
 
-    def test_jwt_in_header_after_request(self, app_with_decorated_routes):
+    def test_after_request_jwt_in_header_(self, app_with_decorated_routes):
+        """Test after_request decorator with JWT in header 
+
+        Args:
+            app_with_decorated_routes (FlaskApp): Flask test enivironment.
+
+        GIVEN:  A JWT token in header
+        WHEN:   The view function  wrapped by @check_logged_in is called
+        THEN:   The a RESPONSE_OBJ_VAL response should be received and 200 OK code
+        """
         with app_with_decorated_routes.app_context():
             with app_with_decorated_routes.test_client() as client:
                 access_token = create_access_token(identity='Admin')
                 response = client.get(
                     '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
                 assert response.status == '200 OK'
+                assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
