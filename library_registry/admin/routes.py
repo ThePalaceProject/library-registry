@@ -39,10 +39,10 @@ def admin_view():
 
 
 @admin.route('/admin/log_in', methods=["POST"])
-@admin.route('/admin/log_in/<jwt_preferred>')
+@admin.route('/admin/log_in/<jwt_boolean>')
 @returns_problem_detail
-def log_in(jwt_preferred=False):
-    return current_app.library_registry.admin_controller.log_in(jwt_preferred)
+def log_in(jwt_boolean=False):
+    return current_app.library_registry.admin_controller.log_in(jwt_boolean)
 
 
 @admin.route('/admin/log_out')
