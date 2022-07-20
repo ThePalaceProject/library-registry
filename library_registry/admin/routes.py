@@ -14,10 +14,9 @@ admin = Blueprint(
     'admin', __name__,
     template_folder='templates')
 
+
 # Using an `after_request` callback, we refresh any token that is within 30
 # minutes of expiring. Change the timedeltas to match the needs of your application.
-
-
 @admin.after_request
 def refresh_expiring_jwts(response):
     try:
