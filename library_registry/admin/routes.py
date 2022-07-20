@@ -49,7 +49,6 @@ def log_in(jwt_preferred=False):
 @admin.route('/admin/log_out')
 @check_logged_in
 @returns_problem_detail
-@jwt_required(optional=True)
 def log_out():
     return current_app.library_registry.admin_controller.log_out()
 
