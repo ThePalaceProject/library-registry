@@ -21,6 +21,8 @@ from library_registry.decorators import (
 )
 
 from library_registry.admin.decorators import check_logged_in
+from library_registry.admin.routes import refresh_expiring_jwts
+
 from library_registry.problem_details import LIBRARY_NOT_FOUND
 from library_registry.util.problem_detail import ProblemDetail
 from library_registry.util.geo import Location
@@ -104,19 +106,8 @@ def app_with_decorated_routes(app):
         return response
 
     @test_blueprint.after_request
-    def refresh_expiring_jwts(response):
-        try:
-            exp_timestamp = get_jwt()["exp"]
-            now = datetime.now(timezone.utc)
-            target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
-            if target_timestamp > exp_timestamp:
-                access_token = create_access_token(identity=get_jwt_identity())
-                response = make_response(response, 201)
-                set_access_cookies(response, access_token)
-            return response
-        except (RuntimeError, KeyError):
-            # Case where there is not a valid JWT. Just return the original response
-            return response
+    def after_request(response):
+        return refresh_expiring_jwts(response)
 
     app.register_blueprint(test_blueprint)
     yield app
