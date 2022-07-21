@@ -44,7 +44,7 @@ def log_in(jwt):
           description: Client Password
         - in: URL
           name: log_in_method
-          description: URL parameter string, any string will return JWT Token
+          description: URL parameter string, 'jwt' expected
           schema:
             type: string
       responses:
