@@ -1,5 +1,5 @@
 from flask import (Response, render_template_string,
-                   session, request, jsonify)
+                   session, request, jsonify, redirect, url_for)
 
 from flask_jwt_extended import (create_access_token,
                                 verify_jwt_in_request, get_jwt_identity, create_refresh_token)
@@ -63,7 +63,7 @@ class AdminController(BaseController):
             return INVALID_CREDENTIALS
         if not jwt_cookie_boolean:
             session["username"] = username
-            return Response(200)
+            return redirect(url_for('admin.admin_view'))
         access_token = create_access_token(identity=username)
         refresh_token = create_refresh_token(identity=username)
         return jsonify(access_token=access_token,
@@ -78,7 +78,7 @@ class AdminController(BaseController):
         """
         if not verify_jwt_in_request(optional=True):
             session["username"] = ""
-            return Response(200)
+            return redirect(url_for('admin.admin_view'))
 
     def refresh_token(self):
         """Refresh JWT access tokens
