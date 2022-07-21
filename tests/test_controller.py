@@ -2014,7 +2014,7 @@ class TestAdminController:
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
-            response = mock_admin_controller.log_in('header')
+            response = mock_admin_controller.log_in('jwt')
             print(response)
             print(response)
             assert response.status == "200 OK"

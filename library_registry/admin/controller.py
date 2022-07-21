@@ -61,7 +61,7 @@ class AdminController(BaseController):
         password = request.form.get("password")
         if not Admin.authenticate(self._db, username, password):
             return INVALID_CREDENTIALS
-        if not log_in_method:
+        if not log_in_method == 'jwt':
             session["username"] = username
             return redirect(url_for('admin.admin_view'))
         access_token = create_access_token(identity=username)
