@@ -79,9 +79,6 @@ class AdminController(BaseController):
         if not verify_jwt_in_request(optional=True):
             session["username"] = ""
             return Response(200)
-        response = Response(200)
-        unset_jwt_cookies(response)
-        return response
 
     def refresh_token(self):
         """Refresh JWT access tokens
