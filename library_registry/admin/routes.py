@@ -19,10 +19,10 @@ def admin_view():
     return current_app.library_registry.view_controller()
 
 
-@admin.route('/admin/log_in', methods=["POST"])
-@admin.route('/admin/log_in/<jwt_boolean>')
+@admin.route('/admin/log_in', methods=["POST"], defaults={'log_in_method': None})
+@admin.route('/admin/log_in/<log_in_method>', methods=["POST"])
 @returns_problem_detail
-def log_in(jwt_boolean=False):
+def log_in(log_in_method):
     """Log in method using Flask Session or JWT Tokens
     ---
     get:
@@ -67,7 +67,7 @@ def log_in(jwt_boolean=False):
             application/json:
               schema: ProblemResponse 
     """
-    return current_app.library_registry.admin_controller.log_in(jwt_boolean)
+    return current_app.library_registry.admin_controller.log_in(log_in_method)
 
 
 # We are using the `refresh=True` options in jwt_required to only allow

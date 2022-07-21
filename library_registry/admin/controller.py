@@ -49,7 +49,7 @@ class AdminController(BaseController):
         super(AdminController, self).__init__(app)
         self.emailer = emailer_class
 
-    def log_in(self, jwt_boolean=False):
+    def log_in(self, log_in_method):
         """End point for login with requesting flask sessions or JWT tokens
 
         Returns:
@@ -61,7 +61,7 @@ class AdminController(BaseController):
         password = request.form.get("password")
         if not Admin.authenticate(self._db, username, password):
             return INVALID_CREDENTIALS
-        if not jwt_boolean:
+        if not log_in_method:
             session["username"] = username
             return redirect(url_for('admin.admin_view'))
         access_token = create_access_token(identity=username)

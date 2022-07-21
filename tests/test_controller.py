@@ -1971,8 +1971,8 @@ class TestAdminController:
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
-            response = mock_admin_controller.log_in()
-            assert response.status == "200 OK"
+            response = mock_admin_controller.log_in(None)
+            assert response.status == "302 FOUND"
             assert session["username"] == "Admin"
 
     def test_log_in_with_error(self, db_session, app, mock_admin_controller):
@@ -1982,7 +1982,7 @@ class TestAdminController:
                 ("username", "Admin"),
                 ("password", "wrong"),
             ])
-            response = mock_admin_controller.log_in()
+            response = mock_admin_controller.log_in(None)
             assert(isinstance(response, ProblemDetail))
             assert response.status_code == 401
             assert response.title == INVALID_CREDENTIALS.title
@@ -1996,8 +1996,8 @@ class TestAdminController:
                 ("username", "New"),
                 ("password", "password")
             ])
-            response = mock_admin_controller.log_in()
-            assert response.status == "200 OK"
+            response = mock_admin_controller.log_in(None)
+            assert response.status == "302 FOUND"
             assert session["username"] == "New"
 
     def test_log_in_with_token(self, app, mock_admin_controller):
@@ -2014,7 +2014,7 @@ class TestAdminController:
         with app.test_request_context("/", method="POST"):
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
-            response = mock_admin_controller.log_in(jwt_cookie_boolean=True)
+            response = mock_admin_controller.log_in('header')
             print(response)
             print(response)
             assert response.status == "200 OK"
@@ -2026,12 +2026,12 @@ class TestAdminController:
         with app.test_request_context("/"):
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
-            mock_admin_controller.log_in()
+            mock_admin_controller.log_in(None)
 
             assert session["username"] == "Admin"
             response = mock_admin_controller.log_out()
             assert session["username"] == ""
-            assert response.status == "200 OK"
+            assert response.status == "302 FOUND"
         db_session.delete(admin)
         db_session.commit()
 

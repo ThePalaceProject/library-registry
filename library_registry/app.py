@@ -49,6 +49,7 @@ def create_app(testing=False, db_session_obj=None):
     app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
     app.config['JWT_COOKIE_CSRF_PROTECT'] = True
     app.config['JWT_CSRF_CHECK_FORM'] = True
+    app.config['SECRET_KEY'] = Configuration.SECRET_KEY
     jwt = JWTManager(app)
 
     # =============Flask JWT Config End=====================
