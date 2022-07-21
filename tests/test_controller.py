@@ -13,7 +13,7 @@ from werkzeug.datastructures import ImmutableMultiDict, MultiDict, ImmutableDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
-from flask_jwt_extended import decode_token, create_access_token
+from flask_jwt_extended import decode_token, create_access_token, create_refresh_token
 
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration
@@ -2036,7 +2036,7 @@ class TestAdminController:
         db_session.commit()
 
     def test_log_out_with_token(self, app, mock_admin_controller):
-        """Test JWT token log in
+        """Test JWT token log out
 
         Args:
             app (FlaskApp): Flask testing environment
@@ -2055,3 +2055,23 @@ class TestAdminController:
             # Assert access token cookie has bee revoked
             assert 'access_token_cookie=;' in response.headers.get(
                 'Set-Cookie')
+
+    def test_refresh_token(self, app, mock_admin_controller):
+        """Test JWT token refresh
+
+        Args:
+            app (FlaskApp): Flask testing environment
+            mock_admin_controller (AdminControllerClass): mocked controller for calls
+
+        GIVEN: An authorized refresh token in headers
+        WHEN: A call to the refresh method
+        THEN: A new access token will be sent
+        """
+        with app.test_request_context("/"):
+            refresh_token = create_refresh_token(identity='Admin')
+            flask.request.headers = ImmutableDict({'Authorization': 'Bearer %s' %
+                                                   refresh_token})
+
+            response = mock_admin_controller.refresh_token()
+            # Assert new token
+            assert b'access_token' in response.data
