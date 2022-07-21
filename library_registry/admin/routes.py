@@ -59,6 +59,13 @@ def log_in(jwt_cookie_boolean=False):
           content:
             application/json:
               schema: ProblemResponse 
+        5XX:
+          description: |
+            An error including:
+            * `INTERNAL_SERVER_ERROR`: Internal server error
+          content:
+            application/json:
+              schema: ProblemResponse 
     """
     return current_app.library_registry.admin_controller.log_in(jwt_cookie_boolean)
 
@@ -93,6 +100,13 @@ def refresh_token():
           content:
             application/json:
               schema: ProblemResponse
+        5XX:
+          description: |
+            An error including:
+            * `INTERNAL_SERVER_ERROR`: Internal server error
+          content:
+            application/json:
+              schema: ProblemResponse 
     """
     return current_app.library_registry.admin_controller.refresh_token()
 

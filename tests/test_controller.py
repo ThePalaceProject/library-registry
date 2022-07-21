@@ -2031,30 +2031,9 @@ class TestAdminController:
             assert session["username"] == "Admin"
             response = mock_admin_controller.log_out()
             assert session["username"] == ""
-            assert response.status == "302 FOUND"
+            assert response.status == "200 OK"
         db_session.delete(admin)
         db_session.commit()
-
-    def test_log_out_with_token(self, app, mock_admin_controller):
-        """Test JWT token log out
-
-        Args:
-            app (FlaskApp): Flask testing environment
-            mock_admin_controller (AdminControllerClass): mocked controller for calls
-
-        GIVEN: An authorized token in headers
-        WHEN: A call to the log_out method
-        THEN: The access token cookie will be unset
-        """
-        with app.test_request_context("/"):
-            access_token = create_access_token(identity='Admin')
-            flask.request.headers = ImmutableDict({'Authorization': 'Bearer %s' %
-                                                   access_token})
-
-            response = mock_admin_controller.log_out()
-            # Assert access token cookie has bee revoked
-            assert 'access_token_cookie=;' in response.headers.get(
-                'Set-Cookie')
 
     def test_refresh_token(self, app, mock_admin_controller):
         """Test JWT token refresh
