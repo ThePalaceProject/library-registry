@@ -1,8 +1,8 @@
 from flask import (Response, render_template_string,
-                   session, redirect, request, url_for, make_response)
+                   session, redirect, request, url_for, make_response, jsonify)
 
 from flask_jwt_extended import (create_access_token,
-                                verify_jwt_in_request, get_jwt_identity, set_access_cookies, unset_jwt_cookies)
+                                verify_jwt_in_request, get_jwt_identity, unset_jwt_cookies, create_refresh_token)
 
 from sqlalchemy.orm import (defer, joinedload)
 from library_registry.admin.templates.templates import admin as admin_template
@@ -63,11 +63,11 @@ class AdminController(BaseController):
             return INVALID_CREDENTIALS
         if not jwt_cookie_boolean:
             session["username"] = username
-            return redirect(url_for('admin.admin_view'))
+            return Response(200)
         access_token = create_access_token(identity=username)
-        response = make_response(redirect(url_for('admin.admin_view')), 302)
-        set_access_cookies(response, access_token)
-        return response
+        refresh_token = create_refresh_token(identity=username)
+        return jsonify(access_token=access_token,
+                       refresh_token=refresh_token)
 
     def log_out(self):
         """End point for both Flask Session logout and Flask JWT Logout

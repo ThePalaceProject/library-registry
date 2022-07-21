@@ -1972,7 +1972,7 @@ class TestAdminController:
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
             response = mock_admin_controller.log_in()
-            assert response.status == "302 FOUND"
+            assert response.status == "200 OK"
             assert session["username"] == "Admin"
 
     def test_log_in_with_error(self, db_session, app, mock_admin_controller):
@@ -1997,7 +1997,7 @@ class TestAdminController:
                 ("password", "password")
             ])
             response = mock_admin_controller.log_in()
-            assert response.status == "302 FOUND"
+            assert response.status == "200 OK"
             assert session["username"] == "New"
 
     def test_log_in_with_token(self, app, mock_admin_controller):
@@ -2015,13 +2015,11 @@ class TestAdminController:
             flask.request.form = MultiDict(
                 [("username", "Admin"), ("password", "123")])
             response = mock_admin_controller.log_in(jwt_cookie_boolean=True)
-            assert response.status == "302 FOUND"
-            cookiejar = response.headers.getlist('Set-Cookie')
-            access_token = [
-                cookie for cookie in cookiejar if 'access_token_cookie' in cookie]
-            assert len(access_token) > 0
-            decoded_token = decode_token(access_token[0][20:-18])
-            assert 'Admin' in decoded_token.get('sub')
+            print(response)
+            print(response)
+            assert response.status == "200 OK"
+            assert b'access_token' in response.data
+            assert b'refresh_token' in response.data
 
     def test_log_out(self, db_session, app, mock_admin_controller):
         admin = Admin.authenticate(db_session, "Admin", "123")
