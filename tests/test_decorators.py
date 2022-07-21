@@ -8,7 +8,7 @@ import pytest
 from flask import Flask, Blueprint, g, jsonify, make_response
 from flask_sqlalchemy_session import current_session
 from flask_jwt_extended import (
-    create_access_token, JWTManager, get_jwt, set_access_cookies, get_jwt_identity)
+    create_access_token, JWTManager)
 from flask_babel import Babel
 
 
@@ -21,7 +21,6 @@ from library_registry.decorators import (
 )
 
 from library_registry.admin.decorators import check_logged_in
-from library_registry.admin.routes import refresh_expiring_jwts
 
 from library_registry.problem_details import LIBRARY_NOT_FOUND
 from library_registry.util.problem_detail import ProblemDetail
@@ -104,10 +103,6 @@ def app_with_decorated_routes(app):
     def returns_logged_in_response():
         response = make_response(RESPONSE_OBJ_VAL)
         return response
-
-    @test_blueprint.after_request
-    def after_request(response):
-        return refresh_expiring_jwts(response)
 
     app.register_blueprint(test_blueprint)
     yield app
@@ -325,27 +320,6 @@ class TestDecorators:
                     '/test/check_logged_in')
                 assert response.status == '401 UNAUTHORIZED'
 
-    def test_after_request_jwt_cookie_refresh(self, app_with_decorated_routes):
-        """Test after_request decorator with JWT cookie 
-
-        Args:
-            app_with_decorated_routes (FlaskApp): Flask test enivironment.
-
-        GIVEN:  A JWT token in cookies
-        WHEN:   The view function  wrapped by @check_logged_in is called
-        THEN:   The a RESPONSE_OBJ_VAL response should be received and 201 CREATED code
-        """
-        with app_with_decorated_routes.app_context():
-            with app_with_decorated_routes.test_client() as client:
-                access_token = create_access_token(
-                    identity='Admin', expires_delta=timedelta(minutes=10))
-                client.set_cookie(
-                    'localhost', 'access_token_cookie', access_token)
-                response = client.get(
-                    '/test/check_logged_in')
-                assert response.status == '201 CREATED'
-                assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL
-
     def test_jwt_expired_auth_point_access(self, app_with_decorated_routes):
         """Test check logged in decorator with expired JWT token 
 
@@ -364,21 +338,3 @@ class TestDecorators:
                 response = client.get(
                     '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
                 assert response.status == '401 UNAUTHORIZED'
-
-    def test_after_request_jwt_in_header_(self, app_with_decorated_routes):
-        """Test after_request decorator with JWT in header 
-
-        Args:
-            app_with_decorated_routes (FlaskApp): Flask test enivironment.
-
-        GIVEN:  A JWT token in header
-        WHEN:   The view function  wrapped by @check_logged_in is called
-        THEN:   The a RESPONSE_OBJ_VAL response should be received and 200 OK code
-        """
-        with app_with_decorated_routes.app_context():
-            with app_with_decorated_routes.test_client() as client:
-                access_token = create_access_token(identity='Admin')
-                response = client.get(
-                    '/test/check_logged_in', headers={'Authorization': 'Bearer %s' % access_token})
-                assert response.status == '200 OK'
-                assert response.data.decode('utf-8') == RESPONSE_OBJ_VAL

@@ -15,26 +15,6 @@ admin = Blueprint(
     template_folder='templates')
 
 
-# Using an `after_request` callback, we refresh any token that is within 30
-# minutes of expiring. Change the timedeltas to match the needs of your application.
-@admin.after_request
-def refresh_expiring_jwts(response):
-    if not verify_jwt_in_request(optional=True, locations='cookies'):
-        return response
-    try:
-        exp_timestamp = get_jwt()["exp"]
-        now = datetime.now(timezone.utc)
-        target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
-        if target_timestamp > exp_timestamp:
-            access_token = create_access_token(identity=get_jwt_identity())
-            response = make_response(response, 201)
-            set_access_cookies(response, access_token)
-        return response
-    except (RuntimeError, KeyError):
-        # Case where there is not a valid JWT. Just return the original response
-        return response
-
-
 @admin.route('/admin/', strict_slashes=False)
 def admin_view():
     return current_app.library_registry.view_controller()
