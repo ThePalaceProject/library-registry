@@ -25,7 +25,7 @@ def admin_view():
 def log_in(log_in_method):
     """Log in method using Flask Session or JWT Tokens
     ---
-    get:
+    post:
       tags:
         - authentication
       summary: Return Flask session or JWT Token if JWT boolean sent
@@ -43,10 +43,10 @@ def log_in(log_in_method):
             type: string
           description: Client Password
         - in: URL
-          name: jwt_cookie_boolean
-          description: Boolean to verify if client app is requesting JWT Token authorization
+          name: log_in_method
+          description: URL parameter string, any string will return JWT Token
           schema:
-            type: boolean
+            type: string
       responses:
         200:
             description: Successful authentication (Flask session)
@@ -77,7 +77,7 @@ def log_in(log_in_method):
 def refresh_token():
     """Refresh JWT access token method
     ---
-    get:
+    post:
       tags:
         - authentication
       summary: Return new JWT Access Token

@@ -46,7 +46,7 @@ def create_app(testing=False, db_session_obj=None):
     # =============Flask JWT Config Begin===================
 
     # Options for JWT Token Locations ["headers", "cookies", "json", "query_string"]
-    app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
+    app.config['JWT_TOKEN_LOCATION'] = ['headers']
     app.config['JWT_COOKIE_CSRF_PROTECT'] = True
     app.config['JWT_CSRF_CHECK_FORM'] = True
     app.config['SECRET_KEY'] = Configuration.SECRET_KEY
