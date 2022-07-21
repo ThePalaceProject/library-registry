@@ -24,6 +24,43 @@ def admin_view():
 @admin.route('/admin/log_in/<jwt_cookie_boolean>')
 @returns_problem_detail
 def log_in(jwt_cookie_boolean=False):
+    """Log in method using Flask Session or JWT Tokens
+    ---
+    get:
+      tags:
+        - authentication
+      summary: Return Flask session or JWT Token if JWT boolean sent
+      description: |
+        Authenticates a user usind the Admin Controller
+      parameters:
+        - in: form
+          name: username
+          schema:
+            type: string
+          description: Client Username
+        - in: form
+          name: password
+          schema:
+            type: string
+          description: Client Password
+        - in: URL
+          name: jwt_cookie_boolean
+          description: Boolean to verify if client app is requesting JWT Token authorization
+          schema:
+            type: boolean
+      responses:
+        200:
+            description: Successful authentication (Flask session)
+        200:
+            description: Returns JWT auth and refresh tokens
+        4XX:
+          description: |
+            An error including:
+            * `INVALID_CREDENTIALS`: Invalid username or password
+          content:
+            application/json:
+              schema: ProblemResponse 
+    """
     return current_app.library_registry.admin_controller.log_in(jwt_cookie_boolean)
 
 
@@ -31,7 +68,33 @@ def log_in(jwt_cookie_boolean=False):
 # refresh tokens to access this route.
 @admin.route("/admin/refresh_token", methods=["POST"])
 @jwt_required(refresh=True)
-def refresh():
+def refresh_token():
+    """Refresh JWT access token method
+    ---
+    get:
+      tags:
+        - authentication
+      summary: Return new JWT Access Token
+      description: |
+        Returns new JWT access token if there is a valid JWT Refresh Token in the request
+      parameters:
+        - in: request
+          name: jwt_refresh_token
+          schema:
+            type: jwt_token
+          description: A valid JWT refresh token
+
+      responses:
+        200:
+            description: Returns new JWT access token
+        4XX:
+          description: |
+            An error including:
+            * `INVALID_CREDENTIALS`: Invalid username or password
+          content:
+            application/json:
+              schema: ProblemResponse
+    """
     return current_app.library_registry.admin_controller.refresh_token()
 
 
