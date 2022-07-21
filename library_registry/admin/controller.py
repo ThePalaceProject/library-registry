@@ -78,12 +78,20 @@ class AdminController(BaseController):
         """
         if not verify_jwt_in_request(optional=True):
             session["username"] = ""
-            return redirect(url_for('admin.admin_view'))
-        response = make_response(redirect(url_for('admin.admin_view')))
+            return Response(200)
+        response = Response(200)
         unset_jwt_cookies(response)
         return response
 
     def refresh_token(self):
+        """Refresh JWT access tokens
+
+        Expects JWT Refresh Token in request
+
+        Returns:
+            JWT: New JWT access token
+            Err: Invalid Credentials response
+        """
         if not verify_jwt_in_request(optional=True, refresh=True):
             return INVALID_CREDENTIALS
         identity = get_jwt_identity()
