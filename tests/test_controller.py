@@ -13,7 +13,7 @@ from werkzeug.datastructures import ImmutableMultiDict, MultiDict, ImmutableDict
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 
-from flask_jwt_extended import decode_token, create_access_token, create_refresh_token
+from flask_jwt_extended import create_access_token, create_refresh_token
 
 from library_registry.authentication_document import AuthenticationDocument
 from library_registry.config import Configuration

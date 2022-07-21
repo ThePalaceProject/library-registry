@@ -1,8 +1,8 @@
 from flask import (Response, render_template_string,
-                   session, redirect, request, url_for, make_response, jsonify)
+                   session, request, jsonify)
 
 from flask_jwt_extended import (create_access_token,
-                                verify_jwt_in_request, get_jwt_identity, unset_jwt_cookies, create_refresh_token)
+                                verify_jwt_in_request, get_jwt_identity, create_refresh_token)
 
 from sqlalchemy.orm import (defer, joinedload)
 from library_registry.admin.templates.templates import admin as admin_template

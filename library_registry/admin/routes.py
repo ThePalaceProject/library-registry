@@ -1,7 +1,6 @@
-from datetime import datetime, timezone, timedelta
-from flask import Blueprint, current_app, make_response, jsonify
+from flask import Blueprint, current_app
 
-from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity, set_access_cookies, verify_jwt_in_request
+from flask_jwt_extended import jwt_required
 
 from library_registry.admin.decorators import check_logged_in
 
