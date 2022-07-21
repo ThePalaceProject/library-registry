@@ -20,9 +20,9 @@ def admin_view():
 
 
 @admin.route('/admin/log_in', methods=["POST"])
-@admin.route('/admin/log_in/<jwt_cookie_boolean>')
+@admin.route('/admin/log_in/<jwt_boolean>')
 @returns_problem_detail
-def log_in(jwt_cookie_boolean=False):
+def log_in(jwt_boolean=False):
     """Log in method using Flask Session or JWT Tokens
     ---
     get:
@@ -67,7 +67,7 @@ def log_in(jwt_cookie_boolean=False):
             application/json:
               schema: ProblemResponse 
     """
-    return current_app.library_registry.admin_controller.log_in(jwt_cookie_boolean)
+    return current_app.library_registry.admin_controller.log_in(jwt_boolean)
 
 
 # We are using the `refresh=True` options in jwt_required to only allow
