@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from flask import Blueprint, current_app, make_response
+from flask import Blueprint, current_app, make_response, jsonify
 
 from flask_jwt_extended import jwt_required, get_jwt, create_access_token, get_jwt_identity, set_access_cookies, verify_jwt_in_request
 
@@ -25,6 +25,14 @@ def admin_view():
 @returns_problem_detail
 def log_in(jwt_cookie_boolean=False):
     return current_app.library_registry.admin_controller.log_in(jwt_cookie_boolean)
+
+
+# We are using the `refresh=True` options in jwt_required to only allow
+# refresh tokens to access this route.
+@admin.route("/admin/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh():
+    return current_app.library_registry.admin_controller.refresh()
 
 
 @admin.route('/admin/log_out')

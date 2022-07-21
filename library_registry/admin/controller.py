@@ -83,6 +83,13 @@ class AdminController(BaseController):
         unset_jwt_cookies(response)
         return response
 
+    def refresh(self):
+        if not verify_jwt_in_request(optional=True):
+            return INVALID_CREDENTIALS
+        identity = get_jwt_identity()
+        access_token = create_access_token(identity=identity)
+        return jsonify(access_token=access_token)
+
     def libraries(self, live=True):
         # Return a specific set of information about all libraries in production;
         # this generates the library list in the admin interface.
