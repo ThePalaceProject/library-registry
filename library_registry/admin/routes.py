@@ -19,7 +19,7 @@ def admin_view():
     return current_app.library_registry.view_controller()
 
 
-@admin.route('/admin/log_in', methods=["POST"], defaults={'log_in_method': None})
+@admin.route('/admin/log_in', methods=["POST"], defaults={'jwt': None})
 @admin.route('/admin/log_in/<jwt>', methods=["POST"])
 @returns_problem_detail
 def log_in(jwt):
