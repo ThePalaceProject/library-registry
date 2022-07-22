@@ -39,7 +39,7 @@ def app():
     babel.init_app(app)
     app.config['JWT_SECRET_KEY'] = 'testing'
     jwt = JWTManager(app)
-    app.config['JWT_TOKEN_LOCATION'] = ['cookies', 'headers']
+    app.config['JWT_TOKEN_LOCATION'] = ['headers']
     return(app)
 
 

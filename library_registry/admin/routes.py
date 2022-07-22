@@ -119,7 +119,6 @@ def log_out():
 
 
 @admin.route('/admin/libraries')
-@jwt_required(optional=True)
 @check_logged_in
 @returns_json_or_response_or_problem_detail
 def libraries():
