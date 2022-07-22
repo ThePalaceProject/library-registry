@@ -1,4 +1,9 @@
-from flask import (Response, render_template_string, session, redirect, request, url_for)
+from flask import (Response, render_template_string,
+                   session, request, jsonify, redirect, url_for)
+
+from flask_jwt_extended import (create_access_token,
+                                verify_jwt_in_request, get_jwt_identity, create_refresh_token)
+
 from sqlalchemy.orm import (defer, joinedload)
 from library_registry.admin.templates.templates import admin as admin_template
 from library_registry.util.shared_controller import BaseController
@@ -18,33 +23,77 @@ from library_registry.model import (
     Validation,
 )
 
+
 class ViewController(BaseController):
     def __call__(self):
-        username = session.get('username', '')
+        """View controller for setting Flask Session or Flask JWT to verify user
+
+        Returns:
+            Response: rednered template string with user identity
+        """
+        if verify_jwt_in_request(optional=True):
+            username = get_jwt_identity()
+        else:
+            username = session.get('username', '')
+
         response = Response(render_template_string(
             admin_template,
             username=username
         ))
         return response
 
+
 class AdminController(BaseController):
 
     def __init__(self, app, emailer_class=Emailer):
         super(AdminController, self).__init__(app)
         self.emailer = emailer_class
-    
-    def log_in(self):
+
+    def log_in(self, log_in_method):
+        """End point for login with requesting flask sessions or JWT tokens
+
+        Returns:
+            err: Invalid credentials
+            flask session: flask session and redirect
+            jwt tokens: JWT tokens as Set-Cookie headers and redirect
+        """
         username = request.form.get("username")
         password = request.form.get("password")
-        if Admin.authenticate(self._db, username, password):
+        if not Admin.authenticate(self._db, username, password):
+            return INVALID_CREDENTIALS
+        if not log_in_method == 'jwt':
             session["username"] = username
             return redirect(url_for('admin.admin_view'))
-        else:
-            return INVALID_CREDENTIALS
+        access_token = create_access_token(identity=username)
+        refresh_token = create_refresh_token(identity=username)
+        return jsonify(access_token=access_token,
+                       refresh_token=refresh_token)
 
     def log_out(self):
-        session["username"] = ""
-        return redirect(url_for('admin.admin_view'))
+        """End point for both Flask Session logout and Flask JWT Logout
+
+        Returns:
+            Response: If JWT in request will send unset jwt cookie request in headers for the browser to remove and redirect
+            Response: No JWT in request will set the `session["username"] == ""` to end the flask session and redirect
+        """
+        if not verify_jwt_in_request(optional=True):
+            session["username"] = ""
+            return redirect(url_for('admin.admin_view'))
+
+    def refresh_token(self):
+        """Refresh JWT access tokens
+
+        Expects JWT Refresh Token in request
+
+        Returns:
+            JWT: New JWT access token
+            Err: Invalid Credentials response
+        """
+        if not verify_jwt_in_request(optional=True, refresh=True):
+            return INVALID_CREDENTIALS
+        identity = get_jwt_identity()
+        access_token = create_access_token(identity=identity)
+        return jsonify(access_token=access_token)
 
     def libraries(self, live=True):
         # Return a specific set of information about all libraries in production;
@@ -255,6 +304,7 @@ class AdminController(BaseController):
         library.pls_id.value = pls_id
         return Response(str(library.internal_urn), 200)
 
+
 class ValidationController(BaseController):
     """Validates Resources based on validation codes.
 
@@ -316,5 +366,5 @@ class ValidationController(BaseController):
         validation.mark_as_successful()
 
         resource = validation.resource
-        message = _("You successfully confirmed %s.") % resource.href
+        message = ("You successfully confirmed %s.") % resource.href
         return self.html_response(200, message)
