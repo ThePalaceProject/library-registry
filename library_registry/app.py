@@ -9,6 +9,7 @@ from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
 from flask_jwt_extended import JWTManager
+from flask_cors import CORS
 
 from .admin import admin
 from .drm import drm
@@ -37,11 +38,13 @@ db_url = Configuration.database_url(test=TESTING)
 def create_app(testing=False, db_session_obj=None):
 
     app = Flask(__name__)
+    CORS(app)
     app.register_blueprint(drm)
     app.register_blueprint(admin)
     app.register_blueprint(libr)
     app.register_blueprint(libr_list)
     babel.init_app(app)
+
 
     # =============Flask JWT Config Begin===================
 
