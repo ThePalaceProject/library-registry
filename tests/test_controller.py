@@ -1518,21 +1518,24 @@ class TestLibraryRegistryController(ControllerTest):
 
     def test_register_fails_on_missing_email_in_authentication_document(self):
 
-        for (rel, error) in (
+        for (rel, error, badlink) in (
             (
                 "http://librarysimplified.org/rel/designated-agent/copyright",
                 "Invalid or missing copyright designated agent email address",
+                "http://not-an-email/",
             ),
-            ("help", "Invalid or missing patron support email address"),
+            (
+                "help",
+                "Invalid or missing patron support email address or website",
+                "tcp://not-an-email-or-site/",
+            ),
         ):
             # Start with a valid document.
             auth_document = self._auth_document()
 
             # Remove the crucial link.
             auth_document["links"] = [
-                x
-                for x in auth_document["links"]
-                if x["rel"] != rel or not x["href"].startswith("mailto:")
+                x for x in auth_document["links"] if x["rel"] != rel
             ]
 
             def _request_fails():
@@ -1547,8 +1550,34 @@ class TestLibraryRegistryController(ControllerTest):
             _request_fails()
 
             # Now add the link back but as an http: link.
-            auth_document["links"].append(dict(rel=rel, href="http://not-an-email/"))
+            auth_document["links"].append(dict(rel=rel, href=badlink))
             _request_fails()
+
+    def test_registration_with_only_patron_support_site(self):
+        """Test the register() without a mailto: HELP rel but an http:// site"""
+        auth_document = self._auth_document()
+        auth_document["links"] = list(
+            filter(
+                lambda x: x["href"] != "mailto:help@library.org", auth_document["links"]
+            )
+        )
+
+        self.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document["id"]
+        )
+        self.queue_opds_success()
+        with self.app.test_request_context("/", method="POST"):
+            flask.request.form = self.registration_form
+            response = self.controller.register(do_get=self.http_client.do_get)
+
+        assert response.status_code == 201
+        for link in response.json["links"]:
+            if link.get("rel") == "help" and link["href"] == "http://help.library.org/":
+                break
+        else:
+            assert (
+                False
+            ), "Did not find the help link 'http://help.library.org/' in the response"
 
     def test_registration_fails_if_email_server_fails(self):
         """Even if everything looks good, registration can fail if
@@ -1586,7 +1615,7 @@ class TestLibraryRegistryController(ControllerTest):
         assert response.uri == INTEGRATION_ERROR.uri
         assert (
             response.detail
-            == "SMTP error while sending email to mailto:help@library.org"
+            == "SMTP error while sending email to mailto:dmca@library.org"
         )
 
     def test_registration_fails_if_email_server_unusable(self):
@@ -1735,7 +1764,9 @@ class TestLibraryRegistryController(ControllerTest):
             library.hyperlinks, key=lambda x: x.rel
         )
         assert help_link.rel == "help"
-        assert help_link.href == "mailto:help@library.org"
+        assert (
+            help_link.href == "http://help.library.org/"
+        )  # The first valid link is now the website
         assert copyright_agent_link.rel == Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL
         assert copyright_agent_link.href == "mailto:dmca@library.org"
         assert integration_contact_link.rel == Hyperlink.INTEGRATION_CONTACT_REL
@@ -1748,7 +1779,6 @@ class TestLibraryRegistryController(ControllerTest):
         destinations = [x[1] for x in sent]
         assert destinations == [
             "dmca@library.org",
-            "help@library.org",
             "me@library.org",
         ]
         self.controller.emailer.sent_out = []
