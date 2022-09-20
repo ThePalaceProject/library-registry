@@ -57,11 +57,15 @@ pytz = ">=2015.7"
 
 [[package]]
 name = "bcrypt"
-version = "4.0.0"
+version = "3.2.0"
 description = "Modern password hashing for your software and your servers"
 category = "main"
 optional = false
 python-versions = ">=3.6"
+
+[package.dependencies]
+cffi = ">=1.1"
+six = ">=1.4.1"
 
 [package.extras]
 tests = ["pytest (>=3.2.1,!=3.3.0)"]
@@ -90,6 +94,17 @@ description = "Python package for providing Mozilla's CA Bundle."
 category = "main"
 optional = false
 python-versions = ">=3.6"
+
+[[package]]
+name = "cffi"
+version = "1.15.1"
+description = "Foreign Function Interface for Python calling C code."
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+pycparser = "*"
 
 [[package]]
 name = "cfgv"
@@ -498,6 +513,14 @@ optional = false
 python-versions = ">=3.6"
 
 [[package]]
+name = "pycparser"
+version = "2.21"
+description = "C parser in Python"
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+
+[[package]]
 name = "pycryptodome"
 version = "3.15.0"
 description = "Cryptographic library for Python"
@@ -777,7 +800,7 @@ pg-binary = ["psycopg2-binary"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7,<4"
-content-hash = "f0183719bbd9bdcd224f01f96ab7a9478c1d8fd8a234b54ee3cadf527e6a1cb4"
+content-hash = "2ffeb3173b96c43be2a23a1b24f4158d0ed8b5bf1f80480422b38466d60a9d11"
 
 [metadata.files]
 atomicwrites = []
@@ -788,6 +811,7 @@ babel = []
 bcrypt = []
 botocore = []
 certifi = []
+cffi = []
 cfgv = []
 charset-normalizer = []
 click = []
@@ -824,6 +848,7 @@ psycopg2 = []
 psycopg2-binary = []
 py = []
 pycodestyle = []
+pycparser = []
 pycryptodome = []
 pyjwt = []
 pyparsing = []
