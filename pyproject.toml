@@ -42,7 +42,7 @@ uszipcode = "==0.2.6"
 
 [tool.poetry.dev-dependencies]
 pre-commit = "~2.16"
-pytest = "^6"
+pytest = "^7"
 pytest-datadir = "*"
 pytest-timeout = "*"
 
