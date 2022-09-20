@@ -18,7 +18,7 @@ repository = "https://github.com/ThePalaceProject/library-registry"
 version = "0" # Version number is managed with tags in git
 
 [tool.poetry.dependencies]
-aws-xray-sdk = "<2.9"
+aws-xray-sdk = "<2.11"
 bcrypt = "*"
 feedparser = "*"
 Flask = "*"
