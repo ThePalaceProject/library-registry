@@ -29,7 +29,6 @@ GeoAlchemy2 = "*"
 gunicorn = "*"
 loggly-python-handler = "*"
 lxml = "*"
-markupsafe = "2.0.1" # This is a transitive dependancy of flask that we need to pin. When we update flask we can drop this dependancy.
 maxminddb-geolite2 = "*"
 Pillow = "*"
 psycopg2 = { version = "*", optional = true }
