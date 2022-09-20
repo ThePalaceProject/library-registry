@@ -34,7 +34,7 @@ toml = "*"
 
 [[package]]
 name = "aws-xray-sdk"
-version = "2.8.0"
+version = "2.10.0"
 description = "The AWS X-Ray SDK for Python (the SDK) enables Python developers to record and emit information from within their applications to the AWS X-Ray service."
 category = "main"
 optional = false
@@ -42,7 +42,6 @@ python-versions = "*"
 
 [package.dependencies]
 botocore = ">=1.11.3"
-future = "*"
 wrapt = "*"
 
 [[package]]
@@ -225,14 +224,6 @@ Werkzeug = ">=0.6.1"
 
 [package.extras]
 docs = ["Sphinx (>=1.2.3)", "alabaster (>=0.6.3)"]
-
-[[package]]
-name = "future"
-version = "0.18.2"
-description = "Clean single-source support for Python 3 and 2"
-category = "main"
-optional = false
-python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [[package]]
 name = "GeoAlchemy2"
@@ -811,7 +802,7 @@ pg-binary = ["psycopg2-binary"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7,<4"
-content-hash = "533a445e0af7bd0181337ffea199618e099d3764d242735a6aa7031a4152d568"
+content-hash = "0b16111d3a3bc279951b13c972e5219700205d7065e7051186e35cee75f3552d"
 
 [metadata.files]
 atomicwrites = [
@@ -826,8 +817,8 @@ autopep8 = [
     {file = "autopep8-1.7.0.tar.gz", hash = "sha256:ca9b1a83e53a7fad65d731dc7a2a2d50aa48f43850407c59f6a1a306c4201142"},
 ]
 aws-xray-sdk = [
-    {file = "aws-xray-sdk-2.8.0.tar.gz", hash = "sha256:90c2fcc982a770e86d009a4c3d2b5c3e372da91cb8284d982bae458e2c0bb268"},
-    {file = "aws_xray_sdk-2.8.0-py2.py3-none-any.whl", hash = "sha256:487e44a2e0b2a5b994f7db5fad3a8115f1ea238249117a119bce8ca2750661bd"},
+    {file = "aws-xray-sdk-2.10.0.tar.gz", hash = "sha256:9b14924fd0628cf92936055864655354003f0b1acc3e1c3ffde6403d0799dd7a"},
+    {file = "aws_xray_sdk-2.10.0-py2.py3-none-any.whl", hash = "sha256:7551e81a796e1a5471ebe84844c40e8edf7c218db33506d046fec61f7495eda4"},
 ]
 Babel = [
     {file = "Babel-2.10.3-py3-none-any.whl", hash = "sha256:ff56f4892c1c4bf0d814575ea23471c230d544203c7748e8c68f0089478d48eb"},
@@ -897,9 +888,6 @@ Flask-Bcrypt = [
 ]
 Flask-SQLAlchemy-Session = [
     {file = "Flask-SQLAlchemy-Session-1.1.tar.gz", hash = "sha256:0fbc520d587c891c2a0d58aa7952bc37edd73660f10006ff4732a72aa16d8157"},
-]
-future = [
-    {file = "future-0.18.2.tar.gz", hash = "sha256:b1bead90b70cf6ec3f0710ae53a525360fa360d306a86583adc6bf83a4db537d"},
 ]
 GeoAlchemy2 = [
     {file = "GeoAlchemy2-0.11.1-py2.py3-none-any.whl", hash = "sha256:43ce38a5387c9b380b4c9d20d720c3d8cf1752ca4f5f18aa88041be11f6948a3"},
