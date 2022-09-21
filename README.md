@@ -274,8 +274,8 @@ If you wish to pass additional arguments to `pytest` you can do so through `tox`
 is `tests`, however you can override this. Every argument passed after a `--` to the `tox` command line will the passed
 to `pytest`, overriding the default.
 
-Only run the `test_app.py` tests with Python 3.6 using docker.
+Only run the `test_app.py` tests with Python 3.10 using docker.
 
 ```shell
-tox -e py36-docker -- tests/test_app.py
+tox -e py310-docker -- tests/test_app.py
 ```
