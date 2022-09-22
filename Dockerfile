@@ -49,8 +49,8 @@ ENV NGINX_VERSION 1.19.8
 ENV NJS_VERSION   0.5.2
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
-ENV POETRY_VERSION 1.1.8
-ENV POETRY_URL "https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py"
+ENV POETRY_VERSION 1.2.1
+ENV POETRY_URL "https://install.python-poetry.org"
 ENV POETRY_HOME "/etc/poetry"
 
 RUN set -x \
@@ -91,9 +91,12 @@ RUN set -x \
     && apk add --no-cache $runDeps \
     && apk del .gettext \
     && mv /tmp/envsubst /usr/local/bin/ \
+    && pip install --upgrade pip \
     && apk add --no-cache tzdata \
     && apk add --no-cache curl ca-certificates \
+    && apk add --no-cache --virtual .build-base build-base \
     && curl -sSL ${POETRY_URL} | python - \
+    && apk del .build-base \
     && ln -s ${POETRY_HOME}/bin/poetry /bin/poetry \
     && pip install supervisor \
     && mkdir /etc/gunicorn \
@@ -136,7 +139,7 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
- && poetry install --no-dev --no-root -E pg \
+ && poetry install --only main --no-root -E pg \
  && poetry cache clear -n --all pypi \
  && apk del --no-network .build-deps
 
