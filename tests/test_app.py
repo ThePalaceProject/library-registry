@@ -3,7 +3,13 @@ from io import BytesIO
 
 import flask
 
-from app_helpers import compressible, has_library_factory, uses_location_factory
+from app_helpers import (
+    auth_admin_only,
+    auth_secret_key,
+    compressible,
+    has_library_factory,
+    uses_location_factory,
+)
 from problem_details import LIBRARY_NOT_FOUND
 
 from .test_controller import ControllerTest
@@ -104,3 +110,34 @@ class TestAppHelpers(ControllerTest):
         response = ask_for_compression("gzip", "Accept-Transfer-Encoding")
         assert response.data == value
         assert "Content-Encoding" not in response.headers
+
+    def test_auth_admin_only(self):
+        @auth_admin_only
+        def test_fn():
+            return True
+
+        with self.app.test_request_context(
+            "/", data=dict(username="admin", password="admin")
+        ) as ctx:
+            # Log in is done, authenticated function should run
+            self.app.library_registry.registry_controller.log_in()
+            assert ctx.session["username"] == "admin"
+            assert test_fn() == True
+
+        with self.app.test_request_context(
+            "/", data=dict(username="admin", password="admin")
+        ) as ctx:
+            # No login done yet, function should fail
+            assert test_fn().status_code == 401
+
+    def test_auth_secret_key(self):
+        @auth_secret_key
+        def test_fn():
+            return True
+
+        with self.app.test_request_context(
+            f"/?secret_key={self.app.secret_key}"
+        ) as ctx:
+            assert test_fn() == True
+        with self.app.test_request_context(f"/") as ctx:
+            assert test_fn().status_code == 401

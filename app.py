@@ -7,7 +7,13 @@ from flask import Flask, Response
 from flask_babel import Babel
 from flask_sqlalchemy_session import flask_scoped_session
 
-from app_helpers import compressible, has_library_factory, uses_location_factory
+from app_helpers import (
+    auth_admin_only,
+    auth_secret_key,
+    compressible,
+    has_library_factory,
+    uses_location_factory,
+)
 from config import Configuration
 from controller import LibraryRegistry
 from log import LogConfiguration
@@ -87,6 +93,7 @@ def nearby_qa(_location):
 
 
 @app.route("/register", methods=["GET", "POST"])
+@auth_secret_key
 @returns_problem_detail
 def register():
     return app.library_registry.registry_controller.register()
@@ -143,45 +150,64 @@ def log_out():
 
 
 @app.route("/admin/libraries")
+@auth_admin_only
 @returns_json_or_response_or_problem_detail
 def libraries():
     return app.library_registry.registry_controller.libraries()
 
 
 @app.route("/admin/libraries/qa")
+@auth_admin_only
 @returns_json_or_response_or_problem_detail
 def libraries_qa_admin():
     return app.library_registry.registry_controller.libraries(live=False)
 
 
 @app.route("/admin/libraries/<uuid>")
+@auth_admin_only
 @returns_json_or_response_or_problem_detail
 def library_details(uuid):
     return app.library_registry.registry_controller.library_details(uuid)
 
 
 @app.route("/admin/libraries/search_details", methods=["POST"])
+@auth_admin_only
 @returns_json_or_response_or_problem_detail
 def search_details():
     return app.library_registry.registry_controller.search_details()
 
 
 @app.route("/admin/libraries/email", methods=["POST"])
+@auth_admin_only
 @returns_json_or_response_or_problem_detail
 def validate_email():
     return app.library_registry.registry_controller.validate_email()
 
 
 @app.route("/admin/libraries/registration", methods=["POST"])
+@auth_admin_only
 @returns_json_or_response_or_problem_detail
 def edit_registration():
     return app.library_registry.registry_controller.edit_registration()
 
 
 @app.route("/admin/libraries/pls_id", methods=["POST"])
+@auth_admin_only
 @returns_json_or_response_or_problem_detail
 def pls_id():
     return app.library_registry.registry_controller.add_or_edit_pls_id()
+
+
+@app.route("/admin/secret_key")
+@auth_admin_only
+@returns_json_or_response_or_problem_detail
+def admin_secret_key():
+    """Admin view for the registry secret key"""
+    return dict(
+        secret_key=app.secret_key,
+        details="Share this key with authorized clients.",
+        usage="Append the secret key as a parameter to required urls. Eg. /register?secret_key=....",
+    )
 
 
 @app.route("/library/<uuid>")

@@ -110,3 +110,32 @@ def compressible(f):
         return f(*args, **kwargs)
 
     return compressor
+
+
+def auth_admin_only(func):
+    """Test authentication on the request.
+    The request session should have previously authenticatated as an admin."""
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if "username" in flask.session and flask.session["username"] is not None:
+            return func(*args, **kwargs)
+        else:
+            return flask.Response(response="Unauthorized", status=401)
+
+    return wrapper
+
+
+def auth_secret_key(func):
+    """Test secret key authentication on the request.
+    The secret key is a shared secret, and must be available to authorized clients."""
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        secret_key = flask.request.args.get("secret_key")
+        if secret_key == flask.current_app.secret_key:
+            return func(*args, **kwargs)
+        else:
+            return flask.Response(response="Unauthorized", status=401)
+
+    return wrapper
