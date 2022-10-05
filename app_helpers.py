@@ -4,6 +4,7 @@ from io import BytesIO
 
 import flask
 
+from model import Admin
 from util import GeometryUtility
 from util.flask_util import originating_ip
 from util.problem_detail import ProblemDetail
@@ -112,30 +113,23 @@ def compressible(f):
     return compressor
 
 
-def auth_admin_only(func):
+def require_admin_authentication(func):
     """Test authentication on the request.
     The request session should have previously authenticatated as an admin."""
 
     @wraps(func)
     def wrapper(*args, **kwargs):
         if "username" in flask.session and flask.session["username"] is not None:
-            return func(*args, **kwargs)
-        else:
-            return flask.Response(response="Unauthorized", status=401)
+            admin = (
+                flask.current_app._db.query(Admin)
+                .filter(Admin.username == flask.session["username"])
+                .first()
+            )
+            print(admin)
+            print(flask.current_app._db.query(Admin).all())
+            if admin:
+                return func(*args, **kwargs)
 
-    return wrapper
-
-
-def auth_secret_key(func):
-    """Test secret key authentication on the request.
-    The secret key is a shared secret, and must be available to authorized clients."""
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        secret_key = flask.request.args.get("secret_key")
-        if secret_key == flask.current_app.secret_key:
-            return func(*args, **kwargs)
-        else:
-            return flask.Response(response="Unauthorized", status=401)
+        return flask.Response(response="Unauthorized", status=401)
 
     return wrapper

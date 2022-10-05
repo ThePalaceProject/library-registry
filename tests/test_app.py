@@ -4,12 +4,12 @@ from io import BytesIO
 import flask
 
 from app_helpers import (
-    auth_admin_only,
-    auth_secret_key,
     compressible,
     has_library_factory,
+    require_admin_authentication,
     uses_location_factory,
 )
+from model import Admin
 from problem_details import LIBRARY_NOT_FOUND
 
 from .test_controller import ControllerTest
@@ -112,32 +112,26 @@ class TestAppHelpers(ControllerTest):
         assert "Content-Encoding" not in response.headers
 
     def test_auth_admin_only(self):
-        @auth_admin_only
+        @require_admin_authentication
         def test_fn():
             return True
+
+        # This will setup the new admin, must use self._db since the test rollback occurs on it
+        Admin.authenticate(self._db, "admin", "admin")
+        # The app._db must be the same session as the above authenticate session so it can share the state
+        self.app._db = self._db
 
         with self.app.test_request_context(
             "/", data=dict(username="admin", password="admin")
         ) as ctx:
+            # Log in not yet done
+            assert test_fn().status_code == 401
+
             # Log in is done, authenticated function should run
             self.app.library_registry.registry_controller.log_in()
             assert ctx.session["username"] == "admin"
             assert test_fn() == True
 
-        with self.app.test_request_context(
-            "/", data=dict(username="admin", password="admin")
-        ) as ctx:
-            # No login done yet, function should fail
-            assert test_fn().status_code == 401
-
-    def test_auth_secret_key(self):
-        @auth_secret_key
-        def test_fn():
-            return True
-
-        with self.app.test_request_context(
-            f"/?secret_key={self.app.secret_key}"
-        ) as ctx:
-            assert test_fn() == True
-        with self.app.test_request_context(f"/") as ctx:
+            # log out, unauthorized again
+            self.app.library_registry.registry_controller.log_out()
             assert test_fn().status_code == 401
