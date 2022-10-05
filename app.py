@@ -196,18 +196,6 @@ def pls_id():
     return app.library_registry.registry_controller.add_or_edit_pls_id()
 
 
-@app.route("/admin/secret_key")
-@require_admin_authentication
-@returns_json_or_response_or_problem_detail
-def admin_secret_key():
-    """Admin view for the registry secret key"""
-    return dict(
-        secret_key=app.secret_key,
-        details="Share this key with authorized clients.",
-        usage="Append the secret key as a parameter to required urls. Eg. /register?secret_key=....",
-    )
-
-
 @app.route("/library/<uuid>")
 @has_library
 @returns_json_or_response_or_problem_detail
