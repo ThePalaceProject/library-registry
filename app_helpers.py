@@ -125,8 +125,7 @@ def require_admin_authentication(func):
                 .filter(Admin.username == flask.session["username"])
                 .first()
             )
-            print(admin)
-            print(flask.current_app._db.query(Admin).all())
+
             if admin:
                 return func(*args, **kwargs)
 
