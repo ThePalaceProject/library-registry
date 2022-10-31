@@ -18,6 +18,7 @@ repository = "https://github.com/ThePalaceProject/library-registry"
 version = "0" # Version number is managed with tags in git
 
 [tool.poetry.dependencies]
+alembic = "^1.8.1"
 aws-xray-sdk = "<2.11"
 bcrypt = "3.2.0"
 feedparser = "*"
