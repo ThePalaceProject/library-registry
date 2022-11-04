@@ -17,6 +17,7 @@ def migrate():
     Note: This function must be run before the SQLAlchemy session is initialized.
     """
     log = logging.getLogger(__name__)
+    logging.basicConfig()
     log.setLevel(logging.INFO)
 
     # Find the 'libraries' table
@@ -26,9 +27,9 @@ def migrate():
     cursor.execute("SELECT * FROM pg_catalog.pg_tables where tablename='libraries';")
     table_row = cursor.fetchone()
     cursor.close()
+    conn.close()
 
     alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("url", db_url)
     if table_row is None:
         # We have no libraries table setup, this is the first ever run.
         # SqlAlchemy will create all tables, simply stamp the head.
