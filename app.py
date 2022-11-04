@@ -1,13 +1,15 @@
 """Library registry web application."""
+import os
 
 ## Before we do anything, we must run the database migrations
 ## It is important this runs before ANY models are imported
 ## or the SQLAlchemy session is initialized
 from db_migration import migrate
 
-migrate()
+# Only migrate if we're not in a testing environment
+if "TESTING" not in os.environ:
+    migrate()
 
-import os
 import sys
 import urllib.parse
 
