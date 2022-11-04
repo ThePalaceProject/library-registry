@@ -1,4 +1,12 @@
 """Library registry web application."""
+
+## Before we do anything, we must run the database migrations
+## It is important this runs before ANY models are imported
+## or the SQLAlchemy session is initialized
+from db_migration import migrate
+
+migrate()
+
 import os
 import sys
 import urllib.parse
