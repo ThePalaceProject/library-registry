@@ -25,6 +25,7 @@ def migrate():
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM pg_catalog.pg_tables where tablename='libraries';")
     table_row = cursor.fetchone()
+    cursor.close()
 
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("url", db_url)
