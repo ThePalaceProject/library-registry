@@ -38,7 +38,7 @@ db_url = Configuration.database_url(test=TESTING)
 def create_app(testing=False, db_session_obj=None):
 
     app = Flask(__name__)
-    CORS(app)
+    CORS(app, supports_credentials=True)
     app.register_blueprint(drm)
     app.register_blueprint(admin)
     app.register_blueprint(libr)
