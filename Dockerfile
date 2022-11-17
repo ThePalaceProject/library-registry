@@ -166,7 +166,7 @@ ENV TESTING 1
 # Install development dependancies with poetry
 RUN set -ex \
  && apk add --no-cache --virtual .build-deps build-base \
- && poetry install --no-root \
+ && poetry install --no-root -E pg \
  && poetry cache clear -n --all pypi \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
  && apk del --no-network .build-deps
