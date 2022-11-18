@@ -162,7 +162,7 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 FROM builder AS libreg_local
 
 ENV FLASK_ENV development
-ENV TESTING 1
+
 # Install development dependancies with poetry
 RUN set -ex \
  && apk add --no-cache --virtual .build-deps build-base \
