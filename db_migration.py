@@ -1,6 +1,4 @@
-# In order to keep the DB from initializing accidentally we do not import any other part of the application in this file
 import logging
-import os
 
 import psycopg2
 
@@ -8,7 +6,7 @@ from alembic.command import stamp, upgrade
 from alembic.config import Config
 
 
-def migrate():
+def migrate(db_url: str):
     """Ensure the alembic migration state is up-to-date.
     If the database table "libraries" has not been created yet, we can assume this is a new deployment.
     Else, we can assume this database should attempt an upgrade to the latest version, if the DB
@@ -21,7 +19,6 @@ def migrate():
     log.setLevel(logging.INFO)
 
     # Find the 'libraries' table
-    db_url = os.environ.get("SIMPLIFIED_PRODUCTION_DATABASE")
     conn = psycopg2.connect(db_url)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM pg_catalog.pg_tables where tablename='libraries';")

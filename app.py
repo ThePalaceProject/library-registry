@@ -1,15 +1,5 @@
 """Library registry web application."""
 import os
-
-## Before we do anything, we must run the database migrations
-## It is important this runs before ANY models are imported
-## or the SQLAlchemy session is initialized
-from db_migration import migrate
-
-# Only migrate if we're not in a testing environment
-if "TESTING" not in os.environ:
-    migrate()
-
 import sys
 import urllib.parse
 
@@ -42,7 +32,7 @@ uses_location = uses_location_factory(app)
 
 testing = "TESTING" in os.environ
 db_url = Configuration.database_url(testing)
-SessionManager.initialize(db_url)
+SessionManager.initialize(db_url, testing=testing)
 session_factory = SessionManager.sessionmaker(db_url)
 _db = flask_scoped_session(session_factory, app)
 
