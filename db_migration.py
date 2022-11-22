@@ -38,7 +38,7 @@ def migrate(db_url: str):
         )
         try:
             stamp(alembic_cfg, "head")
-        except CommandError as ex:
+        except (CommandError, FileNotFoundError) as ex:
             # Alembic log config disables other logs
             log.disabled = False
             log.error(f"Alembic Error: Could not run STAMP HEAD on the database")
@@ -49,7 +49,7 @@ def migrate(db_url: str):
         log.info("Running alembic upgrade.")
         try:
             upgrade(alembic_cfg, "head")
-        except CommandError as ex:
+        except (CommandError, FileNotFoundError) as ex:
             # Alembics log config disables other logs
             log.disabled = False
             log.error(f"Alembic Error: Could not run UPGRADE HEAD on the database")
