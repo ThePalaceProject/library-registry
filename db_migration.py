@@ -4,6 +4,7 @@ import psycopg2
 
 from alembic.command import stamp, upgrade
 from alembic.config import Config
+from alembic.util.exc import CommandError
 
 
 def migrate(db_url: str):
@@ -14,8 +15,8 @@ def migrate(db_url: str):
 
     Note: This function must be run before the SQLAlchemy session is initialized.
     """
-    log = logging.getLogger(__name__)
     logging.basicConfig()
+    log = logging.getLogger(__name__)
     log.setLevel(logging.INFO)
 
     # Find the 'libraries' table
@@ -33,9 +34,21 @@ def migrate(db_url: str):
         log.info(
             "Database tables were not detected, stamping the alembic version to 'head'."
         )
-        stamp(alembic_cfg, "head")
+        try:
+            stamp(alembic_cfg, "head")
+        except CommandError as ex:
+            # Alembic log config disables other logs
+            log.disabled = False
+            log.error(f"Alembic Error: Could not run STAMP HEAD on the database")
+            log.error(f"{ex.__class__.__name__}: {ex}")
     else:
         # This is not a new deployment, run the 'upgrade head' command.
         # This is an idempotent command, we don't have to check whether it needs to be run or not.
         log.info("Running alembic upgrade.")
-        upgrade(alembic_cfg, "head")
+        try:
+            upgrade(alembic_cfg, "head")
+        except CommandError as ex:
+            # Alembics log config disables other logs
+            log.disabled = False
+            log.error(f"Alembic Error: Could not run UPGRADE HEAD on the database")
+            log.error(f"{ex.__class__.__name__}: {ex}")
