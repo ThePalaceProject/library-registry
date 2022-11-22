@@ -15,6 +15,8 @@ def migrate(db_url: str):
 
     Note: This function must be run before the SQLAlchemy session is initialized.
     """
+    # Need to set up some temporary logging since we haven't
+    # had a chance to read the logging config from the DB
     logging.basicConfig()
     log = logging.getLogger(__name__)
     log.setLevel(logging.INFO)
