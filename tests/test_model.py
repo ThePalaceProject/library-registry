@@ -2008,8 +2008,10 @@ class TestDBMigrate(DatabaseTest):
         cfg = Config("alembic.ini")
         ensure_version(cfg)
 
+        # Remove any alembic versions that existed from previous tests
+        cursor.execute("DELETE from alembic_version")
         # Set a fake alembic version, ensuring the 'upgrade' will fail
-        cursor.execute("UPDATE alembic_version SET version_num = 'xxxxx'")
+        cursor.execute("INSERT INTO alembic_version(version_num) VALUES ('xxxxx')")
         conn.commit()
 
         # This will not raise an error
