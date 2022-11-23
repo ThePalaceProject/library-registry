@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import json
 import logging
@@ -7,6 +9,7 @@ import string
 import uuid
 import warnings
 from collections import Counter, defaultdict
+from typing import TYPE_CHECKING, Tuple
 
 import uszipcode
 from flask_babel import lazy_gettext as _
@@ -48,11 +51,15 @@ from sqlalchemy.sql.expression import (
 )
 
 from config import Configuration
+from db_migration import migrate
 from emailer import Emailer
 from util import GeometryUtility
 from util.language import LanguageCodes
 from util.short_client_token import ShortClientTokenTool
 from util.string_helpers import random_string
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import Connection, Engine
 
 
 def production_session():
@@ -96,12 +103,22 @@ class SessionManager(object):
         return sessionmaker(bind=engine)
 
     @classmethod
-    def initialize(cls, url):
+    def initialize(cls, url: str, testing=False) -> Tuple[Engine, Connection]:
+        """Initialize the database connection
+        Create all the database tables from the models
+        Optionally, run the alembic migration scripts
+
+        :param db_url: The Database connection url
+        :param testing: Whether we are in a test environment or not"""
         if url in cls.engine_for_url:
             engine = cls.engine_for_url[url]
             return engine, engine.connect()
 
         engine = cls.engine(url)
+
+        # Run the migrations only if we're not TESTING
+        if not testing:
+            migrate(url)
 
         Base.metadata.create_all(engine)
 
