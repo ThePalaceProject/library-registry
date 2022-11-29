@@ -300,6 +300,8 @@ class Library(Base):
 
     # The library's logo, as a data: URI.
     logo = Column(Unicode)
+    # The library's logo, as a web url
+    logo_url = Column(Unicode)
 
     # Constants for determining which stage a library is in.
     #

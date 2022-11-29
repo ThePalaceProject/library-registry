@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import base64
 import json
 import logging
 import re
 from io import BytesIO
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 import feedparser
@@ -20,8 +23,12 @@ from problem_details import (
     LIBRARY_ALREADY_IN_PRODUCTION,
     TIMEOUT,
 )
+from util.file_storage import LibraryLogoStore
 from util.http import HTTP, RequestTimedOut
 from util.problem_detail import ProblemDetail
+
+if TYPE_CHECKING:
+    from model import Library
 
 
 class VerifyLinkRegexes:
@@ -64,7 +71,7 @@ class LibraryRegistrar(object):
         # by register() -- only the controller uses that stuff.
         return None
 
-    def register(self, library, library_stage):
+    def register(self, library: Library, library_stage):
         """Register the given Library with this registry, if possible.
 
         :param library: A Library to register or re-register.
@@ -207,6 +214,14 @@ class LibraryRegistrar(object):
 
         if auth_document.logo:
             library.logo = auth_document.logo
+            # Write this data to the storage too
+            logo_link = LibraryLogoStore.write_raw(library, auth_document.logo)
+            if logo_link:
+                library.logo_url = logo_link
+            else:
+                return INVALID_INTEGRATION_DOCUMENT.detailed(
+                    _("Could upload the logo image to the file storage")
+                )
         elif auth_document.logo_link:
             url = auth_document.logo_link.get("href")
             if url:
@@ -227,6 +242,16 @@ class LibraryRegistrar(object):
             # Convert to PNG.
             buffer = BytesIO()
             image.save(buffer, format="PNG")
+
+            # Upload to the file store
+            logo_url = LibraryLogoStore.write(library, buffer)
+            if not logo_url:
+                return INVALID_INTEGRATION_DOCUMENT.detailed(
+                    _("Could upload the logo image to the file storage")
+                )
+            library.logo_url = logo_url
+            buffer.seek(0)
+
             b64 = base64.b64encode(buffer.getvalue()).decode("utf8")
             type = logo_response.headers.get(
                 "Content-Type"

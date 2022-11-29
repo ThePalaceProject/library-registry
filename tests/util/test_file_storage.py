@@ -1,6 +1,7 @@
+import base64
 import io
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import requests
 
@@ -79,22 +80,50 @@ class TestFileObject:
 class TestLibraryLogoStore(DatabaseTest):
     def test_write(self):
         """Requires Minio"""
-        self.logo_store = LibraryLogoStore()
         library = self._library(short_name="short")
-        path = self.logo_store.write(library, io.BytesIO(b"logodata..."))
+        path1 = LibraryLogoStore.write(library, io.BytesIO(b"logodata..."))
 
         # Request this data
-        response = requests.get(path)
+        response = requests.get(path1)
         assert response.content == b"logodata..."
 
         # Overwrites should work too
-        path = self.logo_store.write(library, io.BytesIO(b"differentdata..."))
+        path2 = LibraryLogoStore.write(library, io.BytesIO(b"differentdata..."))
+
+        # The same file should have gotten updated
+        assert path1 == path2
 
         # Request this data
-        response = requests.get(path)
+        response = requests.get(path2)
         assert response.content == b"differentdata..."
 
     def test_logo_path(self):
-        self.logo_store = LibraryLogoStore()
-        library = self._library(short_name="short")
-        assert self.logo_store.logo_path(library, "jpeg") == "public/SHORT/logo.jpeg"
+        library = self._library()
+        assert (
+            LibraryLogoStore.logo_path(library, "jpeg")
+            == f"public/{library.id}/logo.jpeg"
+        )
+
+    @patch("util.file_storage.LibraryLogoStore.write")
+    def test_write_raw(self, mock_write: MagicMock):
+        library = self._library()
+        encoded = base64.b64encode(b"someimagedata")
+        data = f"data:image/png;base64,{encoded.decode()}"
+        LibraryLogoStore.write_raw(library, data)
+
+        args = mock_write.call_args_list[0]
+        assert args[0][0] == library
+        assert args[0][1].read() == b"someimagedata"
+        assert args[1]["format"] == "image/png"
+
+    @patch("util.file_storage.LibraryLogoStore.write")
+    def test_write_raw_no_match(self, mock_write: MagicMock):
+        library = self._library()
+        encoded = base64.b64encode(b"someimagedata")
+        data = encoded.decode()
+        LibraryLogoStore.write_raw(library, data)
+
+        args = mock_write.call_args_list[0]
+        assert args[0][0] == library
+        assert args[0][1].read() == encoded
+        assert args[1]["format"] == "binary/octet-stream"

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import io
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -116,9 +118,15 @@ class S3FileStorage(FileStorage):
         else:
             self.bucket_url = f"{config.endpoint_url}/{self._bucket_name}"
 
-    def write(self, name: str, io: IO) -> Optional[FileObject]:
+    def write(
+        self, name: str, io: IO, content_type="binary/octet-stream"
+    ) -> Optional[FileObject]:
         response = self.client.put_object(
-            Key=name, Bucket=self._bucket_name, Body=io.read(), ACL=self.ACL
+            Key=name,
+            Bucket=self._bucket_name,
+            Body=io.read(),
+            ACL=self.ACL,
+            ContentType=content_type,
         )
         if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
             return FileObject(
@@ -138,22 +146,41 @@ class S3FileStorage(FileStorage):
 class LibraryLogoStore:
     """The library logo store mechanism"""
 
-    def __init__(self) -> None:
-        self.storage = S3FileStorage()
-
-    def logo_path(self, library: Library, format: str) -> str:
+    @classmethod
+    def logo_path(self, library: Library, ext: str) -> str:
         """Get the folder path for a library logo
         :param library: The library
-        :param format: The format of the logo, eg. png
+        :param ext: The extension of the logo, eg. png
         """
-        return f"public/{library.short_name}/logo.{format}"
+        return f"public/{library.id}/logo.{ext}"
 
-    def write(self, library: Library, io: IO, format="png") -> str | None:
+    @classmethod
+    def write(cls, library: Library, io: IO, format="image/png") -> str | None:
         """Write the logo to the storage
         :param library: The library
         :param io: The data stream
         :param format: The format of the image
         """
-        obj = self.storage.write(self.logo_path(library, format), io)
+        ext = format if "/" not in format else format.split("/", 1)[1]
+        obj = FileStorage.storage().write(
+            cls.logo_path(library, ext), io, content_type=format
+        )
         if obj:
-            return self.storage.get_link(obj)
+            return FileStorage.storage().get_link(obj)
+
+    @classmethod
+    def write_raw(cls, library: Library, data: str) -> str | None:
+        """Write a raw, possibly b64 encoded, buffer to the storage"""
+        format = "binary/octet-stream"  # Unknown binary format by default
+
+        # Is this is a b64 encoded data blob?
+        match = re.match(r"^data:image/(png|jpg|jpeg);base64,", data[:30])
+        if match:
+            format = match.group(1)
+            format = f"image/{format}"
+            data = base64.b64decode(data.split(",", 1)[1])
+        elif type(data) is str:
+            # If no match, just encode the data
+            data = bytes(data, "utf-8")
+
+        return cls.write(library, io.BytesIO(data), format=format)
