@@ -74,7 +74,7 @@ class DatabaseTest(object):
         if "TESTING" in os.environ:
             del os.environ["TESTING"]
 
-    def setup(self):
+    def setup_method(self):
         # Create a new connection to the database.
         self._db = Session(self.connection)
         self.transaction = self.connection.begin_nested()
@@ -88,7 +88,7 @@ class DatabaseTest(object):
         self.latitude_counter = -90
         self.longitude_counter = -90
 
-    def teardown(self):
+    def teardown_method(self):
         secret_keys = self._db.query(ConfigurationSetting).filter(
             ConfigurationSetting.key == Configuration.SECRET_KEY
         )

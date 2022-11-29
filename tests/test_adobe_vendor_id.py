@@ -280,8 +280,8 @@ class TestVendorIDRequestHandler:
 
 
 class TestVendorIDModel(VendorIDTest):
-    def setup(self):
-        super(TestVendorIDModel, self).setup()
+    def setup_method(self):
+        super(TestVendorIDModel, self).setup_method()
         self._integration()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         self.model = AdobeVendorIDModel(self._db, node_value, delegates)
