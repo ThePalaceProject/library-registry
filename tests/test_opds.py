@@ -296,6 +296,14 @@ class TestOPDSCatalog(DatabaseTest):
         ):
             assert missing_key not in catalog["metadata"]
 
+        # Try again by adding a library logo_url,
+        # the image href should now be the url
+        library.logo_url = "http://logourl"
+        catalog = Mock.library_catalog(
+            library, include_logo=True, url_for=self.mock_url_for
+        )
+        assert catalog["images"][0]["href"] == "http://logourl"
+
     def test__hyperlink_args(self):
         """Verify that _hyperlink_args generates arguments appropriate
         for an OPDS 2 link.
