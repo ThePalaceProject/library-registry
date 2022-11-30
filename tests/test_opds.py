@@ -297,10 +297,11 @@ class TestOPDSCatalog(DatabaseTest):
             assert missing_key not in catalog["metadata"]
 
         # Try again by adding a library logo_url,
-        # the image href should now be the url
+        # the image href should now be the url.
+        # Even if include_logos is False
         library.logo_url = "http://logourl"
         catalog = Mock.library_catalog(
-            library, include_logo=True, url_for=self.mock_url_for
+            library, include_logo=False, url_for=self.mock_url_for
         )
         assert catalog["images"][0]["href"] == "http://logourl"
 
