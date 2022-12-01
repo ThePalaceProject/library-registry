@@ -19,7 +19,7 @@ version = "0" # Version number is managed with tags in git
 
 [tool.poetry.dependencies]
 alembic = "^1.8.1"
-aws-xray-sdk = "<2.11"
+aws-xray-sdk = "<2.12"
 bcrypt = "3.2.0"
 feedparser = "*"
 Flask = "~1.1.2"
