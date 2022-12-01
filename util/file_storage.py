@@ -88,10 +88,14 @@ class S3FileStorage(FileStorage):
     def __init__(self) -> None:
         config = Configuration.aws_config()
         boto_config = Config(signature_version=botocore.UNSIGNED)
-        extras = dict(endpoint_url=config.endpoint_url, config=boto_config)
+        extras = dict(endpoint_url=config.endpoint_url)
 
+        # We need 2 clients since the UNSIGNED config stops the client from signing post requests too
+        # We only need unsigned urls for "get object" requests
         session = boto3.Session()
         self.client = session.client("s3", **extras)
+        self.read_client = session.client("s3", config=boto_config, **extras)
+
         self._bucket_name = config.bucket_name
 
     def write(
@@ -116,7 +120,7 @@ class S3FileStorage(FileStorage):
 
     def get_link(self, obj: FileObject) -> str:
         """All objects are public-read, return the path to the object"""
-        return self.client.generate_presigned_url(
+        return self.read_client.generate_presigned_url(
             "get_object", Params=dict(Bucket=obj.container, Key=obj.key), ExpiresIn=0
         )
 
