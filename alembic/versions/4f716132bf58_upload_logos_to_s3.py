@@ -40,7 +40,9 @@ def upgrade() -> None:
             )
             log.info(f"Uploaded to {uploaded_path}")
             connection.execute(
-                f"UPDATE libraries SET logo_url='{uploaded_path}' WHERE id={lib_id};"
+                "UPDATE libraries SET logo_url=%s WHERE internal_urn=%s;",
+                uploaded_path,
+                lib_uuid,
             )
         else:
             log.info(f"Library {lib_name} has no logo to upload")
