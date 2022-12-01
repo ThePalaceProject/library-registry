@@ -90,35 +90,9 @@ class S3FileStorage(FileStorage):
         boto_config = Config(signature_version=botocore.UNSIGNED)
         extras = dict(endpoint_url=config.endpoint_url, config=boto_config)
 
-        # The client changes if we are using a profile name or not
-        if config.profile_name:
-            session = boto3.Session(profile_name=config.profile_name)
-            self.client = session.client("s3", **extras)
-        else:
-            # If the key_id and secret_key are None,
-            # the client should use the 'default' profile automatically
-            self.client = boto3.client(
-                "s3",
-                aws_access_key_id=config.key_id,
-                aws_secret_access_key=config.secret_key,
-                **extras,
-            )
+        session = boto3.Session()
+        self.client = session.client("s3", **extras)
         self._bucket_name = config.bucket_name
-
-        # The web url to the bucket is required so we may create unsigned public urls
-        if config.endpoint_url is None:
-            if self._bucket_name not in self.BUCKET_REGION_CACHE:
-                region = self.client.get_bucket_location(Bucket=self._bucket_name)
-                self.BUCKET_REGION_CACHE[self._bucket_name] = region[
-                    "LocationConstraint"
-                ]
-
-            region_code = self.BUCKET_REGION_CACHE[self._bucket_name]
-            self.bucket_url = self.S3_ENDPOINT_URL.format(
-                bucket=self._bucket_name, region_code=region_code
-            )
-        else:
-            self.bucket_url = f"{config.endpoint_url}/{self._bucket_name}"
 
     def write(
         self, name: str, io: IO, content_type="binary/octet-stream"

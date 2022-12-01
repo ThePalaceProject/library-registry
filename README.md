@@ -38,13 +38,10 @@ they are not discussed elsewhere in this document.
 ## AWS configuration setup for the storage
 
 - SIMPLIFIED_AWS_S3_BUCKET_NAME (mandatory): The name of the bucket to use on S3
-- SIMPLIFIED_AWS_ACCESS_KEY_ID: The AWS access key ID
-- SIMPLIFIED_AWS_SECRET_ACCESS_KEY: The AWS secret key
 - SIMPLIFIED_AWS_S3_ENDPOINT_URL: The API endpoint for the S3 bucket
-- SIMPLIFIED_AWS_PROFILE: The AWS credentials file profile name
 
 Of the above, only the `SIMPLIFIED_AWS_S3_BUCKET_NAME` is a mandatory configuration.
-If no key or profile name is provided then the default profile will be used from the credentials file (if present).
+The underlying boto library will manage the credentials and authentication mechanism. [[source](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html)]
 
 ## Installation (Docker)
 

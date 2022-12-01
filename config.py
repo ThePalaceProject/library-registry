@@ -82,9 +82,6 @@ class Configuration(object):
     SECRET_KEY = "secret_key"
 
     # AWS credentials
-    AWS_SECRET_ACCESS_KEY = "SIMPLIFIED_AWS_SECRET_ACCESS_KEY"
-    AWS_ACCESS_KEY_ID = "SIMPLIFIED_AWS_ACCESS_KEY_ID"
-    AWS_PROFILE_NAME = "SIMPLIFIED_AWS_PROFILE"
     AWS_S3_BUCKET_NAME = "SIMPLIFIED_AWS_S3_BUCKET_NAME"
     AWS_S3_ENDPOINT_URL = "SIMPLIFIED_AWS_S3_ENDPOINT_URL"
 
@@ -139,9 +136,6 @@ class Configuration(object):
     def aws_config(cls) -> "AWSConfig":
         """Return the AWS configurations setup in the environment"""
         return AWSConfig(
-            key_id=os.environ.get(cls.AWS_ACCESS_KEY_ID),
-            secret_key=os.environ.get(cls.AWS_SECRET_ACCESS_KEY),
-            profile_name=os.environ.get(cls.AWS_PROFILE_NAME),
             bucket_name=os.environ.get(cls.AWS_S3_BUCKET_NAME),
             endpoint_url=os.environ.get(cls.AWS_S3_ENDPOINT_URL),
         )
@@ -149,8 +143,5 @@ class Configuration(object):
 
 @dataclass
 class AWSConfig:
-    key_id: str = None
-    secret_key: str = None
-    profile_name: str = None
     bucket_name: str = None
     endpoint_url: str = None

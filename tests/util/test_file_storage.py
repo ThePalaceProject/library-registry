@@ -15,22 +15,13 @@ class TestS3FileStorage:
         with patch.dict(
             os.environ,
             {
-                Configuration.AWS_ACCESS_KEY_ID: "key",
-                Configuration.AWS_SECRET_ACCESS_KEY: "secret",
                 Configuration.AWS_S3_BUCKET_NAME: "bucket",
                 Configuration.AWS_S3_ENDPOINT_URL: "http://localhost",
             },
         ):
             storage = S3FileStorage()
 
-        assert storage.bucket_url == "http://localhost/bucket"
         assert storage.client._endpoint.host == "http://localhost"
-
-        # Ensure the profile is picked up when using a session profile env
-        with patch.dict(os.environ, {Configuration.AWS_PROFILE_NAME: "profile"}):
-            with patch("util.file_storage.boto3.Session") as mock_session:
-                storage = S3FileStorage()
-                assert mock_session.call_args[1]["profile_name"] == "profile"
 
     def test_write_and_delete(self):
         """Test the writing to the storage.
