@@ -20,7 +20,7 @@ depends_on = None
 
 @dataclass
 class MockLibrary:
-    id: int
+    internal_urn: str
 
 
 def upgrade() -> None:
@@ -31,12 +31,12 @@ def upgrade() -> None:
     log = logging.getLogger("Upload logos to S3")
     log.setLevel(logging.INFO)
     connection = op.get_bind()
-    result = connection.execute("SELECT id, name, logo FROM libraries;")
-    for (lib_id, lib_name, lib_logo) in result:
+    result = connection.execute("SELECT internal_urn, name, logo FROM libraries;")
+    for (lib_uuid, lib_name, lib_logo) in result:
         if lib_logo:
             log.info(f"Uploading logo for {lib_name}")
             uploaded_path = LibraryLogoStore.write_from_b64(
-                MockLibrary(lib_id), lib_logo
+                MockLibrary(lib_uuid), lib_logo
             )
             log.info(f"Uploaded to {uploaded_path}")
             connection.execute(

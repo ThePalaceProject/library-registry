@@ -88,9 +88,11 @@ class TestLibraryLogoStore(DatabaseTest):
 
     def test_logo_path(self):
         library = self._library()
+        # internal urn has the format urn:uuid:xxx, we only put
+        # the xxx part into the URL, so we split that for testing here
         assert (
             LibraryLogoStore.logo_path(library, "jpeg")
-            == f"public/{library.id}/logo.jpeg"
+            == f"logo/{library.internal_urn.split(':', 2)[2]}.jpeg"
         )
 
     @patch("util.file_storage.LibraryLogoStore.write")

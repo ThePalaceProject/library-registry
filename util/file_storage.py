@@ -134,7 +134,15 @@ class LibraryLogoStore:
         :param library: The library
         :param ext: The extension of the logo, eg. png
         """
-        return f"public/{library.id}/logo.{ext}"
+        # Remove the urn:uuid: prefix off of the internal
+        # urn before turning it into a s3 url, since : needs
+        # to be url encoded. Otherwise, the logo urls end up
+        # looking kind of ugly with %2A in them.
+        prefix = "urn:uuid:"
+        uuid = library.internal_urn
+        if uuid.startswith(prefix):
+            uuid = uuid[len(prefix) :]
+        return f"logo/{uuid}.{ext}"
 
     @classmethod
     def write(cls, library: Library, io: IO, format="image/png") -> str | None:
