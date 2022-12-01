@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import IO, TYPE_CHECKING, Optional
 
 import boto3
+import botocore
+from botocore.config import Config
 
 from config import Configuration
 from model import Library
@@ -50,9 +52,8 @@ class FileStorage(ABC):
     @classmethod
     def storage(cls):
         """Return the storage object of the medium in use"""
-        if cls.default_storage:
-            return cls.default_storage
-        cls.default_storage = S3FileStorage()
+        if not cls.default_storage:
+            cls.default_storage = S3FileStorage()
         return cls.default_storage
 
     @abstractmethod
@@ -86,7 +87,8 @@ class S3FileStorage(FileStorage):
 
     def __init__(self) -> None:
         config = Configuration.aws_config()
-        extras = dict(endpoint_url=config.endpoint_url)
+        boto_config = Config(signature_version=botocore.UNSIGNED)
+        extras = dict(endpoint_url=config.endpoint_url, config=boto_config)
 
         # The client changes if we are using a profile name or not
         if config.profile_name:
@@ -140,7 +142,9 @@ class S3FileStorage(FileStorage):
 
     def get_link(self, obj: FileObject) -> str:
         """All objects are public-read, return the path to the object"""
-        return f"{self.bucket_url}/{obj.key}"
+        return self.client.generate_presigned_url(
+            "get_object", Params=dict(Bucket=obj.container, Key=obj.key), ExpiresIn=0
+        )
 
 
 class LibraryLogoStore:
@@ -169,8 +173,8 @@ class LibraryLogoStore:
             return FileStorage.storage().get_link(obj)
 
     @classmethod
-    def write_raw(cls, library: Library, data: str) -> str | None:
-        """Write a raw, possibly b64 encoded, buffer to the storage"""
+    def write_from_b64(cls, library: Library, data: str) -> str | None:
+        """Write a data blob, possibly b64 encoded, to the storage"""
         format = "binary/octet-stream"  # Unknown binary format by default
 
         # Is this is a b64 encoded data blob?

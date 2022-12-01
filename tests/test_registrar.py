@@ -287,7 +287,7 @@ class TestRegistrar(DatabaseTest):
                 headers={"Content-Type": OPDSCatalog.OPDS_1_TYPE},
             )
         )
-        mock_logo_store.write_raw.return_value = "http://localhost/logo"
+        mock_logo_store.write_from_b64.return_value = "http://localhost/logo"
         with patch(
             "registrar.LibraryRegistrar.opds_response_links_to_auth_document"
         ) as mock_fn:
@@ -295,9 +295,9 @@ class TestRegistrar(DatabaseTest):
             registrar.register(library, Library.TESTING_STAGE)
 
         assert registrar._make_request.call_count == 2
-        assert mock_logo_store.write_raw.call_count == 1
+        assert mock_logo_store.write_from_b64.call_count == 1
 
-        args = mock_logo_store.write_raw.call_args
+        args = mock_logo_store.write_from_b64.call_args
         assert args[0][0] == library
         assert args[0][1] == image_data
 

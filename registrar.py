@@ -215,7 +215,7 @@ class LibraryRegistrar(object):
         if auth_document.logo:
             library.logo = auth_document.logo
             # Write this data to the storage too
-            logo_link = LibraryLogoStore.write_raw(library, auth_document.logo)
+            logo_link = LibraryLogoStore.write_from_b64(library, auth_document.logo)
             if logo_link:
                 library.logo_url = logo_link
             else:

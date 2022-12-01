@@ -103,11 +103,11 @@ class TestLibraryLogoStore(DatabaseTest):
         )
 
     @patch("util.file_storage.LibraryLogoStore.write")
-    def test_write_raw(self, mock_write: MagicMock):
+    def test_write_from_b64(self, mock_write: MagicMock):
         library = self._library()
         encoded = base64.b64encode(b"someimagedata")
         data = f"data:image/png;base64,{encoded.decode()}"
-        LibraryLogoStore.write_raw(library, data)
+        LibraryLogoStore.write_from_b64(library, data)
 
         args = mock_write.call_args_list[0]
         assert args[0][0] == library
@@ -115,11 +115,11 @@ class TestLibraryLogoStore(DatabaseTest):
         assert args[1]["format"] == "image/png"
 
     @patch("util.file_storage.LibraryLogoStore.write")
-    def test_write_raw_no_match(self, mock_write: MagicMock):
+    def test_write_from_b64_no_match(self, mock_write: MagicMock):
         library = self._library()
         encoded = base64.b64encode(b"someimagedata")
         data = encoded.decode()
-        LibraryLogoStore.write_raw(library, data)
+        LibraryLogoStore.write_from_b64(library, data)
 
         args = mock_write.call_args_list[0]
         assert args[0][0] == library
