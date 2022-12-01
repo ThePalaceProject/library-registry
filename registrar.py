@@ -215,9 +215,9 @@ class LibraryRegistrar(object):
         if auth_document.logo:
             library.logo = auth_document.logo
             # Write this data to the storage too
-            logo_link = LibraryLogoStore.write_from_b64(library, auth_document.logo)
-            if logo_link:
-                library.logo_url = logo_link
+            logo_url = LibraryLogoStore.write_from_b64(library, auth_document.logo)
+            if logo_url:
+                library.logo_url = logo_url
             else:
                 return INVALID_INTEGRATION_DOCUMENT.detailed(
                     _("Could upload the logo image to the file storage")
