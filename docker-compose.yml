@@ -31,10 +31,6 @@ services:
         source: .
         target: /apps/library-registry
         read_only: true
-      - type: bind
-        source: ../library-registry-admin
-        target: /apps/library-registry-admin
-        read_only: true
 
 volumes:
   local_db_data:
