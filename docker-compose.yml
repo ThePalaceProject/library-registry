@@ -1,4 +1,4 @@
-version: "3.7"
+version: "3.9"
 
 services:
   libreg_local_db:
@@ -16,7 +16,10 @@ services:
   libreg_webapp:
     container_name: libreg_webapp
     depends_on:
-      - libreg_local_db
+      libreg_local_db:
+        condition: service_started
+      libreg_minio:
+        condition: service_healthy
     build:
       context: .
       target: libreg_local
@@ -26,11 +29,32 @@ services:
       - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_local_db:5433/simplified_registry_test
       - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5433/simplified_registry_dev
       - FLASK_ENV=development
+      - AWS_ACCESS_KEY_ID=TEST
+      - AWS_SECRET_ACCESS_KEY=testpassword
+      - SIMPLIFIED_AWS_S3_ENDPOINT_URL=http://minio:9000
+      - SIMPLIFIED_AWS_S3_BUCKET_NAME=registry
     volumes:
       - type: bind
         source: .
         target: /apps/library-registry
         read_only: true
+
+  libreg_minio:
+    container_name: minio
+    image: bitnami/minio:2022.3.3
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ACCESS_KEY=TEST
+      - MINIO_SECRET_KEY=testpassword
+      - MINIO_DEFAULT_BUCKETS=registry:download
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      start_period: 30s
+      timeout: 20s
+      retries: 3
 
 volumes:
   local_db_data:

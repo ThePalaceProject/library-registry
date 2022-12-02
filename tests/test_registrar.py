@@ -1,10 +1,15 @@
+import base64
 import json
+from io import BytesIO
+from unittest.mock import MagicMock, patch
 
 from authentication_document import AuthenticationDocument
+from model import Library
 from opds import OPDSCatalog
 from problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
 from registrar import LibraryRegistrar, VerifyLinkRegexes
 from testing import DatabaseTest, DummyHTTPResponse
+from tests.utils import mock_response
 from util.problem_detail import ProblemDetail
 
 
@@ -227,3 +232,121 @@ class TestRegistrar(DatabaseTest):
         # Multiple links that work.
         result = m("rel2", links, "a title")
         assert result == ["mailto:me@library.org", "mailto:me2@library.org"]
+
+    def _auth_document(self):
+        return {
+            "id": "http://auth",
+            "title": "Test",
+            "authentication": [],
+            "links": [
+                {
+                    "rel": "start",
+                    "type": "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                    "href": "http://auth",
+                },
+                {"rel": "help", "href": "mailto:help@example.org", "type": None},
+                {
+                    "rel": "http://opds-spec.org/shelf",
+                    "href": "http://localhost:6500/localtest/loans/",
+                    "type": "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                },
+                {
+                    "rel": "http://librarysimplified.org/terms/rel/user-profile",
+                    "href": "http://localhost:6500/localtest/patrons/me/",
+                    "type": "vnd.librarysimplified/user-profile+json",
+                },
+                {
+                    "rel": "http://librarysimplified.org/rel/designated-agent/copyright",
+                    "href": "mailto:help@example.org",
+                },
+            ],
+        }
+
+    @patch("registrar.LibraryLogoStore")
+    def test_register_logo_data(self, mock_logo_store):
+        """Test an auth document with base64 encoded image data"""
+        image_data = "data:image/png;base64,abcdefg"
+        auth_document = self._auth_document()
+        auth_document["links"].append(
+            {
+                "rel": "logo",
+                "type": "image/png",
+                "href": image_data,
+            }
+        )
+
+        library: Library = self._library(registry_stage=Library.TESTING_STAGE)
+        library.authentication_url = "http://auth"
+        registrar = LibraryRegistrar(self._db)
+
+        registrar._make_request = MagicMock(
+            return_value=mock_response(
+                200,
+                auth_document,
+                url="http://auth",
+                headers={"Content-Type": OPDSCatalog.OPDS_1_TYPE},
+            )
+        )
+        mock_logo_store.write_from_b64.return_value = "http://localhost/logo"
+        with patch(
+            "registrar.LibraryRegistrar.opds_response_links_to_auth_document"
+        ) as mock_fn:
+            mock_fn.return_value = True
+            registrar.register(library, Library.TESTING_STAGE)
+
+        assert registrar._make_request.call_count == 2
+        assert mock_logo_store.write_from_b64.call_count == 1
+
+        args = mock_logo_store.write_from_b64.call_args
+        assert args[0][0] == library
+        assert args[0][1] == image_data
+
+        assert library.logo_url == "http://localhost/logo"
+
+    @patch("registrar.LibraryLogoStore")
+    def test_register_logo_links(self, mock_logo_store):
+        """Test an auth document with an image link"""
+        image_link = "http://somelogolink"
+        auth_document = self._auth_document()
+        auth_document["links"].append(
+            {
+                "rel": "logo",
+                "type": "image/png",
+                "href": image_link,
+            }
+        )
+
+        library: Library = self._library(registry_stage=Library.TESTING_STAGE)
+        library.authentication_url = "http://auth"
+        registrar = LibraryRegistrar(self._db)
+
+        registrar._make_request = MagicMock(
+            return_value=mock_response(
+                200,
+                auth_document,
+                url="http://auth",
+                headers={"Content-Type": OPDSCatalog.OPDS_1_TYPE},
+            )
+        )
+        small_png = base64.b64decode(
+            b"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+        )
+        registrar.do_get = MagicMock(
+            return_value=mock_response(200, small_png, stream=True)
+        )
+        mock_logo_store.write.return_value = "http://localhost/logo"
+
+        with patch(
+            "registrar.LibraryRegistrar.opds_response_links_to_auth_document"
+        ) as mock_fn:
+            mock_fn.return_value = True
+            registrar.register(library, Library.TESTING_STAGE)
+
+        assert registrar._make_request.call_count == 2
+        assert mock_logo_store.write.call_count == 1
+
+        args = mock_logo_store.write.call_args
+        assert args[0][0] == library
+        assert type(args[0][1]) == BytesIO
+
+        assert library.logo_url == "http://localhost/logo"

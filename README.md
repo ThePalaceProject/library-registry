@@ -35,6 +35,14 @@ they are not discussed elsewhere in this document.
 
 - EMAILER_RECIPIENT_OVERRIDE: If set, `emailer` will send all non-test email to this email address.
 
+## AWS configuration setup for the storage
+
+- SIMPLIFIED_AWS_S3_BUCKET_NAME (mandatory): The name of the bucket to use on S3
+- SIMPLIFIED_AWS_S3_ENDPOINT_URL: The API endpoint for the S3 bucket
+
+Of the above, only the `SIMPLIFIED_AWS_S3_BUCKET_NAME` is a mandatory configuration.
+The underlying boto library will manage the credentials and authentication mechanism. [[source](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html)]
+
 ## Installation (Docker)
 
 If not using Docker, skip to section entitled ["Installation (non-Docker)"](#installation-non-docker)

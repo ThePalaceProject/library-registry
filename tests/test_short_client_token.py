@@ -9,7 +9,7 @@ from . import DatabaseTest
 
 
 class TestShortClientTokenEncoder(object):
-    def setup(self):
+    def setup_method(self):
         self.encoder = ShortClientTokenEncoder()
 
     def test_adobe_base64_encode_decode(self):
@@ -108,8 +108,8 @@ class TestShortClientTokenDecoder(DatabaseTest):
 
     TEST_NODE_VALUE = 114740953091845
 
-    def setup(self):
-        super(TestShortClientTokenDecoder, self).setup()
+    def setup_method(self):
+        super(TestShortClientTokenDecoder, self).setup_method()
         self.encoder = ShortClientTokenEncoder()
         self.decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE, [])
         self.library = self._library()

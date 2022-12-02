@@ -9,8 +9,8 @@ from . import DatabaseTest
 
 
 class TestGeometryLoader(DatabaseTest):
-    def setup(self):
-        super(TestGeometryLoader, self).setup()
+    def setup_method(self):
+        super(TestGeometryLoader, self).setup_method()
         self.loader = GeometryLoader(self._db)
 
     def test_load(self):

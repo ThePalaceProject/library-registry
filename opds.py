@@ -202,6 +202,10 @@ class OPDSCatalog(object):
                 catalog, rel="alternate", href=library.web_url, type="text/html"
             )
 
+        if library.logo_url:
+            cls.add_image_to_catalog(
+                catalog, rel=cls.THUMBNAIL_REL, href=library.logo_url, type="image/png"
+            )
         if include_logo and library.logo:
             cls.add_image_to_catalog(
                 catalog, rel=cls.THUMBNAIL_REL, href=library.logo, type="image/png"

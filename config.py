@@ -4,6 +4,8 @@ import logging
 import os
 from pathlib import Path
 
+from attr import dataclass
+
 
 @contextlib.contextmanager
 def temp_config(new_config=None, replacement_classes=None):
@@ -79,6 +81,10 @@ class Configuration(object):
     # The name of the sitewide secret used for admin login.
     SECRET_KEY = "secret_key"
 
+    # AWS credentials
+    AWS_S3_BUCKET_NAME = "SIMPLIFIED_AWS_S3_BUCKET_NAME"
+    AWS_S3_ENDPOINT_URL = "SIMPLIFIED_AWS_S3_ENDPOINT_URL"
+
     @classmethod
     def database_url(cls, test=False):
         """Find the URL to the database so that other configuration
@@ -125,3 +131,17 @@ class Configuration(object):
             node,
             delegates,
         )
+
+    @classmethod
+    def aws_config(cls) -> "AWSConfig":
+        """Return the AWS configurations setup in the environment"""
+        return AWSConfig(
+            bucket_name=os.environ.get(cls.AWS_S3_BUCKET_NAME),
+            endpoint_url=os.environ.get(cls.AWS_S3_ENDPOINT_URL),
+        )
+
+
+@dataclass
+class AWSConfig:
+    bucket_name: str = None
+    endpoint_url: str = None

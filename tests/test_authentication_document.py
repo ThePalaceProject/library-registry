@@ -580,8 +580,8 @@ class TestUpdateServiceAreas(DatabaseTest):
 
 
 class TestUpdateAudiences(DatabaseTest):
-    def setup(self):
-        super(TestUpdateAudiences, self).setup()
+    def setup_method(self):
+        super(TestUpdateAudiences, self).setup_method()
         self.library = self._library()
 
     def update(self, audiences):
@@ -639,8 +639,8 @@ class TestUpdateAudiences(DatabaseTest):
 
 
 class TestUpdateCollectionSize(DatabaseTest):
-    def setup(self):
-        super(TestUpdateCollectionSize, self).setup()
+    def setup_method(self):
+        super(TestUpdateCollectionSize, self).setup_method()
         self.library = self._library()
 
     def update(self, value):

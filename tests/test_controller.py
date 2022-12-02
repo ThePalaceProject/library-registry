@@ -75,10 +75,10 @@ class MockEmailer(Emailer):
 
 
 class ControllerTest(DatabaseTest):
-    def setup(self):
+    def setup_method(self):
         from app import app, set_secret_key
 
-        super(ControllerTest, self).setup()
+        super(ControllerTest, self).setup_method()
         ConfigurationSetting.sitewide(
             self._db, Configuration.SECRET_KEY
         ).value = "a secret"
@@ -226,8 +226,8 @@ class TestLibraryRegistryController(ControllerTest):
 
         self.vendor_id_setup()
 
-    def setup(self):
-        super(TestLibraryRegistryController, self).setup()
+    def setup_method(self):
+        super(TestLibraryRegistryController, self).setup_method()
         self.controller = LibraryRegistryController(
             self.library_registry, emailer_class=MockEmailer
         )
@@ -2114,8 +2114,8 @@ class TestValidationController(ControllerTest):
 
 
 class TestCoverageController(ControllerTest):
-    def setup(self):
-        super(TestCoverageController, self).setup()
+    def setup_method(self):
+        super(TestCoverageController, self).setup_method()
         self.controller = CoverageController(self.library_registry)
 
     def parse_to(self, coverage, places=[], ambiguous=None, unknown=None, to_json=True):

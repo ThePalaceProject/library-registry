@@ -1532,8 +1532,8 @@ class TestDelegatedPatronIdentifier(DatabaseTest):
 
 
 class TestExternalIntegration(DatabaseTest):
-    def setup(self):
-        super(TestExternalIntegration, self).setup()
+    def setup_method(self):
+        super(TestExternalIntegration, self).setup_method()
         self.external_integration, ignore = create(
             self._db, ExternalIntegration, goal=self._str, protocol=self._str
         )
@@ -1944,8 +1944,8 @@ class TestValidation(DatabaseTest):
 
 
 class TestAdmin(DatabaseTest):
-    def setup(self):
-        super(TestAdmin, self).setup()
+    def setup_method(self):
+        super(TestAdmin, self).setup_method()
         self.admin = self._admin()
 
     def test_make_password(self):
