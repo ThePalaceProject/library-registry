@@ -49,7 +49,7 @@ ENV NGINX_VERSION 1.19.8
 ENV NJS_VERSION   0.5.2
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
-ENV POETRY_VERSION 1.2.1
+ENV POETRY_VERSION 1.3.2
 ENV POETRY_URL "https://install.python-poetry.org"
 ENV POETRY_HOME "/etc/poetry"
 
@@ -139,7 +139,7 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
- && poetry install --only main --no-root -E pg \
+ && poetry install --only main,pg \
  && poetry cache clear -n --all pypi \
  && apk del --no-network .build-deps
 
