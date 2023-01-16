@@ -8,7 +8,7 @@ from util.short_client_token import ShortClientTokenEncoder
 from . import DatabaseTest
 
 
-class TestShortClientTokenEncoder(object):
+class TestShortClientTokenEncoder:
     def setup_method(self):
         self.encoder = ShortClientTokenEncoder()
 
@@ -34,7 +34,7 @@ class TestShortClientTokenEncoder(object):
         assert self.encoder.adobe_base64_decode(encoded) == value
 
     def test_encode_short_client_token_uses_adobe_base64_encoding(self):
-        class MockSigner(object):
+        class MockSigner:
             def prepare_key(self, key):
                 return key
 
@@ -109,7 +109,7 @@ class TestShortClientTokenDecoder(DatabaseTest):
     TEST_NODE_VALUE = 114740953091845
 
     def setup_method(self):
-        super(TestShortClientTokenDecoder, self).setup_method()
+        super().setup_method()
         self.encoder = ShortClientTokenEncoder()
         self.decoder = ShortClientTokenDecoder(self.TEST_NODE_VALUE, [])
         self.library = self._library()

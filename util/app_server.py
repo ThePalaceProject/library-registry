@@ -66,7 +66,7 @@ def returns_json_or_response_or_problem_detail(f):
     return decorated
 
 
-class ErrorHandler(object):
+class ErrorHandler:
     def __init__(self, app, debug):
         self.app = app
         self.debug = debug
@@ -129,6 +129,6 @@ class ErrorHandler(object):
         return response
 
 
-class HeartbeatController(object):
+class HeartbeatController:
     def heartbeat(self):
         return make_response("", 200, {"Content-Type": "application/json"})

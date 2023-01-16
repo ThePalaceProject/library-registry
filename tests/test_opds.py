@@ -21,13 +21,13 @@ class TestOPDSCatalog(DatabaseTest):
         """A simple replacement for url_for that doesn't require an
         application context.
         """
-        return "http://%s/%s" % (route, uuid)
+        return f"http://{route}/{uuid}"
 
     def test_library_catalogs(self):
         l1 = self._library("The New York Public Library")
         l2 = self._library("Brooklyn Public Library")
 
-        class TestAnnotator(object):
+        class TestAnnotator:
             def annotate_catalog(self, catalog_obj, live=True):
                 catalog_obj.catalog["metadata"][
                     "random"
@@ -67,7 +67,7 @@ class TestOPDSCatalog(DatabaseTest):
         ]
 
         # Each library has a link to its web catalog.
-        l1_links, l2_links = [library["links"] for library in parsed["catalogs"]]
+        l1_links, l2_links = (library["links"] for library in parsed["catalogs"])
         [l1_web] = [link["href"] for link in l1_links if link["type"] == "text/html"]
         assert template.replace("{uuid}", l1.internal_urn) == l1_web
 
@@ -258,7 +258,7 @@ class TestOPDSCatalog(DatabaseTest):
         catalog = Mock.library_catalog(
             library, include_private_information=True, url_for=self.mock_url_for
         )
-        assert set(Mock.hyperlinks) == set([public_hyperlink, private_hyperlink])
+        assert set(Mock.hyperlinks) == {public_hyperlink, private_hyperlink}
 
         # If library_catalog is called with include_logo=False,
         # the (potentially large) inline logo is omitted,

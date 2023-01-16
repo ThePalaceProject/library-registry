@@ -43,11 +43,11 @@ class StringFormatter(logging.Formatter):
     """
 
     def format(self, record):
-        data = super(StringFormatter, self).format(record)
+        data = super().format(record)
         return str(data)
 
 
-class LogConfiguration(object):
+class LogConfiguration:
     """Configures the active Python logging handlers based on logging
     configuration from the database.
     """

@@ -8,12 +8,12 @@ from config import Configuration
 from model import ConfigurationSetting, Hyperlink, LibraryType, Validation
 
 
-class Annotator(object):
+class Annotator:
     def annotate_catalog(self, catalog, live=True):
         pass
 
 
-class OPDSCatalog(object):
+class OPDSCatalog:
     """Represents an OPDS 2 Catalog Document.
     https://github.com/opds-community/opds-revision/blob/master/opds-2.0.md
 

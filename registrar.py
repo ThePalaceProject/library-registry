@@ -36,7 +36,7 @@ class VerifyLinkRegexes:
     HTTP_OR_MAILTO = r"^(http[s]?:|mailto:)"
 
 
-class LibraryRegistrar(object):
+class LibraryRegistrar:
     """Encapsulates the logic of the library registration process."""
 
     def __init__(self, _db, do_get=HTTP.debuggable_get):
@@ -257,7 +257,7 @@ class LibraryRegistrar(object):
                 "Content-Type"
             ) or auth_document.logo_link.get("type")
             if type:
-                library.logo = "data:%s;base64,%s" % (type, b64)
+                library.logo = f"data:{type};base64,{b64}"
         else:
             library.logo = None
         problem = auth_document.update_library(library)
@@ -390,7 +390,7 @@ class LibraryRegistrar(object):
         # There were no relevant links.
         if not candidates:
             problem = INVALID_CONTACT_URI.detailed(
-                "No valid '%s' links found with rel=%s" % (link_regex, rel)
+                f"No valid '{link_regex}' links found with rel={rel}"
             )
             problem.title = problem_title
             return problem

@@ -158,7 +158,7 @@ class TestParseCoverage(DatabaseTest):
         MockPlace._default_nation = None
 
 
-class TestLinkExtractor(object):
+class TestLinkExtractor:
     """Test the _extract_link helper method."""
 
     def test_no_matching_link(self):
@@ -450,7 +450,7 @@ class TestUpdateServiceAreas(DatabaseTest):
         assert a2.type == ServiceArea.FOCUS
 
         # The ServiceArea IDs were added to the `ids` list.
-        assert set([a1, a2]) == set(areas)
+        assert {a1, a2} == set(areas)
 
     def test_ambiguous_and_unknown_places_become_problemdetail(self):
         """Test the helper method in a case that ends in failure."""
@@ -581,7 +581,7 @@ class TestUpdateServiceAreas(DatabaseTest):
 
 class TestUpdateAudiences(DatabaseTest):
     def setup_method(self):
-        super(TestUpdateAudiences, self).setup_method()
+        super().setup_method()
         self.library = self._library()
 
     def update(self, audiences):
@@ -603,12 +603,12 @@ class TestUpdateAudiences(DatabaseTest):
         doc = AuthenticationDocument.from_dict(self._db, doc_dict)
         problem = doc.update_audiences(self.library)
         assert problem is None
-        assert set(audiences) == set([x.name for x in self.library.audiences])
+        assert set(audiences) == {x.name for x in self.library.audiences}
 
         # Set them again to different but partially overlapping values.
         audiences = [Audience.EDUCATIONAL_PRIMARY, Audience.EDUCATIONAL_SECONDARY]
         problem = self.update(audiences)
-        assert set(audiences) == set([x.name for x in self.library.audiences])
+        assert set(audiences) == {x.name for x in self.library.audiences}
 
     def test_update_audiences_to_invalid_value(self):
         # You're not supposed to specify a single string as `audience`,
@@ -627,9 +627,9 @@ class TestUpdateAudiences(DatabaseTest):
         # Audience.OTHER.
         audiences = ["Some random audience", Audience.PUBLIC]
         self.update(audiences)
-        assert set([Audience.OTHER, Audience.PUBLIC]) == set(
-            [x.name for x in self.library.audiences]
-        )
+        assert {Audience.OTHER, Audience.PUBLIC} == {
+            x.name for x in self.library.audiences
+        }
 
     def test_audience_defaults_to_public(self):
         # If a library doesn't specify its audience, we assume it's open
@@ -640,7 +640,7 @@ class TestUpdateAudiences(DatabaseTest):
 
 class TestUpdateCollectionSize(DatabaseTest):
     def setup_method(self):
-        super(TestUpdateCollectionSize, self).setup_method()
+        super().setup_method()
         self.library = self._library()
 
     def update(self, value):

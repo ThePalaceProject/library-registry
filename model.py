@@ -9,7 +9,7 @@ import string
 import uuid
 import warnings
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 import uszipcode
 from flask_babel import lazy_gettext as _
@@ -88,7 +88,7 @@ def generate_secret():
     return random_string(24)
 
 
-class SessionManager(object):
+class SessionManager:
 
     engine_for_url = {}
 
@@ -103,7 +103,7 @@ class SessionManager(object):
         return sessionmaker(bind=engine)
 
     @classmethod
-    def initialize(cls, url: str, testing=False) -> Tuple[Engine, Connection]:
+    def initialize(cls, url: str, testing=False) -> tuple[Engine, Connection]:
         """Initialize the database connection
         Create all the database tables from the models
         Optionally, run the alembic migration scripts
@@ -210,7 +210,7 @@ def create(db, model, create_method="", create_method_kwargs=None, **kwargs):
 Base = declarative_base()
 
 
-class LibraryType(object):
+class LibraryType:
     """Constant container for library types.
 
     This is as defined here:
@@ -1180,7 +1180,7 @@ class Library(Base):
     def partial_match(cls, field, value):
         """Create a SQL clause that attempts to match a partial value--e.g.
         just one word of a library's name--against the given field."""
-        return field.ilike("%{}%".format(value))
+        return field.ilike(f"%{value}%")
 
     def set_hyperlink(self, rel, *hrefs):
         """Make sure this library has a Hyperlink with the given `rel` that
@@ -1510,10 +1510,10 @@ class Place(Base):
             parent = self.parent.abbreviated_name or self.parent.external_name
             if self.type == Place.COUNTY:
                 # Renfrew County, ON
-                return "{} County, {}".format(self.external_name, parent)
+                return f"{self.external_name} County, {parent}"
             elif self.type == Place.CITY:
                 # Montgomery, AL
-                return "{}, {}".format(self.external_name, parent)
+                return f"{self.external_name}, {parent}"
 
         # All other cases:
         #  93203
@@ -1635,7 +1635,9 @@ class Place(Base):
                 return None
         if len(places) > 1:
             raise MultipleResultsFound(
-                "More than one place called %s inside %s." % (name, self.external_name)
+                "More than one place called {} inside {}.".format(
+                    name, self.external_name
+                )
             )
         return places[0]
 
@@ -1700,7 +1702,7 @@ class Place(Base):
             abbr = "abbr=%s " % self.abbreviated_name
         else:
             abbr = ""
-        output = "<Place: %s type=%s %sexternal_id=%s parent=%s>" % (
+        output = "<Place: {} type={} {}external_id={} parent={}>".format(
             self.external_name,
             self.type,
             abbr,
@@ -2138,7 +2140,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         return value
 
     def __init__(self, node_value, delegates):
-        super(ShortClientTokenDecoder, self).__init__()
+        super().__init__()
         if isinstance(node_value, str):
             # The node value may be stored in hex form (that's how
             # Adobe gives it out) or as the equivalent decimal number.
@@ -2272,9 +2274,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
             expiration = self.JWT_EPOCH + datetime.timedelta(seconds=expiration)
 
         if expiration < now:
-            raise ValueError(
-                "Token %s expired at %s (now is %s)." % (token, expiration, now)
-            )
+            raise ValueError(f"Token {token} expired at {expiration} (now is {now}).")
 
         # Sign the token and check against the provided signature.
         key = self.signer.prepare_key(secret)
@@ -2367,7 +2367,7 @@ class ExternalIntegration(Base):
 
         integrations = integrations.all()
         if len(integrations) > 1:
-            logging.warn("Multiple integrations found for '%s'/'%s'" % (protocol, goal))
+            logging.warn(f"Multiple integrations found for '{protocol}'/'{goal}'")
 
         if not integrations:
             return None
@@ -2424,7 +2424,7 @@ class ExternalIntegration(Base):
         lines.append("ID: %s" % self.id)
         if self.name:
             lines.append("Name: %s" % self.name)
-        lines.append("Protocol/Goal: %s/%s" % (self.protocol, self.goal))
+        lines.append(f"Protocol/Goal: {self.protocol}/{self.goal}")
 
         def key(setting):
             if setting.library:
@@ -2432,9 +2432,9 @@ class ExternalIntegration(Base):
             return (setting.key, None)
 
         for setting in sorted(self.settings, key=key):
-            explanation = "%s='%s'" % (setting.key, setting.value)
+            explanation = f"{setting.key}='{setting.value}'"
             if setting.library:
-                explanation = "%s (applies only to %s)" % (
+                explanation = "{} (applies only to {})".format(
                     explanation,
                     setting.library.name,
                 )
@@ -2512,7 +2512,7 @@ class ConfigurationSetting(Base):
             lines.append("Site-wide configuration settings:")
             lines.append("---------------------------------")
         for setting in sorted(site_wide_settings, key=lambda s: s.key):
-            lines.append("%s='%s'" % (setting.key, setting.value))
+            lines.append(f"{setting.key}='{setting.value}'")
         return lines
 
     @classmethod
@@ -2626,7 +2626,7 @@ class ConfigurationSetting(Base):
             self.value = default
         return self.value
 
-    MEANS_YES = set(["true", "t", "yes", "y"])
+    MEANS_YES = {"true", "t", "yes", "y"}
 
     @property
     def bool_value(self):

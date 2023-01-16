@@ -15,7 +15,7 @@ license = "Apache-2.0"
 name = "library-registry"
 readme = "README.md"
 repository = "https://github.com/ThePalaceProject/library-registry"
-version = "0" # Version number is managed with tags in git
+version = "0"  # Version number is managed with tags in git
 
 [tool.poetry.dependencies]
 alembic = "^1.8.1"
@@ -33,8 +33,8 @@ loggly-python-handler = "*"
 lxml = "*"
 maxminddb-geolite2 = "*"
 Pillow = "*"
-psycopg2 = { version = "*", optional = true }
-psycopg2-binary = { version = "*", optional = true }
+psycopg2 = {version = "*", optional = true}
+psycopg2-binary = {version = "*", optional = true}
 pycryptodome = "*"
 PyJWT = "*"
 python = ">=3.7,<4"
@@ -55,3 +55,12 @@ pg-binary = ["psycopg2-binary"]
 [tool.pytest.ini_options]
 timeout = "600"
 timeout_method = "thread"
+
+[tool.tomlsort]
+ignore_case = true
+in_place = true
+sort_inline_arrays = true
+sort_table_keys = true
+spaces_before_inline_comment = 2
+spaces_indent_inline_array = 4
+trailing_comma_inline_array = true

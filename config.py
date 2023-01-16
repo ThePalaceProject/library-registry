@@ -30,7 +30,7 @@ class CannotSendEmail(Exception):
     pass
 
 
-class Configuration(object):
+class Configuration:
     DATADIR = Path(os.path.dirname(__file__)) / "data"
 
     instance = None

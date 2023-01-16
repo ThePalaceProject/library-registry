@@ -49,7 +49,7 @@ def package_setup():
     engine.dispose()
 
 
-class DatabaseTest(object):
+class DatabaseTest:
 
     engine = None
     connection = None
@@ -230,7 +230,7 @@ class DatabaseTest(object):
         geometry=None,
     ):
         if not geometry:
-            geometry = "SRID=4326;POINT(%s %s)" % (
+            geometry = "SRID=4326;POINT({} {})".format(
                 self.latitude_counter,
                 self.longitude_counter,
             )
@@ -479,7 +479,7 @@ class DatabaseTest(object):
     crude_us_geojson = '{"type": "Polygon", "coordinates": [[[-88.330078125, 48.80686346108517], [-123.8818359375, 49.35375571830993], [-125.5517578125, 48.42920055556841], [-124.49707031249999, 38.58252615935333], [-121.9482421875, 34.70549341022544], [-118.38867187500001, 32.21280106801518], [-116.19140625, 32.10118973232094], [-111.62109375, 30.826780904779774], [-106.875, 30.44867367928756], [-105.029296875, 28.844673680771795], [-101.689453125, 28.76765910569123], [-100.6787109375, 26.82407078047018], [-96.7236328125, 24.966140159912975], [-96.767578125, 27.254629577800063], [-94.4384765625, 28.613459424004414], [-89.20898437499999, 28.304380682962783], [-88.3740234375, 29.649868677972304], [-84.3310546875, 29.152161283318915], [-81.5185546875, 24.086589258228027], [-79.4970703125, 25.60190226111573], [-80.68359375, 30.713503990354965], [-75.1904296875, 34.813803317113155], [-75.146484375, 36.77409249464195], [-73.47656249999999, 39.57182223734374], [-69.521484375, 41.1455697310095], [-70.048828125, 43.03677585761058], [-66.62109375, 44.308126684886126], [-67.1484375, 46.70973594407157], [-68.5986328125, 48.019324184801185], [-74.970703125, 45.521743896993634], [-79.9365234375, 42.87596410238256], [-82.177734375, 41.80407814427234], [-81.298828125, 45.089035564831036], [-88.330078125, 48.80686346108517]]]}'
 
 
-class DummyHTTPResponse(object):
+class DummyHTTPResponse:
     def __init__(self, status_code, headers, content, links=None, url=None):
         self.status_code = status_code
         self.headers = headers
@@ -492,7 +492,7 @@ class DummyHTTPResponse(object):
         return BytesIO(self.content)
 
 
-class DummyHTTPClient(object):
+class DummyHTTPClient:
     def __init__(self):
         self.responses = []
         self.requests = []
@@ -536,7 +536,7 @@ class DummyHTTPClient(object):
         return response
 
 
-class MockRequestsResponse(object):
+class MockRequestsResponse:
     """A mock object that simulates an HTTP response from the
     `requests` library.
     """
@@ -560,7 +560,7 @@ class MockRequestsResponse(object):
         return self.content.decode("utf8")
 
 
-class MockPlace(object):
+class MockPlace:
     """Used to test AuthenticationDocument.parse_coverage."""
 
     # Used to indicate that a place name is ambiguous.
@@ -591,7 +591,7 @@ class MockPlace(object):
             raise MultipleResultsFound()
         if place is None:
             raise NoResultFound()
-        print("%s->%s" % (name, place))
+        print(f"{name}->{place}")
         return place
 
     def lookup_inside(self, name):

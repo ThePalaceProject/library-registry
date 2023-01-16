@@ -1131,9 +1131,7 @@ class TestLibrary(DatabaseTest):
         # due to its large collection, but maybe it would be better if UNM was.
         libraries = Library.relevant(self._db, (32.32, -106.77), "eng").most_common()
         assert len(libraries) == 2
-        assert set([library[0] for library in libraries]) == set(
-            [unm, internet_archive]
-        )
+        assert {library[0] for library in libraries} == {unm, internet_archive}
 
         # Russian speaker in Albany. Albany doesn't pass the score threshold
         # since it didn't report having any Russian books, but maybe we should
@@ -1290,7 +1288,7 @@ class TestLibrary(DatabaseTest):
             get_one_or_create(
                 self._db, LibraryAlias, name="BPL", language=None, library=library
             )
-        assert set(search("bpl")) == set([brooklyn, boston])
+        assert set(search("bpl")) == {brooklyn, boston}
 
         # We do not tolerate typos in short names, because the chance of
         # ambiguity is so high.
@@ -1338,7 +1336,7 @@ class TestLibrary(DatabaseTest):
 
         # A search for 'manhattan' finds both libraries.
         libraries = list(Library.search_by_location_name(self._db, "manhattan"))
-        assert set([x.name for x in libraries]) == set(["NYPL", "Kansas State Library"])
+        assert {x.name for x in libraries} == {"NYPL", "Kansas State Library"}
 
         # If you're searching from California, the Kansas library
         # shows up first.
@@ -1533,7 +1531,7 @@ class TestDelegatedPatronIdentifier(DatabaseTest):
 
 class TestExternalIntegration(DatabaseTest):
     def setup_method(self):
-        super(TestExternalIntegration, self).setup_method()
+        super().setup_method()
         self.external_integration, ignore = create(
             self._db, ExternalIntegration, goal=self._str, protocol=self._str
         )
@@ -1945,7 +1943,7 @@ class TestValidation(DatabaseTest):
 
 class TestAdmin(DatabaseTest):
     def setup_method(self):
-        super(TestAdmin, self).setup_method()
+        super().setup_method()
         self.admin = self._admin()
 
     def test_make_password(self):

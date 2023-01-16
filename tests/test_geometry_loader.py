@@ -10,7 +10,7 @@ from . import DatabaseTest
 
 class TestGeometryLoader(DatabaseTest):
     def setup_method(self):
-        super(TestGeometryLoader, self).setup_method()
+        super().setup_method()
         self.loader = GeometryLoader(self._db)
 
     def test_load(self):

@@ -59,7 +59,7 @@ class TestRegistrar(DatabaseTest):
         rel = AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
 
         # An OPDS 1 feed that has a link.
-        has_link_feed = '<feed><link rel="%s" href="%s"/></feed>' % (rel, auth_url)
+        has_link_feed = f'<feed><link rel="{rel}" href="{auth_url}"/></feed>'
         response = DummyHTTPResponse(
             200, {"Content-Type": OPDSCatalog.OPDS_1_TYPE}, has_link_feed
         )
@@ -83,9 +83,10 @@ class TestRegistrar(DatabaseTest):
             has_link_feed,
             links={rel: {"url": "http://another-auth-document", "rel": rel}},
         )
-        assert set(LibraryRegistrar.opds_response_links(response, rel)) == set(
-            [auth_url, "http://another-auth-document"]
-        )
+        assert set(LibraryRegistrar.opds_response_links(response, rel)) == {
+            auth_url,
+            "http://another-auth-document",
+        }
         assert (
             LibraryRegistrar.opds_response_links_to_auth_document(response, auth_url)
             is True

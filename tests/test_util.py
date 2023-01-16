@@ -1,7 +1,7 @@
 from util import GeometryUtility
 
 
-class TestGeometryUtility(object):
+class TestGeometryUtility:
     def test_point(self):
         point = GeometryUtility.point("80", "-4")
         assert point == "SRID=4326;POINT(-4 80)"

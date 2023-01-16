@@ -130,7 +130,7 @@ class Emailer:
         )
 
         # Make sure the templates don't contain any template values we can't handle.
-        test_template_values = dict((key, "value") for key in self.KNOWN_TEMPLATE_KEYS)
+        test_template_values = {key: "value" for key in self.KNOWN_TEMPLATE_KEYS}
         for template in list(self.templates.values()):
             try:
                 template.body("from address", "to address", **test_template_values)
@@ -155,7 +155,7 @@ class Emailer:
         if email_type not in self.templates:
             raise ValueError("No such email template: %s" % email_type)
         template = self.templates[email_type]
-        from_header = "%s <%s>" % (self.from_name, self.from_address)
+        from_header = f"{self.from_name} <{self.from_address}>"
         kwargs["from_address"] = self.from_address
         # Check to see if we have an alternative recipient, unless this is a test email.
         recipient = (
