@@ -7,7 +7,7 @@ from admin.config import Configuration as AdminConfig
 from admin.config import OperationalMode
 
 
-class TestAdminUI(object):
+class TestAdminUI:
     @staticmethod
     def _set_env(key: str, value: Optional[str]):
         if value:

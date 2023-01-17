@@ -12,7 +12,7 @@ from emailer import Emailer, EmailTemplate
 from . import DatabaseTest
 
 
-class TestEmailTemplate(object):
+class TestEmailTemplate:
     """Test the ability to generate email messages."""
 
     def test_body(self):
@@ -156,19 +156,17 @@ class TestEmailer(DatabaseTest):
         """Verify the exceptions raised when required constructor
         arguments are missing.
         """
-        args = dict(
-            [
-                (x, None)
-                for x in (
-                    "smtp_username",
-                    "smtp_password",
-                    "smtp_host",
-                    "smtp_port",
-                    "from_name",
-                    "from_address",
-                )
-            ]
-        )
+        args = {
+            x: None
+            for x in (
+                "smtp_username",
+                "smtp_password",
+                "smtp_host",
+                "smtp_port",
+                "from_name",
+                "from_address",
+            )
+        }
         args["templates"] = {}
 
         m = Emailer

@@ -21,7 +21,7 @@ def json(type, status, title, detail=None, instance=None, debug_message=None):
     return j.dumps(d)
 
 
-class ProblemDetail(object):
+class ProblemDetail:
 
     """A common type of problem."""
 

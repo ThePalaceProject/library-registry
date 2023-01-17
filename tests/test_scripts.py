@@ -71,7 +71,7 @@ class TestLibraryScript(DatabaseTest):
 
         # The all_libraries property omits the cancelled library.
         script = LibraryScript(self._db)
-        assert set(script.all_libraries) == set([production, testing])
+        assert set(script.all_libraries) == {production, testing}
 
 
 class TestLoadPlacesScript(DatabaseTest):
@@ -89,10 +89,12 @@ class TestLoadPlacesScript(DatabaseTest):
 
         # ...and import three places into the database.
         places = self._db.query(Place).all()
-        assert set([x.external_name for x in places]) == set(
-            ["United States", "Alabama", "Montgomery"]
-        )
-        assert set([x.external_id for x in places]) == set(["US", "01", "0151000"])
+        assert {x.external_name for x in places} == {
+            "United States",
+            "Alabama",
+            "Montgomery",
+        }
+        assert {x.external_id for x in places} == {"US", "01", "0151000"}
 
 
 class TestSearchPlacesScript(DatabaseTest):
@@ -171,7 +173,7 @@ class TestSearchLibraryScript(DatabaseTest):
         # We found the library whose service area overlaps 10018
         # (NYPL), but not the other library.
         actual_output = output.getvalue()
-        assert actual_output == "%s: %s\n" % (nypl.name, nypl.opds_url)
+        assert actual_output == f"{nypl.name}: {nypl.opds_url}\n"
 
 
 class TestConfigureSiteScript(DatabaseTest):
@@ -326,7 +328,7 @@ class TestRegistrationRefreshScript(DatabaseTest):
         success_library = self._library(name="Success")
         failure_library = self._library(name="Failure")
 
-        class MockRegistrar(object):
+        class MockRegistrar:
             reregistered = []
 
             def reregister(self, library):

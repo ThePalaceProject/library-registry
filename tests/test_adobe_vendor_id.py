@@ -101,7 +101,7 @@ class TestConfiguration(VendorIDTest):
         assert delegates == ["delegate"]
 
 
-class TestVendorIDRequestParsers(object):
+class TestVendorIDRequestParsers:
     username_sign_in_request = t.SIGN_IN_REQUEST_TEMPLATE % {
         "username": "Vendor username",
         "password": "Vendor password",
@@ -281,7 +281,7 @@ class TestVendorIDRequestHandler:
 
 class TestVendorIDModel(VendorIDTest):
     def setup_method(self):
-        super(TestVendorIDModel, self).setup_method()
+        super().setup_method()
         self._integration()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         self.model = AdobeVendorIDModel(self._db, node_value, delegates)

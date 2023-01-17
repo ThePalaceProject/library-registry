@@ -5,7 +5,7 @@ import io
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import IO, TYPE_CHECKING, Optional
+from typing import IO, TYPE_CHECKING
 
 import boto3
 import botocore
@@ -35,7 +35,7 @@ class FileObject:
         return f"{self.backend}://{self.container}/{self.key}"
 
     @classmethod
-    def from_path(cls, path: str) -> "FileObject":
+    def from_path(cls, path: str) -> FileObject:
         """Parse a file object path into a FileObject"""
         match = re.match(r"^([a-z0-9]+)://(.*?)/(.*)$", path)
         return cls(backend=match.group(1), container=match.group(2), key=match.group(3))
@@ -57,7 +57,7 @@ class FileStorage(ABC):
         return cls.default_storage
 
     @abstractmethod
-    def write(self, name: str, io: IO) -> Optional[FileObject]:
+    def write(self, name: str, io: IO) -> FileObject | None:
         """Write a file to the storage
         :param name: Name of the file, with the folder path
         :param io: The data stream to be written
@@ -100,7 +100,7 @@ class S3FileStorage(FileStorage):
 
     def write(
         self, name: str, io: IO, content_type="binary/octet-stream"
-    ) -> Optional[FileObject]:
+    ) -> FileObject | None:
         response = self.client.put_object(
             Key=name,
             Bucket=self._bucket_name,

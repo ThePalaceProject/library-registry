@@ -175,7 +175,7 @@ class LibraryRegistryController(BaseController):
  </OpenSearchDescription>"""
 
     def __init__(self, app, emailer_class=Emailer):
-        super(LibraryRegistryController, self).__init__(app)
+        super().__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
         emailer = None
@@ -329,7 +329,7 @@ class LibraryRegistryController(BaseController):
                 Library.nearby(self._db, location, production=live).limit(5).all()
             )
             b = time.time()
-            self.log.info("Fetched libraries near %s in %.2fsec" % (location, b - a))
+            self.log.info(f"Fetched libraries near {location} in {b - a:.2f}sec")
 
             # Exclude nearby libraries from the alphabetical query
             # to get a list of faraway libraries.
@@ -338,9 +338,7 @@ class LibraryRegistryController(BaseController):
             )
             c = time.time()
             libraries = nearby_libraries + faraway_libraries.all()
-            self.log.info(
-                "Fetched libraries far from %s in %.2fsec" % (location, c - b)
-            )
+            self.log.info(f"Fetched libraries far from {location} in {c - b:.2f}sec")
 
         url = self.app.url_for("libraries_opds")
         a = time.time()
@@ -381,17 +379,17 @@ class LibraryRegistryController(BaseController):
             if hyperlink.rel not in hyperlink_types:
                 continue
             hyperlinks[hyperlink.rel] = hyperlink
-        contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = [
+        contact_email_hyperlink, help_email_hyperlink, copyright_email_hyperlink = (
             hyperlinks.get(rel, None) for rel in hyperlink_types
-        ]
-        contact_email, help_email, copyright_email = [
+        )
+        contact_email, help_email, copyright_email = (
             self._get_email(hyperlinks.get(rel, None)) for rel in hyperlink_types
-        ]
+        )
         (
             contact_email_validated_at,
             help_email_validated_at,
             copyright_email_validated_at,
-        ) = [self._validated_at(hyperlinks.get(rel, None)) for rel in hyperlink_types]
+        ) = (self._validated_at(hyperlinks.get(rel, None)) for rel in hyperlink_types)
 
         setting_types = [Library.PLS_ID]
         settings = dict()
@@ -599,7 +597,7 @@ class LibraryRegistryController(BaseController):
         ).value
         if terms_of_service_html:
             encoded = base64.b64encode(terms_of_service_html)
-            terms_of_service_link = "data:%s;base64,%s" % (type, encoded)
+            terms_of_service_link = f"data:{type};base64,{encoded}"
             OPDSCatalog.add_link_to_catalog(
                 document, rel=rel, type=type, href=terms_of_service_link
             )

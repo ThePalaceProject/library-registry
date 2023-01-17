@@ -6,7 +6,7 @@ A discovery service for matching people to the libraries that serve them.
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
-![Python: 3.7,3.8,3.9,3.10](https://img.shields.io/badge/Python-3.7%20%7C%203.8%20%7C%203.9%20%7C%203.10-blue)
+![Python: 3.8,3.9,3.10,3.11](https://img.shields.io/badge/Python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
 
 This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL
 [Library Simplified](http://www.librarysimplified.org/) Library Registry.
@@ -132,7 +132,7 @@ To install the registry locally, you'll need the following:
 
 - PostgreSQL 12+
 - PostGIS 3
-- Python 3.7+ (3.9 is the build target for the Docker install)
+- Python 3.8+ (3.9 is the build target for the Docker install)
 - Appropriate system dependencies to build the Python dependencies, which may include:
     - `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
     - Compression libs like `bzip2-dev`, `zlib-dev`, etc.
@@ -181,13 +181,13 @@ Having done so, you should be able to run the following in the project directory
 For a development environment:
 
 ```shell
-poetry install --no-root -E pg-binary
+poetry install
 ```
 
 For a production environment:
 
 ```shell
-poetry install --no-dev --no-root -E pg
+poetry install --only main,pg
 ```
 
 ### Running the Registry
@@ -224,7 +224,7 @@ Github Actions runs our unit tests against different Python versions automatical
 To run `pytest` unit tests locally, install `tox`.
 
 ```shell
-pip install tox
+poetry install --only ci
 ```
 
 Tox has an environment for each python version and an optional `-docker` factor that will automatically use docker to
@@ -234,11 +234,11 @@ flag.
 #### Environments
 
 | Environment | Python Version |
-| ----------- | -------------- |
-| py37        | Python 3.7     |
+|-------------|----------------|
 | py38        | Python 3.8     |
 | py39        | Python 3.9     |
 | py310       | Python 3.10    |
+| py311       | Python 3.11    |
 
 All of these environments are tested by default when running tox. To test one specific environment you can use the `-e`
 flag.
@@ -261,11 +261,7 @@ missing Python versions in your system for local testing.
 If you install `tox-docker` tox will take care of setting up all the service containers necessary to run the unit tests
 and pass the correct environment variables to configure the tests to use these services. Using `tox-docker` is not
 required, but it is the recommended way to run the tests locally, since it runs the tests in the same way they are run
-on Github Actions.
-
-```shell
-pip install tox-docker
-```
+on Github Actions. `tox-docker` is installed automatically as part of the `ci` poetry group.
 
 The docker functionality is included in a `docker` factor that can be added to the environment. To run an environment
 with a particular factor you add it to the end of the environment.

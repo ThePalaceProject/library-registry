@@ -1,10 +1,9 @@
-# encoding: utf-8
 import pytest
 
 from util.language import LanguageCodes
 
 
-class TestLanguageCodes(object):
+class TestLanguageCodes:
     def test_lookups(self):
         c = LanguageCodes
         assert c.two_to_three["en"] == "eng"

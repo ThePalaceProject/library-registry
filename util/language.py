@@ -1,9 +1,8 @@
-# encoding: utf-8
 import os
 from collections import defaultdict
 
 
-class LanguageCodes(object):
+class LanguageCodes:
     """Convert between ISO-639-2 and ISO-693-1 language codes.
 
     The data file comes from
@@ -603,7 +602,7 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
 
 def languages_from_accept(accept_languages):
     """Turn a list of (locale, quality) 2-tuples into a list of language codes."""
-    seen = set([])
+    seen = set()
     languages = []
     for locale, quality in accept_languages:
         language = LanguageCodes.iso_639_2_for_locale(locale)

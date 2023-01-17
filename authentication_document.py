@@ -9,7 +9,7 @@ from model import Audience, CollectionSummary, Place, ServiceArea, get_one_or_cr
 from problem_details import INVALID_INTEGRATION_DOCUMENT
 
 
-class AuthenticationDocument(object):
+class AuthenticationDocument:
     """Parse an Authentication For OPDS document, including the
     Library Simplified-specific extensions, extracting all the information
     that's of interest to the library registry.

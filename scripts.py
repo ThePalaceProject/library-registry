@@ -24,7 +24,7 @@ from registrar import LibraryRegistrar
 from util.problem_detail import ProblemDetail
 
 
-class Script(object):
+class Script:
     @property
     def _db(self):
         if not hasattr(self, "_session"):
@@ -86,7 +86,7 @@ class LibraryScript(Script):
 
     @classmethod
     def arg_parser(cls):
-        parser = super(LibraryScript, cls).arg_parser()
+        parser = super().arg_parser()
         parser.add_argument(
             "--library",
             help="Official name of the library",
@@ -146,7 +146,7 @@ class LoadPlacesScript(Script):
 class SearchPlacesScript(Script):
     @classmethod
     def arg_parser(cls):
-        parser = super(SearchPlacesScript, cls).arg_parser()
+        parser = super().arg_parser()
         parser.add_argument("name", nargs="*", help="Place name to search for")
         return parser
 
@@ -162,21 +162,21 @@ class SearchLibraryScript(Script):
 
     @classmethod
     def arg_parser(cls):
-        parser = super(SearchLibraryScript, cls).arg_parser()
+        parser = super().arg_parser()
         parser.add_argument("query", nargs=1, help="Search query.")
         return parser
 
     def run(self, cmd_args=None, stdout=sys.stdout):
         parsed = self.parse_command_line(self._db, cmd_args)
         for library in Library.search(self._db, None, parsed.query[0]):
-            stdout.write("%s: %s" % (library.name, library.opds_url))
+            stdout.write(f"{library.name}: {library.opds_url}")
             stdout.write("\n")
 
 
 class AddLibraryScript(Script):
     @classmethod
     def arg_parser(cls):
-        parser = super(AddLibraryScript, cls).arg_parser()
+        parser = super().arg_parser()
         parser.add_argument(
             "--name", help="Official name of the library", required=True
         )
@@ -247,7 +247,7 @@ class AddLibraryScript(Script):
 class SetCoverageAreaScript(LibraryScript):
     @classmethod
     def arg_parser(cls):
-        parser = super(SetCoverageAreaScript, cls).arg_parser()
+        parser = super().arg_parser()
         parser.add_argument(
             "--service-area",
             help="JSON document or string describing the library's service area. If no value is specified, it is assumed to be the same as --focus-area.",
@@ -341,7 +341,7 @@ class AdobeVendorIDAcceptanceTestScript(Script):
 
     @classmethod
     def arg_parser(cls):
-        parser = super(AdobeVendorIDAcceptanceTestScript, cls).arg_parser()
+        parser = super().arg_parser()
         parser.add_argument("--url", help="URL to the library registry", required=True)
         parser.add_argument(
             "--token",
@@ -456,7 +456,7 @@ class ConfigureSiteScript(ConfigurationSettingScript):
         output.write("Current site-wide settings:\n")
         for setting in settings:
             if args.show_secrets or not setting.is_secret:
-                output.write("%s='%s'\n" % (setting.key, setting.value))
+                output.write(f"{setting.key}='{setting.value}'\n")
         _db.commit()
 
 
