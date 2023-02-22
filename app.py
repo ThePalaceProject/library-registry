@@ -223,10 +223,22 @@ def coverage():
     return app.library_registry.coverage_controller.lookup()
 
 
+@app.route("/version.json")
+def application_version():
+    return app.library_registry.version.version()
+
+
+# TODO: This route is deprecated and should be removed in a
+#       future release of the code, it has been left here for
+#       one release to ease any deployment issues.
 @app.route("/heartbeat")
 @returns_problem_detail
 def hearbeat():
-    return app.library_registry.heartbeat.heartbeat()
+    version_info = application_version()
+    version_info[
+        "WARNING"
+    ] = "The /heartbeat endpoint is deprecated. Please use /version.json instead."
+    return version_info
 
 
 # Adobe Vendor ID implementation

@@ -49,13 +49,21 @@ class Configuration:
         )
 
     @classmethod
-    def _package_name(cls) -> str:
+    def package_name(cls) -> str:
         """Get the effective package name.
 
         :return: A package name.
         :rtype: str
         """
         return os.environ.get(cls.ENV_ADMIN_UI_PACKAGE_NAME) or cls.PACKAGE_NAME
+
+    @classmethod
+    def package_version(cls) -> str:
+        """Get the effective package version.
+
+        :return: Package version.
+        """
+        return os.environ.get(cls.ENV_ADMIN_UI_PACKAGE_VERSION) or cls.PACKAGE_VERSION
 
     @classmethod
     def lookup_asset_url(
@@ -94,11 +102,8 @@ class Configuration:
         :rtype: str
         """
         operational_mode = _operational_mode or cls.operational_mode()
-        version = (
-            os.environ.get(cls.ENV_ADMIN_UI_PACKAGE_VERSION) or cls.PACKAGE_VERSION
-        )
         template = cls.PACKAGE_TEMPLATES[operational_mode]["package_url"]
-        url = template.format(name=cls._package_name(), version=version)
+        url = template.format(name=cls.package_name(), version=cls.package_version())
         if not url.endswith("/"):
             url += "/"
         return url
@@ -115,7 +120,7 @@ class Configuration:
         base_dir = _base_dir or cls.ADMIN_DIRECTORY
         return os.path.join(
             base_dir,
-            cls.DEVELOPMENT_MODE_PACKAGE_TEMPLATE.format(name=cls._package_name()),
+            cls.DEVELOPMENT_MODE_PACKAGE_TEMPLATE.format(name=cls.package_name()),
         )
 
     @classmethod
