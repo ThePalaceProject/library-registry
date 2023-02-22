@@ -42,7 +42,7 @@ from problem_details import (
     UNABLE_TO_NOTIFY,
 )
 from registrar import LibraryRegistrar
-from util.app_server import HeartbeatController, catalog_response
+from util.app_server import ApplicationVersionController, catalog_response
 from util.http import HTTP
 from util.problem_detail import ProblemDetail
 from util.string_helpers import base64, random_string
@@ -73,7 +73,7 @@ class LibraryRegistry:
         self.validation_controller = ValidationController(self)
         self.coverage_controller = CoverageController(self)
         self.static_files = StaticFileController(self)
-        self.heartbeat = HeartbeatController()
+        self.version = ApplicationVersionController()
         vendor_id, node_value, delegates = Configuration.vendor_id(self._db)
         if vendor_id:
             self.adobe_vendor_id = AdobeVendorIDController(
