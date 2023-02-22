@@ -43,8 +43,8 @@ FROM python:3.9.16-alpine3.17 AS builder
 EXPOSE 80
 
 ##### Install NGINX, and Supervisor (Gunicorn installed in virtualenv) #####
-# This is a simplified version of the offical Nginx Dockerfile for Alpine 3.13:
-# https://github.com/nginxinc/docker-nginx/blob/dcaaf66e4464037b1a887541f39acf8182233ab8/mainline/alpine/Dockerfile
+# This is a simplified version of the offical Nginx Dockerfile for Alpine 3.17:
+# https://github.com/nginxinc/docker-nginx/blob/5ce65c3efd395ee2d82d32670f233140e92dba99/mainline/alpine/Dockerfile
 ENV NGINX_VERSION 1.23.3
 ENV NJS_VERSION   0.7.9
 ENV PKG_RELEASE   1
