@@ -38,15 +38,15 @@ EXPOSE 5432
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
-FROM python:3.9.2-alpine3.13 AS builder
+FROM python:3.9.16-alpine3.17 AS builder
 
 EXPOSE 80
 
 ##### Install NGINX, and Supervisor (Gunicorn installed in virtualenv) #####
-# This is a simplified version of the offical Nginx Dockerfile for Alpine 3.13:
-# https://github.com/nginxinc/docker-nginx/blob/dcaaf66e4464037b1a887541f39acf8182233ab8/mainline/alpine/Dockerfile
-ENV NGINX_VERSION 1.19.8
-ENV NJS_VERSION   0.5.2
+# This is a simplified version of the offical Nginx Dockerfile for Alpine 3.17:
+# https://github.com/nginxinc/docker-nginx/blob/5ce65c3efd395ee2d82d32670f233140e92dba99/mainline/alpine/Dockerfile
+ENV NGINX_VERSION 1.23.3
+ENV NJS_VERSION   0.7.9
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
 ENV POETRY_VERSION 1.3.2
@@ -63,10 +63,10 @@ RUN set -x \
         nginx-module-image-filter=${NGINX_VERSION}-r${PKG_RELEASE} \
         nginx-module-njs=${NGINX_VERSION}.${NJS_VERSION}-r${PKG_RELEASE} \
     " \
-    && KEY_SHA512="e7fa8303923d9b95db37a77ad46c68fd4755ff935d0a534d26eba83de193c76166c68bfe7f65471bf8881004ef4aa6df3e34689c305662750c0172fca5d8552a *stdin" \
+    && KEY_SHA512="e09fa32f0a0eab2b879ccbbc4d0e4fb9751486eedda75e35fac65802cc9faa266425edf83e261137a2f4d16281ce2c1a5f4502930fe75154723da014214f0655" \
     && apk add --no-cache --virtual .cert-deps openssl \
     && wget -O /tmp/nginx_signing.rsa.pub https://nginx.org/keys/nginx_signing.rsa.pub \
-    && if [ "$(openssl rsa -pubin -in /tmp/nginx_signing.rsa.pub -text -noout | openssl sha512 -r)" = "$KEY_SHA512" ]; then \
+    && if echo "$KEY_SHA512 */tmp/nginx_signing.rsa.pub" | sha512sum -c -; then \
         echo "key verification succeeded!"; \
         mv /tmp/nginx_signing.rsa.pub /etc/apk/keys/; \
     else \
@@ -94,7 +94,7 @@ RUN set -x \
     && pip install --upgrade pip \
     && apk add --no-cache tzdata \
     && apk add --no-cache curl ca-certificates \
-    && apk add --no-cache --virtual .build-base build-base \
+    && apk add --no-cache --virtual .build-base build-base libffi-dev \
     && curl -sSL ${POETRY_URL} | python - \
     && apk del .build-base \
     && ln -s ${POETRY_HOME}/bin/poetry /bin/poetry \
