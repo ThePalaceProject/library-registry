@@ -288,6 +288,10 @@ class TestLibraryRegistryController(ControllerTest):
                 assert expected.pls_id.value == flattened.get(k)
             elif k == "number_of_patrons":
                 assert str(getattr(expected, k)) == flattened.get(k)
+            elif k in ["help_url"]:
+                # Alternate constraint, is not directly part of the library model
+                # Is tested in the alternate path
+                pass
             else:
                 assert getattr(expected, k) == flattened.get(k)
 
@@ -324,6 +328,7 @@ class TestLibraryRegistryController(ControllerTest):
             "help_validated",
             "copyright_validated",
             "opds_url",
+            "help_url",
         ]
         assert set(library.get("urls_and_contact")) == set(expected_url_contact_keys)
 
@@ -529,15 +534,25 @@ class TestLibraryRegistryController(ControllerTest):
         # Test that the controller can look up the complete information for one specific library.
         library = self.nypl
 
-        def check(has_email=True):
+        def check(has_email=True, assertion=True):
             uuid = library.internal_urn.split("uuid:")[1]
             with self.app.test_request_context("/"):
                 response = self.controller.library_details(uuid, 0)
             assert response.get("uuid") == uuid
             self._check_keys(response)
-            self._is_library(library, response, has_email)
+            if assertion:
+                self._is_library(library, response, has_email)
+            return response
 
         check()
+
+        # Check if changing the help email to a link removes the email value, and adds a link
+        for l in library.hyperlinks:
+            if l.rel == Hyperlink.HELP_REL:
+                l.href = "http://example.org/help"
+        response = check(assertion=False)
+        assert response["urls_and_contact"]["help_email"] == None
+        assert response["urls_and_contact"]["help_url"] == "http://example.org/help"
 
         # Delete the library's contact email, simulating an old
         # library created before this rule was instituted, and try
