@@ -5,7 +5,6 @@ import urllib.parse
 
 from flask import Flask, Response
 from flask_babel import Babel
-from flask_sqlalchemy_session import flask_scoped_session
 
 from app_helpers import (
     compressible,
@@ -15,6 +14,7 @@ from app_helpers import (
 )
 from config import Configuration
 from controller import LibraryRegistry
+from flask_sqlalchemy_session import flask_scoped_session
 from log import LogConfiguration
 from model import ConfigurationSetting, SessionManager
 from util.app_server import (
