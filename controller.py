@@ -391,6 +391,15 @@ class LibraryRegistryController(BaseController):
             copyright_email_validated_at,
         ) = (self._validated_at(hyperlinks.get(rel, None)) for rel in hyperlink_types)
 
+        # If we don't have a help email, we might have a help uri
+        help_url = None
+        if (
+            not help_email
+            and (link := hyperlinks.get(Hyperlink.HELP_REL))
+            and link.href
+        ):
+            help_url = link.href
+
         setting_types = [Library.PLS_ID]
         settings = dict()
         for s in library.settings:
@@ -427,6 +436,7 @@ class LibraryRegistryController(BaseController):
             authentication_url=library.authentication_url,
             opds_url=library.opds_url,
             web_url=library.web_url,
+            help_url=help_url,
         )
 
         # This will be slow unless ServiceArea has been preloaded with a joinedload().
@@ -459,7 +469,10 @@ class LibraryRegistryController(BaseController):
 
     def _get_email(self, hyperlink):
         if hyperlink and hyperlink.resource and hyperlink.resource.href:
-            return hyperlink.resource.href.split("mailto:")[1]
+            try:
+                return hyperlink.resource.href.split("mailto:")[1]
+            except IndexError:
+                return None
 
     def _validated_at(self, hyperlink):
         validated_at = "Not validated"
