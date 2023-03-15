@@ -4,7 +4,11 @@ import logging
 import os
 import sys
 
+import db_migration
 from adobe_vendor_id import AdobeVendorIDClient
+from alembic.command import downgrade, upgrade
+from alembic.config import Config as AlembicConfig
+from alembic.util import CommandError
 from authentication_document import AuthenticationDocument
 from config import Configuration
 from emailer import Emailer, EmailTemplate
@@ -691,3 +695,43 @@ class ConfigureEmailerScript(Script):
         # Since the emailer didn't raise an exception we can assume we sent
         # the email successfully.
         _db.commit()
+
+
+class AlembicMigrateDatabase(Script):
+    @classmethod
+    def arg_parser(cls):
+        parser = argparse.ArgumentParser(
+            prog="Alembic Database Migration",
+            description="By default, running this script without any arguments "
+            "will create the tables and stamp as head if the database is new. Otherwise "
+            "it will perform an alembic 'upgrade head' command.",
+        )
+        parser.add_argument(
+            "-d",
+            "--downgrade",
+            help="Downgrade to a specific version.",
+            required=False,
+            default=None,
+        )
+        parser.add_argument(
+            "-u",
+            "--upgrade",
+            help="Upgrade to a specific version.",
+            required=False,
+            default="head",
+        )
+        return parser
+
+    def do_run(self, cmd_args=None):
+        args = self.parse_command_line(cmd_args=cmd_args)
+        config = AlembicConfig("alembic.ini")
+
+        try:
+            if args.downgrade is not None:
+                downgrade(config, args.downgrade)
+            elif args.upgrade is not None:
+                upgrade(config, args.upgrade)
+            else:
+                db_migration.migrate()
+        except CommandError as e:
+            print(f"Error: {e}. No migrations performed.")

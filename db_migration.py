@@ -1,13 +1,15 @@
 import logging
+import os
 
 import psycopg2
 
 from alembic.command import stamp, upgrade
 from alembic.config import Config
 from alembic.util.exc import CommandError
+from config import Configuration
 
 
-def migrate(db_url: str):
+def migrate(db_url: str = None):
     """Ensure the alembic migration state is up-to-date.
     If the database table "libraries" has not been created yet, we can assume this is a new deployment.
     Else, we can assume this database should attempt an upgrade to the latest version, if the DB
@@ -15,6 +17,10 @@ def migrate(db_url: str):
 
     Note: This function must be run before the SQLAlchemy session is initialized.
     """
+
+    if not db_url:
+        db_url = Configuration.database_url("TESTING" in os.environ)
+
     # Need to set up some temporary logging since we haven't
     # had a chance to read the logging config from the DB
     logging.basicConfig()

@@ -190,6 +190,26 @@ For a production environment:
 poetry install --only main,pg
 ```
 
+### Initialize the database
+
+To initialize a fresh database (ie no tables yet created) use the following script:
+
+```shell
+poetry run ./bin/migrate_database
+```
+
+### Upgrade/Downgrade an existing database
+
+During development you may wish to use Alembic to upgrade or downgrade to a particular database version.
+You can fulfill this desire using the `-u/--upgrade <version>` or `-d/--downgrade <version>` parameters, respectively.
+For example to upgrade to version "ee43af3" you would execute the following command:
+
+```shell
+poetry run ./bin/migrate_database -u ee43af3
+```
+
+Database versions can be found in the alembic/versions directory.
+
 ### Running the Registry
 
 To start the registry inside the virtualenv that `poetry` creates:
