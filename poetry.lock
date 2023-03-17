@@ -496,24 +496,21 @@ dotenv = ["python-dotenv"]
 
 [[package]]
 name = "flask-babel"
-version = "2.0.0"
-description = "Adds i18n/l10n support to Flask applications"
+version = "3.0.1"
+description = "Adds i18n/l10n support fo Flask applications."
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7,<4.0"
 files = [
-    {file = "Flask-Babel-2.0.0.tar.gz", hash = "sha256:f9faf45cdb2e1a32ea2ec14403587d4295108f35017a7821a2b1acb8cfd9257d"},
-    {file = "Flask_Babel-2.0.0-py3-none-any.whl", hash = "sha256:e6820a052a8d344e178cdd36dd4bb8aea09b4bda3d5f9fa9f008df2c7f2f5468"},
+    {file = "flask_babel-3.0.1-py3-none-any.whl", hash = "sha256:ceb8c82039954a6b29da33ec5deb84878b78069d1ea628b21cac3f8233e9189c"},
+    {file = "flask_babel-3.0.1.tar.gz", hash = "sha256:d408cace25514bea8b92e898fd7e55877fbac79b71bc230e266ff515408eba38"},
 ]
 
 [package.dependencies]
-Babel = ">=2.3"
-Flask = "*"
-Jinja2 = ">=2.5"
-pytz = "*"
-
-[package.extras]
-dev = ["Pallets-Sphinx-Themes", "bumpversion", "ghp-import", "pytest", "pytest-mock", "sphinx"]
+Babel = ">=2.11.0,<3.0.0"
+Flask = ">=2.0.0,<3.0.0"
+Jinja2 = ">=3.1.2,<4.0.0"
+pytz = ">=2022.7,<2023.0"
 
 [[package]]
 name = "flask-bcrypt"
@@ -1872,4 +1869,4 @@ pg-binary = []
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4"
-content-hash = "85b8bd0b5343739e01f9147b2c9df9fd6a3c25bfea78c9b097e385bad478a7e7"
+content-hash = "780574c983b29602a31ac20cfcb63dfd3bb63b4f1c0cf9e9d1d29a66d32fcb15"
