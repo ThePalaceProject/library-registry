@@ -6,8 +6,6 @@ import sys
 
 import db_migration
 from adobe_vendor_id import AdobeVendorIDClient
-from alembic.command import downgrade, upgrade
-from alembic.config import Config as AlembicConfig
 from alembic.util import CommandError
 from authentication_document import AuthenticationDocument
 from config import Configuration
@@ -724,14 +722,14 @@ class AlembicMigrateDatabase(Script):
 
     def do_run(self, cmd_args=None):
         args = self.parse_command_line(cmd_args=cmd_args)
-        config = AlembicConfig("alembic.ini")
-
         try:
             if args.downgrade is not None:
-                downgrade(config, args.downgrade)
-            elif args.upgrade is not None:
-                upgrade(config, args.upgrade)
+                action = "downgrade"
+                version = args.downgrade
             else:
-                db_migration.migrate()
+                action = "upgrade"
+                version = "head" if args.upgrade is None else args.upgrade
+
+            db_migration.migrate(action=action, version=version)
         except CommandError as e:
             print(f"Error: {e}. No migrations performed.")

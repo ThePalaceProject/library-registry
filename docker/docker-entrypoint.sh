@@ -22,15 +22,7 @@ EOF
 }
 
 migrate_db () {
-    python > /dev/null 2>&1 <<EOF
-import sys
-from db_migration import migrate
-try:
-  migrate()
-except Exception:
-  sys.exit(1)
-sys.exit(0)
-EOF
+    ./bin/migrate_database > /dev/null 2>&1
 }
 
 until [ -n "$PG_READY" ] || [ $COUNT -gt $RETRIES ]; do

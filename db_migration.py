@@ -3,13 +3,13 @@ import os
 
 import psycopg2
 
-from alembic.command import stamp, upgrade
+from alembic.command import downgrade, stamp, upgrade
 from alembic.config import Config
 from alembic.util.exc import CommandError
 from config import Configuration
 
 
-def migrate(db_url: str = None):
+def migrate(db_url: str = None, action: str = "upgrade", version: str = "head"):
     """Ensure the alembic migration state is up-to-date.
     If the database table "libraries" has not been created yet, we can assume this is a new deployment.
     Else, we can assume this database should attempt an upgrade to the latest version, if the DB
@@ -42,19 +42,29 @@ def migrate(db_url: str = None):
         log.info(
             "Database tables were not detected, stamping the alembic version to 'head'."
         )
-        try:
-            stamp(alembic_cfg, "head")
-        except (CommandError, FileNotFoundError) as ex:
-            # Alembic log config disables other logs
-            log.disabled = False
-            log.error(f"Alembic Error: Could not run STAMP HEAD on the database")
-            log.error(f"{ex.__class__.__name__}: {ex}")
+
+        if action == "upgrade":
+            try:
+                stamp(alembic_cfg, "head")
+            except (CommandError, FileNotFoundError) as ex:
+                # Alembic log config disables other logs
+                log.disabled = False
+                log.error(f"Alembic Error: Could not run STAMP HEAD on the database")
+                log.error(f"{ex.__class__.__name__}: {ex}")
+        else:
+            log.error(f"You cannot downgrade a database that has not yet been created.")
     else:
-        # This is not a new deployment, run the 'upgrade head' command.
+        # This is not a new deployment, run upgrade/downgrade
         # This is an idempotent command, we don't have to check whether it needs to be run or not.
-        log.info("Running alembic upgrade.")
         try:
-            upgrade(alembic_cfg, "head")
+            if action == "upgrade":
+                log.info(f"Upgrading alembic to {version}...")
+                upgrade(alembic_cfg, version)
+            elif action == "downgrade":
+                downgrade(alembic_cfg, version)
+            else:
+                raise Exception(f"Invalid command: {action}")
+
         except (CommandError, FileNotFoundError) as ex:
             # Alembics log config disables other logs
             log.disabled = False
