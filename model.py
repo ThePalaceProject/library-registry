@@ -51,7 +51,6 @@ from sqlalchemy.sql.expression import (
 )
 
 from config import Configuration
-from db_migration import migrate
 from emailer import Emailer
 from util import GeometryUtility
 from util.language import LanguageCodes
@@ -103,22 +102,16 @@ class SessionManager:
         return sessionmaker(bind=engine)
 
     @classmethod
-    def initialize(cls, url: str, testing=False) -> tuple[Engine, Connection]:
+    def initialize(cls, url: str) -> tuple[Engine, Connection]:
         """Initialize the database connection
         Create all the database tables from the models
         Optionally, run the alembic migration scripts
-
-        :param db_url: The Database connection url
-        :param testing: Whether we are in a test environment or not"""
+        :param db_url: The Database connection url"""
         if url in cls.engine_for_url:
             engine = cls.engine_for_url[url]
             return engine, engine.connect()
 
         engine = cls.engine(url)
-
-        # Run the migrations only if we're not TESTING
-        if not testing:
-            migrate(url)
 
         Base.metadata.create_all(engine)
 

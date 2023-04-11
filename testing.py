@@ -57,7 +57,7 @@ class DatabaseTest:
     @classmethod
     def get_database_connection(cls):
         url = Configuration.database_url(test=True)
-        engine, connection = SessionManager.initialize(url, testing=True)
+        engine, connection = SessionManager.initialize(url)
 
         return engine, connection
 
