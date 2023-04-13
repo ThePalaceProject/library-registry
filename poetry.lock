@@ -496,21 +496,21 @@ dotenv = ["python-dotenv"]
 
 [[package]]
 name = "flask-babel"
-version = "3.0.1"
-description = "Adds i18n/l10n support fo Flask applications."
+version = "3.1.0"
+description = "Adds i18n/l10n support for Flask applications."
 category = "main"
 optional = false
 python-versions = ">=3.7,<4.0"
 files = [
-    {file = "flask_babel-3.0.1-py3-none-any.whl", hash = "sha256:ceb8c82039954a6b29da33ec5deb84878b78069d1ea628b21cac3f8233e9189c"},
-    {file = "flask_babel-3.0.1.tar.gz", hash = "sha256:d408cace25514bea8b92e898fd7e55877fbac79b71bc230e266ff515408eba38"},
+    {file = "flask_babel-3.1.0-py3-none-any.whl", hash = "sha256:deb3ee272d5adf97f5974ed09ab501243d63e7fb4a047501a00de4bd4aca4830"},
+    {file = "flask_babel-3.1.0.tar.gz", hash = "sha256:be015772c5d7f046f3b99c508dcf618636eb93d21b713b356db79f3e79f69f39"},
 ]
 
 [package.dependencies]
-Babel = ">=2.11.0,<3.0.0"
-Flask = ">=2.0.0,<3.0.0"
-Jinja2 = ">=3.1.2,<4.0.0"
-pytz = ">=2022.7,<2023.0"
+Babel = ">=2.12"
+Flask = ">=2.0"
+Jinja2 = ">=3.1"
+pytz = ">=2022.7"
 
 [[package]]
 name = "flask-bcrypt"
@@ -1858,4 +1858,4 @@ pg-binary = []
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4"
-content-hash = "780574c983b29602a31ac20cfcb63dfd3bb63b4f1c0cf9e9d1d29a66d32fcb15"
+content-hash = "a1505fd4559a6f1092bcb96ed7bd4bbc6887310f1354a583bb4c92304e4d55a9"
