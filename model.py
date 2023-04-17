@@ -2704,12 +2704,16 @@ class Admin(Base):
         :return: Admin or None
         """
         setting_up = _db.query(Admin).count() == 0
-        admin, is_new = get_one_or_create(_db, Admin, username=username)
+
         if setting_up:
+            admin, ignore = create(_db, Admin, username=username)
             admin.password = cls.make_password(password)
             return admin
-        elif not is_new and admin and admin.check_password(password):
-            return admin
+        else:
+            admin: Admin = get_one(_db, Admin, username=username)
+            if admin and admin.check_password(password):
+                return admin
+
         return None
 
     def __repr__(self):
