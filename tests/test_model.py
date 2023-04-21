@@ -1959,6 +1959,13 @@ class TestAdmin(DatabaseTest):
         # Unsuccessfully authenticate existing admin
         assert Admin.authenticate(self._db, "Admin", "wrong") is None
 
+    def test_authenticate_and_verify_no_new_admins_were_created(self):
+        assert Admin.authenticate(self._db, "Admin", "123") == self.admin
+        before_count = self._db.query(Admin).count()
+        assert Admin.authenticate(self._db, "any_username", "any_password") is None
+        after_count = self._db.query(Admin).count()
+        assert before_count == after_count
+
     def test_make_new_admin(self):
         # Create the first admin
         self._db.delete(self.admin)
