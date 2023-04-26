@@ -12,3 +12,6 @@ def teardown_all_tables_after_test_session():
     yield
     engine, connection = DatabaseTest.get_database_connection()
     Base.metadata.drop_all(engine)
+
+
+pytest_plugins = ["tests.fixtures.database", "tests.fixtures.controller"]

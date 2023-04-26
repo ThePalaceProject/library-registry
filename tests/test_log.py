@@ -5,20 +5,20 @@ import pytest
 from log import JSONFormatter, LogConfiguration, LogglyHandler, StringFormatter
 from model import ExternalIntegration
 
-from . import DatabaseTest
+from .fixtures.database import DatabaseTransactionFixture
 
 
-class TestLogConfiguration(DatabaseTest):
-    def loggly_integration(self):
+class TestLogConfiguration:
+    def loggly_integration(self, db: DatabaseTransactionFixture):
         """Create an ExternalIntegration for a Loggly account."""
-        integration = self._external_integration(
+        integration = db.external_integration(
             protocol=ExternalIntegration.LOGGLY, goal=ExternalIntegration.LOGGING_GOAL
         )
         integration.url = "http://example.com/%s/"
         integration.password = "a_token"
         return integration
 
-    def test_from_configuration(self):
+    def test_from_configuration(self, db: DatabaseTransactionFixture):
         cls = LogConfiguration
         m = cls.from_configuration
 
@@ -31,14 +31,14 @@ class TestLogConfiguration(DatabaseTest):
 
         # The same defaults hold when there is a database connection
         # but nothing is actually configured.
-        internal_log_level, database_log_level, [handler] = m(self._db, testing=False)
+        internal_log_level, database_log_level, [handler] = m(db.session, testing=False)
         assert internal_log_level == cls.INFO
         assert database_log_level == cls.WARN
         assert isinstance(handler.formatter, JSONFormatter)
 
         # Let's set up a Loggly integration and change the defaults.
-        self.loggly_integration()
-        internal = self._external_integration(
+        self.loggly_integration(db)
+        internal = db.external_integration(
             protocol=ExternalIntegration.INTERNAL_LOGGING,
             goal=ExternalIntegration.LOGGING_GOAL,
         )
@@ -47,7 +47,7 @@ class TestLogConfiguration(DatabaseTest):
         internal.setting(cls.DATABASE_LOG_LEVEL).value = cls.DEBUG
         template = "%(filename)s:%(message)s"
         internal.setting(cls.LOG_MESSAGE_TEMPLATE).value = template
-        internal_log_level, database_log_level, handlers = m(self._db, testing=False)
+        internal_log_level, database_log_level, handlers = m(db.session, testing=False)
         assert internal_log_level == cls.ERROR
         assert database_log_level == cls.DEBUG
         [loggly_handler] = [x for x in handlers if isinstance(x, LogglyHandler)]
@@ -60,12 +60,12 @@ class TestLogConfiguration(DatabaseTest):
         # If testing=True, then the database configuration is ignored,
         # and the log setup is one that's appropriate for display
         # alongside unit test output.
-        internal_log_level, database_log_level, [handler] = m(self._db, testing=True)
+        internal_log_level, database_log_level, [handler] = m(db.session, testing=True)
         assert internal_log_level == cls.DEBUG
         assert database_log_level == cls.WARN
         assert handler.formatter._fmt == cls.DEFAULT_MESSAGE_TEMPLATE
 
-    def test_defaults(self):
+    def test_defaults(self, db: DatabaseTransactionFixture):
         cls = LogConfiguration
 
         # Normally the default log level is INFO and log messages are
@@ -86,7 +86,7 @@ class TestLogConfiguration(DatabaseTest):
             cls.DEFAULT_MESSAGE_TEMPLATE,
         )
 
-    def test_set_formatter(self):
+    def test_set_formatter(self, db: DatabaseTransactionFixture):
         # Create a generic handler.
         handler = logging.StreamHandler()
 
@@ -118,10 +118,10 @@ class TestLogConfiguration(DatabaseTest):
         LogConfiguration.set_formatter(handler, None, None)
         assert isinstance(formatter, JSONFormatter)
 
-    def test_loggly_handler(self):
+    def test_loggly_handler(self, db: DatabaseTransactionFixture):
         """Turn an appropriate ExternalIntegration into a LogglyHandler."""
 
-        integration = self.loggly_integration()
+        integration = self.loggly_integration(db)
         handler = LogConfiguration.loggly_handler(integration)
         assert isinstance(handler, LogglyHandler)
         assert handler.url == "http://example.com/a_token/"
@@ -134,7 +134,7 @@ class TestLogConfiguration(DatabaseTest):
             token="a_token"
         )
 
-    def test_interpolate_loggly_url(self):
+    def test_interpolate_loggly_url(self, db: DatabaseTransactionFixture):
         m = LogConfiguration._interpolate_loggly_url
 
         # We support two string interpolation techniques for combining

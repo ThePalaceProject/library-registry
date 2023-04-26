@@ -30,15 +30,14 @@ from scripts import (
     ShowIntegrationsScript,
 )
 from testing import MockPlace
+from tests.fixtures.database import DatabaseTransactionFixture
 
-from . import DatabaseTest
 
+class TestLibraryScript:
+    def test_libraries(self, db: DatabaseTransactionFixture):
 
-class TestLibraryScript(DatabaseTest):
-    def test_libraries(self):
-
-        the_library = self._library(name="The Library")
-        ignored_library = self._library(name="Ignored Library")
+        the_library = db.library(name="The Library")
+        ignored_library = db.library(name="Ignored Library")
 
         class Mock(LibraryScript):
             # Mock of LibraryScript that returns a special value
@@ -50,7 +49,7 @@ class TestLibraryScript(DatabaseTest):
             def all_libraries(self):
                 return self.all_libraries_return_value
 
-        script = Mock(self._db)
+        script = Mock(db.session)
 
         # Any library can be processed if it's identified by name.
         for library in the_library, ignored_library:
@@ -63,32 +62,32 @@ class TestLibraryScript(DatabaseTest):
         # all_libraries is used as the list of libraries.
         assert script.libraries() == script.all_libraries_return_value
 
-    def test_all_libraries(self):
+    def test_all_libraries(self, db: DatabaseTransactionFixture):
         # Three libraries, one in each state.
-        production = self._library()
-        testing = self._library(library_stage=Library.TESTING_STAGE)
-        self._library(library_stage=Library.CANCELLED_STAGE)
+        production = db.library()
+        testing = db.library(library_stage=Library.TESTING_STAGE)
+        db.library(library_stage=Library.CANCELLED_STAGE)
 
         # The all_libraries property omits the cancelled library.
-        script = LibraryScript(self._db)
+        script = LibraryScript(db.session)
         assert set(script.all_libraries) == {production, testing}
 
 
-class TestLoadPlacesScript(DatabaseTest):
-    def test_run(self):
+class TestLoadPlacesScript:
+    def test_run(self, db: DatabaseTransactionFixture):
         test_ndjson = """{"parent_id": null, "name": "United States", "full_name": null, "aliases": [], "type": "nation", "abbreviated_name": "US", "id": "US"}
 {"type": "Point", "coordinates": [-159.459551, 54.948652]}
 {"parent_id": "US", "name": "Alabama", "full_name": null, "aliases": [], "type": "state", "abbreviated_name": "AL", "id": "01"}
 {"type": "Point", "coordinates": [-88.053375, 30.506987]}
 {"parent_id": "01", "name": "Montgomery", "full_name": null, "aliases": [], "type": "city", "abbreviated_name": null, "id": "0151000"}
 {"type": "Point", "coordinates": [-86.034128, 32.302979]}"""
-        script = LoadPlacesScript(self._db)
+        script = LoadPlacesScript(db.session)
 
         # Run the script...
         script.run(cmd_args=[], stdin=StringIO(test_ndjson))
 
         # ...and import three places into the database.
-        places = self._db.query(Place).all()
+        places = db.session.query(Place).all()
         assert {x.external_name for x in places} == {
             "United States",
             "Alabama",
@@ -97,15 +96,15 @@ class TestLoadPlacesScript(DatabaseTest):
         assert {x.external_id for x in places} == {"US", "01", "0151000"}
 
 
-class TestSearchPlacesScript(DatabaseTest):
-    def test_run(self):
-        nys = self.new_york_state
-        ct = self.connecticut_state  # noqa: F841
-        nyc = self.new_york_city
+class TestSearchPlacesScript:
+    def test_run(self, db: DatabaseTransactionFixture):
+        nys = db.new_york_state
+        ct = db.connecticut_state  # noqa: F841
+        nyc = db.new_york_city
 
         # Run the script...
         output = StringIO()
-        script = SearchPlacesScript(self._db)
+        script = SearchPlacesScript(db.session)
         script.run(["New York"], stdout=output)
 
         # We found the two places called 'New York', but not the other
@@ -116,9 +115,9 @@ class TestSearchPlacesScript(DatabaseTest):
         assert "Connecticut" not in actual_output
 
 
-class TestAddLibraryScript(DatabaseTest):
-    def test_run(self):
-        nyc = self.new_york_city
+class TestAddLibraryScript:
+    def test_run(self, db: DatabaseTransactionFixture):
+        nyc = db.new_york_city
         args = [
             "--name=The New York Public Library",
             "--authentication-url=https://circulation.librarysimplified.org/NYNYPL/authentication_document",
@@ -130,11 +129,11 @@ class TestAddLibraryScript(DatabaseTest):
             "--short-name=NYNYPL",
             "--shared-secret=12345",
         ]
-        script = AddLibraryScript(self._db)
+        script = AddLibraryScript(db.session)
         script.run(cmd_args=args)
 
         # A library was created with the given specs.
-        [library] = self._db.query(Library).all()
+        [library] = db.session.query(Library).all()
 
         assert library.name == "The New York Public Library"
         assert library.internal_urn.startswith("urn:uuid")
@@ -155,19 +154,19 @@ class TestAddLibraryScript(DatabaseTest):
         assert [x.place for x in library.service_areas] == [nyc]
 
 
-class TestSearchLibraryScript(DatabaseTest):
-    def test_run(self):
-        nys = self.new_york_state  # noqa: F841
-        nypl = self.nypl
-        csl = self.connecticut_state_library  # noqa: F841
-        zip = self.zip_10018  # noqa: F841
-        ct = self.connecticut_state  # noqa: F841
-        nyc = self.new_york_city  # noqa: F841
+class TestSearchLibraryScript:
+    def test_run(self, db: DatabaseTransactionFixture):
+        nys = db.new_york_state  # noqa: F841
+        nypl = db.nypl
+        csl = db.connecticut_state_library  # noqa: F841
+        zip = db.zip_10018  # noqa: F841
+        ct = db.connecticut_state  # noqa: F841
+        nyc = db.new_york_city  # noqa: F841
         nypl.opds_url = "http://opds/"
 
         # Run the script...
         output = StringIO()
-        script = SearchLibraryScript(self._db)
+        script = SearchLibraryScript(db.session)
         script.run(cmd_args=["10018"], stdout=output)
 
         # We found the library whose service area overlaps 10018
@@ -176,12 +175,12 @@ class TestSearchLibraryScript(DatabaseTest):
         assert actual_output == f"{nypl.name}: {nypl.opds_url}\n"
 
 
-class TestConfigureSiteScript(DatabaseTest):
-    def test_settings(self):
+class TestConfigureSiteScript:
+    def test_settings(self, db: DatabaseTransactionFixture):
         script = ConfigureSiteScript()
         output = StringIO()
         script.do_run(
-            self._db,
+            db.session,
             [
                 "--setting=setting1=value1",
                 '--setting=setting2=[1,2,"3"]',
@@ -194,38 +193,40 @@ class TestConfigureSiteScript(DatabaseTest):
         assert "setting1='value1'" in actual
         assert """setting2='[1,2,"3"]'""" in actual
 
-        assert ConfigurationSetting.sitewide(self._db, "setting1").value == "value1"
-        assert ConfigurationSetting.sitewide(self._db, "setting2").value == '[1,2,"3"]'
+        assert ConfigurationSetting.sitewide(db.session, "setting1").value == "value1"
         assert (
-            ConfigurationSetting.sitewide(self._db, "secret_setting").value
+            ConfigurationSetting.sitewide(db.session, "setting2").value == '[1,2,"3"]'
+        )
+        assert (
+            ConfigurationSetting.sitewide(db.session, "secret_setting").value
             == "secretvalue"
         )
 
         # If we run again with --show-secrets, the secret is shown.
         output = StringIO()
-        script.do_run(self._db, ["--show-secrets"], output)
+        script.do_run(db.session, ["--show-secrets"], output)
         actual = output.getvalue()
         assert "secret_setting='secretvalue'" in actual
         assert "setting1='value1'" in actual
         assert """setting2='[1,2,"3"]'""" in actual
 
 
-class TestShowIntegrationsScript(DatabaseTest):
-    def test_with_no_integrations(self):
+class TestShowIntegrationsScript:
+    def test_with_no_integrations(self, db: DatabaseTransactionFixture):
         output = StringIO()
-        ShowIntegrationsScript().do_run(self._db, output=output)
+        ShowIntegrationsScript().do_run(db.session, output=output)
         assert output.getvalue() == "No integrations found.\n"
 
-    def test_with_multiple_integrations(self):
+    def test_with_multiple_integrations(self, db: DatabaseTransactionFixture):
         i1, ignore = create(
-            self._db,
+            db.session,
             ExternalIntegration,
             name="Integration 1",
             goal="Goal",
             protocol=ExternalIntegration.ADOBE_VENDOR_ID,
         )
         i2, ignore = create(
-            self._db,
+            db.session,
             ExternalIntegration,
             name="Integration 2",
             goal="Goal",
@@ -235,7 +236,7 @@ class TestShowIntegrationsScript(DatabaseTest):
         # The output of this script is the result of running explain()
         # on both integrations.
         output = StringIO()
-        ShowIntegrationsScript().do_run(self._db, output=output)
+        ShowIntegrationsScript().do_run(db.session, output=output)
         expect_1 = "\n".join(i1.explain(include_secrets=False))
         expect_2 = "\n".join(i2.explain(include_secrets=False))
 
@@ -244,63 +245,63 @@ class TestShowIntegrationsScript(DatabaseTest):
         # We can tell the script to only list a single integration.
         output = StringIO()
         ShowIntegrationsScript().do_run(
-            self._db, cmd_args=["--name=Integration 2"], output=output
+            db.session, cmd_args=["--name=Integration 2"], output=output
         )
         assert output.getvalue() == expect_2 + "\n"
 
         # We can tell the script to include the integration secrets
         output = StringIO()
         ShowIntegrationsScript().do_run(
-            self._db, cmd_args=["--show-secrets"], output=output
+            db.session, cmd_args=["--show-secrets"], output=output
         )
         expect_1 = "\n".join(i1.explain(include_secrets=True))
         expect_2 = "\n".join(i2.explain(include_secrets=True))
         assert output.getvalue() == expect_1 + "\n" + expect_2 + "\n"
 
 
-class TestConfigureIntegrationScript(DatabaseTest):
-    def test_load_integration(self):
+class TestConfigureIntegrationScript:
+    def test_load_integration(self, db: DatabaseTransactionFixture):
         m = ConfigureIntegrationScript._integration
 
         with pytest.raises(ValueError) as exc:
-            m(self._db, None, None, "protocol", None)
+            m(db.session, None, None, "protocol", None)
         assert (
             "An integration must by identified by either ID, name, or the combination of protocol and goal."
             in str(exc.value)
         )
 
         with pytest.raises(ValueError) as exc:
-            m(self._db, "notanid", None, None, None)
+            m(db.session, "notanid", None, None, None)
         assert "No integration with ID notanid." in str(exc.value)
 
         with pytest.raises(ValueError) as exc:
-            m(self._db, None, "Unknown integration", None, None)
+            m(db.session, None, "Unknown integration", None, None)
         assert (
             'No integration with name "Unknown integration". To create it, you must also provide protocol and goal.'
             in str(exc.value)
         )
 
         integration, ignore = create(
-            self._db, ExternalIntegration, protocol="Protocol", goal="Goal"
+            db.session, ExternalIntegration, protocol="Protocol", goal="Goal"
         )
         integration.name = "An integration"
-        assert m(self._db, integration.id, None, None, None) == integration
-        assert m(self._db, None, integration.name, None, None) == integration
-        assert m(self._db, None, None, "Protocol", "Goal") == integration
+        assert m(db.session, integration.id, None, None, None) == integration
+        assert m(db.session, None, integration.name, None, None) == integration
+        assert m(db.session, None, None, "Protocol", "Goal") == integration
 
         # An integration may be created given a protocol and goal.
-        integration2 = m(self._db, None, "I exist now", "Protocol", "Goal2")
+        integration2 = m(db.session, None, "I exist now", "Protocol", "Goal2")
         assert integration2 != integration
         assert integration2.protocol == "Protocol"
         assert integration2.goal == "Goal2"
         assert integration2.name == "I exist now"
 
-    def test_add_settings(self):
+    def test_add_settings(self, db: DatabaseTransactionFixture):
         script = ConfigureIntegrationScript()
         output = StringIO()
 
         script.do_run(
-            self._db,
+            db.session,
             [
                 "--protocol=aprotocol",
                 "--goal=agoal",
@@ -311,7 +312,7 @@ class TestConfigureIntegrationScript(DatabaseTest):
 
         # An ExternalIntegration was created and configured.
         integration = get_one(
-            self._db, ExternalIntegration, protocol="aprotocol", goal="agoal"
+            db.session, ExternalIntegration, protocol="aprotocol", goal="agoal"
         )
 
         expect_output = (
@@ -320,13 +321,13 @@ class TestConfigureIntegrationScript(DatabaseTest):
         assert output.getvalue() == expect_output
 
 
-class TestRegistrationRefreshScript(DatabaseTest):
-    def test_run(self):
+class TestRegistrationRefreshScript:
+    def test_run(self, db: DatabaseTransactionFixture):
         # Verify that run() instantiates a LibraryRegistrar using .registrar,
         # then calls its reregister() method on every library that it's
         # been asked to handle.
-        success_library = self._library(name="Success")
-        failure_library = self._library(name="Failure")
+        success_library = db.library(name="Success")
+        failure_library = db.library(name="Failure")
 
         class MockRegistrar:
             reregistered = []
@@ -361,7 +362,7 @@ class TestRegistrationRefreshScript(DatabaseTest):
                 # Return a fake LibraryRegistrar.
                 return mock_registrar
 
-        script = MockScript(self._db)
+        script = MockScript(db.session)
 
         # Run with no arguments -- this will process all libraries in
         # script.libraries.
@@ -379,39 +380,39 @@ class TestRegistrationRefreshScript(DatabaseTest):
         script.run(cmd_args=["--library=Library1"])
         assert script.libraries_called_with == "Library1"
 
-    def test_registrar(self):
+    def test_registrar(self, db: DatabaseTransactionFixture):
         # Verify that the normal, non-mocked value of script.registrar
         # is a LibraryRegistrar.
-        script = RegistrationRefreshScript(self._db)
+        script = RegistrationRefreshScript(db.session)
         registrar = script.registrar
         assert isinstance(registrar, LibraryRegistrar)
-        assert registrar._db == self._db
+        assert registrar._db == db.session
 
 
-class TestSetCoverageAreaScript(DatabaseTest):
-    def test_argument_parsing(self):
-        library = self._library()
-        s = SetCoverageAreaScript(_db=self._db)
+class TestSetCoverageAreaScript:
+    def test_argument_parsing(self, db: DatabaseTransactionFixture):
+        library = db.library()
+        s = SetCoverageAreaScript(_db=db.session)
 
         # You can run the script without specifying any areas, to
         # see a library's current areas.
         s.run(["--library=%s" % library.name], place_class=MockPlace)
 
-    def test_unrecognized_place(self):
-        library = self._library()
-        s = SetCoverageAreaScript(_db=self._db)
+    def test_unrecognized_place(self, db: DatabaseTransactionFixture):
+        library = db.library()
+        s = SetCoverageAreaScript(_db=db.session)
         for arg in ["service-area", "focus-area"]:
             args = ["--library=%s" % library.name, '--%s={"US": "San Francisco"}' % arg]
             with pytest.raises(ValueError) as exc:
                 s.run(args, place_class=MockPlace)
             assert "Unknown places:" in str(exc.value)
 
-    def test_ambiguous_place(self):
+    def test_ambiguous_place(self, db: DatabaseTransactionFixture):
 
         MockPlace.by_name["OO"] = MockPlace.AMBIGUOUS
 
-        library = self._library()
-        s = SetCoverageAreaScript(_db=self._db)
+        library = db.library()
+        s = SetCoverageAreaScript(_db=db.session)
         for arg in ["service-area", "focus-area"]:
             args = ["--library=%s" % library.name, '--%s={"OO": "everywhere"}' % arg]
             with pytest.raises(ValueError) as exc:
@@ -419,10 +420,10 @@ class TestSetCoverageAreaScript(DatabaseTest):
             assert "Ambiguous places:" in str(exc.value)
         MockPlace.by_name = {}
 
-    def test_success(self):
-        us = self._place(type=Place.NATION, abbreviated_name="US")
-        library = self._library()
-        s = SetCoverageAreaScript(_db=self._db)
+    def test_success(self, db: DatabaseTransactionFixture):
+        us = db.place(type=Place.NATION, abbreviated_name="US")
+        library = db.library()
+        s = SetCoverageAreaScript(_db=db.session)
 
         # Setting an eligibility area with no focus area assigns that
         # service area to the library.
@@ -437,7 +438,7 @@ class TestSetCoverageAreaScript(DatabaseTest):
 
         # Note that running this script a second time replaces the
         # old service areas rather than adding to them.
-        uk = self._place(type=Place.NATION, abbreviated_name="UK")
+        uk = db.place(type=Place.NATION, abbreviated_name="UK")
         args = [
             "--library=%s" % library.name,
             '--focus-area={"UK": "everywhere"}',
@@ -456,9 +457,9 @@ class TestSetCoverageAreaScript(DatabaseTest):
         # If a default nation is set, you can name a single place as
         # your service area.
         ConfigurationSetting.sitewide(
-            self._db, Configuration.DEFAULT_NATION_ABBREVIATION
+            db.session, Configuration.DEFAULT_NATION_ABBREVIATION
         ).value = "US"
-        ut = self._place(type=Place.STATE, abbreviated_name="UT", parent=us)
+        ut = db.place(type=Place.STATE, abbreviated_name="UT", parent=us)
 
         args = ["--library=%s" % library.name, "--service-area=UT"]
         s.run(args)
@@ -469,8 +470,8 @@ class TestSetCoverageAreaScript(DatabaseTest):
         assert area.place == ut
 
 
-class TestConfigureEmailerScript(DatabaseTest):
-    def test_run(self):
+class TestConfigureEmailerScript:
+    def test_run(self, db: DatabaseTransactionFixture):
         class Mock(Emailer):
             sent = None
 
@@ -486,11 +487,11 @@ class TestConfigureEmailerScript(DatabaseTest):
             "--from-name=Administrator",
             "--test-address=you@example.com",
         ]
-        script = ConfigureEmailerScript(self._db)
-        script.do_run(self._db, cmd_args=cmd_args, emailer_class=Mock)
+        script = ConfigureEmailerScript(db.session)
+        script.do_run(db.session, cmd_args=cmd_args, emailer_class=Mock)
 
         # The ExternalIntegration is properly configured.
-        emailer = Emailer._sitewide_integration(self._db)
+        emailer = Emailer._sitewide_integration(db.session)
         assert emailer.username == "a_user"
         assert emailer.password == "a_password"
         assert emailer.url == "a_host"
@@ -504,20 +505,22 @@ class TestConfigureEmailerScript(DatabaseTest):
         assert to == "you@example.com"
 
 
-class TestConfigureVendorIDScript(DatabaseTest):
-    def test_run(self):
+class TestConfigureVendorIDScript:
+    def test_run(self, db: DatabaseTransactionFixture):
         cmd_args = [
             "--vendor-id=LIBR",
             "--node-value=abc12",
             "--delegate=http://server1/AdobeAuth/",
             "--delegate=http://server2/AdobeAuth/",
         ]
-        script = ConfigureVendorIDScript(self._db)
-        script.do_run(self._db, cmd_args=cmd_args)
+        script = ConfigureVendorIDScript(db.session)
+        script.do_run(db.session, cmd_args=cmd_args)
 
         # The ExternalIntegration is properly configured.
         integration = ExternalIntegration.lookup(
-            self._db, ExternalIntegration.ADOBE_VENDOR_ID, ExternalIntegration.DRM_GOAL
+            db.session,
+            ExternalIntegration.ADOBE_VENDOR_ID,
+            ExternalIntegration.DRM_GOAL,
         )
         assert integration.setting(Configuration.ADOBE_VENDOR_ID).value == "LIBR"
         assert (
@@ -533,12 +536,14 @@ class TestConfigureVendorIDScript(DatabaseTest):
             "--vendor-id=VENDOR",
             "--node-value=133715d34d",
         ]
-        script = ConfigureVendorIDScript(self._db)
-        script.do_run(self._db, cmd_args=cmd_args)
+        script = ConfigureVendorIDScript(db.session)
+        script.do_run(db.session, cmd_args=cmd_args)
 
         # The ExternalIntegration is properly configured.
         integration = ExternalIntegration.lookup(
-            self._db, ExternalIntegration.ADOBE_VENDOR_ID, ExternalIntegration.DRM_GOAL
+            db.session,
+            ExternalIntegration.ADOBE_VENDOR_ID,
+            ExternalIntegration.DRM_GOAL,
         )
         assert integration.setting(Configuration.ADOBE_VENDOR_ID).value == "VENDOR"
         assert (
@@ -557,7 +562,7 @@ class TestConfigureVendorIDScript(DatabaseTest):
             "--node-value=not a hex number",
         ]
         with pytest.raises(ValueError) as exc:
-            script.do_run(self._db, cmd_args=cmd_args)
+            script.do_run(db.session, cmd_args=cmd_args)
         assert "invalid literal for int" in str(exc.value)
 
         cmd_args = [
@@ -566,5 +571,5 @@ class TestConfigureVendorIDScript(DatabaseTest):
             "--delegate=http://random-site/",
         ]
         with pytest.raises(ValueError) as exc:
-            script.do_run(self._db, cmd_args=cmd_args)
+            script.do_run(db.session, cmd_args=cmd_args)
         assert "Invalid delegate: http://random-site/" in str(exc.value)
