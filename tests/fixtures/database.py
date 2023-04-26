@@ -1,5 +1,4 @@
 import logging
-import logging
 import os
 import shutil
 import tempfile
@@ -14,8 +13,19 @@ from sqlalchemy.orm import Session
 
 from config import Configuration
 from log import LogConfiguration
-from model import SessionManager, Base, Library, ExternalIntegration, get_one_or_create, Hyperlink, Audience, \
-    ServiceArea, Place, PlaceAlias, Admin
+from model import (
+    Admin,
+    Audience,
+    Base,
+    ExternalIntegration,
+    Hyperlink,
+    Library,
+    Place,
+    PlaceAlias,
+    ServiceArea,
+    SessionManager,
+    get_one_or_create,
+)
 from util import GeometryUtility
 
 
@@ -50,6 +60,7 @@ class ApplicationFixture:
 
 class DatabaseFixture:
     """The DatabaseFixture stores a reference to the database."""
+
     _engine: Engine
     _connection: Connection
 
@@ -91,7 +102,7 @@ class DatabaseTransactionFixture:
     _longitude_counter: int
 
     def __init__(
-            self, database: DatabaseFixture, session: Session, transaction: Transaction
+        self, database: DatabaseFixture, session: Session, transaction: Transaction
     ):
         self._database = database
         self._session = session
@@ -150,7 +161,7 @@ class DatabaseTransactionFixture:
         return Admin.authenticate(self.session, username, password)
 
     def external_integration(
-            self, protocol, goal=None, settings=None, libraries=None, **kwargs
+        self, protocol, goal=None, settings=None, libraries=None, **kwargs
     ) -> ExternalIntegration:
         integration = None
         if not libraries:
@@ -190,23 +201,25 @@ class DatabaseTransactionFixture:
         return integration
 
     def library(
-            self,
-            name=None,
-            short_name=None,
-            eligibility_areas=[],
-            focus_areas=[],
-            audiences=None,
-            library_stage=Library.PRODUCTION_STAGE,
-            registry_stage=Library.PRODUCTION_STAGE,
-            has_email=False,
-            description=None,
+        self,
+        name=None,
+        short_name=None,
+        eligibility_areas=[],
+        focus_areas=[],
+        audiences=None,
+        library_stage=Library.PRODUCTION_STAGE,
+        registry_stage=Library.PRODUCTION_STAGE,
+        has_email=False,
+        description=None,
     ):
         name = name or self.fresh_str()
         library, ignore = get_one_or_create(
             self.session,
             Library,
             name=name,
-            create_method_kwargs=dict(authentication_url=self.fresh_url(), opds_url=self.fresh_url()),
+            create_method_kwargs=dict(
+                authentication_url=self.fresh_url(), opds_url=self.fresh_url()
+            ),
         )
         library.short_name = short_name or self.fresh_str()
         library.shared_secret = self.fresh_str()
@@ -245,13 +258,13 @@ class DatabaseTransactionFixture:
         return library
 
     def place(
-            self,
-            external_id=None,
-            external_name=None,
-            type=None,
-            abbreviated_name=None,
-            parent=None,
-            geometry=None,
+        self,
+        external_id=None,
+        external_name=None,
+        type=None,
+        abbreviated_name=None,
+        parent=None,
+        geometry=None,
     ):
         if not geometry:
             geometry = "SRID=4326;POINT({} {})".format(
@@ -281,7 +294,9 @@ class DatabaseTransactionFixture:
 
     @property
     def nypl(self):
-        return self.library("NYPL", "nypl", [self.new_york_city, self.zip_11212], has_email=True)
+        return self.library(
+            "NYPL", "nypl", [self.new_york_city, self.zip_11212], has_email=True
+        )
 
     @property
     def connecticut_state_library(self):
@@ -369,9 +384,7 @@ class DatabaseTransactionFixture:
 
     @property
     def massachussets_state(self):
-        return self.place(
-            "25", "Massachussets", Place.STATE, "MA", self.crude_us, None
-        )
+        return self.place("25", "Massachussets", Place.STATE, "MA", self.crude_us, None)
 
     @property
     def boston_ma(self):
@@ -549,7 +562,7 @@ def database(application: ApplicationFixture) -> Iterable[DatabaseFixture]:
 
 @pytest.fixture(scope="function")
 def db(
-        database: DatabaseFixture,
+    database: DatabaseFixture,
 ) -> Generator[DatabaseTransactionFixture, None, None]:
     tr = DatabaseTransactionFixture.create(database)
     yield tr

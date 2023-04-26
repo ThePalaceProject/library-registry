@@ -1,5 +1,5 @@
 import os
-from typing import Callable, Any, Generator
+from typing import Any, Callable
 
 import pytest
 from flask import Flask
@@ -34,10 +34,15 @@ class ControllerSetupFixture:
     def __init__(self, db: DatabaseTransactionFixture):
         self.db = db
 
-    def setup(self, do_setup: Callable[["ControllerFixture"], Any] = lambda x: None) -> "ControllerFixture":
+    def setup(
+        self, do_setup: Callable[["ControllerFixture"], Any] = lambda x: None
+    ) -> "ControllerFixture":
         from app import app, set_secret_key
+
         fixture = ControllerFixture(self)
-        ConfigurationSetting.sitewide(self.db.session, Configuration.SECRET_KEY).value = "a secret"
+        ConfigurationSetting.sitewide(
+            self.db.session, Configuration.SECRET_KEY
+        ).value = "a secret"
         set_secret_key(self.db.session)
 
         fixture.saved_env = os.environ.get("AUTOINITIALIZE")
@@ -47,7 +52,9 @@ class ControllerSetupFixture:
         do_setup(fixture)
 
         fixture.app = app
-        fixture.library_registry = MockLibraryRegistry(self.db.session, testing=True, emailer_class=MockEmailer)
+        fixture.library_registry = MockLibraryRegistry(
+            self.db.session, testing=True, emailer_class=MockEmailer
+        )
         fixture.app.library_registry = fixture.library_registry
         fixture.http_client = DummyHTTPClient()
         return fixture
