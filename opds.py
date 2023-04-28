@@ -206,10 +206,6 @@ class OPDSCatalog:
             cls.add_image_to_catalog(
                 catalog, rel=cls.THUMBNAIL_REL, href=library.logo_url, type="image/png"
             )
-        if include_logo and library.logo:
-            cls.add_image_to_catalog(
-                catalog, rel=cls.THUMBNAIL_REL, href=library.logo, type="image/png"
-            )
 
         # Add links that allow clients to discover the library's
         # focus and eligibility area.
