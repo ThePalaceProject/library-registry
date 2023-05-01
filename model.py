@@ -291,11 +291,6 @@ class Library(Base):
         onupdate=lambda: datetime.datetime.utcnow(),
     )
 
-    # The library's logo, as a data: URI.
-    # DEPRECATED: Do not use this attribute
-    # logos should only be used from the remote storage
-    # USE LOGO_URL INSTEAD
-    logo = Column(Unicode)
     # The library's logo, as a web url
     logo_url = Column(Unicode)
 

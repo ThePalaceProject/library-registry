@@ -52,6 +52,7 @@ from problem_details import (
 )
 from testing import DummyHTTPClient
 from util import GeometryUtility
+from util.file_storage import LibraryLogoStore
 from util.http import RequestTimedOut
 from util.problem_detail import ProblemDetail
 
@@ -1716,7 +1717,6 @@ class TestLibraryRegistryController(ControllerTest):
             assert library.name == "A Library"
             assert library.description == "Description"
             assert library.web_url == "http://circmanager.org"
-            assert library.logo == "data:image/png;imagedata"
 
             # The client didn't specify a stage, so the server acted
             # like the client asked to be put into production.
@@ -1869,8 +1869,7 @@ class TestLibraryRegistryController(ControllerTest):
             assert library.name == "A Library"
             assert library.description == "New and improved"
             assert library.web_url is None
-            encoded_image = base64.b64encode(image_data).decode("utf8")
-            assert library.logo == "data:image/png;base64,%s" % encoded_image
+            assert library.logo_url.endswith(LibraryLogoStore.logo_path(library, "png"))
             # The library's library_stage has been updated to reflect
             # the 'stage' method passed in from the client.
             assert library.library_stage == Library.TESTING_STAGE

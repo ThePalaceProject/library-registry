@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import logging
 import re
@@ -213,8 +212,7 @@ class LibraryRegistrar:
             library.web_url = None
 
         if auth_document.logo:
-            library.logo = auth_document.logo
-            # Write this data to the storage too
+            # Write this data to the storage
             logo_url = LibraryLogoStore.write_from_b64(library, auth_document.logo)
             if logo_url:
                 library.logo_url = logo_url
@@ -252,14 +250,6 @@ class LibraryRegistrar:
             library.logo_url = logo_url
             buffer.seek(0)
 
-            b64 = base64.b64encode(buffer.getvalue()).decode("utf8")
-            type = logo_response.headers.get(
-                "Content-Type"
-            ) or auth_document.logo_link.get("type")
-            if type:
-                library.logo = f"data:{type};base64,{b64}"
-        else:
-            library.logo = None
         problem = auth_document.update_library(library)
         if problem:
             self.log.error(

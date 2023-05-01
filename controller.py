@@ -260,7 +260,6 @@ class LibraryRegistryController(BaseController):
         )
 
         # Avoid transferring large fields that we won't end up using.
-        alphabetical = alphabetical.options(defer("logo"))
         alphabetical = alphabetical.options(defer("service_areas", "place", "geometry"))
         alphabetical = alphabetical.options(
             defer("service_areas", "place", "parent", "geometry")
@@ -307,7 +306,6 @@ class LibraryRegistryController(BaseController):
             joinedload("hyperlinks", "resource"),
             joinedload("hyperlinks", "resource", "validation"),
         )
-        alphabetical = alphabetical.options(defer("logo"))
         if location is None:
             # No location data is available. Use the alphabetical list as
             # the list of libraries.

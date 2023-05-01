@@ -151,8 +151,8 @@ class TestOPDSCatalog(DatabaseTest):
         library.description = "It's a wonderful library."
         library.opds_url = "https://opds/"
         library.web_url = "https://nypl.org/"
-        library.logo = "Fake logo"
         library.authentication_url = "http://authdocument/"
+        library.logo_url = "http://logo-url/"
 
         # This email address is a secret between the library and the
         # registry.
@@ -239,9 +239,9 @@ class TestOPDSCatalog(DatabaseTest):
         assert focus["rel"] == OPDSCatalog.FOCUS_REL
         assert focus["type"] == "application/geo+json"
 
-        assert logo["href"] == library.logo
-        assert logo["rel"] == OPDSCatalog.THUMBNAIL_REL
+        assert logo["rel"] == "http://opds-spec.org/image/thumbnail"
         assert logo["type"] == "image/png"
+        assert logo["href"] == "http://logo-url/"
 
         assert authentication_url["href"] == library.authentication_url
         assert "rel" not in authentication_url
