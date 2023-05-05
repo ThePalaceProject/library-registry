@@ -12,20 +12,19 @@ from model import (
     create,
 )
 from opds import OPDSCatalog
+from tests.fixtures.database import DatabaseTransactionFixture
 
-from . import DatabaseTest
 
-
-class TestOPDSCatalog(DatabaseTest):
+class TestOPDSCatalog:
     def mock_url_for(self, route, uuid, **kwargs):
         """A simple replacement for url_for that doesn't require an
         application context.
         """
         return f"http://{route}/{uuid}"
 
-    def test_library_catalogs(self):
-        l1 = self._library("The New York Public Library")
-        l2 = self._library("Brooklyn Public Library")
+    def test_library_catalogs(self, db: DatabaseTransactionFixture):
+        l1 = db.library("The New York Public Library")
+        l2 = db.library("Brooklyn Public Library")
 
         class TestAnnotator:
             def annotate_catalog(self, catalog_obj, live=True):
@@ -37,11 +36,11 @@ class TestOPDSCatalog(DatabaseTest):
         # for each library.
         template = "http://web/{uuid}"
         ConfigurationSetting.sitewide(
-            self._db, Configuration.WEB_CLIENT_URL
+            db.session, Configuration.WEB_CLIENT_URL
         ).value = template
 
         catalog = OPDSCatalog(
-            self._db,
+            db.session,
             "A Catalog!",
             "http://url/",
             [l1, l2],
@@ -74,13 +73,15 @@ class TestOPDSCatalog(DatabaseTest):
         [l2_web] = [link["href"] for link in l2_links if link["type"] == "text/html"]
         assert template.replace("{uuid}", l2.internal_urn) == l2_web
 
-    def test_large_feeds_treated_differently(self):
+    def test_large_feeds_treated_differently(self, db: DatabaseTransactionFixture):
         # The libraries in large feeds are converted to JSON in ways
         # that omit large chunks of data such as inline logos.
 
         # In this test, a feed with 2 or more items is considered
         # 'large'. Any smaller feed is considered 'small'.
-        setting = ConfigurationSetting.sitewide(self._db, Configuration.LARGE_FEED_SIZE)
+        setting = ConfigurationSetting.sitewide(
+            db.session, Configuration.LARGE_FEED_SIZE
+        )
         setting.value = 2
 
         class Mock(OPDSCatalog):
@@ -91,49 +92,51 @@ class TestOPDSCatalog(DatabaseTest):
 
         # Every item in the large feed resulted in a call with
         # include_logo=False and include_service_areas=False.
-        large_feed = Mock(self._db, "title", "url", ["it's", "large"])
+        large_feed = Mock(db.session, "title", "url", ["it's", "large"])
         large_catalog = large_feed.catalog["catalogs"]
         assert large_catalog == [(False, False), (False, False)]
 
         # Every item in the small feed resulted in a call with
         # include_logo=True and include_service_areas=True.
-        small_feed = Mock(self._db, "title", "url", ["small"])
+        small_feed = Mock(db.session, "title", "url", ["small"])
         small_catalog = small_feed.catalog["catalogs"]
         assert small_catalog == [(True, True)]
 
         # Make it so even a feed with one item is 'large'.
         setting.value = 1
-        small_feed = Mock(self._db, "title", "url", ["small"])
+        small_feed = Mock(db.session, "title", "url", ["small"])
         small_catalog = small_feed.catalog["catalogs"]
         assert small_catalog == [(False, False)]
 
         # Try it with a query that returns no results. No catalogs
         # are included at all.
-        small_feed = Mock(self._db, "title", "url", self._db.query(Library))
+        small_feed = Mock(db.session, "title", "url", db.session.query(Library))
         small_catalog = small_feed.catalog["catalogs"]
         assert small_catalog == []
 
-    def test_feed_is_large(self):
+    def test_feed_is_large(self, db: DatabaseTransactionFixture):
         # Verify that the _feed_is_large helper method
         # works whether it's given a Python list or a SQLAlchemy query.
-        setting = ConfigurationSetting.sitewide(self._db, Configuration.LARGE_FEED_SIZE)
+        setting = ConfigurationSetting.sitewide(
+            db.session, Configuration.LARGE_FEED_SIZE
+        )
         setting.value = 2
         m = OPDSCatalog._feed_is_large
-        query = self._db.query(Library)
+        query = db.session.query(Library)
 
         # There are no libraries, and the limit is 2, so a feed of libraries would not be large.
         assert query.count() == 0
-        assert m(self._db, query) is False
+        assert m(db.session, query) is False
 
         # Make some libraries, and the feed becomes large.
-        [self._library() for x in range(2)]
-        assert m(self._db, query) is True
+        [db.library() for x in range(2)]
+        assert m(db.session, query) is True
 
         # It also works with a list.
-        assert m(self._db, [1, 2]) is True
-        assert m(self._db, [1]) is False
+        assert m(db.session, [1, 2]) is True
+        assert m(db.session, [1]) is False
 
-    def test_library_catalog(self):
+    def test_library_catalog(self, db: DatabaseTransactionFixture):
         class Mock(OPDSCatalog):
             """An OPDSCatalog that instruments calls to _hyperlink_args."""
 
@@ -144,8 +147,8 @@ class TestOPDSCatalog(DatabaseTest):
                 cls.hyperlinks.append(hyperlink)
                 return OPDSCatalog._hyperlink_args(hyperlink)
 
-        library = self._library(
-            "The New York Public Library", focus_areas=[self.new_york_city]
+        library = db.library(
+            "The New York Public Library", focus_areas=[db.new_york_city]
         )
         library.urn = "123-abc"
         library.description = "It's a wonderful library."
@@ -305,13 +308,13 @@ class TestOPDSCatalog(DatabaseTest):
         )
         assert catalog["images"][0]["href"] == "http://logourl"
 
-    def test__hyperlink_args(self):
+    def test__hyperlink_args(self, db: DatabaseTransactionFixture):
         """Verify that _hyperlink_args generates arguments appropriate
         for an OPDS 2 link.
         """
         m = OPDSCatalog._hyperlink_args
 
-        library = self._library()
+        library = db.library()
         hyperlink, is_new = library.set_hyperlink("some-rel", None)
 
         # If there's not enough information to make a link,
@@ -324,7 +327,7 @@ class TestOPDSCatalog(DatabaseTest):
         assert m(hyperlink) == dict(href=hyperlink.href, rel=hyperlink.rel)
 
         # Create a Validation.
-        validation, is_new = create(self._db, Validation)
+        validation, is_new = create(db.session, Validation)
         hyperlink.resource.validation = validation
 
         def assert_reservation_status(expect):

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from config import Configuration
-from testing import DatabaseTest
+from tests.fixtures.database import DatabaseTransactionFixture
 from util.file_storage import FileObject, LibraryLogoStore, S3FileStorage
 
 
@@ -66,10 +66,10 @@ class TestFileObject:
         assert fobj.key == "path/to/object"
 
 
-class TestLibraryLogoStore(DatabaseTest):
-    def test_write(self):
+class TestLibraryLogoStore:
+    def test_write(self, db: DatabaseTransactionFixture):
         """Requires Minio"""
-        library = self._library(short_name="short")
+        library = db.library(short_name="short")
         path1 = LibraryLogoStore.write(library, io.BytesIO(b"logodata..."))
 
         # Request this data
@@ -86,8 +86,8 @@ class TestLibraryLogoStore(DatabaseTest):
         response = requests.get(path2)
         assert response.content == b"differentdata..."
 
-    def test_logo_path(self):
-        library = self._library()
+    def test_logo_path(self, db: DatabaseTransactionFixture):
+        library = db.library()
         # internal urn has the format urn:uuid:xxx, we only put
         # the xxx part into the URL, so we split that for testing here
         assert (
@@ -96,8 +96,10 @@ class TestLibraryLogoStore(DatabaseTest):
         )
 
     @patch("util.file_storage.LibraryLogoStore.write")
-    def test_write_from_b64(self, mock_write: MagicMock):
-        library = self._library()
+    def test_write_from_b64(
+        self, mock_write: MagicMock, db: DatabaseTransactionFixture
+    ):
+        library = db.library()
         encoded = base64.b64encode(b"someimagedata")
         data = f"data:image/png;base64,{encoded.decode()}"
         LibraryLogoStore.write_from_b64(library, data)
@@ -108,8 +110,10 @@ class TestLibraryLogoStore(DatabaseTest):
         assert args[1]["format"] == "image/png"
 
     @patch("util.file_storage.LibraryLogoStore.write")
-    def test_write_from_b64_no_match(self, mock_write: MagicMock):
-        library = self._library()
+    def test_write_from_b64_no_match(
+        self, mock_write: MagicMock, db: DatabaseTransactionFixture
+    ):
+        library = db.library()
         encoded = base64.b64encode(b"someimagedata")
         data = encoded.decode()
         LibraryLogoStore.write_from_b64(library, data)

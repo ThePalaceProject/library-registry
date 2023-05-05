@@ -1,23 +1,36 @@
 from io import StringIO
 
+import pytest
 from sqlalchemy import func
 
 from geometry_loader import GeometryLoader
 from model import Place, PlaceAlias, get_one_or_create
 
-from . import DatabaseTest
+from .fixtures.database import DatabaseTransactionFixture
 
 
-class TestGeometryLoader(DatabaseTest):
-    def setup_method(self):
-        super().setup_method()
-        self.loader = GeometryLoader(self._db)
+class GeometryLoaderFixture:
+    loader: GeometryLoader
+    db: DatabaseTransactionFixture
 
-    def test_load(self):
+    def __init__(self, loader: GeometryLoader, db: DatabaseTransactionFixture):
+        self.loader = loader
+        self.db = db
+
+
+@pytest.fixture(scope="function")
+def geometry_loader_fixture(db: DatabaseTransactionFixture) -> GeometryLoaderFixture:
+    return GeometryLoaderFixture(GeometryLoader(db.session), db)
+
+
+class TestGeometryLoader:
+    def test_load(self, geometry_loader_fixture: GeometryLoaderFixture):
+        db, loader = geometry_loader_fixture.db, geometry_loader_fixture.loader
+
         # Load a place identified by a GeoJSON Polygon.
         metadata = '{"parent_id": null, "name": "77977", "id": "77977", "type": "postal_code", "aliases": [{"name": "The 977", "language": "eng"}]}'
         geography = '{"type": "Polygon", "coordinates": [[[-96.840066, 28.683039], [-96.830637, 28.690131], [-96.835048, 28.693599], [-96.833515, 28.694926], [-96.82657, 28.699584], [-96.822495, 28.695826], [-96.821248, 28.696391], [-96.814249, 28.700983], [-96.772337, 28.722765], [-96.768804, 28.725363], [-96.768564, 28.725046], [-96.767246, 28.723276], [-96.765295, 28.722084], [-96.764568, 28.720456], [-96.76254, 28.718483], [-96.763087, 28.717521], [-96.761814, 28.716488], [-96.761088, 28.713623], [-96.762231, 28.712798], [-96.75967, 28.709812], [-96.781093, 28.677548], [-96.784803, 28.675363], [-96.793788, 28.669546], [-96.791527, 28.667603], [-96.808567, 28.678507], [-96.81505, 28.682946], [-96.820191, 28.684517], [-96.827178, 28.679867], [-96.828626, 28.681719], [-96.831309, 28.680451], [-96.83565, 28.677724], [-96.840066, 28.683039]]]}'
-        texas_zip, is_new = self.loader.load(metadata, geography)
+        texas_zip, is_new = loader.load(metadata, geography)
         assert is_new is True
         assert texas_zip.external_id == "77977"
         assert texas_zip.external_name == "77977"
@@ -31,7 +44,7 @@ class TestGeometryLoader(DatabaseTest):
         # Load another place identified by a GeoJSON Point.
         metadata = '{"parent_id": null, "name": "New York", "type": "state", "abbreviated_name": "NY", "id": "NY", "full_name": "New York", "aliases": [{"name": "New York State", "language": "eng"}]}'
         geography = '{"type": "Point", "coordinates": [-75, 43]}'
-        new_york, is_new = self.loader.load(metadata, geography)
+        new_york, is_new = loader.load(metadata, geography)
         assert new_york.abbreviated_name == "NY"
         assert new_york.external_name == "New York"
         assert is_new is True
@@ -39,7 +52,7 @@ class TestGeometryLoader(DatabaseTest):
         # We can measure the distance in kilometers between New York
         # and Texas.
         distance_func = func.ST_DistanceSphere(new_york.geometry, texas_zip.geometry)
-        distance_qu = self._db.query().add_columns(distance_func)
+        distance_qu = db.session.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
         assert int(distance / 1000) == 2510
 
@@ -50,20 +63,22 @@ class TestGeometryLoader(DatabaseTest):
         # If we load the same place again, but with a different geography,
         # the Place object is updated.
         geography = '{"type": "Point", "coordinates": [-74, 44]}'
-        new_york_2, is_new = self.loader.load(metadata, geography)
+        new_york_2, is_new = loader.load(metadata, geography)
         assert is_new is False
         assert new_york_2 == new_york
 
         # This changes the distance between the two points.
         distance_func = func.ST_DistanceSphere(new_york_2.geometry, texas_zip.geometry)
-        distance_qu = self._db.query().add_columns(distance_func)
+        distance_qu = db.session.query().add_columns(distance_func)
         [[distance]] = distance_qu.all()
         assert int(distance / 1000) == 2637
 
-    def test_load_ndjson(self):
+    def test_load_ndjson(self, geometry_loader_fixture: GeometryLoaderFixture):
+        db, loader = geometry_loader_fixture.db, geometry_loader_fixture.loader
+
         # Create a preexisting Place with an alias.
         old_us, is_new = get_one_or_create(
-            self._db,
+            db.session,
             Place,
             parent=None,
             external_name="United States",
@@ -73,7 +88,7 @@ class TestGeometryLoader(DatabaseTest):
         )
         assert old_us.abbreviated_name is None
         old_alias = get_one_or_create(
-            self._db, PlaceAlias, name="USA", language="eng", place=old_us
+            db.session, PlaceAlias, name="USA", language="eng", place=old_us
         )
         old_us_geography = old_us.geometry
 
@@ -87,7 +102,7 @@ class TestGeometryLoader(DatabaseTest):
 {"type": "Point", "coordinates": [-86.034128, 32.302979]}"""
         input = StringIO(test_ndjson)
         [(us, ignore), (alabama, ignore), (montgomery, ignore)] = list(
-            self.loader.load_ndjson(input)
+            loader.load_ndjson(input)
         )
 
         # All three places were loaded as Place objects and their
@@ -119,6 +134,6 @@ class TestGeometryLoader(DatabaseTest):
         # chosen to represent 'Montgomery' and the point chosen to
         # represent 'Alabama'.
         distance_func = func.ST_DistanceSphere(montgomery.geometry, alabama.geometry)
-        [[distance]] = self._db.query().add_columns(distance_func).all()
+        [[distance]] = db.session.query().add_columns(distance_func).all()
         print(distance)
         assert int(distance / 1000) == 276

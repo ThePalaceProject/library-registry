@@ -8,19 +8,20 @@ from model import Library
 from opds import OPDSCatalog
 from problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
 from registrar import LibraryRegistrar, VerifyLinkRegexes
-from testing import DatabaseTest, DummyHTTPResponse
+from testing import DummyHTTPResponse
+from tests.fixtures.database import DatabaseTransactionFixture
 from tests.utils import mock_response
 from util.problem_detail import ProblemDetail
 
 
-class TestRegistrar(DatabaseTest):
+class TestRegistrar:
 
     # TODO: The core method, register(), is tested indirectly in
     # test_controller.py, because the LibraryRegistrar code was
     # originally part of LibraryRegistryController. This could be
     # refactored.
 
-    def test_reregister(self):
+    def test_reregister(self, db: DatabaseTransactionFixture):
         class Mock(LibraryRegistrar):
             RETURN_VALUE = NO_AUTH_URL
 
@@ -28,7 +29,7 @@ class TestRegistrar(DatabaseTest):
                 self.called_with = (library, library_stage)
                 return self.RETURN_VALUE
 
-        library = self._library()
+        library = db.library()
         registrar = Mock(object(), object())
 
         # Test the case where register() returns a problem detail.
@@ -264,7 +265,7 @@ class TestRegistrar(DatabaseTest):
         }
 
     @patch("registrar.LibraryLogoStore")
-    def test_register_logo_data(self, mock_logo_store):
+    def test_register_logo_data(self, mock_logo_store, db: DatabaseTransactionFixture):
         """Test an auth document with base64 encoded image data"""
         image_data = "data:image/png;base64,abcdefg"
         auth_document = self._auth_document()
@@ -276,9 +277,9 @@ class TestRegistrar(DatabaseTest):
             }
         )
 
-        library: Library = self._library(registry_stage=Library.TESTING_STAGE)
+        library: Library = db.library(registry_stage=Library.TESTING_STAGE)
         library.authentication_url = "http://auth"
-        registrar = LibraryRegistrar(self._db)
+        registrar = LibraryRegistrar(db.session)
 
         registrar._make_request = MagicMock(
             return_value=mock_response(
@@ -305,7 +306,7 @@ class TestRegistrar(DatabaseTest):
         assert library.logo_url == "http://localhost/logo"
 
     @patch("registrar.LibraryLogoStore")
-    def test_register_logo_links(self, mock_logo_store):
+    def test_register_logo_links(self, mock_logo_store, db: DatabaseTransactionFixture):
         """Test an auth document with an image link"""
         image_link = "http://somelogolink"
         auth_document = self._auth_document()
@@ -317,9 +318,9 @@ class TestRegistrar(DatabaseTest):
             }
         )
 
-        library: Library = self._library(registry_stage=Library.TESTING_STAGE)
+        library: Library = db.library(registry_stage=Library.TESTING_STAGE)
         library.authentication_url = "http://auth"
-        registrar = LibraryRegistrar(self._db)
+        registrar = LibraryRegistrar(db.session)
 
         registrar._make_request = MagicMock(
             return_value=mock_response(
