@@ -678,7 +678,7 @@ class Library(Base):
                 )
             )
             .select_from(libraries_audiences.join(Audience))
-            .lateral("public_audiences")
+            .scalar_subquery()
         )
 
         # Check if each library has a non-public audience from
@@ -694,7 +694,7 @@ class Library(Base):
                 )
             )
             .select_from(libraries_audiences.join(Audience))
-            .lateral("non_public_audiences")
+            .scalar_subquery()
         )
 
         # Increase the score if there was an audience match other than
