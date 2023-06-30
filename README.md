@@ -190,6 +190,13 @@ For a production environment:
 poetry install --only main,pg
 ```
 
+_Important note_: The `uszipcodes` dependency is pinned because we also rely on a [repo-local](./data/simple_db.sqlite)
+copy of the [release-specific version](https://github.com/MacHu-GWU/uszipcode-project/releases) of the
+associated "simple" (versus "comprehensive") database (e.g.,
+[this file](https://github.com/MacHu-GWU/uszipcode-project/releases/download/1.0.1.db/simple_db.sqlite)
+for release 1.0.1). When updating this dependency, it is important to obtain the corresponding database and store it as
+`./data/simple_db.sqlite`, since that is where the code expects to find it.
+
 ### Initialize the database
 
 To initialize a fresh database (ie no tables yet created) use the following script:

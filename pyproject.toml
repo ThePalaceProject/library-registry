@@ -35,9 +35,10 @@ Pillow = "*"
 pycryptodome = "*"
 PyJWT = "*"
 python = ">=3.8,<4"
+python-levenshtein = "^0.21.1"
 requests = "*"
 SQLAlchemy = "^1.4"
-uszipcode = "==0.2.6"
+uszipcode = "==1.0.1"
 
 [tool.poetry.extras]
 pg = ["psycopg2"]
