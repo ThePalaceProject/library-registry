@@ -1512,20 +1512,6 @@ files = [
 six = ">=1.5"
 
 [[package]]
-name = "python-levenshtein"
-version = "0.21.1"
-description = "Python extension for computing string edit distances and similarities."
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "python-Levenshtein-0.21.1.tar.gz", hash = "sha256:01ea6828c03738a475ee18ea8b86a674eb45ce80e9cce88376d132cf3ab26060"},
-    {file = "python_Levenshtein-0.21.1-py3-none-any.whl", hash = "sha256:5f49ebb4772a274aac4aeb190fc23ad537ebe778dec15a8f17975f746478c691"},
-]
-
-[package.dependencies]
-Levenshtein = "0.21.1"
-
-[[package]]
 name = "pytz"
 version = "2022.7.1"
 description = "World timezone definitions, modern and historical"
@@ -2182,4 +2168,4 @@ pg-binary = []
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4"
-content-hash = "055dcca708089988df90ed25ff26b1282298cf9aaf69fcb1244aa54de4a430bd"
+content-hash = "77e1011456b0272d7c052de1280f12a0867feac998c3696fdf970f99c78a850c"
