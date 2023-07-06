@@ -1,6 +1,7 @@
 import json
 
 import flask
+from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Query
 
 from authentication_document import AuthenticationDocument
@@ -78,7 +79,7 @@ class OPDSCatalog:
             _db, Configuration.WEB_CLIENT_URL
         ).value
         for library in libraries:
-            if not isinstance(library, tuple):
+            if not isinstance(library, Row):
                 library = (library,)
             self.catalog["catalogs"].append(
                 self.library_catalog(

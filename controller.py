@@ -10,7 +10,7 @@ from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
 from flask import Response, redirect, render_template_string, request, session, url_for
 from flask_babel import lazy_gettext as _
-from sqlalchemy.orm import defer, joinedload
+from sqlalchemy.orm import defaultload, joinedload
 
 from admin.config import Configuration as AdminClientConfig
 from admin.templates import admin as admin_template
@@ -260,9 +260,14 @@ class LibraryRegistryController(BaseController):
         )
 
         # Avoid transferring large fields that we won't end up using.
-        alphabetical = alphabetical.options(defer("service_areas", "place", "geometry"))
         alphabetical = alphabetical.options(
-            defer("service_areas", "place", "parent", "geometry")
+            defaultload("service_areas").defaultload("place").defer("geometry")
+        )
+        alphabetical = alphabetical.options(
+            defaultload("service_areas")
+            .defaultload("place")
+            .defaultload("parent")
+            .defer("geometry")
         )
 
         if live:

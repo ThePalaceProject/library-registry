@@ -32,11 +32,16 @@ from sqlalchemy import (
 )
 from sqlalchemy import exc as sa_exc
 from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import aliased, backref, relationship, sessionmaker, validates
-from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
+from sqlalchemy.orm import (
+    aliased,
+    backref,
+    declarative_base,
+    relationship,
+    sessionmaker,
+    validates,
+)
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql.expression import (
@@ -678,7 +683,7 @@ class Library(Base):
                 )
             )
             .select_from(libraries_audiences.join(Audience))
-            .lateral("public_audiences")
+            .scalar_subquery()
         )
 
         # Check if each library has a non-public audience from
@@ -694,7 +699,7 @@ class Library(Base):
                 )
             )
             .select_from(libraries_audiences.join(Audience))
-            .lateral("non_public_audiences")
+            .scalar_subquery()
         )
 
         # Increase the score if there was an audience match other than
@@ -1644,7 +1649,7 @@ class Place(Base):
             return None
 
         search = uszipcode.SearchEngine(
-            db_file_dir=Configuration.DATADIR, simple_zipcode=True
+            db_file_path=f"{Configuration.DATADIR}/simple_db.sqlite"
         )
         state = self.abbreviated_name
         uszipcode_matches = []
@@ -1654,6 +1659,7 @@ class Place(Base):
         ):
             # The given name is an exact match for one of the
             # cities. Let's look up every ZIP code for that city.
+            # `returns=None` here means to not limit the number of results.
             uszipcode_matches = search.by_city_and_state(name, state, returns=None)
 
         # Look up a Place object for each ZIP code and return the
