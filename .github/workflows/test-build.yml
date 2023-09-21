@@ -110,7 +110,7 @@ jobs:
 
       - name: Generate tags
         id: library-registry-tags
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY_HOST }}/${{ github.repository_owner }}/library-registry
           tags: |
