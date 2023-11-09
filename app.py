@@ -54,7 +54,11 @@ else:
         app.library_registry = LibraryRegistry(_db)
 
 
-@app.before_first_request
+def initialize(arbiter):
+    """To be called by gunicorn on server startup"""
+    set_secret_key()
+
+
 def set_secret_key(_db=None):
     _db = _db or app._db
     app.secret_key = ConfigurationSetting.sitewide_secret(_db, Configuration.SECRET_KEY)
@@ -327,4 +331,5 @@ if __name__ == "__main__":
         port = 80
 
     app.library_registry.log.info("Starting app on %s:%s", host, port)
+    initialize(None)
     app.run(debug=debug, host=host, port=port)

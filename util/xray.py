@@ -57,9 +57,6 @@ class PalaceXrayMiddleware(XRayMiddleware):
     def __init__(self, app: Flask, recorder: AWSXRayRecorder):
         super().__init__(app, recorder)
 
-        # Add an additional hook to before first request
-        self.app.before_first_request(self._before_first_request)
-
     def _before_first_request(self):
         self._before_request()
         segment = self._recorder.current_segment()
@@ -69,8 +66,14 @@ class PalaceXrayMiddleware(XRayMiddleware):
         request._palace_first_request = True
 
     def _before_request(self):
+        if getattr(self.app, "_xray_first_request_done", None) is None:
+            # First request so we do first request processing
+            setattr(self.app, "_xray_first_request_done", True)
+            self._before_first_request()
+
         if getattr(request, "_palace_first_request", None) is not None:
             # If we are in the first request this work is already done
             return
+
         super()._before_request()
         PalaceXrayUtils.put_annotations(self._recorder.current_segment(), "registry")

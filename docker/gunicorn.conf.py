@@ -4,9 +4,9 @@ import os
 # The `LIBRARY_REGISTRY_DOCKER_HOME` environment variables is set in the
 # `Dockerfile`. It contains the value of the app directory.
 APP_HOME = os.environ.get("LIBRARY_REGISTRY_DOCKER_HOME")
-
 # Shared Settings
 wsgi_app = "app:app"
+when_ready = "app.initialize"
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"
