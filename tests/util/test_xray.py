@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, call
 
 from pytest import MonkeyPatch
 
-from app import app
+from tests.fixtures.controller import ControllerSetupFixture
 from util.xray import PalaceXrayMiddleware, PalaceXrayUtils
 
 
@@ -41,7 +41,7 @@ class TestPalaceXrayUtils:
         monkeypatch.setattr("util.xray.PalaceXrayMiddleware", mock_middleware)
 
         # Nothing happens if env isn't set
-        monkeypatch.delenv(PalaceXrayUtils.XRAY_ENV_ENABLE)
+        monkeypatch.delenv(PalaceXrayUtils.XRAY_ENV_ENABLE, raising=False)
         PalaceXrayUtils.configure_app(mock_app)
         assert PalaceXrayUtils.setup_xray.called is False
         assert mock_middleware.called is False
@@ -60,21 +60,24 @@ class TestPalaceXrayUtils:
 
 
 class TestPalaceXrayMiddleware:
-    def test_before_request(self, monkeypatch: MonkeyPatch):
+    def test_before_request(
+        self, monkeypatch: MonkeyPatch, controller_setup_fixture: ControllerSetupFixture
+    ):
         mock_app = MagicMock()
         mock_app._xray_first_request_done = None
         mock_recorder = MagicMock()
         xray = PalaceXrayMiddleware(mock_app, mock_recorder)
 
-        # First request does additional setup
-        with app.test_request_context("/") as ctx:
-            xray._before_request()
-            assert mock_app._xray_first_request_done == True
-            assert mock_recorder.current_segment().put_annotation.call_count == 2
-            assert ctx.request._palace_first_request == True
+        with controller_setup_fixture.setup() as fixture:
+            # First request does additional setup
+            with fixture.app.test_request_context("/") as ctx:
+                xray._before_request()
+                assert mock_app._xray_first_request_done == True
+                assert mock_recorder.current_segment().put_annotation.call_count == 2
+                assert ctx.request._palace_first_request == True
 
-        # Second request only calls put_annotation once
-        with app.test_request_context("/") as ctx:
-            xray._before_request()
-            assert getattr(ctx.request, "_palace_first_request", None) is None
-            assert mock_recorder.current_segment().put_annotation.call_count == 3
+            # Second request only calls put_annotation once
+            with fixture.app.test_request_context("/") as ctx:
+                xray._before_request()
+                assert getattr(ctx.request, "_palace_first_request", None) is None
+                assert mock_recorder.current_segment().put_annotation.call_count == 3
