@@ -8,7 +8,7 @@ from aws_xray_sdk.core import xray_recorder
 from aws_xray_sdk.core.models.segment import Segment
 from aws_xray_sdk.ext.flask.middleware import XRayMiddleware
 from aws_xray_sdk.ext.httplib import add_ignored as httplib_add_ignored
-from flask import Flask, request
+from flask import Flask
 
 
 class PalaceXrayUtils:
@@ -57,20 +57,6 @@ class PalaceXrayMiddleware(XRayMiddleware):
     def __init__(self, app: Flask, recorder: AWSXRayRecorder):
         super().__init__(app, recorder)
 
-        # Add an additional hook to before first request
-        self.app.before_first_request(self._before_first_request)
-
-    def _before_first_request(self):
-        self._before_request()
-        segment = self._recorder.current_segment()
-
-        # Add an annotation for the first request, since it does extra caching work.
-        segment.put_annotation("request", "first")
-        request._palace_first_request = True
-
     def _before_request(self):
-        if getattr(request, "_palace_first_request", None) is not None:
-            # If we are in the first request this work is already done
-            return
         super()._before_request()
         PalaceXrayUtils.put_annotations(self._recorder.current_segment(), "registry")

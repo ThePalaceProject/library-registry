@@ -38,6 +38,7 @@ class TestPalaceXrayUtils:
         monkeypatch.setattr("util.xray.PalaceXrayMiddleware", mock_middleware)
 
         # Nothing happens if env isn't set
+        monkeypatch.delenv(PalaceXrayUtils.XRAY_ENV_ENABLE, raising=False)
         PalaceXrayUtils.configure_app(mock_app)
         assert PalaceXrayUtils.setup_xray.called is False
         assert mock_middleware.called is False
