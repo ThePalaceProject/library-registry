@@ -497,13 +497,13 @@ speedup = ["python-levenshtein (>=0.12)"]
 
 [[package]]
 name = "geoalchemy2"
-version = "0.14.2"
+version = "0.14.6"
 description = "Using SQLAlchemy with Spatial Databases"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "GeoAlchemy2-0.14.2-py3-none-any.whl", hash = "sha256:ca81c2d924c0724458102bac93f68f3e3c337a65fcb811af5e504ce7c5d56ac2"},
-    {file = "GeoAlchemy2-0.14.2.tar.gz", hash = "sha256:8ca023dcb9a36c6d312f3b4aee631d66385264e2fc9feb0ab0f446eb5609407d"},
+    {file = "GeoAlchemy2-0.14.6-py3-none-any.whl", hash = "sha256:649c70f9275aded0341ed0c879e140d77c16ec33023cc21352de2eb7bb5fd509"},
+    {file = "GeoAlchemy2-0.14.6.tar.gz", hash = "sha256:e940681a60571d692124f687ecfe605164675341dbbaf5adf5f0ee46932c337b"},
 ]
 
 [package.dependencies]
