@@ -40,15 +40,15 @@ EXPOSE 5433
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
-FROM python:3.9.2-alpine3.13 AS builder
+FROM python:3.9.18-alpine3.19 AS builder
 
 EXPOSE 80
 
 ##### Install NGINX, and Supervisor (Gunicorn installed in virtualenv) #####
 # This is a simplified version of the offical Nginx Dockerfile for Alpine 3.13:
 # https://github.com/nginxinc/docker-nginx/blob/dcaaf66e4464037b1a887541f39acf8182233ab8/mainline/alpine/Dockerfile
-ENV NGINX_VERSION 1.19.8
-ENV NJS_VERSION   0.5.2
+ENV NGINX_VERSION 1.25.4
+ENV NJS_VERSION   0.8.3
 ENV PKG_RELEASE   1
 ENV SUPERVISOR_VERSION 4.2.2
 
@@ -62,7 +62,7 @@ RUN set -x \
         nginx-module-image-filter=${NGINX_VERSION}-r${PKG_RELEASE} \
         nginx-module-njs=${NGINX_VERSION}.${NJS_VERSION}-r${PKG_RELEASE} \
     " \
-    && KEY_SHA512="e7fa8303923d9b95db37a77ad46c68fd4755ff935d0a534d26eba83de193c76166c68bfe7f65471bf8881004ef4aa6df3e34689c305662750c0172fca5d8552a *stdin" \
+    && KEY_SHA512="de7031fdac1354096d3388d6f711a508328ce66c168967ee0658c294226d6e7a161ce7f2628d577d56f8b63ff6892cc576af6f7ef2a6aa2e17c62ff7b6bf0d98 *stdin" \
     && apk add --no-cache --virtual .cert-deps openssl \
     && wget -O /tmp/nginx_signing.rsa.pub https://nginx.org/keys/nginx_signing.rsa.pub \
     && if [ "$(openssl rsa -pubin -in /tmp/nginx_signing.rsa.pub -text -noout | openssl sha512 -r)" = "$KEY_SHA512" ]; then \
@@ -160,7 +160,6 @@ RUN set -ex \
  && apk add --no-cache --virtual .node-build-deps \
     make \
     build-base \
-    python2 \
     npm \
  && mkdir /tmp/simplified_npm_build \
  && cp ./package*.json /tmp/simplified_npm_build \
