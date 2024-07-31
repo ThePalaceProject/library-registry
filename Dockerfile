@@ -153,22 +153,6 @@ RUN set -ex \
  && pipenv install --dev --skip-lock --clear \
  && apk del --no-network .build-deps
 
-# Build a static version of the front end to serve
-COPY ./package*.json ./
-
-RUN set -ex \
- && apk add --no-cache --virtual .node-build-deps \
-    make \
-    build-base \
-    npm \
- && mkdir /tmp/simplified_npm_build \
- && cp ./package*.json /tmp/simplified_npm_build \
- && npm install --prefix /tmp/simplified_npm_build \
- && mkdir -p /simplified_static/static \
- && cp /tmp/simplified_npm_build/node_modules/simplified-registry-admin/dist/* /simplified_static/static \
- && rm -rf /tmp/simplified_npm_build \
- && apk del --no-network .node-build-deps
-
 COPY ./docker/gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/supervisord-alpine.ini /etc/supervisord.conf
