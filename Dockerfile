@@ -105,7 +105,7 @@ RUN set -x \
 # This causes pipenv not to spam the build output with extra lines when 
 # running `pipenv install`:
 #   https://github.com/pypa/pipenv/issues/4052#issuecomment-588480867
-ENV CI 1
+ENV CI=1
 
 # This creates the /simplified_app directory without issuing a separate RUN directive.
 WORKDIR /simplified_app
@@ -126,7 +126,7 @@ COPY ./Pipfile* ./
 #
 #   https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
 #
-ENV WORKON_HOME /simplified_venv
+ENV WORKON_HOME=/simplified_venv
 
 # Install the system dependencies and the Python dependencies. Note that if 
 # you want to be able to install new Python dependencies on the fly from
@@ -188,7 +188,7 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 # the entire project directory since it will remain static.
 FROM builder AS libreg_local
 
-ENV FLASK_ENV development
+ENV FLASK_ENV=development
 ##############################################################################
 
 
@@ -197,7 +197,7 @@ ENV FLASK_ENV development
 #
 FROM builder AS libreg_active
 
-ENV FLASK_ENV production
+ENV FLASK_ENV=production
 
 COPY . /simplified_app
 ##############################################################################
