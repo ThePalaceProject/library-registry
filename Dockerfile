@@ -47,10 +47,10 @@ EXPOSE 80
 ##### Install NGINX, and Supervisor (Gunicorn installed in virtualenv) #####
 # This is a simplified version of the offical Nginx Dockerfile for Alpine 3.13:
 # https://github.com/nginxinc/docker-nginx/blob/dcaaf66e4464037b1a887541f39acf8182233ab8/mainline/alpine/Dockerfile
-ENV NGINX_VERSION 1.25.4
-ENV NJS_VERSION   0.8.3
-ENV PKG_RELEASE   1
-ENV SUPERVISOR_VERSION 4.2.2
+ENV NGINX_VERSION=1.27.0
+ENV NJS_VERSION=0.8.5
+ENV PKG_RELEASE=2
+ENV SUPERVISOR_VERSION=4.2.2
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
