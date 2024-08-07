@@ -40,17 +40,17 @@ EXPOSE 5433
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
-FROM python:3.9.2-alpine3.13 AS builder
+FROM python:3.12.4-alpine3.20 AS builder
 
 EXPOSE 80
 
 ##### Install NGINX, and Supervisor (Gunicorn installed in virtualenv) #####
 # This is a simplified version of the offical Nginx Dockerfile for Alpine 3.13:
 # https://github.com/nginxinc/docker-nginx/blob/dcaaf66e4464037b1a887541f39acf8182233ab8/mainline/alpine/Dockerfile
-ENV NGINX_VERSION 1.19.8
-ENV NJS_VERSION   0.5.2
-ENV PKG_RELEASE   1
-ENV SUPERVISOR_VERSION 4.2.2
+ENV NGINX_VERSION=1.27.0
+ENV NJS_VERSION=0.8.5
+ENV PKG_RELEASE=2
+ENV SUPERVISOR_VERSION=4.2.2
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
@@ -62,7 +62,7 @@ RUN set -x \
         nginx-module-image-filter=${NGINX_VERSION}-r${PKG_RELEASE} \
         nginx-module-njs=${NGINX_VERSION}.${NJS_VERSION}-r${PKG_RELEASE} \
     " \
-    && KEY_SHA512="e7fa8303923d9b95db37a77ad46c68fd4755ff935d0a534d26eba83de193c76166c68bfe7f65471bf8881004ef4aa6df3e34689c305662750c0172fca5d8552a *stdin" \
+    && KEY_SHA512="de7031fdac1354096d3388d6f711a508328ce66c168967ee0658c294226d6e7a161ce7f2628d577d56f8b63ff6892cc576af6f7ef2a6aa2e17c62ff7b6bf0d98 *stdin" \
     && apk add --no-cache --virtual .cert-deps openssl \
     && wget -O /tmp/nginx_signing.rsa.pub https://nginx.org/keys/nginx_signing.rsa.pub \
     && if [ "$(openssl rsa -pubin -in /tmp/nginx_signing.rsa.pub -text -noout | openssl sha512 -r)" = "$KEY_SHA512" ]; then \
@@ -105,7 +105,7 @@ RUN set -x \
 # This causes pipenv not to spam the build output with extra lines when 
 # running `pipenv install`:
 #   https://github.com/pypa/pipenv/issues/4052#issuecomment-588480867
-ENV CI 1
+ENV CI=1
 
 # This creates the /simplified_app directory without issuing a separate RUN directive.
 WORKDIR /simplified_app
@@ -126,7 +126,7 @@ COPY ./Pipfile* ./
 #
 #   https://github.com/pypa/pipenv/issues/1226#issuecomment-598487793
 #
-ENV WORKON_HOME /simplified_venv
+ENV WORKON_HOME=/simplified_venv
 
 # Install the system dependencies and the Python dependencies. Note that if 
 # you want to be able to install new Python dependencies on the fly from
@@ -153,23 +153,6 @@ RUN set -ex \
  && pipenv install --dev --skip-lock --clear \
  && apk del --no-network .build-deps
 
-# Build a static version of the front end to serve
-COPY ./package*.json ./
-
-RUN set -ex \
- && apk add --no-cache --virtual .node-build-deps \
-    make \
-    build-base \
-    python2 \
-    npm \
- && mkdir /tmp/simplified_npm_build \
- && cp ./package*.json /tmp/simplified_npm_build \
- && npm install --prefix /tmp/simplified_npm_build \
- && mkdir -p /simplified_static/static \
- && cp /tmp/simplified_npm_build/node_modules/simplified-registry-admin/dist/* /simplified_static/static \
- && rm -rf /tmp/simplified_npm_build \
- && apk del --no-network .node-build-deps
-
 COPY ./docker/gunicorn.conf.py /etc/gunicorn/gunicorn.conf.py
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/supervisord-alpine.ini /etc/supervisord.conf
@@ -189,7 +172,7 @@ ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
 # the entire project directory since it will remain static.
 FROM builder AS libreg_local
 
-ENV FLASK_ENV development
+ENV FLASK_ENV=development
 ##############################################################################
 
 
@@ -198,7 +181,7 @@ ENV FLASK_ENV development
 #
 FROM builder AS libreg_active
 
-ENV FLASK_ENV production
+ENV FLASK_ENV=production
 
 COPY . /simplified_app
 ##############################################################################

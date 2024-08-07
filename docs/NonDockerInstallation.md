@@ -41,7 +41,7 @@ To proxy incoming requests to the `gunicorn` WSGI server, you will need to insta
 
 ## Python Environment
 
-The Registry runs on Python 3.9+, though it is likely compatible with earlier Python3 versions as well. Once you install Python, you'll be able to set up a virtual environment to install Python dependencies into.
+The Registry runs on Python 3.12, though it is likely compatible with earlier Python3 versions as well. Once you install Python, you'll be able to set up a virtual environment to install Python dependencies into.
 
 ### Virtual Environment
 
