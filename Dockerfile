@@ -45,13 +45,13 @@ EXPOSE 80
 ##### Install NGINX, and Supervisor (Gunicorn installed in virtualenv) #####
 # This is a simplified version of the offical Nginx Dockerfile for Alpine 3.17:
 # https://github.com/nginxinc/docker-nginx/blob/5ce65c3efd395ee2d82d32670f233140e92dba99/mainline/alpine/Dockerfile
-ENV NGINX_VERSION 1.23.3
-ENV NJS_VERSION   0.7.9
-ENV PKG_RELEASE   1
-ENV SUPERVISOR_VERSION 4.2.2
-ENV POETRY_VERSION 1.5.1
-ENV POETRY_URL "https://install.python-poetry.org"
-ENV POETRY_HOME "/etc/poetry"
+ENV NGINX_VERSION=1.23.3
+ENV NJS_VERSION=0.7.9
+ENV PKG_RELEASE=1
+ENV SUPERVISOR_VERSION=4.2.2
+ENV POETRY_VERSION=1.5.1
+ENV POETRY_URL="https://install.python-poetry.org"
+ENV POETRY_HOME="/etc/poetry"
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
@@ -179,7 +179,7 @@ RUN set -ex \
 #
 FROM builder AS libreg_active
 
-ENV FLASK_ENV production
+ENV FLASK_ENV=production
 
 COPY . ./
 ##############################################################################
