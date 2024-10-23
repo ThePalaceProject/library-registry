@@ -18,4 +18,11 @@ psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     \c simplified_registry_test
     CREATE EXTENSION fuzzystrmatch;
     CREATE EXTENSION postgis;
+
+    \c simplified_registry_dev postgres
+    GRANT ALL ON SCHEMA public TO simplified;
+
+    \c simplified_registry_test postgres
+    GRANT ALL ON SCHEMA public TO simplified;
+
 EOSQL
