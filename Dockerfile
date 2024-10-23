@@ -13,7 +13,7 @@
 
 ##############################################################################
 # Build target: libreg_local_db
-FROM postgis/postgis:12-3.1 AS libreg_local_db
+FROM postgis/postgis:16-3.5 AS libreg_local_db
 
 ENV POSTGRES_PASSWORD="password"
 ENV POSTGRES_USER="postgres"
@@ -38,7 +38,7 @@ EXPOSE 5432
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
-FROM python:3.10-alpine3.17 AS builder
+FROM python:3.12-alpine3.20 AS builder
 
 EXPOSE 80
 
