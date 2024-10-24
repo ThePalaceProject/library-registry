@@ -13,7 +13,7 @@
 
 ##############################################################################
 # Build target: libreg_local_db
-FROM postgis/postgis:12-3.1 AS libreg_local_db
+FROM postgis/postgis:16-3.5 AS libreg_local_db
 
 ENV POSTGRES_PASSWORD="password"
 ENV POSTGRES_USER="postgres"
@@ -52,6 +52,10 @@ ENV SUPERVISOR_VERSION=4.2.2
 ENV POETRY_VERSION=1.5.1
 ENV POETRY_URL="https://install.python-poetry.org"
 ENV POETRY_HOME="/etc/poetry"
+# required for postgres ssl: the crt file doesn't exist
+# but the path must point to a visible directory otherwise we
+# get a permissions error
+ENV PGSSLCERT=/tmp/postgresql.crt
 
 RUN set -x \
     && addgroup -g 101 -S nginx \

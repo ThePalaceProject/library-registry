@@ -130,7 +130,7 @@ will be served from the linked package, rather than the CDN.
 
 To install the registry locally, you'll need the following:
 
-- PostgreSQL 12+
+- PostgreSQL 16+
 - PostGIS 3
 - Python 3.8+ (3.9 is the build target for the Docker install)
 - Appropriate system dependencies to build the Python dependencies, which may include:
@@ -159,6 +159,12 @@ CREATE EXTENSION postgis;
 \c simplified_registry_test
 CREATE EXTENSION fuzzystrmatch;
 CREATE EXTENSION postgis;
+
+\c simplified_registry_dev postgres
+GRANT ALL ON SCHEMA public TO simplified;
+
+\c simplified_registry_test postgres
+GRANT ALL ON SCHEMA public TO simplified;
 ```
 
 The database configuration is exposed to the application via environment variables.

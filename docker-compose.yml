@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   libreg_local_db:
     container_name: libreg_local_db
@@ -12,6 +10,10 @@ services:
       - "5433:5433"
     environment:
       - PGPORT=5433
+    command: >
+            -c ssl=on
+            -c ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+            -c ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
 
   libreg_webapp:
     container_name: libreg_webapp
@@ -27,7 +29,9 @@ services:
       - "80:80"
     environment:
       - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_local_db:5433/simplified_registry_test
-      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5433/simplified_registry_dev
+      # AWS RDS Postgres 16+ enables SSL by default so we require ssl here in order to mirror the production environment
+      # as closely as possible for our dev instance.
+      - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5433/simplified_registry_dev?sslmode=require
       - FLASK_ENV=development
       - AWS_ACCESS_KEY_ID=TEST
       - AWS_SECRET_ACCESS_KEY=testpassword
