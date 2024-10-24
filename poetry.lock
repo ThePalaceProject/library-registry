@@ -2360,4 +2360,4 @@ pg-binary = []
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4"
-content-hash = "e6d1c8bab4c1740b60bbea77949e02c94ddbeb8133ddaeb93969ff18c65b0d83"
+content-hash = "fbe65fbe26d8d9754d6e17f9bdbd77df4cd0a8938d55bc5cde2b1331a3c8bdf4"

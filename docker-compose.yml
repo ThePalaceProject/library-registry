@@ -29,6 +29,8 @@ services:
       - "80:80"
     environment:
       - SIMPLIFIED_TEST_DATABASE=postgresql://simplified_test:simplified_test@libreg_local_db:5433/simplified_registry_test
+      # AWS RDS Postgres 16+ enables SSL by default so we require ssl here in order to mirror the production environment
+      # as closely as possible for our dev instance.
       - SIMPLIFIED_PRODUCTION_DATABASE=postgresql://simplified:simplified@libreg_local_db:5433/simplified_registry_dev?sslmode=require
       - FLASK_ENV=development
       - AWS_ACCESS_KEY_ID=TEST

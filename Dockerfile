@@ -55,7 +55,7 @@ ENV POETRY_HOME="/etc/poetry"
 # required for postgres ssl: the crt file doesn't exist
 # but the path must point to a visible directory otherwise we
 # get a permissions error
-ENV PGSSLCERT /tmp/postgresql.crt
+ENV PGSSLCERT=/tmp/postgresql.crt
 
 RUN set -x \
     && addgroup -g 101 -S nginx \
