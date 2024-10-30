@@ -36,7 +36,7 @@ Pillow = "*"
 pycryptodome = "*"
 PyJWT = "*"
 python = ">=3.8,<4"
-requests = "2.31.0"
+requests = "2.32.3"
 SQLAlchemy = "^1.4"
 uszipcode = "==1.0.1"
 
