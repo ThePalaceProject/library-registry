@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 import pytest
 
@@ -9,7 +8,7 @@ from admin.config import OperationalMode
 
 class TestAdminUI:
     @staticmethod
-    def _set_env(key: str, value: Optional[str]):
+    def _set_env(key: str, value: str | None):
         if value:
             os.environ[key] = value
         elif key in os.environ:
@@ -43,8 +42,8 @@ class TestAdminUI:
     )
     def test_package_url(
         self,
-        package_name: Optional[str],
-        package_version: Optional[str],
+        package_name: str | None,
+        package_version: str | None,
         mode: OperationalMode,
         expected_result_startswith: str,
     ):
@@ -71,8 +70,8 @@ class TestAdminUI:
     )
     def test_package_development_directory(
         self,
-        package_name: Optional[str],
-        package_version: Optional[str],
+        package_name: str | None,
+        package_version: str | None,
         expected_result: str,
     ):
         self._set_env("TPP_LIBRARY_REGISTRY_ADMIN_PACKAGE_NAME", package_name)

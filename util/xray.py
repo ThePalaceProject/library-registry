@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Optional
 
 from aws_xray_sdk.core import AWSXRayRecorder
 from aws_xray_sdk.core import patch as xray_patch
@@ -17,9 +16,7 @@ class PalaceXrayUtils:
     XRAY_ENV_ANNOTATE = "PALACE_XRAY_ANNOTATE_"
 
     @classmethod
-    def put_annotations(
-        cls, segment: Optional[Segment], seg_type: Optional[str] = None
-    ):
+    def put_annotations(cls, segment: Segment | None, seg_type: str | None = None):
         if seg_type is not None:
             segment.put_annotation("type", seg_type)
 
