@@ -155,7 +155,7 @@ class Configuration:
         )
 
     @classmethod
-    def aws_config(cls) -> "AWSConfig":
+    def aws_config(cls) -> AWSConfig:
         """Return the AWS configurations setup in the environment"""
         return AWSConfig(
             bucket_name=os.environ.get(cls.AWS_S3_BUCKET_NAME),
