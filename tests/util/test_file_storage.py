@@ -31,12 +31,11 @@ class TestS3FileStorage:
         data = io.BytesIO(b"abcdefghijk")
         fobj = storage.write("test-file-1", data)
 
+        aws_config = Configuration.aws_config()
+
         # Assert the link created is as expected
         link = storage.get_link(fobj)
-        assert (
-            link
-            == f"{os.environ[Configuration.AWS_S3_ENDPOINT_URL]}/{storage._bucket_name}/test-file-1"
-        )
+        assert link == f"{aws_config.endpoint_url}/{aws_config.bucket_name}/test-file-1"
 
         # Link should work for downloads, without auth
         response = requests.get(link)

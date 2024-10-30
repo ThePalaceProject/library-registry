@@ -30,6 +30,26 @@ class CannotSendEmail(Exception):
     pass
 
 
+def _url_from_environment(environment_variable: str) -> str | None:
+    url = os.environ.get(environment_variable)
+    if url is not None:
+        return url
+
+    # Try loading the URL in pieces. This is necessary in CI.
+    scheme = os.environ.get(environment_variable + "_SCHEME")
+    host = os.environ.get(environment_variable + "_HOST")
+    port = os.environ.get(environment_variable + "_PORT")
+    user = os.environ.get(environment_variable + "_USER")
+    password = os.environ.get(environment_variable + "_PASSWORD")
+
+    if scheme and host and port:
+        if user and password:
+            host = f"{user}:{password}@" + host
+        return f"{scheme}://{host}:{port}"
+
+    return None
+
+
 class Configuration:
     DATADIR = Path(os.path.dirname(__file__)) / "data"
 
@@ -95,7 +115,7 @@ class Configuration:
         else:
             environment_variable = cls.DATABASE_PRODUCTION_ENVIRONMENT_VARIABLE
 
-        url = os.environ.get(environment_variable)
+        url = _url_from_environment(environment_variable)
         if not url:
             raise CannotLoadConfiguration(
                 "Database URL was not defined in environment variable (%s) or configuration file."
@@ -137,7 +157,7 @@ class Configuration:
         """Return the AWS configurations setup in the environment"""
         return AWSConfig(
             bucket_name=os.environ.get(cls.AWS_S3_BUCKET_NAME),
-            endpoint_url=os.environ.get(cls.AWS_S3_ENDPOINT_URL),
+            endpoint_url=_url_from_environment(cls.AWS_S3_ENDPOINT_URL),
         )
 
 
