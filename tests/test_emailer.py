@@ -1,7 +1,6 @@
 import os
 import quopri
 from email.mime.text import MIMEText
-from typing import Optional
 from unittest import mock
 
 import pytest
@@ -81,7 +80,7 @@ class MockBrokenEmailer(Emailer):
 
 class TestEmailer:
     @staticmethod
-    def _set_env(key: str, value: Optional[str]):
+    def _set_env(key: str, value: str | None):
         if value:
             os.environ[key] = value
         elif key in os.environ:

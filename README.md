@@ -6,7 +6,7 @@ A discovery service for matching people to the libraries that serve them.
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
-![Python: 3.8,3.9,3.10,3.11](https://img.shields.io/badge/Python-3.8%20%7C%203.9%20%7C%203.10%20%7C%203.11-blue)
+![Python: 3.10,3.11,3.12](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue)
 
 This is a [LYRASIS](http://lyrasis.org)-maintained fork of the NYPL
 [Library Simplified](http://www.librarysimplified.org/) Library Registry.
@@ -132,7 +132,7 @@ To install the registry locally, you'll need the following:
 
 - PostgreSQL 16+
 - PostGIS 3
-- Python 3.8+ (3.9 is the build target for the Docker install)
+- Python 3.10+
 - Appropriate system dependencies to build the Python dependencies, which may include:
     - `make` / `gcc` / `build-essential` (debian) / `build-base` (alpine) / XCode CLI Tools (mac)
     - Compression libs like `bzip2-dev`, `zlib-dev`, etc.
@@ -268,18 +268,17 @@ flag.
 
 | Environment | Python Version |
 |-------------|----------------|
-| py38        | Python 3.8     |
-| py39        | Python 3.9     |
 | py310       | Python 3.10    |
 | py311       | Python 3.11    |
+| py312       | Python 3.12    |
 
 All of these environments are tested by default when running tox. To test one specific environment you can use the `-e`
 flag.
 
-Test Python 3.8
+Test Python 3.10
 
 ```shell
-tox -e py38
+tox -e py310
 ```
 
 You need to have the Python versions you are testing against installed on your local system. `tox` searches the system
@@ -299,10 +298,10 @@ on Github Actions. `tox-docker` is installed automatically as part of the `ci` p
 The docker functionality is included in a `docker` factor that can be added to the environment. To run an environment
 with a particular factor you add it to the end of the environment.
 
-Test with Python 3.8 using docker containers for the services.
+Test with Python 3.10 using docker containers for the services.
 
 ```shell
-tox -e py38-docker
+tox -e py310-docker
 ```
 
 #### Override `pytest` arguments

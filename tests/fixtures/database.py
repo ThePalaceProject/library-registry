@@ -3,8 +3,8 @@ import os
 import shutil
 import tempfile
 import time
+from collections.abc import Generator, Iterable
 from datetime import datetime
-from typing import Generator, Iterable, Optional, Tuple
 
 import pytest as pytest
 import sqlalchemy
@@ -69,7 +69,7 @@ class DatabaseFixture:
         self._connection = connection
 
     @staticmethod
-    def _get_database_connection() -> Tuple[Engine, Connection]:
+    def _get_database_connection() -> tuple[Engine, Connection]:
         url = Configuration.database_url(test=True)
         engine, connection = SessionManager.initialize(url)
         return engine, connection
@@ -93,7 +93,7 @@ class DatabaseTransactionFixture:
     """A fixture representing a single transaction. The transaction is automatically rolled back."""
 
     _database: DatabaseFixture
-    _default_library: Optional[Library]
+    _default_library: Library | None
     _session: Session
     _transaction: Transaction
     _counter: int
