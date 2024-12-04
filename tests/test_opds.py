@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import datetime
 import json
+
+import pytest
 
 from authentication_document import AuthenticationDocument
 from config import Configuration
@@ -351,3 +355,67 @@ class TestOPDSCatalog:
         # _hyperlink_args stops working.
         hyperlink.resource = None
         assert m(hyperlink) is None
+
+
+class TestOpdsMediaTypeChecks:
+    @pytest.mark.parametrize(
+        "media_type, expect_is_opds1, expect_is_opds2",
+        [
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                True,
+                False,
+                id="opds1-acquisition",
+            ),
+            pytest.param(
+                "application/atom+xml;kind=acquisition;profile=opds-catalog",
+                True,
+                False,
+                id="opds1_acquisition-different-order",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition;api-version=1",
+                True,
+                False,
+                id="opds1-acquisition-apiv1",
+            ),
+            pytest.param(
+                "application/atom+xml;api-version=1;kind=acquisition;profile=opds-catalog",
+                True,
+                False,
+                id="opds1_acquisition_apiv1-different-order",
+            ),
+            pytest.param(
+                "application/atom+xml;api-version=2;kind=acquisition;profile=opds-catalog",
+                True,
+                False,
+                id="opds1-acquisition-apiv2",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=navigation",
+                False,
+                False,
+                id="opds1-navigation",
+            ),
+            pytest.param(
+                "application/opds+json;api-version=1", False, True, id="opds2-apiv1"
+            ),
+            pytest.param(
+                "application/opds+json;api-version=2", False, True, id="opds2-apiv2"
+            ),
+            pytest.param("application/epub+zip", False, False, id="epub+zip"),
+            pytest.param("application/json", False, False, id="application-json"),
+            pytest.param("", False, False, id="empty-string"),
+            pytest.param(None, False, False, id="none-value"),
+        ],
+    )
+    def test_opds_catalog_types(
+        self, media_type: str | None, expect_is_opds1: bool, expect_is_opds2: bool
+    ) -> None:
+        is_opds1 = OPDSCatalog.is_opds1_type(media_type)
+        is_opds2 = OPDSCatalog.is_opds2_type(media_type)
+        is_opds_catalog_type = OPDSCatalog.is_opds_type(media_type)
+
+        assert is_opds1 == expect_is_opds1
+        assert is_opds2 == expect_is_opds2
+        assert is_opds_catalog_type == (expect_is_opds1 or expect_is_opds2)

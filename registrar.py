@@ -180,10 +180,9 @@ class LibraryRegistrar:
                     opds_url=opds_url,
                     auth_url=auth_url,
                 )
-        elif content_type not in (OPDSCatalog.OPDS_TYPE, OPDSCatalog.OPDS_1_TYPE):
+        elif not OPDSCatalog.is_opds_type(content_type):
             failure_detail = _(
-                "Supposed root document at %(url)s is not an OPDS document",
-                url=opds_url,
+                f"Supposed root document at {opds_url} does not appear to be an OPDS document (content_type={content_type!r}).",
             )
         elif not self.opds_response_links_to_auth_document(opds_response, auth_url):
             failure_detail = _(
@@ -316,14 +315,14 @@ class LibraryRegistrar:
         if link:
             links.append(link.get("url"))
         media_type = response.headers.get("Content-Type")
-        if media_type == OPDSCatalog.OPDS_TYPE:
+        if OPDSCatalog.is_opds2_type(media_type):
             # Parse as OPDS 2.
             catalog = json.loads(response.content)
             links = []
             for k, v in catalog.get("links", {}).items():
                 if k == rel:
                     links.append(v.get("href"))
-        elif media_type == OPDSCatalog.OPDS_1_TYPE:
+        elif OPDSCatalog.is_opds1_type(media_type):
             # Parse as OPDS 1.
             feed = feedparser.parse(response.content)
             for link in feed.get("feed", {}).get("links", []):
