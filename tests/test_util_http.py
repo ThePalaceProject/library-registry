@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 import pytest
@@ -7,6 +9,7 @@ from testing import MockRequestsResponse
 from util.http import (
     HTTP,
     BadResponseException,
+    NormalizedMediaType,
     RemoteIntegrationException,
     RequestNetworkException,
     RequestTimedOut,
@@ -296,3 +299,132 @@ class TestRequestNetworkException:
         # The status code corresponding to an upstream timeout is 502.
         document, status_code, headers = standard_detail.response
         assert status_code == 502
+
+
+class TestNormalizedMediaType:
+    @pytest.mark.parametrize(
+        "media_type, expected_prefix, expected_directives",
+        [
+            pytest.param("text/html", "text/html", {}, id="simple-type"),
+            pytest.param(
+                "application/json; charset=utf-8",
+                "application/json",
+                {"charset": "utf-8"},
+                id="type-with-single-directive",
+            ),
+            pytest.param(
+                "image/png; quality=high; version=1.0",
+                "image/png",
+                {"quality": "high", "version": "1.0"},
+                id="type-with-multiple-directives",
+            ),
+            pytest.param(
+                "image/png; version=1.0; quality=high",
+                "image/png",
+                {"quality": "high", "version": "1.0"},
+                id="directives-in-different-order",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                "application/atom+xml",
+                {"profile": "opds-catalog", "kind": "acquisition"},
+                id="opds-without-api-version",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition;api-version=1",
+                "application/atom+xml",
+                {"profile": "opds-catalog", "kind": "acquisition", "api-version": "1"},
+                id="opds-with-api-version",
+            ),
+            pytest.param(
+                "text/html;", "text/html", {}, id="simple-type-trailing-semicolon"
+            ),
+            pytest.param(
+                "text/html;=", "text/html", {}, id="simple-type-trailing-equal"
+            ),
+            pytest.param(
+                "text/html;=value", "text/html", {}, id="simple-type-trailing-equal"
+            ),
+        ],
+    )
+    def test_initialization(
+        self,
+        media_type: str,
+        expected_prefix: str,
+        expected_directives: dict[str, str],
+    ) -> None:
+        normalized = NormalizedMediaType(media_type)
+
+        assert normalized.prefix == expected_prefix
+        assert normalized.directives == expected_directives
+
+    @pytest.mark.parametrize(
+        "media_type, other, expected_match",
+        [
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                "application/atom+xml;profile=opds-catalog;kind=acquisition;api-version=1",
+                True,
+                id="other-with-added-directives",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition;api-version=1",
+                "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                False,
+                id="other-with-fewer-directives",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                "application/atom+xml;api-version=1;kind=acquisition;profile=opds-catalog",
+                True,
+                id="added-directives-different-order",
+            ),
+            pytest.param(
+                "image/png; quality=high; version=1.0",
+                "image/png;quality=high;version=1.0",
+                True,
+                id="self-extra-spaces",
+            ),
+            pytest.param(
+                "image/png;quality=high;version=1.0",
+                "image/png; quality=high; version=1.0",
+                True,
+                id="other-extra-spaces",
+            ),
+            pytest.param("text/html", "text/html", True, id="exact-match"),
+            pytest.param("text/htmlxx", "text/html", False, id="self-extra-characters"),
+            pytest.param(
+                "text/html", "text/htmlxx", False, id="other-extra-characters"
+            ),
+            pytest.param(
+                "application/json; charset=utf-8",
+                "application/json; charset=utf-8",
+                True,
+                id="exact-match-with-directives",
+            ),
+            pytest.param(
+                "image/png; quality=high",
+                "image/png; quality=high; version=1.0",
+                True,
+                id="match-with-extra-directives",
+            ),
+            pytest.param(
+                "image/png; quality=high",
+                "image/png; quality=low",
+                False,
+                id="mismatch-directive-value",
+            ),
+            pytest.param("text/html", "application/json", False, id="different-prefix"),
+        ],
+    )
+    def test_min_match(self, media_type: str, other: str, expected_match) -> None:
+        normalized = NormalizedMediaType(media_type)
+        is_match = normalized.min_match(other)
+        none_match = normalized.min_match(None)
+
+        assert is_match == expected_match
+        assert none_match == False
+
+    def test_invalid_cases(self):
+        with pytest.raises(AttributeError):
+            NormalizedMediaType._from_string(None)

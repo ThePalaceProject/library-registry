@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 
 import flask
@@ -7,6 +9,7 @@ from sqlalchemy.orm import Query
 from authentication_document import AuthenticationDocument
 from config import Configuration
 from model import ConfigurationSetting, Hyperlink, LibraryType, Validation
+from util.http import NormalizedMediaType
 
 
 class Annotator:
@@ -37,6 +40,9 @@ class OPDSCatalog:
     FOCUS_REL = "http://librarysimplified.org/rel/registry/focus"
 
     CACHE_TIME = 3600 * 12
+
+    _NORMALIZED_OPDS2_TYPE = NormalizedMediaType(OPDS_TYPE)
+    _NORMALIZED_OPDS1_TYPE = NormalizedMediaType(OPDS_1_TYPE)
 
     @classmethod
     def _strftime(cls, date):
@@ -87,10 +93,22 @@ class OPDSCatalog:
                     url_for=url_for,
                     include_logo=include_logos,
                     web_client_uri_template=web_client_uri_template,
-                    include_service_area=include_service_areas
+                    include_service_area=include_service_areas,
                 )
             )
         annotator.annotate_catalog(self, live=live)
+
+    @classmethod
+    def is_opds1_type(cls, media_type: str | None) -> bool:
+        return cls._NORMALIZED_OPDS1_TYPE.min_match(media_type)
+
+    @classmethod
+    def is_opds2_type(cls, media_type: str | None) -> bool:
+        return cls._NORMALIZED_OPDS2_TYPE.min_match(media_type)
+
+    @classmethod
+    def is_opds_type(cls, media_type: str | None) -> bool:
+        return cls.is_opds1_type(media_type) or cls.is_opds2_type(media_type)
 
     @classmethod
     def _feed_is_large(cls, _db, libraries):
@@ -125,7 +143,6 @@ class OPDSCatalog:
         web_client_uri_template=None,
         include_service_area=False,
     ):
-
         """Create an OPDS catalog for a library.
 
         :param distance: The distance, in meters, from the client's

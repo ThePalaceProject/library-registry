@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import datetime
 import json
@@ -1507,30 +1509,78 @@ class TestLibraryRegistryController:
                 == "Error retrieving OPDS root document at http://circmanager.org/feed/"
             )
 
+    @pytest.mark.parametrize(
+        "media_type, expect_success",
+        [
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition",
+                True,
+                id="opds1-acquisition",
+            ),
+            pytest.param(
+                "application/atom+xml;kind=acquisition;profile=opds-catalog",
+                True,
+                id="opds1_acquisition-different-order",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=acquisition;api-version=1",
+                True,
+                id="opds1-acquisition-apiv1",
+            ),
+            pytest.param(
+                "application/atom+xml;api-version=1;kind=acquisition;profile=opds-catalog",
+                True,
+                id="opds1_acquisition_apiv1-different-order",
+            ),
+            pytest.param(
+                "application/atom+xml;api-version=2;kind=acquisition;profile=opds-catalog",
+                True,
+                id="opds1-acquisition-apiv2",
+            ),
+            pytest.param(
+                "application/atom+xml;profile=opds-catalog;kind=navigation",
+                False,
+                id="opds1-navigation",
+            ),
+            pytest.param("application/opds+json;api-version=1", True, id="opds2-apiv1"),
+            pytest.param("application/opds+json;api-version=2", True, id="opds2-apiv2"),
+            pytest.param("application/epub+zip", False, id="epub+zip"),
+            pytest.param("application/json", False, id="application-json"),
+            pytest.param("", False, id="empty-string"),
+            pytest.param(None, False, id="none-value"),
+        ],
+    )
     def test_register_fails_on_start_link_not_opds_feed(
-        self, registry_controller_fixture: LibraryRegistryControllerFixture
-    ):
+        self,
+        media_type: str | None,
+        expect_success: bool,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+    ) -> None:
         fixture = registry_controller_fixture
+        # An empty string media type results in a no content-type header.
+        content_type = None if media_type == "" else media_type
 
         """The request returns an authentication document but an attempt
         to retrieve the corresponding OPDS feed gives a server-side error.
         """
         auth_document = self._auth_document()
+        # The start link returns a 200 response code but the media type might be wrong.
         fixture.http_client.queue_response(
             200, content=json.dumps(auth_document), url=auth_document["id"]
         )
 
-        # The start link returns a 200 response code but the wrong
-        # Content-Type.
-        fixture.http_client.queue_response(200, "text/html")
+        fixture.http_client.queue_response(200, media_type)
         with fixture.app.test_request_context("/", method="POST"):
             flask.request.form = fixture.form
             response = fixture.controller.register(do_get=fixture.http_client.do_get)
+            # We expect to get INVALID_INTEGRATION_DOCUMENT problem detail here, in any case,
+            # since our test is not fully configured.
             assert response.uri == INVALID_INTEGRATION_DOCUMENT.uri
+            # But we should see the `not OPDS` detail only in the case of an invalid media type.
             assert (
                 response.detail
-                == "Supposed root document at http://circmanager.org/feed/ is not an OPDS document"
-            )
+                != f"Supposed root document at http://circmanager.org/feed/ does not appear to be an OPDS document (content_type={content_type!r})."
+            ) == expect_success
 
     def test_register_fails_if_start_link_does_not_link_back_to_auth_document(
         self, registry_controller_fixture: LibraryRegistryControllerFixture

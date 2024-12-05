@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 import urllib.parse
+from dataclasses import dataclass
 
 import requests
 from flask_babel import lazy_gettext as _
@@ -382,7 +385,7 @@ class HTTP:
             make_request_with,
             http_method,
             process_response_with=cls.process_debuggable_response,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod
@@ -425,3 +428,56 @@ class HTTP:
                 response.content,
             )
         )
+
+
+@dataclass
+class NormalizedMediaType:
+    """Represents a normalized HTTP media type with its type prefix and directives.
+
+    This class provides methods to normalize a media type string into a canonical form
+    and compare media types.
+
+    TODO: Parsing is currently very lenient, and will accept media types with missing
+     or malformed directives.
+    """
+
+    string: str
+
+    def __post_init__(self):
+        self.prefix, self.directives = self._from_string(self.string)
+
+    @staticmethod
+    def _from_string(media_type: str):
+        elements = media_type.split(";")
+        prefix = elements.pop(0)
+        directives = {
+            k.strip(): v.strip()
+            for k, v in (
+                directive.split("=", 1) for directive in elements if "=" in directive
+            )
+            if k.strip()
+        }
+        return prefix, directives
+
+    def min_match(self, other: NormalizedMediaType | str | None) -> bool:
+        """Determine whether another media type is a 'minimum match' for this one.
+
+        :param other: The other media type to compare with this one.
+        :return: True if the other media type is a minimum match for this one, False otherwise.
+
+        A minimum match here is a media type that matches the prefix and
+        directives of this one, but may or may not have additional directives.
+        """
+        if other is None:
+            return False
+        if isinstance(other, str):
+            other = NormalizedMediaType(other)
+
+        if self.prefix != other.prefix:
+            return False
+        for k, v in self.directives.items():
+            if k not in other.directives:
+                return False
+            if other.directives[k] != v:
+                return False
+        return True
