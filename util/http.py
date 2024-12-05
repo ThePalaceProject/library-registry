@@ -385,7 +385,7 @@ class HTTP:
             make_request_with,
             http_method,
             process_response_with=cls.process_debuggable_response,
-            **kwargs
+            **kwargs,
         )
 
     @classmethod

@@ -93,7 +93,7 @@ class OPDSCatalog:
                     url_for=url_for,
                     include_logo=include_logos,
                     web_client_uri_template=web_client_uri_template,
-                    include_service_area=include_service_areas
+                    include_service_area=include_service_areas,
                 )
             )
         annotator.annotate_catalog(self, live=live)
