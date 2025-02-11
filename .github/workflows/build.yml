@@ -39,7 +39,7 @@ jobs:
           python-version: "3.10"
 
       - name: Install Poetry
-        uses: ThePalaceProject/circulation/.github/actions/poetry@feature/workflow-arm-runner
+        uses: ThePalaceProject/circulation/.github/actions/poetry@main
         with:
           version: "1.8.5"
 
