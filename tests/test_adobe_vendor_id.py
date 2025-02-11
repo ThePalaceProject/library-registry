@@ -48,14 +48,11 @@ class MockAdobeVendorIDClient(AdobeVendorIDClient):
 
 
 class TestAdobeVendorIdController:
-    def test_signin_handler(self):
-        ...
+    def test_signin_handler(self): ...
 
-    def test_userinfo_handler(self):
-        ...
+    def test_userinfo_handler(self): ...
 
-    def test_status_handler(self):
-        ...
+    def test_status_handler(self): ...
 
 
 class VendorIDFixture:
@@ -74,9 +71,9 @@ class VendorIDFixture:
             goal=ExternalIntegration.DRM_GOAL,
         )
         integration.setting(Configuration.ADOBE_VENDOR_ID).value = "VENDORID"
-        integration.setting(
-            Configuration.ADOBE_VENDOR_ID_NODE_VALUE
-        ).value = self.NODE_VALUE
+        integration.setting(Configuration.ADOBE_VENDOR_ID_NODE_VALUE).value = (
+            self.NODE_VALUE
+        )
         return integration
 
 
@@ -107,9 +104,9 @@ class TestConfiguration:
 
     def test_accessor_with_delegates(self, vendor_id_fixture: VendorIDFixture):
         integration = vendor_id_fixture.integration()
-        integration.setting(
-            Configuration.ADOBE_VENDOR_ID_DELEGATE_URL
-        ).value = json.dumps(["delegate"])
+        integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = (
+            json.dumps(["delegate"])
+        )
         vendor_id, node_value, delegates = Configuration.vendor_id(
             vendor_id_fixture.db.session
         )

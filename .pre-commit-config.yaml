@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -17,14 +17,14 @@ repos:
       - id: mixed-line-ending
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.17.0
+    rev: v3.19.1
     hooks:
       - id: pyupgrade
         args:
           - --py310-plus
 
   - repo: https://github.com/myint/autoflake
-    rev: v2.0.0
+    rev: v2.3.1
     hooks:
       - id: autoflake
         args:
@@ -33,32 +33,32 @@ repos:
           - --ignore-init-module-imports
 
   - repo: https://github.com/psf/black
-    rev: 22.10.0
+    rev: 25.1.0
     hooks:
       - id: black
         name: Run black
 
   - repo: https://github.com/PyCQA/isort
-    rev: 5.11.5
+    rev: 6.0.0
     hooks:
       - id: isort
         name: Run isort
 
   - repo: https://github.com/sirosen/check-jsonschema
-    rev: 0.19.2
+    rev: 0.31.1
     hooks:
       - id: check-github-workflows
       - id: check-github-actions
 
   - repo: https://github.com/pappasam/toml-sort
-    rev: v0.22.1
+    rev: v0.24.2
     hooks:
       - id: toml-sort
         args: []
         files: pyproject.toml
 
   - repo: https://github.com/jackdewinter/pymarkdown
-    rev: v0.9.8
+    rev: v0.9.27
     hooks:
       - id: pymarkdown
         args:

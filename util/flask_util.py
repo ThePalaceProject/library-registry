@@ -1,4 +1,5 @@
 """Utilities for Flask applications."""
+
 import ipaddress
 import re
 

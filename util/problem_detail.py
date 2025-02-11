@@ -2,6 +2,7 @@
 
 As per http://datatracker.ietf.org/doc/draft-ietf-appsawg-http-problem/
 """
+
 import json as j
 import logging
 
@@ -22,7 +23,6 @@ def json(type, status, title, detail=None, instance=None, debug_message=None):
 
 
 class ProblemDetail:
-
     """A common type of problem."""
 
     JSON_MEDIA_TYPE = JSON_MEDIA_TYPE

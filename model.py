@@ -31,7 +31,9 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy import exc as sa_exc
-from sqlalchemy import func
+from sqlalchemy import (
+    func,
+)
 from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
@@ -509,7 +511,7 @@ class Library(Base):
 
         # Convert the results to a dictionary.
         results = dict()
-        for (library_id, count) in rows:
+        for library_id, count in rows:
             results[library_id] = count
 
         return results
@@ -1217,7 +1219,6 @@ class Library(Base):
 
 
 class LibraryAlias(Base):
-
     """An alternate name for a library."""
 
     __tablename__ = "libraryalias"
@@ -1527,7 +1528,6 @@ class Place(Base):
         return qu.filter(intersects).filter(touches == False)
 
     def lookup_inside(self, name, using_overlap=False, using_external_source=True):
-
         """Look up a named Place that is geographically 'inside' this Place.
 
         :param name: The name of a place, such as "Boston" or
@@ -1707,7 +1707,6 @@ class Place(Base):
 
 
 class PlaceAlias(Base):
-
     """An alternate name for a place."""
 
     __tablename__ = "placealiases"
@@ -2284,7 +2283,6 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
 
 
 class ExternalIntegration(Base):
-
     """An external integration contains configuration for connecting
     to a third-party API.
     """

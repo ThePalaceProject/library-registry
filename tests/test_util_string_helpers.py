@@ -1,4 +1,5 @@
 """Test the helper objects in util.string."""
+
 import base64 as stdlib_base64
 import re
 
