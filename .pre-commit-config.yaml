@@ -39,7 +39,7 @@ repos:
         name: Run black
 
   - repo: https://github.com/PyCQA/isort
-    rev: 6.0.0
+    rev: 5.13.2
     hooks:
       - id: isort
         name: Run isort

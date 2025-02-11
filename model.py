@@ -31,9 +31,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy import exc as sa_exc
-from sqlalchemy import (
-    func,
-)
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
