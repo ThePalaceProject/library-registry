@@ -5,6 +5,7 @@ Revises: aa6b44e2e879
 Create Date: 2022-12-01 08:22:19.889670+00:00
 
 """
+
 import logging
 from dataclasses import dataclass
 
@@ -32,7 +33,7 @@ def upgrade() -> None:
     log.setLevel(logging.INFO)
     connection = op.get_bind()
     result = connection.execute("SELECT internal_urn, name, logo FROM libraries;")
-    for (lib_uuid, lib_name, lib_logo) in result:
+    for lib_uuid, lib_name, lib_logo in result:
         if lib_logo:
             log.info(f"Uploading logo for {lib_name}")
             uploaded_path = LibraryLogoStore.write_from_b64(

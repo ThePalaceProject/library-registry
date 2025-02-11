@@ -459,7 +459,7 @@ class LibraryRegistryController(BaseController):
 
     def _areas(self, areas):
         result = {}
-        for (a, b) in [
+        for a, b in [
             (ServiceArea.FOCUS, "focus"),
             (ServiceArea.ELIGIBILITY, "service"),
         ]:

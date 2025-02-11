@@ -1775,7 +1775,7 @@ class TestLibraryRegistryController:
     ):
         fixture = registry_controller_fixture
 
-        for (rel, error, badlink) in (
+        for rel, error, badlink in (
             (
                 "http://librarysimplified.org/rel/designated-agent/copyright",
                 "Invalid or missing copyright designated agent email address",
@@ -1850,6 +1850,7 @@ class TestLibraryRegistryController:
         """Even if everything looks good, registration can fail if
         the library registry can't send out the validation emails.
         """
+
         # Simulate an SMTP server that won't accept email for
         # whatever reason.
         class NonfunctionalEmailer(MockEmailer):
@@ -1895,6 +1896,7 @@ class TestLibraryRegistryController:
         WHEN:  A registration is requested
         THEN:  A ProblemDetail of an appropriate type should be returned
         """
+
         # Simulate an SMTP server that is wholly unresponsive
         class UnresponsiveEmailer(Emailer):
             def _send_email(*args):

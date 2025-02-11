@@ -286,7 +286,7 @@ class SetCoverageAreaScript(LibraryScript):
         service_area, focus_area = AuthenticationDocument.parse_service_and_focus_area(
             self._db, service_area, focus_area, place_class
         )
-        for (valid, unknown, ambiguous) in [service_area, focus_area]:
+        for valid, unknown, ambiguous in [service_area, focus_area]:
             if unknown:
                 raise ValueError("Unknown places: %r" % list(unknown.items()))
             if ambiguous:
@@ -637,9 +637,9 @@ class ConfigureVendorIDScript(Script):
                     'Invalid delegate: %s. Expected something ending with "/AdobeAuth/"'
                     % delegate
                 )
-        integration.setting(
-            Configuration.ADOBE_VENDOR_ID_DELEGATE_URL
-        ).value = json.dumps(delegates)
+        integration.setting(Configuration.ADOBE_VENDOR_ID_DELEGATE_URL).value = (
+            json.dumps(delegates)
+        )
         _db.commit()
 
 
