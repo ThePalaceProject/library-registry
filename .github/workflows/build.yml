@@ -1,0 +1,150 @@
+name: Docker Build
+on: [push]
+
+concurrency:
+  group: build-${{ github.ref_name }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Docker build (${{ matrix.arch.name }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - name: "amd64"
+            runner: "ubuntu-24.04"
+          - name: "arm64"
+            runner: "ubuntu-24.04-arm"
+
+    runs-on: ${{ matrix.arch.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      repo: ${{ steps.repo.outputs.registry }}
+      meta: ${{ steps.meta.outputs.json }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Poetry
+        uses: ThePalaceProject/circulation/.github/actions/poetry@feature/workflow-arm-runner
+        with:
+          version: "1.8.5"
+
+      - name: Setup Dunamai
+        run: poetry install --only ci
+        env:
+          POETRY_VIRTUALENVS_CREATE: false
+
+      - name: Create version file
+        run: |
+          echo "__version__ = '$(dunamai from git --style semver)'" >> admin/_version.py
+          echo "__commit__ = '$(dunamai from git --format {commit} --full-commit)'" >> admin/_version.py
+          echo "__branch__ = '$(dunamai from git --format {branch})'" >> admin/_version.py
+          cat admin/_version.py
+
+      # Docker doesn't support uppercase letters in repo names, so we need to lowercase the owner
+      - name: Set output repo
+        id: repo
+        run: |
+          repo=${GITHUB_REPOSITORY_OWNER,,}
+          registry="ghcr.io/$repo/library-registry"
+          echo "registry=$registry"
+          echo "registry=$registry" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.repo.outputs.registry }}
+          tags: |
+            type=semver,pattern={{major}}.{{minor}},priority=10
+            type=semver,pattern={{version}},priority=20
+            type=ref,event=branch,priority=30
+            type=sha,priority=40
+
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          target: libreg_active
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,"name=${{ steps.repo.outputs.registry }}",push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digests
+        run: |
+          mkdir -p ${{ runner.temp }}/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+          echo "DIGEST=$digest"
+
+      - name: Upload digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch.name }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # TODO: Add a job to test the image before we push it to the registry
+  # We already do this in the circulation images. Its a bit more complicated here
+  # because of the structure of the docker containers and docker-compose file.
+  # It would be nice make these more consistent across the different projects, so
+  # we can reuse the same testing setup.
+
+  push:
+    name: Tag & Push Images
+    runs-on: ubuntu-24.04
+    needs: [build]
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest & push
+        working-directory: ${{ runner.temp }}/digests
+        run: >
+          docker buildx imagetools create
+          $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< '${{ needs.build.outputs.meta }}')
+          $(printf '${{ needs.build.outputs.repo }}@sha256:%s ' *)
