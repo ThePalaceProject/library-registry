@@ -13,6 +13,7 @@ description = "The Palace Project library registry"
 homepage = "https://thepalaceproject.org"
 license = "Apache-2.0"
 name = "library-registry"
+package-mode = false
 readme = "README.md"
 repository = "https://github.com/ThePalaceProject/library-registry"
 version = "0"  # Version number is managed with tags in git
