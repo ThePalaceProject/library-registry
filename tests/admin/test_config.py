@@ -2,8 +2,7 @@ import os
 
 import pytest
 
-from admin.config import Configuration as AdminConfig
-from admin.config import OperationalMode
+from admin.config import Configuration as AdminConfig, OperationalMode
 
 
 class TestAdminUI:

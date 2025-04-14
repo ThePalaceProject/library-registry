@@ -29,9 +29,9 @@ from sqlalchemy import (
     Unicode,
     UniqueConstraint,
     create_engine,
+    exc as sa_exc,
+    func,
 )
-from sqlalchemy import exc as sa_exc
-from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import (
