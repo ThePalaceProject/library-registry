@@ -143,7 +143,7 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
- && poetry install --only main,pg \
+ && poetry sync --only main,pg \
  && poetry cache clear -n --all pypi \
  && apk del --no-network .build-deps
 
@@ -170,7 +170,7 @@ ENV FLASK_ENV development
 # Install development dependancies with poetry
 RUN set -ex \
  && apk add --no-cache --virtual .build-deps build-base \
- && poetry install --no-root -E pg \
+ && poetry sync -E pg \
  && poetry cache clear -n --all pypi \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
  && apk del --no-network .build-deps
