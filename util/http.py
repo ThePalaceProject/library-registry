@@ -7,8 +7,10 @@ from dataclasses import dataclass
 import requests
 from flask_babel import lazy_gettext as _
 
-from .problem_detail import JSON_MEDIA_TYPE as PROBLEM_DETAIL_JSON_MEDIA_TYPE
-from .problem_detail import ProblemDetail as pd
+from .problem_detail import (
+    JSON_MEDIA_TYPE as PROBLEM_DETAIL_JSON_MEDIA_TYPE,
+    ProblemDetail as pd,
+)
 
 INTEGRATION_ERROR = pd(
     "http://librarysimplified.org/terms/problem/remote-integration-failed",
