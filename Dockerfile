@@ -143,7 +143,7 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
- && poetry sync --only main,pg \
+ && poetry install --only main,pg \
  && poetry cache clear -n --all pypi \
  && apk del --no-network .build-deps
 
@@ -152,7 +152,7 @@ COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/supervisord-alpine.ini /etc/supervisord.conf
 COPY ./docker/docker-entrypoint.sh /docker-entrypoint.sh
 
-ENTRYPOINT ["/bin/sh", "-c", "/docker-entrypoint.sh"]
+CMD ["/docker-entrypoint.sh"]
 
 ##############################################################################
 
@@ -170,7 +170,7 @@ ENV FLASK_ENV development
 # Install development dependancies with poetry
 RUN set -ex \
  && apk add --no-cache --virtual .build-deps build-base \
- && poetry sync -E pg \
+ && poetry install -E pg \
  && poetry cache clear -n --all pypi \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
  && apk del --no-network .build-deps
