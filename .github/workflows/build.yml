@@ -168,6 +168,8 @@ jobs:
       - name: Test webserver is running
         run: |
           timeout 240s grep -q 'gunicorn entered RUNNING state' <(docker logs registry -f 2>&1)
+          timeout 240s grep -q 'nginx entered RUNNING state' <(docker logs registry -f 2>&1)
+          timeout 240s grep -q 'Booting worker' <(docker logs registry -f 2>&1)
           healthcheck=$(curl --write-out "%{http_code}" --silent --output /dev/null http://localhost:8080/version.json)
           if ! [[ ${healthcheck} == "200" ]]; then
             echo "  ERROR: Unexpected status code: ${healthcheck}"
