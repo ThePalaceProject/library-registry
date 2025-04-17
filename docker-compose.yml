@@ -44,7 +44,7 @@ services:
         read_only: true
 
   libreg_minio:
-    container_name: libreg_minio
+    container_name: minio
     image: bitnami/minio:2022.3.3
     ports:
       - "9000:9000"
