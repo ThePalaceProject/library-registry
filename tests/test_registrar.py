@@ -352,3 +352,23 @@ class TestRegistrar:
         assert type(args[0][1]) == BytesIO
 
         assert library.logo_url == "http://localhost/logo"
+
+    def test__make_request(self, db: DatabaseTransactionFixture) -> None:
+        mock_get = MagicMock()
+        registrar = LibraryRegistrar(db.session, do_get=mock_get)
+        response = registrar._make_request(
+            "http://test.com/registration",
+            "http://test.com/auth",
+            "Uh oh 404",
+            "Uh oh timeout",
+            "Uh oh exception",
+        )
+
+        mock_get.assert_called_once_with(
+            "http://test.com/auth",
+            allowed_response_codes=["2xx", "3xx", 404],
+            timeout=30,
+            headers={"Cache-Control": "no-cache"},
+        )
+
+        assert response == mock_get.return_value

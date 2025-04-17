@@ -271,7 +271,10 @@ class LibraryRegistrar:
             allowed_codes.append(401)
         try:
             response = self.do_get(
-                url, allowed_response_codes=allowed_codes, timeout=30
+                url,
+                allowed_response_codes=allowed_codes,
+                timeout=30,
+                headers={"Cache-Control": "no-cache"},
             )
             # We only allowed 404 above so that we could return a more
             # specific problem detail document if it happened.
