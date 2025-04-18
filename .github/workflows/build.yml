@@ -110,16 +110,85 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # TODO: Add a job to test the image before we push it to the registry
-  # We already do this in the circulation images. Its a bit more complicated here
-  # because of the structure of the docker containers and docker-compose file.
-  # It would be nice make these more consistent across the different projects, so
-  # we can reuse the same testing setup.
+  test:
+    name: Integration test (${{ matrix.arch.name }})
+    runs-on: ${{ matrix.arch.runner }}
+    needs: [build]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - name: "amd64"
+            runner: "ubuntu-24.04"
+# This is disabled for now, as the postgis/postgis image does not support arm64
+# we should eventually figure out a solution for this so we can test on all platforms
+#          - name: "arm64"
+#            runner: "ubuntu-24.04-arm"
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_USER: palace
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: registry
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}
+          pattern: digests-${{ matrix.arch.name }}
+
+      - name: Set image
+        working-directory: ${{ runner.temp }}/digests-${{ matrix.arch.name }}
+        run: |
+          IMAGE="${{needs.build.outputs.repo}}$(printf '@sha256:%s' *)"
+          echo "$IMAGE"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Pull & Start containers
+        run: >
+          docker run
+          --name registry
+          -d -p 8080:80
+          --network ${{ job.services.postgres.network }}
+          -e "SIMPLIFIED_PRODUCTION_DATABASE=postgresql://palace:test@postgres:5432/registry"
+          ${IMAGE}
+
+      - name: Test webserver is running
+        run: |
+          timeout 60s grep -q 'Booting worker' <(docker logs registry -f 2>&1)
+          healthcheck=$(curl --write-out "%{http_code}" --silent --output /dev/null http://localhost:8080/version.json)
+          if ! [[ ${healthcheck} == "200" ]]; then
+            echo "  ERROR: Unexpected status code: ${healthcheck}"
+            curl -v http://localhost:8080/version.json
+            exit 1
+          else
+            echo "  OK"
+          fi
+
+      - name: Output logs
+        if: failure()
+        run: docker logs registry
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f registry
 
   push:
     name: Tag & Push Images
     runs-on: ubuntu-24.04
-    needs: [build]
+    needs: [test, build]
     permissions:
       contents: read
       packages: write
