@@ -62,9 +62,24 @@ class OPDSCatalog:
         catalog.setdefault("images", []).append(image)
 
     def __init__(
-        self, _db, title, url, libraries, annotator=None, live=True, url_for=None
+        self,
+        _db,
+        title,
+        url,
+        libraries,
+        annotator=None,
+        live=True,
+        url_for=None,
+        pagination=None,
+        has_next_page=False,
+        order=None,
     ):
-        """Turn a list of libraries into a catalog."""
+        """Turn a list of libraries into a catalog.
+
+        :param pagination: Pagination object for adding rel links (optional).
+        :param has_next_page: Whether there's a next page of results.
+        :param order: OrderFacet for URL generation (optional).
+        """
         if not annotator:
             annotator = Annotator()
 
@@ -96,6 +111,11 @@ class OPDSCatalog:
                     include_service_area=include_service_areas,
                 )
             )
+
+        # Add pagination links if paginated feed.
+        if pagination:
+            self._add_pagination_links(url, pagination, has_next_page, order, url_for)
+
         annotator.annotate_catalog(self, live=live)
 
     @classmethod
@@ -131,6 +151,61 @@ class OPDSCatalog:
             # This is something like a normal Python list.
             size = len(libraries)
         return size >= large_feed_size
+
+    def _add_pagination_links(
+        self, base_url, pagination, has_next_page, order=None, url_for=None
+    ):
+        """Add OPDS 2.0 pagination links (rel=first/previous/next/last).
+
+        :param order: OrderFacet enum value for including in URLs (optional).
+        """
+        from pagination import OrderFacet
+
+        def paginated_url(page):
+            params = [f"after={page.offset}", f"size={page.size}"]
+            # Include order parameter if non-default.
+            if order and order not in (OrderFacet.DEFAULT, OrderFacet.TIMESTAMP):
+                params.append(f"order={order.value}")
+            return f"{base_url}?{'&'.join(params)}"
+
+        # Add numberOfItems to metadata for progress bars (OPDS 2.0).
+        if pagination.total_count is not None:
+            self.catalog["metadata"]["numberOfItems"] = pagination.total_count
+
+        # Always add rel="first".
+        self.add_link_to_catalog(
+            self.catalog,
+            rel="first",
+            href=paginated_url(pagination.first_page),
+            type=self.OPDS_TYPE,
+        )
+
+        # Add rel="previous" if not on first page.
+        if pagination.previous_page:
+            self.add_link_to_catalog(
+                self.catalog,
+                rel="previous",
+                href=paginated_url(pagination.previous_page),
+                type=self.OPDS_TYPE,
+            )
+
+        # Add rel="next" if there are more results.
+        if has_next_page:
+            self.add_link_to_catalog(
+                self.catalog,
+                rel="next",
+                href=paginated_url(pagination.next_page),
+                type=self.OPDS_TYPE,
+            )
+
+        # Add rel="last" if we know the total count.
+        if pagination.last_page is not None:
+            self.add_link_to_catalog(
+                self.catalog,
+                rel="last",
+                href=paginated_url(pagination.last_page),
+                type=self.OPDS_TYPE,
+            )
 
     @classmethod
     def library_catalog(

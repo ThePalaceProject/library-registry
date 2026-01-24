@@ -100,6 +100,9 @@ class Configuration:
     # controls how big a feed must be to be considered 'large'.
     LARGE_FEED_SIZE = "large_feed_size"
 
+    # Default page size for crawlable paginated feeds.
+    CRAWLABLE_PAGE_SIZE = "crawlable_page_size"
+
     # The name of the sitewide secret used for admin login.
     SECRET_KEY = "secret_key"
 

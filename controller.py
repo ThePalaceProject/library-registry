@@ -329,6 +329,145 @@ class LibraryRegistryController(BaseController):
         self.log.info("Built library catalog in %.2fsec" % (b - a))
         return catalog_response(catalog)
 
+    def libraries_opds_crawlable(self, live=True, location=None):
+        """Return paginated libraries in OPDS format for crawlers.
+
+        :param live: If True, only production libraries are shown.
+        :param location: Geographic location for nearby ordering (optional).
+        :return: Flask Response with OPDS 2.0 JSON catalog.
+        """
+        from pagination import OrderFacet, Pagination
+        from problem_details import INVALID_INPUT
+
+        NEARBY_LIBRARY_LIMIT = 5  # Maximum number of nearby libraries to promote.
+
+        # Parse pagination from request.
+        pagination = Pagination.from_request(_db=self._db)
+
+        # Parse order parameter (defaults to timestamp DESC).
+        order_str = flask.request.args.get("order", OrderFacet.TIMESTAMP.value)
+        try:
+            order = OrderFacet(order_str)
+        except ValueError:
+            return INVALID_INPUT.detailed(
+                f"I don't know how to order a feed by '{order_str}'", 400
+            )
+
+        # Validate that location is provided if order=nearby.
+        if order.requires_location and not location:
+            return INVALID_INPUT.detailed(
+                "The 'nearby' order requires location data. "
+                "Provide a _location parameter or allow IP geolocation.",
+                400,
+            )
+
+        # Build base query with stage filtering.
+        base_query = self._db.query(Library).filter(
+            Library._feed_restriction(production=live)
+        )
+
+        # Handle nearby ordering separately (uses Library.nearby() query).
+        if order == OrderFacet.NEARBY:
+            # Get nearby libraries (up to NEARBY_LIBRARY_LIMIT).
+            nearby_with_distance = (
+                Library.nearby(self._db, location, production=live)
+                .limit(NEARBY_LIBRARY_LIMIT)
+                .all()
+            )
+            nearby_libraries = [lib for lib, distance in nearby_with_distance]
+            nearby_ids = {lib.id for lib in nearby_libraries}
+
+            # Get remaining libraries (exclude nearby) with fallback ordering.
+            remaining_query = base_query.filter(~Library.id.in_(nearby_ids)).order_by(
+                *order.sort_order_expressions
+            )
+
+            # Get total count (all libraries, not just nearby).
+            total_count = base_query.count()
+            pagination.total_count = total_count
+
+            # Handle pagination:
+            # - Nearby libraries occupy slots 0-N (where N is number of nearby).
+            # - Remaining libraries start at offset max(0, pagination.offset - N).
+
+            nearby_count = len(nearby_libraries)
+
+            if pagination.offset < nearby_count:
+                # Page includes some nearby libraries.
+                nearby_on_page = nearby_libraries[pagination.offset :]
+                remaining_needed = pagination.size - len(nearby_on_page)
+
+                if remaining_needed > 0:
+                    # Need to fetch some remaining libraries too.
+                    remaining_query = remaining_query.options(
+                        joinedload("hyperlinks"),
+                        joinedload("hyperlinks", "resource"),
+                        joinedload("hyperlinks", "resource", "validation"),
+                    )
+                    remaining_query = remaining_query.offset(0).limit(
+                        remaining_needed + 1
+                    )
+                    remaining_results = remaining_query.all()
+                    remaining_on_page, _ = pagination.page_loaded(remaining_results)
+                    all_results = nearby_on_page + remaining_on_page
+                else:
+                    all_results = nearby_on_page[: pagination.size]
+            else:
+                # Page is entirely from remaining libraries.
+                remaining_offset = pagination.offset - nearby_count
+                remaining_query = remaining_query.options(
+                    joinedload("hyperlinks"),
+                    joinedload("hyperlinks", "resource"),
+                    joinedload("hyperlinks", "resource", "validation"),
+                )
+                remaining_query = remaining_query.offset(remaining_offset).limit(
+                    pagination.size + 1
+                )
+                all_results = remaining_query.all()
+
+            libraries, has_next = pagination.page_loaded(all_results)
+
+        else:
+            # Standard ordering (timestamp, name, random).
+            query = base_query.order_by(*order.sort_order_expressions)
+
+            # Get total count for rel="last" link and progress bars.
+            total_count = query.count()
+            pagination.total_count = total_count
+
+            # Eager load relationships (prevent N+1 queries).
+            query = query.options(
+                joinedload("hyperlinks"),
+                joinedload("hyperlinks", "resource"),
+                joinedload("hyperlinks", "resource", "validation"),
+            )
+
+            # Apply pagination and execute.
+            query = pagination.modify_query(query)
+            all_results = query.all()
+            libraries, has_next = pagination.page_loaded(all_results)
+
+        self.log.info(
+            f"Fetched {len(libraries)} of {total_count} libraries "
+            f"(offset={pagination.offset}, size={pagination.size}, order={order.value})"
+        )
+
+        # Build OPDS catalog with pagination links.
+        route_name = "libraries_crawlable" if live else "libraries_qa_crawlable"
+        catalog = OPDSCatalog(
+            self._db,
+            "Libraries",
+            self.app.url_for(route_name),
+            libraries,
+            annotator=self.annotator,
+            live=live,
+            pagination=pagination,
+            has_next_page=has_next,
+            order=order,
+        )
+
+        return catalog_response(catalog)
+
     def library_details(self, uuid, library=None, patron_count=None):
         """Return complete information about one specific library.
 
