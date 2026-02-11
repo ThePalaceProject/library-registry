@@ -409,145 +409,98 @@ class TestLibraryRegistryController:
         self._is_library(nypl, libraries[2])
         self._is_library(in_testing, libraries[3], False)
 
-    def test_libraries_opds_qa(
-        self, registry_controller_fixture: LibraryRegistryControllerFixture
-    ):
-        fixture = registry_controller_fixture
-        fixture.db.library(
-            name="Test Cancelled Library",
-            short_name="test_cancelled_lib",
-            library_stage=Library.CANCELLED_STAGE,
-            registry_stage=Library.TESTING_STAGE,
-        )
-        response = fixture.controller.libraries(False)
-        libraries = response.get("libraries")
-
-        # There are currently four libraries
-        assert len(libraries) == 4
-
-        with fixture.app.test_request_context("/libraries"):
-            response = fixture.controller.libraries_opds(False)
-
-            assert response.status == "200 OK"
-            assert response.headers["Content-Type"] == OPDSCatalog.OPDS_TYPE
-
-            catalog = response.json
-
-            # The cancelled library got filtered out.
-            assert len(catalog["catalogs"]) == 3
-
-            # The other libraries are in alphabetical order.
-            [ct, ks, nypl] = catalog["catalogs"]
-            assert ct["metadata"]["title"] == "Connecticut State Library"
-            assert (
-                ct["metadata"]["id"]
-                == fixture.db.connecticut_state_library.internal_urn
-            )
-
-            assert ks["metadata"]["title"] == "Kansas State Library"
-            assert ks["metadata"]["id"] == fixture.db.kansas_state_library.internal_urn
-
-            assert nypl["metadata"]["title"] == "NYPL"
-            assert nypl["metadata"]["id"] == fixture.db.nypl.internal_urn
-
-            [library_link, register_link, search_link, self_link] = sorted(
-                catalog["links"], key=lambda x: x["rel"]
-            )
-            url_for = fixture.app.library_registry.url_for
-
-            assert self_link["href"] == url_for("libraries_opds")
-            assert self_link["rel"] == "self"
-            assert self_link["type"] == OPDSCatalog.OPDS_TYPE
-
-            # Try again with a location in Kansas.
-            #
-            # See test_app_server.py to verify that @uses_location converts normal-looking
-            # latitude/longitude into this format.
-            with fixture.app.test_request_context("/libraries"):
-                response = fixture.controller.libraries_opds(
-                    False, location="SRID=4326;POINT(-98 39)"
-                )
-            catalog = response.json
-            titles = [x["metadata"]["title"] for x in catalog["catalogs"]]
-
-            # The nearby library is promoted to the top of the list.
-            # The other libraries are still in alphabetical order.
-            assert titles == [
-                "Kansas State Library",
-                "Connecticut State Library",
-                "NYPL",
-            ]
-
+    @pytest.mark.parametrize(
+        "production_only, expected_count",
+        [
+            pytest.param(True, 3, id="production-only"),
+            pytest.param(False, 4, id="include-testing"),
+        ],
+    )
     def test_libraries_opds(
-        self, registry_controller_fixture: LibraryRegistryControllerFixture
-    ):
+        self,
+        production_only: bool,
+        expected_count: int,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+    ) -> None:
+        """Test libraries for the OPDS feed."""
         fixture = registry_controller_fixture
+
+        # Add a library in an overall canceled state.
         fixture.db.library(
-            name="Test Cancelled Library",
-            short_name="test_cancelled_lib",
+            name="Canceled Library",
+            short_name="test_canceled_lib",
             library_stage=Library.CANCELLED_STAGE,
             registry_stage=Library.TESTING_STAGE,
+            has_email=True,
         )
-        response = fixture.controller.libraries()
-        libraries = response.get("libraries")
-
-        # There are currently four libraries, but only the three in production are shown.
-        assert len(libraries) == 3
+        # Add a library in an overall testing state.
+        fixture.db.library(
+            name="My Test Library",
+            short_name="my_test_lib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+            has_email=True,
+        )
 
         with fixture.app.test_request_context("/libraries"):
-            response = fixture.controller.libraries_opds()
+            response = fixture.controller.libraries_opds(production_only)
 
             assert response.status == "200 OK"
             assert response.headers["Content-Type"] == OPDSCatalog.OPDS_TYPE
 
-            catalog = json.loads(response.data)
+            catalog = response.json
+            catalogs_by_title = {
+                lib["metadata"]["title"]: lib for lib in catalog["catalogs"]
+            }
 
-            # In the OPDS response, instead of getting four libraries like
-            # libraries_qa() returns, we should only get three back because
-            # the last library has a stage that is cancelled.
-            assert len(catalog["catalogs"]) == 3
+            # Verify libraries are sorted alphabetically by title.
+            library_titles = [lib["metadata"]["title"] for lib in catalog["catalogs"]]
+            assert library_titles == sorted(
+                library_titles
+            ), f"Libraries not in alphabetical order: {library_titles}"
 
-            [ct, ks, nypl] = catalog["catalogs"]
-            assert ct["metadata"]["title"] == "Connecticut State Library"
+            assert len(catalog["catalogs"]) == expected_count
+
+            # Canceled libraries are never in OPDS feeds.
+            assert "Canceled Library" not in catalogs_by_title
+
+            if production_only:
+                assert "My Test Library" not in catalogs_by_title
+            else:
+                # Include both production and testing libraries.
+                assert "My Test Library" in catalogs_by_title
+
+            # These production libraries should always be present in the catalog.
+            assert "Connecticut State Library" in catalogs_by_title
+            assert "Kansas State Library" in catalogs_by_title
+            assert "NYPL" in catalogs_by_title
+
+            # TODO: The following could probably be split off into a separate test
+            #  that is more focused on the overall feed (from `catalog_response`).
+
+            # Verify metadata structure - check that at least one library has correct id.
+            ct_catalog = catalogs_by_title["Connecticut State Library"]
             assert (
-                ct["metadata"]["id"]
+                ct_catalog["metadata"]["id"]
                 == fixture.db.connecticut_state_library.internal_urn
             )
 
-            assert ks["metadata"]["title"] == "Kansas State Library"
-            assert ks["metadata"]["id"] == fixture.db.kansas_state_library.internal_urn
+            # Verify all expected OPDS links are present.
+            link_rels = {link["rel"] for link in catalog["links"]}
+            assert "self" in link_rels
+            assert "register" in link_rels
+            assert "search" in link_rels
 
-            assert nypl["metadata"]["title"] == "NYPL"
-            assert nypl["metadata"]["id"] == fixture.db.nypl.internal_urn
-
-            [library_link, register_link, search_link, self_link] = sorted(
-                catalog["links"], key=lambda x: x["rel"]
+            # Verify the self link.
+            self_link = next(
+                (link for link in catalog["links"] if link["rel"] == "self"), None
             )
+            assert self_link is not None
             url_for = fixture.app.library_registry.url_for
 
             assert self_link["href"] == url_for("libraries_opds")
             assert self_link["rel"] == "self"
             assert self_link["type"] == OPDSCatalog.OPDS_TYPE
-
-            # Try again with a location in Kansas.
-            #
-            # See test_app_server.py to verify that @uses_location
-            # converts normal-looking latitude/longitude into this
-            # format.
-            with fixture.app.test_request_context("/libraries"):
-                response = fixture.controller.libraries_opds(
-                    location="SRID=4326;POINT(-98 39)"
-                )
-            catalog = json.loads(response.data)
-            titles = [x["metadata"]["title"] for x in catalog["catalogs"]]
-
-            # The nearby library is promoted to the top of the list.
-            # The other libraries are still in alphabetical order.
-            assert titles == [
-                "Kansas State Library",
-                "Connecticut State Library",
-                "NYPL",
-            ]
 
     def test_library_details(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
@@ -1940,6 +1893,7 @@ class TestLibraryRegistryController:
         # library's authentication document.
         assert response.uri == UNABLE_TO_NOTIFY.uri
 
+    # TODO: This test is very, very slow (on trhe order of 30s locally).
     def test_register_success(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
     ):

@@ -290,13 +290,17 @@ class LibraryRegistryController(BaseController):
         data = dict(libraries=result)
         return data
 
-    def libraries_opds(self, live=True, location=None):
-        """Return all the libraries in OPDS format
+    def libraries_opds(self, live: bool = True) -> OPDSCatalog:
+        """Return all the libraries in OPDS format.
+
+        When `live` is True, only production libraries are included; otherwise
+        both production and testing libraries are included. Canceled libraries
+        should never be included in the client feed.
 
         :param live: If this is True, then only production libraries are shown.
-        :param location: If this is set, then libraries near this point will be
-           promoted out of the alphabetical list.
+        :return: An OPDS catalog containing production and possibly testing libraries.
         """
+        # TODO: This sort is not case-insensitive. We should change this in the future.
         alphabetical = self._db.query(Library).order_by(Library.name)
 
         # We always want to filter out cancelled libraries.  If live, we also filter out
@@ -311,37 +315,10 @@ class LibraryRegistryController(BaseController):
             joinedload("hyperlinks", "resource"),
             joinedload("hyperlinks", "resource", "validation"),
         )
-        if location is None:
-            # No location data is available. Use the alphabetical list as
-            # the list of libraries.
-            a = time.time()
-            libraries = alphabetical.all()
-            b = time.time()
-            self.log.info(
-                "Built alphabetical list of all libraries in %.2fsec" % (b - a)
-            )
-        else:
-            # Location data is available. Get the list of nearby libraries, then get
-            # the rest of the list in alphabetical order.
-
-            # We can't easily do the joindeload() thing for this
-            # query, because it doesn't simply return Library objects,
-            # but it won't return more than five results.
-            a = time.time()
-            nearby_libraries = (
-                Library.nearby(self._db, location, production=live).limit(5).all()
-            )
-            b = time.time()
-            self.log.info(f"Fetched libraries near {location} in {b - a:.2f}sec")
-
-            # Exclude nearby libraries from the alphabetical query
-            # to get a list of faraway libraries.
-            faraway_libraries = alphabetical.filter(
-                ~Library.id.in_([x.id for x, distance in nearby_libraries])
-            )
-            c = time.time()
-            libraries = nearby_libraries + faraway_libraries.all()
-            self.log.info(f"Fetched libraries far from {location} in {c - b:.2f}sec")
+        a = time.time()
+        libraries = alphabetical.all()
+        b = time.time()
+        self.log.info("Built alphabetical list of all libraries in %.2fsec" % (b - a))
 
         url = self.app.url_for("libraries_opds")
         a = time.time()
