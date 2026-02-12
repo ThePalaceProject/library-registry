@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Look up information about places in the system."""
+
 import os
 import sys
 

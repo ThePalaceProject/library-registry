@@ -1580,13 +1580,10 @@ class TestExternalIntegration:
         integration.setting("somesetting").value = "somevalue"
         integration.setting("password").value = "somepass"
 
-        expect = (
-            """ID: %s
+        expect = """ID: %s
 Name: The Integration
 Protocol/Goal: protocol/goal
-somesetting='somevalue'"""
-            % integration.id
-        )
+somesetting='somevalue'""" % integration.id
         actual = integration.explain()
         assert expect == "\n".join(actual)
 
@@ -1842,7 +1839,7 @@ class TestHyperlink:
         validation = link.resource.validation
         secret = validation.secret
 
-        (type, sent_to, kwargs) = emailer.sent.pop()
+        type, sent_to, kwargs = emailer.sent.pop()
 
         # We 'sent' an email about the fact that a new email address was
         # registered.
@@ -1869,7 +1866,7 @@ class TestHyperlink:
         link2, is_modified = library.set_hyperlink("help", "mailto:you@library")
         link2.notify(emailer, emailer.url_for)
 
-        (type, href, kwargs) = emailer.sent.pop()
+        type, href, kwargs = emailer.sent.pop()
         assert type == emailer.ADDRESS_DESIGNATED
         assert kwargs["rel_desc"] == "patron help contact address"
 
@@ -1883,7 +1880,7 @@ class TestHyperlink:
         # Same if we somehow send another notification for a Hyperlink with an
         # active Validation.
         link.notify(emailer, emailer.url_for)
-        (type, href, kwargs) = emailer.sent.pop()
+        type, href, kwargs = emailer.sent.pop()
         assert type == emailer.ADDRESS_DESIGNATED
         assert link.resource.validation.secret == secret
 
@@ -1892,7 +1889,7 @@ class TestHyperlink:
         now = datetime.datetime.utcnow()
         link.resource.validation.started_at = now - datetime.timedelta(days=10)
         link.notify(emailer, emailer.url_for)
-        (type, href, kwargs) = emailer.sent.pop()
+        type, href, kwargs = emailer.sent.pop()
         assert type == emailer.ADDRESS_NEEDS_CONFIRMATION
         assert "confirmation_link" in kwargs
 

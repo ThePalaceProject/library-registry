@@ -148,11 +148,11 @@ class AdobeVendorIDRequestHandler:
             return self.error_document(self.AUTH_ERROR_TYPE, "No method specified")
 
         if data["method"] == parser.STANDARD:
-            (user_id, label) = standard_lookup(data)
+            user_id, label = standard_lookup(data)
             failure = self.AUTHENTICATION_FAILURE
         elif data["method"] == parser.AUTH_DATA:
             authdata = data[parser.AUTH_DATA]
-            (user_id, label) = authdata_lookup(authdata)
+            user_id, label = authdata_lookup(authdata)
             failure = self.TOKEN_FAILURE
 
         if user_id is None:
@@ -236,9 +236,7 @@ class AdobeVendorIDModel:
         else:
             for delegate in self.short_client_token_decoder.delegates:
                 try:
-                    (account_id, label, _) = delegate.sign_in_standard(
-                        username, password
-                    )
+                    account_id, label, _ = delegate.sign_in_standard(username, password)
                     return account_id, label
                 except Exception:
                     pass  # This delegate couldn't help us.
@@ -266,7 +264,7 @@ class AdobeVendorIDModel:
         else:
             for delegate in self.short_client_token_decoder.delegates:
                 try:
-                    (account_id, label, _) = delegate.sign_in_authdata(authdata)
+                    account_id, label, _ = delegate.sign_in_authdata(authdata)
                     return account_id, label
                 except Exception:
                     pass  # This delegate couldn't help us.

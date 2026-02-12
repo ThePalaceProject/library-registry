@@ -522,9 +522,7 @@ zza|||Zaza; Dimili; Dimli; Kirdki; Kirmanjki; Zazaki|zaza; dimili; dimli; kirdki
     ]
 
     for i in RAW_DATA.split("\n"):
-        (alpha_3, terminologic_code, alpha_2, names, french_names) = i.strip().split(
-            "|"
-        )
+        alpha_3, terminologic_code, alpha_2, names, french_names = i.strip().split("|")
         names = [x.strip() for x in names.split(";")]
         if alpha_2:
             three_to_two[alpha_3] = alpha_2
