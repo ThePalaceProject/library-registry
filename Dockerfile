@@ -48,7 +48,7 @@ EXPOSE 80
 ENV NGINX_VERSION=1.28.2
 ENV NJS_VERSION=0.9.5
 ENV PKG_RELEASE=1
-ENV POETRY_VERSION=2.1.1
+ENV POETRY_VERSION=2.2.1
 ENV POETRY_URL="https://install.python-poetry.org"
 ENV POETRY_HOME="/etc/poetry"
 # required for postgres ssl: the crt file doesn't exist
