@@ -1,6 +1,7 @@
 services:
   libreg_local_db:
     container_name: libreg_local_db
+    platform: linux/amd64
     build:
       context: .
       target: libreg_local_db
