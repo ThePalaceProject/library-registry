@@ -144,13 +144,13 @@ jobs:
 
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
-          path: ${{ runner.temp }}
+          path: ${{ runner.temp }}/digests
           pattern: digests-${{ matrix.arch.name }}
 
       - name: Set image
-        working-directory: ${{ runner.temp }}/digests-${{ matrix.arch.name }}
+        working-directory: ${{ runner.temp }}/digests
         run: |
           IMAGE="${{needs.build.outputs.repo}}$(printf '@sha256:%s' *)"
           echo "$IMAGE"
@@ -195,7 +195,7 @@ jobs:
 
     steps:
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: ${{ runner.temp }}/digests
           pattern: digests-*
