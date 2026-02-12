@@ -38,17 +38,16 @@ EXPOSE 5432
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
-FROM python:3.10-alpine3.17 AS builder
+FROM python:3.12-alpine AS builder
 
 EXPOSE 80
 
 ##### Install NGINX, and Supervisor (Gunicorn installed in virtualenv) #####
-# This is a simplified version of the offical Nginx Dockerfile for Alpine 3.17:
-# https://github.com/nginxinc/docker-nginx/blob/5ce65c3efd395ee2d82d32670f233140e92dba99/mainline/alpine/Dockerfile
-ENV NGINX_VERSION=1.23.3
-ENV NJS_VERSION=0.7.9
+# This is a simplified version of the offical Nginx Dockerfile for Alpine:
+# https://github.com/nginxinc/docker-nginx/blob/master/stable/alpine/Dockerfile
+ENV NGINX_VERSION=1.28.2
+ENV NJS_VERSION=0.9.5
 ENV PKG_RELEASE=1
-ENV SUPERVISOR_VERSION=4.2.2
 ENV POETRY_VERSION=2.1.1
 ENV POETRY_URL="https://install.python-poetry.org"
 ENV POETRY_HOME="/etc/poetry"
@@ -78,7 +77,7 @@ RUN set -x \
         exit 1; \
     fi \
     && apk del .cert-deps \
-    && apk add -X "https://nginx.org/packages/mainline/alpine/v$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)/main" --no-cache $nginxPackages \
+    && apk add -X "https://nginx.org/packages/alpine/v$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)/main" --no-cache $nginxPackages \
     && if [ -n "$tempDir" ]; then rm -rf "$tempDir"; fi \
     && if [ -n "/etc/apk/keys/abuild-key.rsa.pub" ]; then rm -f /etc/apk/keys/abuild-key.rsa.pub; fi \
     && if [ -n "/etc/apk/keys/nginx_signing.rsa.pub" ]; then rm -f /etc/apk/keys/nginx_signing.rsa.pub; fi \
