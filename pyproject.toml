@@ -55,7 +55,7 @@ tox-gh-actions = "^3.0"
 
 [tool.poetry.group.dev.dependencies]
 psycopg2-binary = "~2.9.5"
-pytest = "^8"
+pytest = "^9"
 pytest-datadir = "*"
 pytest-timeout = "*"
 
