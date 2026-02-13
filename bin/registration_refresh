@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Refresh the registration for all registered libraries."""
+
 import os
 import sys
 

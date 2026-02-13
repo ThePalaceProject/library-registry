@@ -270,7 +270,7 @@ class TestEmailer:
 
         # The template was filled out and passed into our mocked-up
         # _send_email implementation.
-        (to, body, smtp) = emailer.emails.pop()
+        to, body, smtp = emailer.emails.pop()
         assert to == "you@library"
         for phrase in [
             "From: Me <me@registry>",

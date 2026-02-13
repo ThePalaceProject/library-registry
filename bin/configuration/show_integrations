@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Show an integration or the full list of integrations."""
+
 import os
 import sys
 
