@@ -9,14 +9,6 @@ from pagination import OrderFacet, Pagination
 class TestOrderFacet:
     """Tests for OrderFacet enum."""
 
-    def test_requires_location(self):
-        """Test that NEARBY requires location, others don't."""
-        assert OrderFacet.NEARBY.requires_location is True
-        assert OrderFacet.TIMESTAMP.requires_location is False
-        assert OrderFacet.NAME.requires_location is False
-        assert OrderFacet.DEFAULT.requires_location is False
-        assert OrderFacet.RANDOM.requires_location is False
-
     def test_sort_order_expressions_timestamp(self):
         """Test timestamp sort order expressions."""
         order = OrderFacet.TIMESTAMP
@@ -29,17 +21,16 @@ class TestOrderFacet:
         expressions = order.sort_order_expressions
         assert len(expressions) == 3
 
-    def test_sort_order_expressions_nearby(self):
-        """Test nearby sort order expressions (fallback)."""
-        order = OrderFacet.NEARBY
-        expressions = order.sort_order_expressions
-        assert len(expressions) == 2
+    def test_default_is_alias_for_timestamp(self):
+        """DEFAULT produces the same ordering as TIMESTAMP."""
+        assert (
+            OrderFacet.DEFAULT.sort_order_expressions
+            == OrderFacet.TIMESTAMP.sort_order_expressions
+        )
 
-    def test_sort_order_expressions_random(self):
-        """Test random sort order expressions."""
-        order = OrderFacet.RANDOM
-        expressions = order.sort_order_expressions
-        assert len(expressions) == 1
+    def test_sort_order_expressions_natural(self):
+        """Natural order returns no sort expressions (no ORDER BY)."""
+        assert OrderFacet.NATURAL.sort_order_expressions == []
 
 
 class TestPagination:

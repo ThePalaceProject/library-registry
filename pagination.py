@@ -15,22 +15,13 @@ class OrderFacet(StrEnum):
     """Sort order options for library feeds."""
 
     DEFAULT = "default"  # Alias for TIMESTAMP (reverse chronological).
-    TIMESTAMP = "timestamp"  # Newest first (matches crawlable feed default).
+    TIMESTAMP = "timestamp"  # Newest first (reverse chronological).
     NAME = "name"  # Alphabetical A-Z.
-    NEARBY = "nearby"  # Nearby libraries first (requires location data).
-    RANDOM = "random"  # Randomized order.
-
-    @property
-    def requires_location(self) -> bool:
-        """Return True if this order requires location data."""
-        return self == self.NEARBY
+    NATURAL = "natural"  # Database natural order (no ORDER BY).
 
     @property
     def sort_order_expressions(self) -> list:
-        """Return SQLAlchemy order_by expressions for this sort order.
-
-        Note: NEARBY ordering is handled differently via Library.nearby() query.
-        """
+        """Return SQLAlchemy order_by expressions for this sort order."""
         if self in (self.DEFAULT, self.TIMESTAMP):
             # Reverse chronological: newest libraries first, then alphabetical.
             return [
@@ -45,16 +36,9 @@ class OrderFacet(StrEnum):
                 Library.timestamp.desc(),
                 Library.id.asc(),
             ]
-        elif self == self.NEARBY:
-            # Location-based ordering is handled separately in controller.
-            # This returns fallback ordering for libraries beyond nearby radius.
-            return [
-                func.upper(Library.name).asc(),
-                Library.id.asc(),
-            ]
-        elif self == self.RANDOM:
-            # Randomized order (PostgreSQL).
-            return [func.random()]
+        elif self == self.NATURAL:
+            # No ORDER BY — rows returned in database natural order.
+            return []
         else:
             raise ValueError(f"Unknown order facet: {self}")
 

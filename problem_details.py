@@ -79,3 +79,9 @@ UNABLE_TO_NOTIFY = pd(
     500,
     title=lgt("Registry server unable to send notification emails."),
 )
+
+INVALID_INPUT = pd(
+    "http://librarysimplified.org/terms/problem/invalid-input",
+    400,
+    title=lgt("Invalid input"),
+)
