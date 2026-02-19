@@ -3,44 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
 import flask
-from sqlalchemy import func
-
-from model import Library
-
-
-class OrderFacet(StrEnum):
-    """Sort order options for library feeds."""
-
-    DEFAULT = "default"  # Alias for TIMESTAMP (reverse chronological).
-    TIMESTAMP = "timestamp"  # Newest first (reverse chronological).
-    NAME = "name"  # Alphabetical A-Z.
-    NATURAL = "natural"  # Database natural order (no ORDER BY).
-
-    @property
-    def sort_order_expressions(self) -> list:
-        """Return SQLAlchemy order_by expressions for this sort order."""
-        if self in (self.DEFAULT, self.TIMESTAMP):
-            # Reverse chronological: newest libraries first, then alphabetical.
-            return [
-                Library.timestamp.desc(),
-                func.upper(Library.name).asc(),
-                Library.id.asc(),
-            ]
-        elif self == self.NAME:
-            # Alphabetical: A-Z by name, then newest first as tiebreaker.
-            return [
-                func.upper(Library.name).asc(),
-                Library.timestamp.desc(),
-                Library.id.asc(),
-            ]
-        elif self == self.NATURAL:
-            # No ORDER BY — rows returned in database natural order.
-            return []
-        else:
-            raise ValueError(f"Unknown order facet: {self}")
 
 
 @dataclass
@@ -51,12 +15,13 @@ class Pagination:
     """
 
     DEFAULT_SIZE = 100
-    MAX_SIZE = 100
-    MIN_SIZE = 1
+    MAX_SIZE = 500
+    MIN_SIZE = 20
 
     offset: int = 0
     size: int = DEFAULT_SIZE
-    total_count: int | None = None  # Total items across all pages.
+    # Total items across all pages
+    total_count: int | None = None
 
     @classmethod
     def from_request(cls, request: flask.Request = None, _db=None) -> Pagination:
@@ -83,7 +48,7 @@ class Pagination:
         # Parse and validate size parameter.
         try:
             size = int(request.args.get("size", default_size))
-            size = max(cls.MIN_SIZE, min(cls.MAX_SIZE, size))  # Clamp to [1, 100].
+            size = max(cls.MIN_SIZE, min(cls.MAX_SIZE, size))
         except (ValueError, TypeError):
             size = default_size
 

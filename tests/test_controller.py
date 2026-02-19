@@ -40,6 +40,7 @@ from model import (
     get_one_or_create,
 )
 from opds import OPDSCatalog
+from pagination import Pagination
 from problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
@@ -2263,8 +2264,8 @@ class TestLibraryRegistryController:
                 library_stage=Library.PRODUCTION_STAGE,
                 registry_stage=Library.PRODUCTION_STAGE,
             )
-            # Set explicit timestamps (newest first will be lib14, lib13, ...).
-            lib.timestamp = base_time - datetime.timedelta(days=i)
+            # i=14 is newest (base_time + 14 days), so feed order is lib14, lib13, ...
+            lib.timestamp = base_time + datetime.timedelta(days=i)
         fixture.db.session.flush()
 
         # Test first page.
@@ -2301,10 +2302,15 @@ class TestLibraryRegistryController:
         fixture = registry_controller_fixture
         base_time = datetime.datetime.utcnow()
 
-        # Create 25 libraries.
-        for i in range(25):
+        size = Pagination.MIN_SIZE
+
+        # Create enough libraries for three pages so that
+        # the middle page has all four nav links.
+        n = size * 2 + 3  # Three pages: full, full, partial.
+        for i in range(n):
             lib = fixture.db.library(
-                name=f"ZLib {i:03d}",  # Z prefix to sort after default fixtures.
+                # Z prefix to sort after default fixtures
+                name=f"ZLib {i:03d}",
                 short_name=f"zlib{i}",
                 library_stage=Library.PRODUCTION_STAGE,
                 registry_stage=Library.PRODUCTION_STAGE,
@@ -2312,33 +2318,32 @@ class TestLibraryRegistryController:
             lib.timestamp = base_time - datetime.timedelta(seconds=i)
         fixture.db.session.flush()
 
-        # Test second page (offset=10, size=10).
-        with fixture.app.test_request_context("/libraries/crawlable?after=10&size=10"):
+        total_expected = n + 3  # n new + 3 from fixture.
+
+        # Test second page — should have prev, next, first, and last links.
+        with fixture.app.test_request_context(
+            f"/libraries/crawlable?after={size}&size={size}"
+        ):
             response = fixture.controller.libraries_opds_crawlable()
             catalog = json.loads(response.data)
 
-            # Should have exactly 10 libraries.
-            assert len(catalog["catalogs"]) == 10
+            assert len(catalog["catalogs"]) == size
 
-            # Check total count.
             total = catalog["metadata"]["numberOfItems"]
-            assert total == 28  # 25 new + 3 from fixture.
+            assert total == total_expected
 
-            # Check pagination links.
             links = {link["rel"]: link for link in catalog["links"]}
             assert "first" in links
             assert "previous" in links
-            assert "next" in links  # More results available.
+            assert "next" in links
             assert "last" in links
 
-            # Verify link URLs.
-            assert "after=0&size=10" in links["first"]["href"]
-            assert "after=0&size=10" in links["previous"]["href"]
-            assert "after=20&size=10" in links["next"]["href"]
+            assert f"after=0&size={size}" in links["first"]["href"]
+            assert f"after=0&size={size}" in links["previous"]["href"]
+            assert f"after={size * 2}&size={size}" in links["next"]["href"]
 
-            # Calculate expected last page offset.
-            expected_last = ((total - 1) // 10) * 10
-            assert f"after={expected_last}&size=10" in links["last"]["href"]
+            expected_last = ((total_expected - 1) // size) * size
+            assert f"after={expected_last}&size={size}" in links["last"]["href"]
 
     def test_libraries_opds_crawlable_ordering(
         self, registry_controller_fixture: LibraryRegistryControllerFixture

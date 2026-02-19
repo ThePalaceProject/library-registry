@@ -3,34 +3,7 @@
 import pytest
 from flask import Flask
 
-from pagination import OrderFacet, Pagination
-
-
-class TestOrderFacet:
-    """Tests for OrderFacet enum."""
-
-    def test_sort_order_expressions_timestamp(self):
-        """Test timestamp sort order expressions."""
-        order = OrderFacet.TIMESTAMP
-        expressions = order.sort_order_expressions
-        assert len(expressions) == 3
-
-    def test_sort_order_expressions_name(self):
-        """Test name sort order expressions."""
-        order = OrderFacet.NAME
-        expressions = order.sort_order_expressions
-        assert len(expressions) == 3
-
-    def test_default_is_alias_for_timestamp(self):
-        """DEFAULT produces the same ordering as TIMESTAMP."""
-        assert (
-            OrderFacet.DEFAULT.sort_order_expressions
-            == OrderFacet.TIMESTAMP.sort_order_expressions
-        )
-
-    def test_sort_order_expressions_natural(self):
-        """Natural order returns no sort expressions (no ORDER BY)."""
-        assert OrderFacet.NATURAL.sort_order_expressions == []
+from pagination import Pagination
 
 
 class TestPagination:
@@ -43,11 +16,18 @@ class TestPagination:
         app.config["TESTING"] = True
         return app
 
+    def test_sensible_size_constants(self):
+        """Test that size constants are reasonable."""
+        assert Pagination.MIN_SIZE > 0
+        assert Pagination.MAX_SIZE > Pagination.MIN_SIZE
+        assert Pagination.DEFAULT_SIZE >= Pagination.MIN_SIZE
+        assert Pagination.DEFAULT_SIZE <= Pagination.MAX_SIZE
+
     def test_default_values(self):
         """Test default pagination values."""
         p = Pagination()
         assert p.offset == 0
-        assert p.size == 100
+        assert p.size == Pagination.DEFAULT_SIZE
         assert p.total_count is None
 
     def test_from_request_defaults(self, app):
@@ -55,7 +35,7 @@ class TestPagination:
         with app.test_request_context("/"):
             p = Pagination.from_request()
             assert p.offset == 0
-            assert p.size == 100
+            assert p.size == Pagination.DEFAULT_SIZE
             assert p.total_count is None
 
     def test_from_request_with_params(self, app):
@@ -67,15 +47,18 @@ class TestPagination:
 
     def test_from_request_clamps_size(self, app):
         """Test that size is clamped to MAX_SIZE."""
-        with app.test_request_context("/?size=500"):
+        # Ensure that our value is greater than MAX_SIZE.
+        test_size = Pagination.MAX_SIZE + 97
+
+        with app.test_request_context(f"/?size={test_size}"):
             p = Pagination.from_request()
-            assert p.size == 100  # MAX_SIZE
+            assert p.size == Pagination.MAX_SIZE
 
     def test_from_request_clamps_size_min(self, app):
         """Test that size is clamped to MIN_SIZE."""
         with app.test_request_context("/?size=0"):
             p = Pagination.from_request()
-            assert p.size == 1  # MIN_SIZE
+            assert p.size == Pagination.MIN_SIZE
 
     def test_from_request_negative_offset(self, app):
         """Test that negative offset defaults to 0."""
@@ -88,7 +71,7 @@ class TestPagination:
         with app.test_request_context("/?after=abc&size=xyz"):
             p = Pagination.from_request()
             assert p.offset == 0
-            assert p.size == 100  # Uses default
+            assert p.size == Pagination.DEFAULT_SIZE
 
     def test_next_page(self):
         """Test next page calculation."""
@@ -115,7 +98,7 @@ class TestPagination:
         """Test previous page when offset < size."""
         p = Pagination(offset=25, size=50, total_count=200)
         prev_p = p.previous_page
-        assert prev_p.offset == 0  # Clamped to 0
+        assert prev_p.offset == 0
 
     def test_first_page(self):
         """Test first page navigation."""

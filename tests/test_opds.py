@@ -15,8 +15,30 @@ from model import (
     Validation,
     create,
 )
-from opds import OPDSCatalog
+from opds import OPDSCatalog, OrderFacet
 from tests.fixtures.database import DatabaseTransactionFixture
+
+
+class TestOrderFacet:
+    """Tests for OrderFacet enum."""
+
+    @pytest.mark.parametrize(
+        "facet, expected_count",
+        [
+            pytest.param(OrderFacet.TIMESTAMP, 3, id="timestamp"),
+            pytest.param(OrderFacet.NAME, 3, id="name"),
+            pytest.param(OrderFacet.NATURAL, 0, id="natural"),
+            pytest.param(OrderFacet.DEFAULT, 3, id="default"),
+        ],
+    )
+    def test_sort_order_expression_count(self, facet, expected_count):
+        assert len(facet.sort_order_expressions) == expected_count
+
+    def test_default_is_alias_for_timestamp(self):
+        """DEFAULT produces the same SQL expressions as TIMESTAMP."""
+        assert [str(e) for e in OrderFacet.DEFAULT.sort_order_expressions] == [
+            str(e) for e in OrderFacet.TIMESTAMP.sort_order_expressions
+        ]
 
 
 class TestOPDSCatalog:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from enum import StrEnum
 
 import flask
 from sqlalchemy.engine.row import Row
@@ -8,8 +9,51 @@ from sqlalchemy.orm import Query
 
 from authentication_document import AuthenticationDocument
 from config import Configuration
-from model import ConfigurationSetting, Hyperlink, LibraryType, Validation
+from model import ConfigurationSetting, Hyperlink, Library, LibraryType, Validation
 from util.http import NormalizedMediaType
+
+
+class OrderFacet(StrEnum):
+    """Sort order options for library feeds."""
+
+    DEFAULT = "default"  # Alias for TIMESTAMP (reverse chronological).
+    TIMESTAMP = "timestamp"  # Newest first (reverse chronological).
+    NAME = "name"  # Alphabetical A-Z, word-by-word (dictionary order).
+    NATURAL = "natural"  # Database natural order (no ORDER BY).
+
+    @property
+    def label(self) -> str:
+        """Human-readable label for display in sort facet links."""
+        return {
+            "timestamp": "Newest first",
+            "name": "Library name (A-Z)",
+            "natural": "Database order",
+        }[self.value]
+
+    @classmethod
+    def advertised_facets(cls) -> list[OrderFacet]:
+        """Sort orders to include in feed sort links (excludes the DEFAULT alias)."""
+        return [cls.TIMESTAMP, cls.NAME, cls.NATURAL]
+
+    @property
+    def sort_order_expressions(self) -> list:
+        """Return SQLAlchemy order_by expressions for this sort order."""
+        if self in (self.DEFAULT, self.TIMESTAMP):
+            return [
+                Library.timestamp.desc(),
+                Library.name_sort_key().asc(),
+                Library.id.asc(),
+            ]
+        elif self == self.NAME:
+            return [
+                Library.name_sort_key().asc(),
+                Library.timestamp.desc(),
+                Library.id.asc(),
+            ]
+        elif self == self.NATURAL:
+            return []
+        else:
+            raise ValueError(f"Unknown order facet: {self}")
 
 
 class Annotator:
@@ -78,7 +122,7 @@ class OPDSCatalog:
 
         :param pagination: Pagination object for adding rel links (optional).
         :param has_next_page: Whether there's a next page of results.
-        :param order: OrderFacet for URL generation (optional).
+        :param order: Raw order string from request to preserve in pagination URLs (optional).
         """
         if not annotator:
             annotator = Annotator()
@@ -157,16 +201,16 @@ class OPDSCatalog:
     ):
         """Add OPDS 2.0 pagination links (rel=first/previous/next/last).
 
-        :param order: OrderFacet enum value for including in URLs (optional).
+        :param order: Raw order string from the original request, or None if absent.
         """
-        from pagination import OrderFacet
+
+        base_path = base_url.split("?")[0]
 
         def paginated_url(page):
             params = [f"after={page.offset}", f"size={page.size}"]
-            # Include order parameter if non-default.
-            if order and order not in (OrderFacet.DEFAULT, OrderFacet.TIMESTAMP):
-                params.append(f"order={order.value}")
-            return f"{base_url}?{'&'.join(params)}"
+            if order is not None:
+                params.append(f"order={order}")
+            return f"{base_path}?{'&'.join(params)}"
 
         # Add numberOfItems to metadata for progress bars (OPDS 2.0).
         if pagination.total_count is not None:

@@ -31,8 +31,8 @@ from model import (
     get_one_or_create,
     production_session,
 )
-from opds import Annotator, OPDSCatalog
-from pagination import OrderFacet, Pagination
+from opds import Annotator, OPDSCatalog, OrderFacet
+from pagination import Pagination
 from problem_details import (
     AUTHENTICATION_FAILURE,
     INTEGRATION_ERROR,
@@ -311,8 +311,7 @@ class LibraryRegistryController(BaseController):
         :param live: If this is True, then only production libraries are shown.
         :return: An OPDS catalog containing production and possibly testing libraries.
         """
-        # TODO: This sort is not case-insensitive. We should change this in the future.
-        alphabetical = self._db.query(Library).order_by(Library.name)
+        alphabetical = self._db.query(Library).order_by(Library.name_sort_key())
 
         # We always want to filter out cancelled libraries.  If live, we also filter out
         # libraries that are in the testing stage, i.e. only show production libraries.
@@ -326,10 +325,14 @@ class LibraryRegistryController(BaseController):
         b = time.time()
         self.log.info("Built alphabetical list of all libraries in %.2fsec" % (b - a))
 
-        url = self.app.url_for("libraries_opds")
         a = time.time()
         catalog = OPDSCatalog(
-            self._db, "Libraries", url, libraries, annotator=self.annotator, live=live
+            self._db,
+            "Libraries",
+            flask.request.url,
+            libraries,
+            annotator=self.annotator,
+            live=live,
         )
         b = time.time()
         self.log.info("Built library catalog in %.2fsec" % (b - a))
@@ -344,10 +347,12 @@ class LibraryRegistryController(BaseController):
         # Parse pagination from request.
         pagination = Pagination.from_request(_db=self._db)
 
-        # Parse order parameter (defaults to timestamp DESC).
-        order_str = flask.request.args.get("order", OrderFacet.TIMESTAMP.value)
+        # Parse order parameter; absent means default (timestamp DESC).
+        order_str = flask.request.args.get("order")
         try:
-            order = OrderFacet(order_str)
+            order = (
+                OrderFacet(order_str) if order_str is not None else OrderFacet.DEFAULT
+            )
         except ValueError:
             return INVALID_INPUT.detailed(
                 f"I don't know how to order a feed by '{order_str}'", 400
@@ -374,21 +379,20 @@ class LibraryRegistryController(BaseController):
 
         self.log.info(
             f"Fetched {len(libraries)} of {total_count} libraries "
-            f"(offset={pagination.offset}, size={pagination.size}, order={order.value})"
+            f"(offset={pagination.offset}, size={pagination.size}, order={order_str or 'default'})"
         )
 
         # Build OPDS catalog with pagination links.
-        route_name = "libraries_crawlable" if live else "libraries_qa_crawlable"
         catalog = OPDSCatalog(
             self._db,
             "Libraries",
-            self.app.url_for(route_name),
+            flask.request.url,
             libraries,
             annotator=self.annotator,
             live=live,
             pagination=pagination,
             has_next_page=has_next,
-            order=order,
+            order=order_str,
         )
 
         return catalog_response(catalog)
