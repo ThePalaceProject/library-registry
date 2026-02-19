@@ -25,7 +25,7 @@ class TestOrderFacet:
     @pytest.mark.parametrize(
         "facet, expected_count",
         [
-            pytest.param(OrderFacet.TIMESTAMP, 3, id="timestamp"),
+            pytest.param(OrderFacet.MODIFIED, 3, id="modified"),
             pytest.param(OrderFacet.NAME, 3, id="name"),
             pytest.param(OrderFacet.NATURAL, 0, id="natural"),
             pytest.param(OrderFacet.DEFAULT, 3, id="default"),
@@ -34,10 +34,10 @@ class TestOrderFacet:
     def test_sort_order_expression_count(self, facet, expected_count):
         assert len(facet.sort_order_expressions) == expected_count
 
-    def test_default_is_alias_for_timestamp(self):
-        """DEFAULT produces the same SQL expressions as TIMESTAMP."""
+    def test_default_is_alias_for_modified(self):
+        """DEFAULT produces the same SQL expressions as MODIFIED."""
         assert [str(e) for e in OrderFacet.DEFAULT.sort_order_expressions] == [
-            str(e) for e in OrderFacet.TIMESTAMP.sort_order_expressions
+            str(e) for e in OrderFacet.MODIFIED.sort_order_expressions
         ]
 
 

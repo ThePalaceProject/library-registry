@@ -16,8 +16,8 @@ from util.http import NormalizedMediaType
 class OrderFacet(StrEnum):
     """Sort order options for library feeds."""
 
-    DEFAULT = "default"  # Alias for TIMESTAMP (reverse chronological).
-    TIMESTAMP = "timestamp"  # Newest first (reverse chronological).
+    DEFAULT = "default"  # Alias for MODIFIED (reverse chronological).
+    MODIFIED = "modified"  # Most recently modified first (reverse chronological).
     NAME = "name"  # Alphabetical A-Z, word-by-word (dictionary order).
     NATURAL = "natural"  # Database natural order (no ORDER BY).
 
@@ -25,7 +25,7 @@ class OrderFacet(StrEnum):
     def label(self) -> str:
         """Human-readable label for display in sort facet links."""
         return {
-            "timestamp": "Newest first",
+            "modified": "Most recently modified first",
             "name": "Library name (A-Z)",
             "natural": "Database order",
         }[self.value]
@@ -33,12 +33,12 @@ class OrderFacet(StrEnum):
     @classmethod
     def advertised_facets(cls) -> list[OrderFacet]:
         """Sort orders to include in feed sort links (excludes the DEFAULT alias)."""
-        return [cls.TIMESTAMP, cls.NAME, cls.NATURAL]
+        return [cls.MODIFIED, cls.NAME, cls.NATURAL]
 
     @property
     def sort_order_expressions(self) -> list:
         """Return SQLAlchemy order_by expressions for this sort order."""
-        if self in (self.DEFAULT, self.TIMESTAMP):
+        if self in (self.DEFAULT, self.MODIFIED):
             return [
                 Library.timestamp.desc(),
                 Library.name_sort_key().asc(),

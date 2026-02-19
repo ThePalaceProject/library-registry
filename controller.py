@@ -347,7 +347,7 @@ class LibraryRegistryController(BaseController):
         # Parse pagination from request.
         pagination = Pagination.from_request(_db=self._db)
 
-        # Parse order parameter; absent means default (timestamp DESC).
+        # Parse order parameter; absent means default (modified DESC).
         order_str = flask.request.args.get("order")
         try:
             order = (
