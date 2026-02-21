@@ -14,9 +14,15 @@ from palace.registry.app_helpers import (
     uses_location_factory,
 )
 from palace.registry.config import Configuration
-from palace.registry.controller import LibraryRegistry
+from palace.registry.controller import (
+    OPDS_CATALOG_REGISTRATION_MEDIA_TYPE,
+    OPENSEARCH_MEDIA_TYPE,
+    LibraryRegistry,
+)
 from palace.registry.flask_sqlalchemy_session import flask_scoped_session
 from palace.registry.log import LogConfiguration
+from palace.registry.opds import OPDSCatalog
+from palace.registry.route_links import RouteLinkRegistry
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.session import SessionManager
 from palace.registry.util.app_server import (
@@ -27,6 +33,8 @@ from palace.registry.util.xray import PalaceXrayUtils
 
 app = Flask(__name__)
 babel = Babel(app)
+
+route_links = RouteLinkRegistry()
 
 # Create annotators for this app.
 has_library = has_library_factory(app)
@@ -53,7 +61,7 @@ if os.environ.get("AUTOINITIALIZE") == "False":
     # appropriately.
 else:
     if getattr(app, "library_registry", None) is None:
-        app.library_registry = LibraryRegistry(_db)
+        app.library_registry = LibraryRegistry(_db, route_links=route_links)
 
 
 def initialize(arbiter):
@@ -98,12 +106,14 @@ def nearby_qa(_location):
 
 
 @app.route("/register", methods=["GET", "POST"])
+@route_links.register(rel="register", type=OPDS_CATALOG_REGISTRATION_MEDIA_TYPE)
 @returns_problem_detail
 def register():
     return app.library_registry.registry_controller.register()
 
 
 @app.route("/search")
+@route_links.register(rel="search", type=OPENSEARCH_MEDIA_TYPE, production_only=True)
 @uses_location
 @returns_problem_detail
 def search(_location):
@@ -111,6 +121,7 @@ def search(_location):
 
 
 @app.route("/qa/search")
+@route_links.register(rel="search", type=OPENSEARCH_MEDIA_TYPE, production_only=False)
 @uses_location
 @returns_problem_detail
 def search_qa(_location):
@@ -206,6 +217,12 @@ def pls_id():
 
 
 @app.route("/library/<uuid>")
+@route_links.register(
+    rel="http://librarysimplified.org/rel/registry/library",
+    type=OPDSCatalog.OPDS_TYPE,
+    templated=True,
+    url_kwargs={"uuid": "{uuid}"},
+)
 @has_library
 @returns_json_or_response_or_problem_detail
 def library():
