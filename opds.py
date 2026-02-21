@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
+from urllib.parse import urlencode, urlparse, urlunparse
 
 import flask
 from sqlalchemy.engine.row import Row
@@ -25,6 +26,7 @@ class OrderFacet(StrEnum):
     def label(self) -> str:
         """Human-readable label for display in sort facet links."""
         return {
+            "default": "Default order",
             "modified": "Most recently modified first",
             "name": "Library name (A-Z)",
             "natural": "Database order",
@@ -158,7 +160,7 @@ class OPDSCatalog:
 
         # Add pagination links if paginated feed.
         if pagination:
-            self._add_pagination_links(url, pagination, has_next_page, order, url_for)
+            self._add_pagination_links(url, pagination, has_next_page, order)
 
         annotator.annotate_catalog(self, live=live)
 
@@ -197,20 +199,24 @@ class OPDSCatalog:
         return size >= large_feed_size
 
     def _add_pagination_links(
-        self, base_url, pagination, has_next_page, order=None, url_for=None
+        self,
+        base_url,
+        pagination,
+        has_next_page,
+        order=None,
     ):
         """Add OPDS 2.0 pagination links (rel=first/previous/next/last).
 
         :param order: Raw order string from the original request, or None if absent.
         """
 
-        base_path = base_url.split("?")[0]
+        parsed = urlparse(base_url)
 
         def paginated_url(page):
-            params = [f"after={page.offset}", f"size={page.size}"]
+            params = {"offset": page.offset, "size": page.size}
             if order is not None:
-                params.append(f"order={order}")
-            return f"{base_path}?{'&'.join(params)}"
+                params["order"] = order
+            return urlunparse(parsed._replace(query=urlencode(params)))
 
         # Add numberOfItems to metadata for progress bars (OPDS 2.0).
         if pagination.total_count is not None:

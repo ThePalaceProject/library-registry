@@ -1,5 +1,6 @@
 """Tests for pagination module."""
 
+import flask
 import pytest
 from flask import Flask
 
@@ -33,15 +34,15 @@ class TestPagination:
     def test_from_request_defaults(self, app):
         """Test parsing request with no parameters."""
         with app.test_request_context("/"):
-            p = Pagination.from_request()
+            p = Pagination.from_request(flask.request)
             assert p.offset == 0
             assert p.size == Pagination.DEFAULT_SIZE
             assert p.total_count is None
 
     def test_from_request_with_params(self, app):
         """Test parsing request with pagination parameters."""
-        with app.test_request_context("/?after=50&size=25"):
-            p = Pagination.from_request()
+        with app.test_request_context("/?offset=50&size=25"):
+            p = Pagination.from_request(flask.request)
             assert p.offset == 50
             assert p.size == 25
 
@@ -51,25 +52,25 @@ class TestPagination:
         test_size = Pagination.MAX_SIZE + 97
 
         with app.test_request_context(f"/?size={test_size}"):
-            p = Pagination.from_request()
+            p = Pagination.from_request(flask.request)
             assert p.size == Pagination.MAX_SIZE
 
     def test_from_request_clamps_size_min(self, app):
         """Test that size is clamped to MIN_SIZE."""
         with app.test_request_context("/?size=0"):
-            p = Pagination.from_request()
+            p = Pagination.from_request(flask.request)
             assert p.size == Pagination.MIN_SIZE
 
     def test_from_request_negative_offset(self, app):
         """Test that negative offset defaults to 0."""
-        with app.test_request_context("/?after=-50"):
-            p = Pagination.from_request()
+        with app.test_request_context("/?offset=-50"):
+            p = Pagination.from_request(flask.request)
             assert p.offset == 0
 
     def test_from_request_invalid_values(self, app):
         """Test handling of invalid parameter values."""
-        with app.test_request_context("/?after=abc&size=xyz"):
-            p = Pagination.from_request()
+        with app.test_request_context("/?offset=abc&size=xyz"):
+            p = Pagination.from_request(flask.request)
             assert p.offset == 0
             assert p.size == Pagination.DEFAULT_SIZE
 

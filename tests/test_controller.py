@@ -61,6 +61,7 @@ from tests.fixtures.controller import (
 )
 from tests.fixtures.database import DatabaseTransactionFixture
 from util import GeometryUtility
+from util.datetime_helpers import utc_now
 from util.file_storage import LibraryLogoStore
 from util.http import RequestTimedOut
 from util.problem_detail import ProblemDetail
@@ -2254,7 +2255,7 @@ class TestLibraryRegistryController:
     ):
         """Test basic crawlable feed functionality."""
         fixture = registry_controller_fixture
-        base_time = datetime.datetime.utcnow()
+        base_time = utc_now()
 
         # Create 15 libraries with different timestamps.
         for i in range(15):
@@ -2300,7 +2301,7 @@ class TestLibraryRegistryController:
     ):
         """Test pagination across multiple pages."""
         fixture = registry_controller_fixture
-        base_time = datetime.datetime.utcnow()
+        base_time = utc_now()
 
         size = Pagination.MIN_SIZE
 
@@ -2322,7 +2323,7 @@ class TestLibraryRegistryController:
 
         # Test second page — should have prev, next, first, and last links.
         with fixture.app.test_request_context(
-            f"/libraries/crawlable?after={size}&size={size}"
+            f"/libraries/crawlable?offset={size}&size={size}"
         ):
             response = fixture.controller.libraries_opds_crawlable()
             catalog = json.loads(response.data)
@@ -2338,19 +2339,19 @@ class TestLibraryRegistryController:
             assert "next" in links
             assert "last" in links
 
-            assert f"after=0&size={size}" in links["first"]["href"]
-            assert f"after=0&size={size}" in links["previous"]["href"]
-            assert f"after={size * 2}&size={size}" in links["next"]["href"]
+            assert f"offset=0&size={size}" in links["first"]["href"]
+            assert f"offset=0&size={size}" in links["previous"]["href"]
+            assert f"offset={size * 2}&size={size}" in links["next"]["href"]
 
             expected_last = ((total_expected - 1) // size) * size
-            assert f"after={expected_last}&size={size}" in links["last"]["href"]
+            assert f"offset={expected_last}&size={size}" in links["last"]["href"]
 
     def test_libraries_opds_crawlable_ordering(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
     ):
         """Test deterministic ordering: timestamp DESC, name ASC (case-insensitive)."""
         fixture = registry_controller_fixture
-        now = datetime.datetime.utcnow()
+        now = utc_now()
 
         # Create libraries with same timestamp but different names.
         for name in ["zebra", "Apple", "Banana", "aardvark"]:

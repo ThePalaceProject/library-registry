@@ -344,9 +344,6 @@ class LibraryRegistryController(BaseController):
         :param live: If True, only production libraries are shown.
         :return: Flask Response with OPDS 2.0 JSON catalog.
         """
-        # Parse pagination from request.
-        pagination = Pagination.from_request(_db=self._db)
-
         # Parse order parameter; absent means default (modified DESC).
         order_str = flask.request.args.get("order")
         try:
@@ -365,9 +362,10 @@ class LibraryRegistryController(BaseController):
             .order_by(*order.sort_order_expressions)
         )
 
-        # Get total count for rel="last" link and progress bars.
-        total_count = query.count()
-        pagination.total_count = total_count
+        # Parse pagination from request, supplying total count for last/progress links.
+        pagination = Pagination.from_request(
+            flask.request, _db=self._db, total_count=query.count()
+        )
 
         # Eager load relationships (prevent N+1 queries).
         query = query.options(*self._hyperlink_load_options())
@@ -378,7 +376,7 @@ class LibraryRegistryController(BaseController):
         libraries, has_next = pagination.page_loaded(all_results)
 
         self.log.info(
-            f"Fetched {len(libraries)} of {total_count} libraries "
+            f"Fetched {len(libraries)} of {pagination.total_count} libraries "
             f"(offset={pagination.offset}, size={pagination.size}, order={order_str or 'default'})"
         )
 

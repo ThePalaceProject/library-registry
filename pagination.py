@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import flask
+from sqlalchemy.orm import Session
 
 
-@dataclass
+@dataclass(frozen=True)
 class Pagination:
     """Offset-based pagination for library feeds.
 
@@ -20,21 +21,26 @@ class Pagination:
 
     offset: int = 0
     size: int = DEFAULT_SIZE
-    # Total items across all pages
+    #: Total items across all pages
     total_count: int | None = None
 
     @classmethod
-    def from_request(cls, request: flask.Request = None, _db=None) -> Pagination:
+    def from_request(
+        cls,
+        request: flask.Request,
+        *,
+        _db: Session = None,
+        total_count: int | None = None,
+    ) -> Pagination:
         """Parse pagination parameters from Flask request.
 
-        :param request: Flask request object (defaults to flask.request).
         :param _db: Database session for loading configuration (optional).
+        :param request: Flask request object (defaults to flask.request).
+        :param total_count: Total number of items across all pages (optional).
         :return: Pagination instance with validated parameters.
         """
         from config import Configuration
         from model import ConfigurationSetting
-
-        request = request or flask.request
 
         # Get configurable default.
         default_size = cls.DEFAULT_SIZE
@@ -54,12 +60,12 @@ class Pagination:
 
         # Parse offset.
         try:
-            offset = int(request.args.get("after", 0))
+            offset = int(request.args.get("offset", 0))
             offset = max(0, offset)
         except (ValueError, TypeError):
             offset = 0
 
-        return cls(offset=offset, size=size)
+        return cls(offset=offset, size=size, total_count=total_count)
 
     @property
     def next_page(self) -> Pagination:
