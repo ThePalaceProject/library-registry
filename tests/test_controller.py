@@ -40,6 +40,7 @@ from model import (
     get_one_or_create,
 )
 from opds import OPDSCatalog
+from pagination import Pagination
 from problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
@@ -60,6 +61,7 @@ from tests.fixtures.controller import (
 )
 from tests.fixtures.database import DatabaseTransactionFixture
 from util import GeometryUtility
+from util.datetime_helpers import utc_now
 from util.file_storage import LibraryLogoStore
 from util.http import RequestTimedOut
 from util.problem_detail import ProblemDetail
@@ -2247,6 +2249,165 @@ class TestLibraryRegistryController:
         # The library's authentication_url and opds_url have been modified.
         assert library.authentication_url == new_auth_url
         assert library.opds_url == new_opds_url
+
+    def test_libraries_opds_crawlable(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ):
+        """Test basic crawlable feed functionality."""
+        fixture = registry_controller_fixture
+        base_time = utc_now()
+
+        # Create 15 libraries with different timestamps.
+        for i in range(15):
+            lib = fixture.db.library(
+                name=f"Library {i:02d}",
+                short_name=f"lib{i}",
+                library_stage=Library.PRODUCTION_STAGE,
+                registry_stage=Library.PRODUCTION_STAGE,
+            )
+            # i=14 is newest (base_time + 14 days), so feed order is lib14, lib13, ...
+            lib.timestamp = base_time + datetime.timedelta(days=i)
+        fixture.db.session.flush()
+
+        # Test first page.
+        with fixture.app.test_request_context("/libraries/crawlable"):
+            response = fixture.controller.libraries_opds_crawlable()
+
+            assert response.status == "200 OK"
+            assert response.headers["Content-Type"] == OPDSCatalog.OPDS_TYPE
+
+            catalog = json.loads(response.data)
+            # Should include all libraries (less than default page size of 100).
+            # Note: fixture already has 3 default libraries from setup.
+            assert len(catalog["catalogs"]) == 18
+
+            # Check ordering: newest first (Library 14).
+            first_lib = catalog["catalogs"][0]
+            assert "Library 14" in first_lib["metadata"]["title"]
+
+            # Check metadata includes total count.
+            assert catalog["metadata"]["numberOfItems"] == 18
+
+            # Check pagination links.
+            links = {link["rel"]: link for link in catalog["links"]}
+            assert "first" in links
+            assert "self" in links
+            assert "last" in links
+            assert "next" not in links  # No next page (all results fit in one page).
+            assert "previous" not in links  # First page has no previous.
+
+    def test_libraries_opds_crawlable_pagination(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ):
+        """Test pagination across multiple pages."""
+        fixture = registry_controller_fixture
+        base_time = utc_now()
+
+        size = Pagination.MIN_SIZE
+
+        # Create enough libraries for three pages so that
+        # the middle page has all four nav links.
+        n = size * 2 + 3  # Three pages: full, full, partial.
+        for i in range(n):
+            lib = fixture.db.library(
+                # Z prefix to sort after default fixtures
+                name=f"ZLib {i:03d}",
+                short_name=f"zlib{i}",
+                library_stage=Library.PRODUCTION_STAGE,
+                registry_stage=Library.PRODUCTION_STAGE,
+            )
+            lib.timestamp = base_time - datetime.timedelta(seconds=i)
+        fixture.db.session.flush()
+
+        total_expected = n + 3  # n new + 3 from fixture.
+
+        # Test second page — should have prev, next, first, and last links.
+        with fixture.app.test_request_context(
+            f"/libraries/crawlable?offset={size}&size={size}"
+        ):
+            response = fixture.controller.libraries_opds_crawlable()
+            catalog = json.loads(response.data)
+
+            assert len(catalog["catalogs"]) == size
+
+            total = catalog["metadata"]["numberOfItems"]
+            assert total == total_expected
+
+            links = {link["rel"]: link for link in catalog["links"]}
+            assert "first" in links
+            assert "previous" in links
+            assert "next" in links
+            assert "last" in links
+
+            assert f"offset=0&size={size}" in links["first"]["href"]
+            assert f"offset=0&size={size}" in links["previous"]["href"]
+            assert f"offset={size * 2}&size={size}" in links["next"]["href"]
+
+            expected_last = ((total_expected - 1) // size) * size
+            assert f"offset={expected_last}&size={size}" in links["last"]["href"]
+
+    def test_libraries_opds_crawlable_ordering(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ):
+        """Test deterministic ordering: timestamp DESC, name ASC (case-insensitive)."""
+        fixture = registry_controller_fixture
+        now = utc_now()
+
+        # Create libraries with same timestamp but different names.
+        for name in ["zebra", "Apple", "Banana", "aardvark"]:
+            lib = fixture.db.library(
+                name=name,
+                short_name=name.lower()[:16],  # Short name has max length.
+                library_stage=Library.PRODUCTION_STAGE,
+                registry_stage=Library.PRODUCTION_STAGE,
+            )
+            lib.timestamp = now
+        fixture.db.session.flush()
+
+        with fixture.app.test_request_context("/libraries/crawlable"):
+            response = fixture.controller.libraries_opds_crawlable()
+            catalog = json.loads(response.data)
+
+            # Find our test libraries (all have same recent timestamp, should appear first).
+            test_libs = catalog["catalogs"][:4]
+
+            # Should be in case-insensitive alphabetical order.
+            names = [lib["metadata"]["title"] for lib in test_libs]
+            assert names == ["aardvark", "Apple", "Banana", "zebra"]
+
+    def test_libraries_opds_crawlable_qa(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ):
+        """Test QA crawlable feed includes testing libraries."""
+        fixture = registry_controller_fixture
+
+        # Create testing library.
+        test_lib = fixture.db.library(
+            name="Testing Library",
+            short_name="test_lib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+        )
+        fixture.db.session.flush()
+
+        # Production feed should not include testing library.
+        with fixture.app.test_request_context("/libraries/crawlable"):
+            response = fixture.controller.libraries_opds_crawlable(live=True)
+            catalog = json.loads(response.data)
+            titles = [cat["metadata"]["title"] for cat in catalog["catalogs"]]
+            assert "Testing Library" not in titles
+            prod_count = catalog["metadata"]["numberOfItems"]
+
+        # QA feed should include testing library.
+        with fixture.app.test_request_context("/libraries/qa/crawlable"):
+            response = fixture.controller.libraries_opds_crawlable(live=False)
+            catalog = json.loads(response.data)
+            titles = [cat["metadata"]["title"] for cat in catalog["catalogs"]]
+            assert "Testing Library" in titles
+
+            # QA feed should have more libraries than production.
+            qa_count = catalog["metadata"]["numberOfItems"]
+            assert qa_count == prod_count + 1
 
 
 class TestValidationController:

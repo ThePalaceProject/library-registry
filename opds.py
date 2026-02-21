@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from enum import StrEnum
+from urllib.parse import urlencode, urlparse, urlunparse
 
 import flask
 from sqlalchemy.engine.row import Row
@@ -8,8 +10,52 @@ from sqlalchemy.orm import Query
 
 from authentication_document import AuthenticationDocument
 from config import Configuration
-from model import ConfigurationSetting, Hyperlink, LibraryType, Validation
+from model import ConfigurationSetting, Hyperlink, Library, LibraryType, Validation
 from util.http import NormalizedMediaType
+
+
+class OrderFacet(StrEnum):
+    """Sort order options for library feeds."""
+
+    DEFAULT = "default"  # Alias for MODIFIED (reverse chronological).
+    MODIFIED = "modified"  # Most recently modified first (reverse chronological).
+    NAME = "name"  # Alphabetical A-Z, word-by-word (dictionary order).
+    NATURAL = "natural"  # Database natural order (no ORDER BY).
+
+    @property
+    def label(self) -> str:
+        """Human-readable label for display in sort facet links."""
+        return {
+            "default": "Default order",
+            "modified": "Most recently modified first",
+            "name": "Library name (A-Z)",
+            "natural": "Database order",
+        }[self.value]
+
+    @classmethod
+    def advertised_facets(cls) -> list[OrderFacet]:
+        """Sort orders to include in feed sort links (excludes the DEFAULT alias)."""
+        return [cls.MODIFIED, cls.NAME, cls.NATURAL]
+
+    @property
+    def sort_order_expressions(self) -> list:
+        """Return SQLAlchemy order_by expressions for this sort order."""
+        if self in (self.DEFAULT, self.MODIFIED):
+            return [
+                Library.timestamp.desc(),
+                Library.name_sort_key().asc(),
+                Library.id.asc(),
+            ]
+        elif self == self.NAME:
+            return [
+                Library.name_sort_key().asc(),
+                Library.timestamp.desc(),
+                Library.id.asc(),
+            ]
+        elif self == self.NATURAL:
+            return []
+        else:
+            raise ValueError(f"Unknown order facet: {self}")
 
 
 class Annotator:
@@ -62,9 +108,24 @@ class OPDSCatalog:
         catalog.setdefault("images", []).append(image)
 
     def __init__(
-        self, _db, title, url, libraries, annotator=None, live=True, url_for=None
+        self,
+        _db,
+        title,
+        url,
+        libraries,
+        annotator=None,
+        live=True,
+        url_for=None,
+        pagination=None,
+        has_next_page=False,
+        order=None,
     ):
-        """Turn a list of libraries into a catalog."""
+        """Turn a list of libraries into a catalog.
+
+        :param pagination: Pagination object for adding rel links (optional).
+        :param has_next_page: Whether there's a next page of results.
+        :param order: Raw order string from request to preserve in pagination URLs (optional).
+        """
         if not annotator:
             annotator = Annotator()
 
@@ -96,6 +157,11 @@ class OPDSCatalog:
                     include_service_area=include_service_areas,
                 )
             )
+
+        # Add pagination links if paginated feed.
+        if pagination:
+            self._add_pagination_links(url, pagination, has_next_page, order)
+
         annotator.annotate_catalog(self, live=live)
 
     @classmethod
@@ -131,6 +197,65 @@ class OPDSCatalog:
             # This is something like a normal Python list.
             size = len(libraries)
         return size >= large_feed_size
+
+    def _add_pagination_links(
+        self,
+        base_url,
+        pagination,
+        has_next_page,
+        order=None,
+    ):
+        """Add OPDS 2.0 pagination links (rel=first/previous/next/last).
+
+        :param order: Raw order string from the original request, or None if absent.
+        """
+
+        parsed = urlparse(base_url)
+
+        def paginated_url(page):
+            params = {"offset": page.offset, "size": page.size}
+            if order is not None:
+                params["order"] = order
+            return urlunparse(parsed._replace(query=urlencode(params)))
+
+        # Add numberOfItems to metadata for progress bars (OPDS 2.0).
+        if pagination.total_count is not None:
+            self.catalog["metadata"]["numberOfItems"] = pagination.total_count
+
+        # Always add rel="first".
+        self.add_link_to_catalog(
+            self.catalog,
+            rel="first",
+            href=paginated_url(pagination.first_page),
+            type=self.OPDS_TYPE,
+        )
+
+        # Add rel="previous" if not on first page.
+        if pagination.previous_page:
+            self.add_link_to_catalog(
+                self.catalog,
+                rel="previous",
+                href=paginated_url(pagination.previous_page),
+                type=self.OPDS_TYPE,
+            )
+
+        # Add rel="next" if there are more results.
+        if has_next_page:
+            self.add_link_to_catalog(
+                self.catalog,
+                rel="next",
+                href=paginated_url(pagination.next_page),
+                type=self.OPDS_TYPE,
+            )
+
+        # Add rel="last" if we know the total count.
+        if pagination.last_page is not None:
+            self.add_link_to_catalog(
+                self.catalog,
+                rel="last",
+                href=paginated_url(pagination.last_page),
+                type=self.OPDS_TYPE,
+            )
 
     @classmethod
     def library_catalog(

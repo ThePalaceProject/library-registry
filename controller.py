@@ -31,12 +31,14 @@ from model import (
     get_one_or_create,
     production_session,
 )
-from opds import Annotator, OPDSCatalog
+from opds import Annotator, OPDSCatalog, OrderFacet
+from pagination import Pagination
 from problem_details import (
     AUTHENTICATION_FAILURE,
     INTEGRATION_ERROR,
     INVALID_CONTACT_URI,
     INVALID_CREDENTIALS,
+    INVALID_INPUT,
     LIBRARY_NOT_FOUND,
     NO_AUTH_URL,
     UNABLE_TO_NOTIFY,
@@ -290,6 +292,15 @@ class LibraryRegistryController(BaseController):
         data = dict(libraries=result)
         return data
 
+    @staticmethod
+    def _hyperlink_load_options():
+        """Return eager load options for library hyperlinks and their validation state."""
+        return [
+            joinedload("hyperlinks"),
+            joinedload("hyperlinks", "resource"),
+            joinedload("hyperlinks", "resource", "validation"),
+        ]
+
     def libraries_opds(self, live: bool = True) -> OPDSCatalog:
         """Return all the libraries in OPDS format.
 
@@ -300,33 +311,88 @@ class LibraryRegistryController(BaseController):
         :param live: If this is True, then only production libraries are shown.
         :return: An OPDS catalog containing production and possibly testing libraries.
         """
-        # TODO: This sort is not case-insensitive. We should change this in the future.
-        alphabetical = self._db.query(Library).order_by(Library.name)
+        alphabetical = self._db.query(Library).order_by(Library.name_sort_key())
 
         # We always want to filter out cancelled libraries.  If live, we also filter out
         # libraries that are in the testing stage, i.e. only show production libraries.
         alphabetical = alphabetical.filter(Library._feed_restriction(production=live))
 
-        # Pick up each library's hyperlinks and validation
-        # information; this will save database queries when building
-        # the feed.
-        alphabetical = alphabetical.options(
-            joinedload("hyperlinks"),
-            joinedload("hyperlinks", "resource"),
-            joinedload("hyperlinks", "resource", "validation"),
-        )
+        # Pick up each library's hyperlinks and validation information; this will
+        # save database queries when building the feed.
+        alphabetical = alphabetical.options(*self._hyperlink_load_options())
         a = time.time()
         libraries = alphabetical.all()
         b = time.time()
         self.log.info("Built alphabetical list of all libraries in %.2fsec" % (b - a))
 
-        url = self.app.url_for("libraries_opds")
         a = time.time()
         catalog = OPDSCatalog(
-            self._db, "Libraries", url, libraries, annotator=self.annotator, live=live
+            self._db,
+            "Libraries",
+            flask.request.url,
+            libraries,
+            annotator=self.annotator,
+            live=live,
         )
         b = time.time()
         self.log.info("Built library catalog in %.2fsec" % (b - a))
+        return catalog_response(catalog)
+
+    def libraries_opds_crawlable(self, live=True):
+        """Return paginated libraries in OPDS format for crawlers.
+
+        :param live: If True, only production libraries are shown.
+        :return: Flask Response with OPDS 2.0 JSON catalog.
+        """
+        # Parse order parameter; absent means default (modified DESC).
+        order_str = flask.request.args.get("order")
+        try:
+            order = (
+                OrderFacet(order_str) if order_str is not None else OrderFacet.DEFAULT
+            )
+        except ValueError:
+            return INVALID_INPUT.detailed(
+                f"I don't know how to order a feed by '{order_str}'", 400
+            )
+
+        # Build query with stage filtering and requested ordering.
+        query = (
+            self._db.query(Library)
+            .filter(Library._feed_restriction(production=live))
+            .order_by(*order.sort_order_expressions)
+        )
+
+        # Parse pagination from request, supplying total count for last/progress links.
+        pagination = Pagination.from_request(
+            flask.request, _db=self._db, total_count=query.count()
+        )
+
+        # Eager load relationships (prevent N+1 queries).
+        query = query.options(*self._hyperlink_load_options())
+
+        # Apply pagination and execute.
+        query = pagination.modify_query(query)
+        all_results = query.all()
+        libraries, has_next = pagination.page_loaded(all_results)
+
+        self.log.info(
+            f"Fetched {len(libraries)} of {pagination.total_count} libraries "
+            f"(offset={pagination.offset}, size={pagination.size}, order={order_str or 'default'})"
+        )
+
+        # Build OPDS catalog with pagination links.
+        catalog = OPDSCatalog(
+            self._db,
+            "Libraries",
+            flask.request.url,
+            libraries,
+            annotator=self.annotator,
+            live=live,
+            pagination=pagination,
+            has_next_page=has_next,
+            order=order_str,
+        )
+
         return catalog_response(catalog)
 
     def library_details(self, uuid, library=None, patron_count=None):

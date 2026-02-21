@@ -28,6 +28,7 @@ from sqlalchemy import (
     Table,
     Unicode,
     UniqueConstraint,
+    collate,
     create_engine,
     exc as sa_exc,
     func,
@@ -597,6 +598,16 @@ class Library(Base):
         if self.service_area:
             return self.service_area.human_friendly_name
         return None
+
+    @classmethod
+    def name_sort_key(cls):
+        """Case-insensitive sort key for ORDER BY clauses.
+
+        Here we use a collation for which spaces sort before letters,
+        The "default" collation selects the locale specified at database
+        creation time, which might or might not be appropriate.
+        """
+        return collate(func.upper(cls.name), "unicode")
 
     @classmethod
     def _feed_restriction(cls, production, library_field=None, registry_field=None):

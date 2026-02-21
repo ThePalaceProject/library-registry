@@ -136,6 +136,20 @@ def libraries_qa():
     return app.library_registry.registry_controller.libraries_opds(live=False)
 
 
+@app.route("/libraries/crawlable")
+@compressible
+@returns_problem_detail
+def libraries_crawlable():
+    return app.library_registry.registry_controller.libraries_opds_crawlable()
+
+
+@app.route("/libraries/qa/crawlable")
+@compressible
+@returns_problem_detail
+def libraries_qa_crawlable():
+    return app.library_registry.registry_controller.libraries_opds_crawlable(live=False)
+
+
 @app.route("/admin/log_in", methods=["POST"])
 @returns_problem_detail
 def log_in():
