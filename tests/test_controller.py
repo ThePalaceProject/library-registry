@@ -4,8 +4,10 @@ import base64
 import datetime
 import json
 import random
+from collections.abc import Generator
 from contextlib import contextmanager
 from smtplib import SMTPException
+from typing import Any
 from urllib.parse import unquote
 
 import flask
@@ -201,7 +203,7 @@ class LibraryRegistryControllerFixture:
 @pytest.fixture(scope="function")
 def registry_controller_fixture(
     controller_setup_fixture: ControllerSetupFixture,
-) -> LibraryRegistryControllerFixture:
+) -> Generator[LibraryRegistryControllerFixture, Any, None]:
     def data_setup(fixture: ControllerFixture):
         """Configure the site before setup() creates a LibraryRegistry
         object.
@@ -239,6 +241,13 @@ def registry_controller_fixture(
         yield LibraryRegistryControllerFixture(
             fixture, controller, registration_form, manhattan, oakland
         )
+
+
+@pytest.fixture(scope="session")
+def rsa_key_pair() -> RSA.RsaKey:
+    """Pre-generated RSA key for registration tests. Session-scoped to avoid
+    repeated slow key generation (pycryptodome minimum is 1024 bits)."""
+    return RSA.generate(1024)
 
 
 class TestLibraryRegistryController:
@@ -1200,6 +1209,34 @@ class TestLibraryRegistryController:
             }
         return auth_document
 
+    def _register_library(
+        self,
+        fixture: LibraryRegistryControllerFixture,
+        key: RSA.RsaKey,
+        auth_url: str = "http://circmanager.org/authentication.opds",
+        contact: str = "mailto:me@library.org",
+    ) -> tuple[Response, Library]:
+        """Register a new library and return (response, library).
+
+        Resets http_client.requests afterward. Does not clear emailer.sent_out
+        so callers that need to inspect initial registration emails can do so.
+        """
+        auth_document = self._auth_document(key)
+        fixture.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document["id"]
+        )
+        self.queue_opds_success(fixture)
+        with fixture.app.test_request_context("/", method="POST"):
+            flask.request.form = ImmutableMultiDict(
+                [("url", auth_url), ("contact", contact)]
+            )
+            response = fixture.controller.register(do_get=fixture.http_client.do_get)
+        library = get_one(
+            fixture.db.session, Library, opds_url="http://circmanager.org/feed/"
+        )
+        fixture.http_client.requests = []
+        return response, library
+
     def test_register_get(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
     ):
@@ -1895,31 +1932,27 @@ class TestLibraryRegistryController:
         # library's authentication document.
         assert response.uri == UNABLE_TO_NOTIFY.uri
 
-    # TODO: This test is very, very slow (on trhe order of 30s locally).
-    def test_register_success(
-        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    def test_register_new_library(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        rsa_key_pair: RSA.RsaKey,
     ):
         fixture = registry_controller_fixture
-
         opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
+        opds_url = "http://circmanager.org/feed/"
 
-        # Pretend we are a library with a valid authentication document.
-        key = RSA.generate(1024)
-        auth_document = self._auth_document(key)
+        auth_document = self._auth_document(rsa_key_pair)
         fixture.http_client.queue_response(
             200, content=json.dumps(auth_document), url=auth_document["id"]
         )
         self.queue_opds_success(fixture)
-
-        auth_url = "http://circmanager.org/authentication.opds"
-        opds_url = "http://circmanager.org/feed/"
 
         # Send a registration request to the registry.
         random.seed(42)
         with fixture.app.test_request_context("/", method="POST"):
             flask.request.form = ImmutableMultiDict(
                 [
-                    ("url", auth_url),
+                    ("url", "http://circmanager.org/authentication.opds"),
                     ("contact", "mailto:me@library.org"),
                 ]
             )
@@ -1930,7 +1963,7 @@ class TestLibraryRegistryController:
             # The library has been created. Information from its
             # authentication document has been added to the database.
             library = get_one(fixture.db.session, Library, opds_url=opds_url)
-            assert library != None
+            assert library is not None
             assert library.name == "A Library"
             assert library.description == "Description"
             assert library.web_url == "http://circmanager.org"
@@ -1966,29 +1999,37 @@ class TestLibraryRegistryController:
 
             # Since the auth document had a public key, the registry
             # generated a short name and shared secret for the library.
+            assert catalog["metadata"]["short_name"] == library.short_name
             #
             # We know which short name will be generated because we seeded
             # the random number generator for this test.
+            assert library.short_name == "UDAXIH"
             #
             # We can't try the same trick with the shared secret,
             # because it was generated using techniques designed for
             # cryptography which ignore seed(). But we do know how
             # long it is.
-            expect = "UDAXIH"
-            assert expect == library.short_name
             assert len(library.shared_secret) == 48
 
-            assert catalog["metadata"]["short_name"] == library.short_name
             # The registry encrypted the secret with the public key, and
             # it can be decrypted with the private key.
-            encryptor = PKCS1_OAEP.new(key)
-            shared_secret = catalog["metadata"]["shared_secret"]
-            encrypted_secret = base64.b64decode(shared_secret.encode("utf8"))
-            decrypted_secret = encryptor.decrypt(encrypted_secret)
-            assert decrypted_secret.decode("utf8") == library.shared_secret
+            encryptor = PKCS1_OAEP.new(rsa_key_pair)
+            encrypted_secret = base64.b64decode(
+                catalog["metadata"]["shared_secret"].encode("utf8")
+            )
+            assert (
+                encryptor.decrypt(encrypted_secret).decode("utf8")
+                == library.shared_secret
+            )
 
-        old_secret = library.shared_secret
-        fixture.http_client.requests = []
+    def test_register_hyperlinks_and_emails(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        rsa_key_pair: RSA.RsaKey,
+    ):
+        fixture = registry_controller_fixture
+        response, library = self._register_library(fixture, rsa_key_pair)
+        catalog = json.loads(response.data)
 
         # Hyperlink objects were created for the three email addresses
         # associated with the library.
@@ -2008,12 +2049,7 @@ class TestLibraryRegistryController:
         sent = sorted(fixture.controller.emailer.sent_out, key=lambda x: x[1])
         for email in sent:
             assert email[0] == Emailer.ADDRESS_NEEDS_CONFIRMATION
-        destinations = [x[1] for x in sent]
-        assert destinations == [
-            "dmca@library.org",
-            "me@library.org",
-        ]
-        fixture.controller.emailer.sent_out = []
+        assert [x[1] for x in sent] == ["dmca@library.org", "me@library.org"]
 
         # The document sent by the library registry to the library
         # includes status information about the library's integration
@@ -2027,8 +2063,23 @@ class TestLibraryRegistryController:
         assert link["href"] == "mailto:me@library.org"
         assert link["properties"][Validation.STATUS_PROPERTY] == Validation.IN_PROGRESS
 
-        # Later, the library's information changes.
-        auth_document = {
+    def test_register_updates_existing_library(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        rsa_key_pair: RSA.RsaKey,
+    ):
+        fixture = registry_controller_fixture
+        opds_directory = "application/opds+json;profile=https://librarysimplified.org/rel/profile/directory"
+        auth_url = "http://circmanager.org/authentication.opds"
+        opds_url = "http://circmanager.org/feed/"
+
+        _, library = self._register_library(fixture, rsa_key_pair)
+        fixture.controller.emailer.sent_out = []
+        help_link, copyright_agent_link, integration_contact_link = sorted(
+            library.hyperlinks, key=lambda x: x.rel
+        )
+
+        updated_auth_document = {
             "id": auth_url,
             "name": "A Library",
             "service_description": "New and improved",
@@ -2036,7 +2087,7 @@ class TestLibraryRegistryController:
                 {"rel": "logo", "href": "/logo.png", "type": "image/png"},
                 {
                     "rel": "start",
-                    "href": "http://circmanager.org/feed/",
+                    "href": opds_url,
                     "type": "application/atom+xml;profile=opds-catalog",
                 },
                 {"rel": "help", "href": "mailto:new-help@library.org"},
@@ -2048,7 +2099,9 @@ class TestLibraryRegistryController:
             "service_area": {"US": "Connecticut"},
         }
         fixture.http_client.queue_response(
-            200, content=json.dumps(auth_document), url=auth_document["id"]
+            200,
+            content=json.dumps(updated_auth_document),
+            url=updated_auth_document["id"],
         )
         self.queue_opds_success(fixture)
 
@@ -2071,21 +2124,18 @@ class TestLibraryRegistryController:
                     ("stage", Library.TESTING_STAGE),
                 ]
             )
-
             response = fixture.controller.register(do_get=fixture.http_client.do_get)
             assert response.status_code == 200
             assert response.headers.get("Content-Type") == opds_directory
 
-            # The data sent in the response includes the library's new
-            # data.
+            # The data sent in the response includes the library's new data.
             catalog = json.loads(response.data)
             assert catalog["metadata"]["title"] == "A Library"
             assert catalog["metadata"]["description"] == "New and improved"
 
             # The library's new data is also in the database.
             library = get_one(fixture.db.session, Library, opds_url=opds_url)
-            assert library != None
-            assert library.name == "A Library"
+            assert library is not None
             assert library.description == "New and improved"
             assert library.web_url is None
             assert library.logo_url.endswith(LibraryLogoStore.logo_path(library, "png"))
@@ -2093,8 +2143,7 @@ class TestLibraryRegistryController:
             # the 'stage' method passed in from the client.
             assert library.library_stage == Library.TESTING_STAGE
 
-            # There are still three Hyperlinks associated with the
-            # library.
+            # There are still three Hyperlinks associated with the library.
             help_link_2, copyright_agent_link_2, integration_contact_link_2 = sorted(
                 library.hyperlinks, key=lambda x: x.rel
             )
@@ -2140,74 +2189,94 @@ class TestLibraryRegistryController:
             # get the root OPDS feed, the registry made a
             # follow-up request to download the library's logo.
             assert fixture.http_client.requests == [
-                "http://circmanager.org/authentication.opds",
-                "http://circmanager.org/feed/",
+                auth_url,
+                opds_url,
                 "http://circmanager.org/logo.png",
             ]
 
+    def test_register_resets_shared_secret(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        rsa_key_pair: RSA.RsaKey,
+    ):
         # If we include the old secret in a request and also set
-        # reset_shared_secret, the registry will generate a new
-        # secret.
-        form_args_no_reset = ImmutableMultiDict(
-            [
-                ("url", "http://circmanager.org/authentication.opds"),
-                ("contact", "mailto:me@library.org"),
-            ]
-        )
-        form_args_with_reset = ImmutableMultiDict(
-            list(form_args_no_reset.items()) + [("reset_shared_secret", "y")]
-        )
-        with fixture.app.test_request_context(
-            "/", headers={"Authorization": "Bearer %s" % old_secret}, method="POST"
-        ):
-            flask.request.form = form_args_with_reset
-            key = RSA.generate(1024)
-            auth_document = self._auth_document(key)
-            fixture.http_client.queue_response(
-                200, content=json.dumps(auth_document), url=auth_document["id"]
-            )
-            self.queue_opds_success(fixture)
+        # reset_shared_secret, the registry will generate a new secret.
+        fixture = registry_controller_fixture
+        _, library = self._register_library(fixture, rsa_key_pair)
+        old_secret = library.shared_secret
 
+        auth_document = self._auth_document(rsa_key_pair)
+        fixture.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document["id"]
+        )
+        self.queue_opds_success(fixture)
+
+        with fixture.app.test_request_context(
+            "/", headers={"Authorization": f"Bearer {old_secret}"}, method="POST"
+        ):
+            flask.request.form = ImmutableMultiDict(
+                [
+                    ("url", "http://circmanager.org/authentication.opds"),
+                    ("contact", "mailto:me@library.org"),
+                    ("reset_shared_secret", "y"),
+                ]
+            )
             response = fixture.controller.register(do_get=fixture.http_client.do_get)
             assert response.status_code == 200
-            catalog = json.loads(response.data)
             assert library.shared_secret != old_secret
 
             # The registry encrypted the new secret with the public key, and
             # it can be decrypted with the private key.
-            encryptor = PKCS1_OAEP.new(key)
+            catalog = json.loads(response.data)
+            encryptor = PKCS1_OAEP.new(rsa_key_pair)
             encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
             assert (
                 encryptor.decrypt(encrypted_secret).decode("utf8")
                 == library.shared_secret
             )
 
+    @pytest.mark.parametrize(
+        "secret,include_reset_flag,expected_status",
+        [
+            # Wrong secret → auth failure before registration completes.
+            pytest.param("notthesecret", True, 401, id="wrong-secret-with-reset-flag"),
+            # Correct secret but no reset flag → registration succeeds, secret unchanged.
+            pytest.param(None, False, 200, id="correct-secret-without-flag"),
+        ],
+    )
+    def test_register_does_not_reset_shared_secret(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        rsa_key_pair: RSA.RsaKey,
+        secret: str | None,
+        include_reset_flag: bool,
+        expected_status: int,
+    ):
+        fixture = registry_controller_fixture
+        _, library = self._register_library(fixture, rsa_key_pair)
         old_secret = library.shared_secret
 
-        # If we include an incorrect secret, or we don't ask for the
-        # secret to be reset, the secret doesn't change.
-        for secret, form in (
-            ("notthesecret", form_args_with_reset),
-            (library.shared_secret, form_args_no_reset),
+        auth_document = self._auth_document(rsa_key_pair)
+        fixture.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document["id"]
+        )
+        self.queue_opds_success(fixture)
+
+        bearer = secret if secret is not None else old_secret
+        form_items = [
+            ("url", "http://circmanager.org/authentication.opds"),
+            ("contact", "mailto:me@library.org"),
+        ]
+        if include_reset_flag:
+            form_items.append(("reset_shared_secret", "y"))
+
+        with fixture.app.test_request_context(
+            "/", headers={"Authorization": f"Bearer {bearer}"}, method="POST"
         ):
-            with fixture.app.test_request_context(
-                "/", headers={"Authorization": "Bearer %s" % secret}
-            ):
-                flask.request.form = form
-
-                key = RSA.generate(1024)
-                auth_document = self._auth_document(key)
-                fixture.http_client.queue_response(
-                    200, content=json.dumps(auth_document)
-                )
-                self.queue_opds_success(fixture)
-
-                response = fixture.controller.register(
-                    do_get=fixture.http_client.do_get
-                )
-
-                assert response.status_code == 200
-                assert library.shared_secret == old_secret
+            flask.request.form = ImmutableMultiDict(form_items)
+            response = fixture.controller.register(do_get=fixture.http_client.do_get)
+            assert response.status_code == expected_status
+            assert library.shared_secret == old_secret
 
     def test_register_with_secret_changes_authentication_url_and_opds_url(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
