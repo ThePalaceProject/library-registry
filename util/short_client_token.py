@@ -2,7 +2,10 @@ import base64
 import datetime
 import logging
 
+import pytz
 from jwt.algorithms import HMACAlgorithm
+
+from util.datetime_helpers import utc_now
 
 
 class ShortClientTokenTool:
@@ -40,12 +43,12 @@ class ShortClientTokenTool:
         return base64.decodebytes(to_decode)
 
     JWT_EPOCH = datetime.datetime(
-        1970, 1, 1
+        1970, 1, 1, tzinfo=pytz.UTC
     )  # The JWT spec takes January 1 1970 as the epoch.
 
     # For the sake of shortening tokens, the Short Client Token spec takes January 1 2017 as the epoch,
     # and measures time in minutes rather than seconds.
-    SCT_EPOCH = datetime.datetime(2017, 1, 1)
+    SCT_EPOCH = datetime.datetime(2017, 1, 1, tzinfo=pytz.UTC)
 
     @classmethod
     def sct_numericdate(cls, d):
@@ -82,7 +85,7 @@ class ShortClientTokenEncoder(ShortClientTokenTool):
         if not patron_identifier:
             raise ValueError("No patron identifier specified.")
 
-        now = datetime.datetime.utcnow()
+        now = utc_now()
         expires = int(self.sct_numericdate(now + datetime.timedelta(minutes=60)))
 
         return self._encode(

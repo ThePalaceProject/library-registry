@@ -2491,8 +2491,8 @@ class TestValidationController:
             )
 
             # Secret matches resource but validation has expired.
-            needs_validation.validation.started_at = (
-                datetime.datetime.now() - datetime.timedelta(days=7)
+            needs_validation.validation.started_at = utc_now() - datetime.timedelta(
+                days=7
             )
             assert_response(
                 needs_validation.id,
