@@ -32,6 +32,7 @@ from model import (
     get_one_or_create,
 )
 from util import GeometryUtility
+from util.datetime_helpers import utc_now
 
 from .fixtures.database import DatabaseTransactionFixture
 
@@ -444,7 +445,7 @@ class TestLibrary:
         """Timestamp gets automatically set on database commit."""
         nypl = db.library("New York Public Library")
         first_modified = nypl.timestamp
-        now = datetime.datetime.utcnow()
+        now = utc_now()
         db.session.commit()
         assert (now - first_modified).seconds < 2
 
@@ -1886,7 +1887,7 @@ class TestHyperlink:
 
         # However, if a Hyperlink's Validation has expired, it's reset and a new
         # ADDRESS_NEEDS_CONFIRMATION email is sent out.
-        now = datetime.datetime.utcnow()
+        now = utc_now()
         link.resource.validation.started_at = now - datetime.timedelta(days=10)
         link.notify(emailer, emailer.url_for)
         type, href, kwargs = emailer.sent.pop()
@@ -1912,7 +1913,7 @@ class TestValidation:
         http = link2.resource
 
         # Let's set up validation for both of them.
-        now = datetime.datetime.utcnow()
+        now = utc_now()
         email_validation = email.restart_validation()
         http_validation = http.restart_validation()
 
@@ -1957,7 +1958,7 @@ class TestValidation:
 
         # A validation that has expired cannot be marked as successful.
         validation.restart()
-        validation.started_at = datetime.datetime.utcnow() - datetime.timedelta(days=7)
+        validation.started_at = utc_now() - datetime.timedelta(days=7)
         assert validation.active is False
         with pytest.raises(Exception) as exc:
             validation.mark_as_successful()

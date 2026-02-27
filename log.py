@@ -1,4 +1,3 @@
-import datetime
 import json
 import logging
 import socket
@@ -6,6 +5,7 @@ import socket
 from loggly.handlers import HTTPSHandler as LogglyHandler
 
 from config import CannotLoadConfiguration
+from util.datetime_helpers import utc_now
 
 
 class JSONFormatter(logging.Formatter):
@@ -28,7 +28,7 @@ class JSONFormatter(logging.Formatter):
             level=record.levelname,
             filename=record.filename,
             message=message,
-            timestamp=datetime.datetime.utcnow().isoformat(),
+            timestamp=utc_now().isoformat(),
         )
         if record.exc_info:
             data["traceback"] = self.formatException(record.exc_info)
