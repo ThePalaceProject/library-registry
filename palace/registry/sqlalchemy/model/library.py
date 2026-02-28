@@ -36,13 +36,12 @@ from sqlalchemy.orm import (
 from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import join, select
 
+from palace.registry.sqlalchemy.model.audience import libraries_audiences
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import get_one, get_one_or_create
 from util import GeometryUtility
 from util.datetime_helpers import utc_now
 from util.language import LanguageCodes
-
-from ..util import get_one, get_one_or_create
-from .audience import libraries_audiences
-from .base import Base
 
 
 class Library(Base):
@@ -262,13 +261,17 @@ class Library(Base):
 
     @property
     def pls_id(self):
-        from .configuration_setting import ConfigurationSetting
+        from palace.registry.sqlalchemy.model.configuration_setting import (
+            ConfigurationSetting,
+        )
 
         return ConfigurationSetting.for_library(Library.PLS_ID, self)
 
     @property
     def number_of_patrons(self):
-        from .delegated_patron_identifier import DelegatedPatronIdentifier
+        from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
+            DelegatedPatronIdentifier,
+        )
 
         db = Session.object_session(self)
         # This is only meaningful if the library is in production.
@@ -290,7 +293,9 @@ class Library(Base):
         :param libraries: A list of Library objects.
         :return: A dictionary mapping library IDs to patron counts.
         """
-        from .delegated_patron_identifier import DelegatedPatronIdentifier
+        from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
+            DelegatedPatronIdentifier,
+        )
 
         # The concept of 'patron count' only makes sense for
         # production libraries.
@@ -356,7 +361,7 @@ class Library(Base):
         :return: A Place, if there is one well-defined place this
         library serves; otherwise None.
         """
-        from .service_area import ServiceArea
+        from palace.registry.sqlalchemy.model.service_area import ServiceArea
 
         everywhere = None
 
@@ -365,7 +370,7 @@ class Library(Base):
         for a in self.service_areas:
             if not a.place:
                 continue
-            from .place import Place
+            from palace.registry.sqlalchemy.model.place import Place
 
             if a.place.type == Place.EVERYWHERE:
                 # We will only return 'everywhere' if we don't find
@@ -468,10 +473,12 @@ class Library(Base):
 
         :return A Counter mapping Library objects to scores.
         """
-        from .audience import Audience
-        from .collection_summary import CollectionSummary
-        from .place import Place
-        from .service_area import ServiceArea
+        from palace.registry.sqlalchemy.model.audience import Audience
+        from palace.registry.sqlalchemy.model.collection_summary import (
+            CollectionSummary,
+        )
+        from palace.registry.sqlalchemy.model.place import Place
+        from palace.registry.sqlalchemy.model.service_area import ServiceArea
 
         # Constants that determine the weights of different components of the score.
         # These may need to be adjusted when there are more libraries in the system to
@@ -731,8 +738,8 @@ class Library(Base):
         (library, distance from starting point). Distances are
         measured in meters.
         """
-        from .place import Place
-        from .service_area import ServiceArea
+        from palace.registry.sqlalchemy.model.place import Place
+        from palace.registry.sqlalchemy.model.service_area import ServiceArea
 
         # We start with a single point on the globe. Call this Point
         # A.
@@ -870,8 +877,8 @@ class Library(Base):
         :param production: If True, only libraries that are ready for
             production are shown.
         """
-        from .place import Place, PlaceAlias
-        from .service_area import ServiceArea
+        from palace.registry.sqlalchemy.model.place import Place, PlaceAlias
+        from palace.registry.sqlalchemy.model.service_area import ServiceArea
 
         # For a library to match, the Place named by the query must
         # intersect a Place served by that library.
@@ -902,8 +909,8 @@ class Library(Base):
 
     @classmethod
     def create_query(cls, _db, here=None, production=True, *args):
-        from .place import Place
-        from .service_area import ServiceArea
+        from palace.registry.sqlalchemy.model.place import Place
+        from palace.registry.sqlalchemy.model.service_area import ServiceArea
 
         qu = _db.query(Library).outerjoin(Library.aliases)
         if here:
@@ -958,7 +965,7 @@ class Library(Base):
         """Turn a query received by a user into a set of things to
         check against different bits of the database.
         """
-        from .place import Place
+        from palace.registry.sqlalchemy.model.place import Place
 
         query = cls.query_cleanup(query)
 
@@ -1028,7 +1035,7 @@ class Library(Base):
             Hyperlink was modified.
 
         """
-        from .hyperlink import Hyperlink
+        from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
 
         if not rel:
             raise ValueError("No link relation was specified")

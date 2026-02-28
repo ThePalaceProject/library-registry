@@ -8,7 +8,8 @@ from flask import Flask
 from config import Configuration
 from controller import LibraryRegistry
 from emailer import Emailer
-from model import ConfigurationSetting, ExternalIntegration
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
 from palace.registry.sqlalchemy.util import get_one_or_create
 from testing import DummyHTTPClient
 from tests.fixtures.database import DatabaseTransactionFixture

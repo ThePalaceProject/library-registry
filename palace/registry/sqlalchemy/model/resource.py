@@ -8,10 +8,9 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Unicode
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.orm.session import Session
 
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import create, generate_secret
 from util.datetime_helpers import utc_now
-
-from ..util import create, generate_secret
-from .base import Base
 
 
 class Validation(Base):

@@ -4,7 +4,7 @@ from io import BytesIO
 
 import flask
 
-from model import Admin
+from palace.registry.sqlalchemy.model.admin import Admin
 from util import GeometryUtility
 from util.flask_util import originating_ip
 from util.problem_detail import ProblemDetail

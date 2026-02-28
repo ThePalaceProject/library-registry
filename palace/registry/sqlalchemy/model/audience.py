@@ -6,8 +6,8 @@ from flask_babel import lazy_gettext as _
 from sqlalchemy import Column, ForeignKey, Integer, Table, Unicode, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from ..util import get_one_or_create
-from .base import Base
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import get_one_or_create
 
 
 class Audience(Base):

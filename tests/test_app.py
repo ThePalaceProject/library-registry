@@ -9,7 +9,7 @@ from app_helpers import (
     require_admin_authentication,
     uses_location_factory,
 )
-from model import Admin
+from palace.registry.sqlalchemy.model.admin import Admin
 from problem_details import LIBRARY_NOT_FOUND
 
 from .fixtures.controller import ControllerSetupFixture

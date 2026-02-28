@@ -2,7 +2,10 @@ import base64
 
 import pytest
 
-from model import DelegatedPatronIdentifier, ShortClientTokenDecoder
+from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
+    DelegatedPatronIdentifier,
+    ShortClientTokenDecoder,
+)
 from util.short_client_token import ShortClientTokenEncoder
 
 from .fixtures.database import DatabaseTransactionFixture

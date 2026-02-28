@@ -12,8 +12,8 @@ from flask_babel import lazy_gettext as _
 from PIL import Image
 
 from authentication_document import AuthenticationDocument
-from model import Hyperlink
 from opds import OPDSCatalog
+from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
 from problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
@@ -27,7 +27,7 @@ from util.http import HTTP, RequestTimedOut
 from util.problem_detail import ProblemDetail
 
 if TYPE_CHECKING:
-    from model import Library
+    from palace.registry.sqlalchemy.model.library import Library
 
 
 class VerifyLinkRegexes:

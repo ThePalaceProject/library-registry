@@ -26,18 +26,18 @@ from controller import (
     ValidationController,
 )
 from emailer import Emailer, EmailTemplate
-from model import (
-    ConfigurationSetting,
-    DelegatedPatronIdentifier,
-    ExternalIntegration,
-    Hyperlink,
-    Library,
-    Place,
-    ServiceArea,
-    Validation,
-)
 from opds import OPDSCatalog
 from pagination import Pagination
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
+    DelegatedPatronIdentifier,
+)
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
+from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
+from palace.registry.sqlalchemy.model.library import Library
+from palace.registry.sqlalchemy.model.place import Place
+from palace.registry.sqlalchemy.model.resource import Validation
+from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.util import create, get_one, get_one_or_create
 from problem_details import (
     ERROR_RETRIEVING_DOCUMENT,

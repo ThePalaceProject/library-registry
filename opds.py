@@ -10,7 +10,11 @@ from sqlalchemy.orm import Query
 
 from authentication_document import AuthenticationDocument
 from config import Configuration
-from model import ConfigurationSetting, Hyperlink, Library, LibraryType, Validation
+from palace.registry.sqlalchemy.constants import LibraryType
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
+from palace.registry.sqlalchemy.model.library import Library
+from palace.registry.sqlalchemy.model.resource import Validation
 from util.http import NormalizedMediaType
 
 

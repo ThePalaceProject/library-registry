@@ -4,8 +4,8 @@ from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 from authentication_document import AuthenticationDocument
-from model import Library
 from opds import OPDSCatalog
+from palace.registry.sqlalchemy.model.library import Library
 from problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
 from registrar import LibraryRegistrar, VerifyLinkRegexes
 from testing import DummyHTTPResponse

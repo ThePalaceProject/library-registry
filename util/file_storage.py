@@ -12,7 +12,7 @@ import botocore
 from botocore.config import Config
 
 from config import Configuration
-from model import Library
+from palace.registry.sqlalchemy.model.library import Library
 
 if TYPE_CHECKING:
     pass

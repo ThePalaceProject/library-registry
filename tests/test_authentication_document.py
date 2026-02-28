@@ -1,7 +1,9 @@
 from collections import defaultdict
 
 from authentication_document import AuthenticationDocument
-from model import Audience, Place, ServiceArea
+from palace.registry.sqlalchemy.model.audience import Audience
+from palace.registry.sqlalchemy.model.place import Place
+from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from problem_details import INVALID_INTEGRATION_DOCUMENT
 from testing import MockPlace
 from tests.fixtures.database import DatabaseTransactionFixture

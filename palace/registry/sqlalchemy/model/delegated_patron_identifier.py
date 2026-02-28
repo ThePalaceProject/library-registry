@@ -7,11 +7,13 @@ import uuid
 
 from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint
 
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import (
+    get_one,
+    get_one_or_create as base_get_one_or_create,
+)
 from util.datetime_helpers import utc_now
 from util.short_client_token import ShortClientTokenTool
-
-from ..util import get_one, get_one_or_create as base_get_one_or_create
-from .base import Base
 
 
 class DelegatedPatronIdentifier(Base):
@@ -204,7 +206,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         library_short_name = library_short_name.upper()
 
         # Look up the Library object based on short name.
-        from .library import Library
+        from palace.registry.sqlalchemy.model.library import Library
 
         library = get_one(_db, Library, short_name=library_short_name)
         if not library:

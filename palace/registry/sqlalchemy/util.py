@@ -6,6 +6,14 @@ from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 
 from util.string_helpers import random_string
 
+__all__ = [
+    "generate_secret",
+    "get_one",
+    "get_one_or_create",
+    "create",
+    "dump_query",
+]
+
 
 def generate_secret():
     """Generate a random secret."""

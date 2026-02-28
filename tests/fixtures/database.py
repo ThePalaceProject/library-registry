@@ -13,17 +13,14 @@ from sqlalchemy.orm import Session
 
 from config import Configuration
 from log import LogConfiguration
-from model import (
-    Admin,
-    Audience,
-    Base,
-    ExternalIntegration,
-    Hyperlink,
-    Library,
-    Place,
-    PlaceAlias,
-    ServiceArea,
-)
+from palace.registry.sqlalchemy.model.admin import Admin
+from palace.registry.sqlalchemy.model.audience import Audience
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
+from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
+from palace.registry.sqlalchemy.model.library import Library
+from palace.registry.sqlalchemy.model.place import Place, PlaceAlias
+from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.session import SessionManager
 from palace.registry.sqlalchemy.util import get_one_or_create
 from util import GeometryUtility

@@ -147,7 +147,9 @@ class LogConfiguration:
         ) = cls._defaults(testing)
 
         handlers = []
-        from model import ExternalIntegration
+        from palace.registry.sqlalchemy.model.external_integration import (
+            ExternalIntegration,
+        )
 
         if _db and not testing:
             goal = ExternalIntegration.LOGGING_GOAL

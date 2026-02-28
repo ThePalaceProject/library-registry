@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from log import JSONFormatter, LogConfiguration, LogglyHandler, StringFormatter
-from model import ExternalIntegration
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
 
 from .fixtures.database import DatabaseTransactionFixture
 

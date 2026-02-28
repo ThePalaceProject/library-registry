@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import Column, Enum, ForeignKey, Integer, UniqueConstraint
 
-from .base import Base
+from palace.registry.sqlalchemy.model.base import Base
 
 
 class ServiceArea(Base):

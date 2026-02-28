@@ -8,7 +8,7 @@ from sqlalchemy import Column, Integer, Unicode
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
-from .base import Base
+from palace.registry.sqlalchemy.model.base import Base
 
 
 class ExternalIntegration(Base):
@@ -130,7 +130,9 @@ class ExternalIntegration(Base):
         :param key: Name of the setting.
         :return: A ConfigurationSetting
         """
-        from .configuration_setting import ConfigurationSetting
+        from palace.registry.sqlalchemy.model.configuration_setting import (
+            ConfigurationSetting,
+        )
 
         return ConfigurationSetting.for_externalintegration(key, self)
 

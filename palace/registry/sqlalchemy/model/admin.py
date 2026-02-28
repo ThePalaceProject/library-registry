@@ -5,8 +5,8 @@ from __future__ import annotations
 from flask_bcrypt import check_password_hash, generate_password_hash
 from sqlalchemy import Column, Integer, Unicode
 
-from ..util import create, get_one
-from .base import Base
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import create, get_one
 
 
 class Admin(Base):

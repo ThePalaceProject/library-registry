@@ -1,6 +1,6 @@
 import json
 
-from model import Place, PlaceAlias
+from palace.registry.sqlalchemy.model.place import Place, PlaceAlias
 from palace.registry.sqlalchemy.util import get_one_or_create
 from util import GeometryUtility
 
