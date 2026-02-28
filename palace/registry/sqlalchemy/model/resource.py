@@ -8,6 +8,8 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Unicode
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.orm.session import Session
 
+from util.datetime_helpers import utc_now
+
 from ..util import create, generate_secret
 from .base import Base
 
@@ -24,10 +26,10 @@ class Validation(Base):
     id = Column(Integer, primary_key=True)
     success = Column(Boolean, index=True, default=False)
     started_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         index=True,
         nullable=False,
-        default=lambda x: datetime.datetime.utcnow(),
+        default=utc_now(),
     )
 
     # Used in OPDS catalogs to convey the status of a validation attempt.
@@ -54,7 +56,7 @@ class Validation(Base):
         handled separately by something capable of generating the URL
         to the validation controller.
         """
-        self.started_at = datetime.datetime.utcnow()
+        self.started_at = utc_now()
         self.secret = generate_secret()
         self.success = False
 
@@ -71,7 +73,7 @@ class Validation(Base):
         An inactive Validation can't be marked as successful -- it
         needs to be reset.
         """
-        now = datetime.datetime.utcnow()
+        now = utc_now()
         return not self.success and now < self.deadline
 
     def mark_as_successful(self):

@@ -7,6 +7,7 @@ import uuid
 
 from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint
 
+from util.datetime_helpers import utc_now
 from util.short_client_token import ShortClientTokenTool
 
 from ..util import get_one, get_one_or_create as base_get_one_or_create
@@ -234,7 +235,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # Currently there are two ways of specifying a token's
         # expiration date: as a number of minutes since self.SCT_EPOCH
         # or as a number of seconds since self.JWT_EPOCH.
-        now = datetime.datetime.utcnow()
+        now = utc_now()
 
         # NOTE: The JWT code needs to be removed by the year 4869 or
         # this will break.

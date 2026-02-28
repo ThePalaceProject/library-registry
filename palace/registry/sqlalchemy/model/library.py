@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import random
 import re
 import string
@@ -38,6 +37,7 @@ from sqlalchemy.orm.session import Session
 from sqlalchemy.sql.expression import join, select
 
 from util import GeometryUtility
+from util.datetime_helpers import utc_now
 from util.language import LanguageCodes
 
 from ..util import get_one, get_one_or_create
@@ -93,10 +93,10 @@ class Library(Base):
 
     # When our record of this library was last updated.
     timestamp = Column(
-        DateTime,
+        DateTime(timezone=True),
         index=True,
-        default=lambda: datetime.datetime.utcnow(),
-        onupdate=lambda: datetime.datetime.utcnow(),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     # The library's logo, as a web url
