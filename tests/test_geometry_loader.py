@@ -4,7 +4,8 @@ import pytest
 from sqlalchemy import func
 
 from geometry_loader import GeometryLoader
-from model import Place, PlaceAlias, get_one_or_create
+from model import Place, PlaceAlias
+from palace.registry.sqlalchemy.util import get_one_or_create
 
 from .fixtures.database import DatabaseTransactionFixture
 

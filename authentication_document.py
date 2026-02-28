@@ -5,7 +5,8 @@ from flask_babel import lazy_gettext as _
 from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.session import Session
 
-from model import Audience, CollectionSummary, Place, ServiceArea, get_one_or_create
+from model import Audience, CollectionSummary, Place, ServiceArea
+from palace.registry.sqlalchemy.util import get_one_or_create
 from problem_details import INVALID_INTEGRATION_DOCUMENT
 
 

@@ -13,9 +13,9 @@ from model import (
     Library,
     LibraryType,
     Validation,
-    create,
 )
 from opds import OPDSCatalog, OrderFacet
+from palace.registry.sqlalchemy.util import create
 from tests.fixtures.database import DatabaseTransactionFixture
 from util.datetime_helpers import utc_now
 

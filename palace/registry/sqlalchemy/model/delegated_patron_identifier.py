@@ -9,7 +9,8 @@ from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint
 
 from util.short_client_token import ShortClientTokenTool
 
-from .base import Base, get_one
+from ..util import get_one, get_one_or_create as base_get_one_or_create
+from .base import Base
 
 
 class DelegatedPatronIdentifier(Base):
@@ -70,7 +71,6 @@ class DelegatedPatronIdentifier(Base):
         :return: A 2-tuple (DelegatedPatronIdentifier, is_new)
 
         """
-        from .base import get_one_or_create as base_get_one_or_create
 
         identifier, is_new = base_get_one_or_create(
             _db,

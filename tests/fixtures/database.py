@@ -23,9 +23,9 @@ from model import (
     Place,
     PlaceAlias,
     ServiceArea,
-    SessionManager,
-    get_one_or_create,
 )
+from palace.registry.sqlalchemy.session import SessionManager
+from palace.registry.sqlalchemy.util import get_one_or_create
 from util import GeometryUtility
 
 

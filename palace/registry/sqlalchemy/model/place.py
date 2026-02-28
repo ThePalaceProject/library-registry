@@ -11,9 +11,10 @@ from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql.expression import and_, or_, select
 
 from config import Configuration
+from palace.registry.sqlalchemy.constants import LibraryType
 
-from .base import Base, get_one, get_one_or_create
-from .library_type import LibraryType
+from ..util import get_one, get_one_or_create
+from .base import Base
 
 
 class Place(Base):

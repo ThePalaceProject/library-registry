@@ -13,7 +13,8 @@ from adobe_vendor_id import (
     VendorIDServerException,
 )
 from config import Configuration
-from model import DelegatedPatronIdentifier, ExternalIntegration, create
+from model import DelegatedPatronIdentifier, ExternalIntegration
+from palace.registry.sqlalchemy.util import create
 from tests.fixtures.database import DatabaseTransactionFixture
 from util.short_client_token import ShortClientTokenEncoder
 from util.string_helpers import base64

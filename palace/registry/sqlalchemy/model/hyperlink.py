@@ -8,7 +8,8 @@ from sqlalchemy import Column, ForeignKey, Integer, Unicode, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm.session import Session
 
-from .base import Base, create, get_one_or_create
+from ..util import create, get_one_or_create
+from .base import Base
 
 
 class Hyperlink(Base):

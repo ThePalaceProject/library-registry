@@ -7,7 +7,8 @@ import json
 from sqlalchemy import Column, ForeignKey, Integer, Unicode, UniqueConstraint
 from sqlalchemy.orm.session import Session
 
-from .base import Base, generate_secret, get_one, get_one_or_create
+from ..util import generate_secret, get_one, get_one_or_create
+from .base import Base
 
 
 class ConfigurationSetting(Base):
