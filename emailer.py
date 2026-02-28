@@ -229,7 +229,9 @@ class Emailer:
     @classmethod
     def _sitewide_integration(cls, _db):
         """Find the ExternalIntegration for the emailer."""
-        from model import ExternalIntegration
+        from palace.registry.sqlalchemy.model.external_integration import (
+            ExternalIntegration,
+        )
 
         qu = _db.query(ExternalIntegration).filter(ExternalIntegration.goal == cls.GOAL)
         integrations = qu.all()

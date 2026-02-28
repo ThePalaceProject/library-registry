@@ -12,9 +12,8 @@ from sqlalchemy.sql.expression import and_, or_, select
 
 from config import Configuration
 from palace.registry.sqlalchemy.constants import LibraryType
-
-from ..util import get_one, get_one_or_create
-from .base import Base
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import get_one, get_one_or_create
 
 
 class Place(Base):
@@ -96,7 +95,9 @@ class Place(Base):
 
         :return: The default nation, if one can be found. Otherwise, None.
         """
-        from .configuration_setting import ConfigurationSetting
+        from palace.registry.sqlalchemy.model.configuration_setting import (
+            ConfigurationSetting,
+        )
 
         default_nation = None
         abbreviation = ConfigurationSetting.sitewide(
@@ -452,8 +453,8 @@ class Place(Base):
         """
         from sqlalchemy.orm.session import Session
 
-        from .library import Library
-        from .service_area import ServiceArea
+        from palace.registry.sqlalchemy.model.library import Library
+        from palace.registry.sqlalchemy.model.service_area import ServiceArea
 
         _db = Session.object_session(self)
         qu = _db.query(Library).join(Library.service_areas).join(ServiceArea.place)

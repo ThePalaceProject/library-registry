@@ -14,21 +14,19 @@ from alembic.config import Config
 from config import Configuration
 from db_migration import migrate
 from emailer import Emailer
-from model import (
-    Admin,
-    Audience,
-    CollectionSummary,
-    ConfigurationSetting,
+from palace.registry.sqlalchemy.constants import LibraryType
+from palace.registry.sqlalchemy.model.admin import Admin
+from palace.registry.sqlalchemy.model.audience import Audience
+from palace.registry.sqlalchemy.model.collection_summary import CollectionSummary
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
     DelegatedPatronIdentifier,
-    ExternalIntegration,
-    Hyperlink,
-    Library,
-    LibraryAlias,
-    LibraryType,
-    Place,
-    PlaceAlias,
-    Validation,
 )
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
+from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
+from palace.registry.sqlalchemy.model.library import Library, LibraryAlias
+from palace.registry.sqlalchemy.model.place import Place, PlaceAlias
+from palace.registry.sqlalchemy.model.resource import Validation
 from palace.registry.sqlalchemy.util import create, get_one_or_create
 from util import GeometryUtility
 from util.datetime_helpers import utc_now

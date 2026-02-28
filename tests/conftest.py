@@ -1,6 +1,6 @@
 import pytest
 
-from model import Base
+from palace.registry.sqlalchemy.model.base import Base
 from testing import DatabaseTest
 
 

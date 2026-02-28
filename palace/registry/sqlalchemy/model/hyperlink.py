@@ -8,8 +8,8 @@ from sqlalchemy import Column, ForeignKey, Integer, Unicode, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm.session import Session
 
-from ..util import create, get_one_or_create
-from .base import Base
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import create, get_one_or_create
 
 
 class Hyperlink(Base):
@@ -56,7 +56,7 @@ class Hyperlink(Base):
 
     @href.setter
     def href(self, url):
-        from .resource import Resource
+        from palace.registry.sqlalchemy.model.resource import Resource
 
         _db = Session.object_session(self)
         resource, is_new = get_one_or_create(_db, Resource, href=url)
@@ -79,8 +79,9 @@ class Hyperlink(Base):
         """
         from config import Configuration
         from emailer import Emailer
-
-        from .configuration_setting import ConfigurationSetting
+        from palace.registry.sqlalchemy.model.configuration_setting import (
+            ConfigurationSetting,
+        )
 
         if not emailer or not url_for:
             # We can't actually send any emails.
@@ -109,7 +110,7 @@ class Hyperlink(Base):
         # Make sure there's a Validation object associated with this
         # Resource.
         if resource.validation is None:
-            from .resource import Validation
+            from palace.registry.sqlalchemy.model.resource import Validation
 
             resource.validation, is_new = create(_db, Validation)
         else:

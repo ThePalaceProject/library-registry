@@ -18,18 +18,15 @@ from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
 from config import CannotLoadConfiguration, CannotSendEmail, Configuration
 from emailer import Emailer
-from model import (
-    Admin,
-    ConfigurationSetting,
-    Hyperlink,
-    Library,
-    Place,
-    Resource,
-    ServiceArea,
-    Validation,
-)
 from opds import Annotator, OPDSCatalog, OrderFacet
 from pagination import Pagination
+from palace.registry.sqlalchemy.model.admin import Admin
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
+from palace.registry.sqlalchemy.model.library import Library
+from palace.registry.sqlalchemy.model.place import Place
+from palace.registry.sqlalchemy.model.resource import Resource, Validation
+from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.session import production_session
 from palace.registry.sqlalchemy.util import get_one, get_one_or_create
 from problem_details import (

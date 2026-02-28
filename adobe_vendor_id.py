@@ -4,7 +4,9 @@ import requests
 from flask import Response, request
 
 import adobe_xml_templates as t
-from model import ShortClientTokenDecoder
+from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
+    ShortClientTokenDecoder,
+)
 from util.string_helpers import base64
 from util.xmlparser import XMLParser
 

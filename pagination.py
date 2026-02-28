@@ -40,7 +40,9 @@ class Pagination:
         :return: Pagination instance with validated parameters.
         """
         from config import Configuration
-        from model import ConfigurationSetting
+        from palace.registry.sqlalchemy.model.configuration_setting import (
+            ConfigurationSetting,
+        )
 
         # Get configurable default.
         default_size = cls.DEFAULT_SIZE

@@ -134,7 +134,9 @@ class Configuration:
 
         :return: a 3-tuple (vendor ID, node value, [delegates])
         """
-        from model import ExternalIntegration
+        from palace.registry.sqlalchemy.model.external_integration import (
+            ExternalIntegration,
+        )
 
         integration = ExternalIntegration.lookup(
             _db, ExternalIntegration.ADOBE_VENDOR_ID, ExternalIntegration.DRM_GOAL

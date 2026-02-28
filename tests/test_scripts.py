@@ -4,13 +4,11 @@ import pytest
 
 from config import Configuration
 from emailer import Emailer
-from model import (
-    ConfigurationSetting,
-    ExternalIntegration,
-    Library,
-    Place,
-    ServiceArea,
-)
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
+from palace.registry.sqlalchemy.model.library import Library
+from palace.registry.sqlalchemy.model.place import Place
+from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.util import create, get_one
 from problem_details import INVALID_INTEGRATION_DOCUMENT
 from registrar import LibraryRegistrar

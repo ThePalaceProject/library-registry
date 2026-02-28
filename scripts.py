@@ -11,14 +11,11 @@ from authentication_document import AuthenticationDocument
 from config import Configuration
 from emailer import Emailer, EmailTemplate
 from geometry_loader import GeometryLoader
-from model import (
-    ConfigurationSetting,
-    ExternalIntegration,
-    Library,
-    LibraryAlias,
-    Place,
-    ServiceArea,
-)
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
+from palace.registry.sqlalchemy.model.library import Library, LibraryAlias
+from palace.registry.sqlalchemy.model.place import Place
+from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.session import production_session
 from palace.registry.sqlalchemy.util import get_one, get_one_or_create
 from registrar import LibraryRegistrar

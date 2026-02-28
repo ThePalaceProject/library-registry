@@ -6,10 +6,9 @@ from flask_babel import lazy_gettext as _
 from sqlalchemy import Column, ForeignKey, Index, Integer, Unicode
 from sqlalchemy.orm.session import Session
 
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import get_one_or_create
 from util.language import LanguageCodes
-
-from ..util import get_one_or_create
-from .base import Base
 
 
 class CollectionSummary(Base):

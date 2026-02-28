@@ -7,7 +7,7 @@ from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from config import Configuration
-from palace.registry.sqlalchemy.model import Base
+from palace.registry.sqlalchemy.model.base import Base
 
 
 def production_session():

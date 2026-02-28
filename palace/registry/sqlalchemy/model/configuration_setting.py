@@ -7,8 +7,8 @@ import json
 from sqlalchemy import Column, ForeignKey, Integer, Unicode, UniqueConstraint
 from sqlalchemy.orm.session import Session
 
-from ..util import generate_secret, get_one, get_one_or_create
-from .base import Base
+from palace.registry.sqlalchemy.model.base import Base
+from palace.registry.sqlalchemy.util import generate_secret, get_one, get_one_or_create
 
 
 class ConfigurationSetting(Base):
@@ -125,7 +125,7 @@ class ConfigurationSetting(Base):
 
     @property
     def library(self):
-        from .library import Library
+        from palace.registry.sqlalchemy.model.library import Library
 
         _db = Session.object_session(self)
         if self.library_id:
