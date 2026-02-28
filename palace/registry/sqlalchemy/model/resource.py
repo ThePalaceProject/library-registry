@@ -8,7 +8,8 @@ from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Unicode
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.orm.session import Session
 
-from .base import Base, create, generate_secret
+from ..util import create, generate_secret
+from .base import Base
 
 
 class Validation(Base):

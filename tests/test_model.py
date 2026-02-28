@@ -28,9 +28,8 @@ from model import (
     Place,
     PlaceAlias,
     Validation,
-    create,
-    get_one_or_create,
 )
+from palace.registry.sqlalchemy.util import create, get_one_or_create
 from util import GeometryUtility
 from util.datetime_helpers import utc_now
 

@@ -40,8 +40,9 @@ from sqlalchemy.sql.expression import join, select
 from util import GeometryUtility
 from util.language import LanguageCodes
 
+from ..util import get_one, get_one_or_create
 from .audience import libraries_audiences
-from .base import Base, get_one, get_one_or_create
+from .base import Base
 
 
 class Library(Base):

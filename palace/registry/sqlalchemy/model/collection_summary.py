@@ -8,7 +8,8 @@ from sqlalchemy.orm.session import Session
 
 from util.language import LanguageCodes
 
-from .base import Base, get_one_or_create
+from ..util import get_one_or_create
+from .base import Base
 
 
 class CollectionSummary(Base):

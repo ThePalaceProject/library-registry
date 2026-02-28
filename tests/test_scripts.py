@@ -10,9 +10,8 @@ from model import (
     Library,
     Place,
     ServiceArea,
-    create,
-    get_one,
 )
+from palace.registry.sqlalchemy.util import create, get_one
 from problem_details import INVALID_INTEGRATION_DOCUMENT
 from registrar import LibraryRegistrar
 from scripts import (
