@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from admin.config import Configuration as AdminConfig, OperationalMode
+from palace.registry.admin.config import Configuration as AdminConfig, OperationalMode
 
 
 class TestAdminUI:

@@ -21,8 +21,8 @@ var/
 .installed.cfg
 *.egg
 node_modules/
-admin/package.json
-admin/package-lock.json
+palace/registry/admin/package.json
+palace/registry/admin/package-lock.json
 
 # Installer logs
 pip-log.txt
@@ -59,4 +59,4 @@ docs/_build/
 .vscode
 
 # Our dynamically generated version file
-admin/_version.py
+palace/registry/_version.py

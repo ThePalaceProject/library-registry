@@ -50,10 +50,10 @@ jobs:
 
       - name: Create version file
         run: |
-          echo "__version__ = '$(dunamai from git --style semver)'" >> admin/_version.py
-          echo "__commit__ = '$(dunamai from git --format {commit} --full-commit)'" >> admin/_version.py
-          echo "__branch__ = '$(dunamai from git --format {branch})'" >> admin/_version.py
-          cat admin/_version.py
+          echo "__version__ = '$(dunamai from git --style semver)'" >> palace/registry/_version.py
+          echo "__commit__ = '$(dunamai from git --format {commit} --full-commit)'" >> palace/registry/_version.py
+          echo "__branch__ = '$(dunamai from git --format {branch})'" >> palace/registry/_version.py
+          cat palace/registry/_version.py
 
       # Docker doesn't support uppercase letters in repo names, so we need to lowercase the owner
       - name: Set output repo

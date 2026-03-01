@@ -12,14 +12,14 @@ from flask import Response, redirect, render_template_string, request, session, 
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm import defaultload, joinedload
 
-from admin.config import Configuration as AdminClientConfig
-from admin.templates import admin as admin_template
 from adobe_vendor_id import AdobeVendorIDController
 from authentication_document import AuthenticationDocument
 from config import CannotLoadConfiguration, CannotSendEmail, Configuration
 from emailer import Emailer
 from opds import Annotator, OPDSCatalog, OrderFacet
 from pagination import Pagination
+from palace.registry.admin.config import Configuration as AdminClientConfig
+from palace.registry.admin.templates import admin as admin_template
 from palace.registry.sqlalchemy.model.admin import Admin
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
