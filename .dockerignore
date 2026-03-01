@@ -5,8 +5,9 @@
 # Temp files
 *~
 
-# Readmes
+# Need README.md for package; otherwise, exclude most docs
 **/*.md
+!README.md
 
 # Tests
 tests/

@@ -6,6 +6,8 @@ requires = ["poetry-core>=1.0.0"]
 
 [tool.isort]
 combine_as_imports = true
+known_first_party = ["palace"]
+known_third_party = ["alembic"]
 profile = "black"
 
 [tool.poetry]
@@ -13,8 +15,8 @@ authors = ["The Palace Project <info@thepalaceproject.org>"]
 description = "The Palace Project library registry"
 homepage = "https://thepalaceproject.org"
 license = "Apache-2.0"
-name = "library-registry"
-packages = [{include = "palace/registry", from = "."}]
+name = "palace.registry"
+packages = [{include = "palace/registry", from = "src"}]
 readme = "README.md"
 repository = "https://github.com/ThePalaceProject/library-registry"
 version = "0"  # Version number is managed with tags in git

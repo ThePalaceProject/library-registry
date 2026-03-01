@@ -118,6 +118,7 @@ WORKDIR $LIBRARY_REGISTRY_DOCKER_HOME
 # the docker layer caching isn't impacted by extraneous changes in the repo.
 COPY pyproject.toml ./
 COPY ./poetry.lock ./
+COPY README.md ./
 
 # Tell poetry not to use a virtualenv since we are in a container
 ENV POETRY_VIRTUALENVS_CREATE=false
@@ -142,7 +143,7 @@ RUN set -ex \
     jpeg-dev \
     libxcb-dev \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
- && poetry install --only main,pg \
+ && poetry install --no-root --only main,pg \
  && poetry cache clear -n --all pypi \
  && apk del --no-network .build-deps
 
@@ -169,7 +170,7 @@ ENV FLASK_ENV development
 # Install development dependancies with poetry
 RUN set -ex \
  && apk add --no-cache --virtual .build-deps build-base \
- && poetry install -E pg \
+ && poetry install --no-root -E pg \
  && poetry cache clear -n --all pypi \
  && cd "${LIBRARY_REGISTRY_DOCKER_HOME}" \
  && apk del --no-network .build-deps
@@ -185,4 +186,8 @@ FROM builder AS libreg_active
 ENV FLASK_ENV=production
 
 COPY . ./
+
+# Install the package itself now that source code is available
+RUN poetry install
+
 ##############################################################################

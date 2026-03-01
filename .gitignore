@@ -59,4 +59,4 @@ docs/_build/
 .vscode
 
 # Our dynamically generated version file
-palace/registry/_version.py
+src/palace/registry/_version.py

@@ -5,6 +5,7 @@ import os
 import sys
 
 from alembic.util import CommandError
+
 from palace.registry import db_migration
 from palace.registry.adobe.adobe_vendor_id import AdobeVendorIDClient
 from palace.registry.authentication_document import AuthenticationDocument
