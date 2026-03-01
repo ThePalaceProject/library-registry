@@ -3,16 +3,16 @@
 # them here, so they can be used by the application.
 
 try:
-    from admin._version import __version__
+    from palace.registry._version import __version__
 except (ModuleNotFoundError, ImportError):
     __version__ = None
 
 try:
-    from admin._version import __commit__
+    from palace.registry._version import __commit__
 except (ModuleNotFoundError, ImportError):
     __commit__ = None
 
 try:
-    from admin._version import __branch__
+    from palace.registry._version import __branch__
 except (ModuleNotFoundError, ImportError):
     __branch__ = None

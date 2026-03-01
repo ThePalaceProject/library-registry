@@ -11,9 +11,9 @@ from flask_babel import lazy_gettext as _
 from lxml import etree
 from psycopg2 import DatabaseError
 
-import admin
-from admin.config import Configuration as AdminUiConfig
 from opds import OPDSCatalog
+from palace.registry import admin
+from palace.registry.admin.config import Configuration as AdminUiConfig
 from palace.registry.util.problem_detail import ProblemDetail
 
 

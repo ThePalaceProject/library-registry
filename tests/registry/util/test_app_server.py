@@ -1,8 +1,8 @@
 import pytest
 from flask import Flask, make_response
 
-import admin
-from admin.config import Configuration as AdminUiConfig
+from palace.registry import admin
+from palace.registry.admin.config import Configuration as AdminUiConfig
 from palace.registry.util.app_server import ApplicationVersionController
 
 
