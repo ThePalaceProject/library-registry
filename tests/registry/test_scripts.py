@@ -26,8 +26,8 @@ from palace.registry.sqlalchemy.model.library import Library
 from palace.registry.sqlalchemy.model.place import Place
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.util import create, get_one
-from testing import MockPlace
 from tests.fixtures.database import DatabaseTransactionFixture
+from tests.testing import MockPlace
 
 
 class TestLibraryScript:

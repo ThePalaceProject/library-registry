@@ -9,8 +9,8 @@ from palace.registry.problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
 from palace.registry.registrar import LibraryRegistrar, VerifyLinkRegexes
 from palace.registry.sqlalchemy.model.library import Library
 from palace.registry.util.problem_detail import ProblemDetail
-from testing import DummyHTTPResponse
 from tests.fixtures.database import DatabaseTransactionFixture
+from tests.testing import DummyHTTPResponse
 from tests.utils import mock_response
 
 

@@ -55,7 +55,6 @@ from palace.registry.util.datetime_helpers import utc_now
 from palace.registry.util.file_storage import LibraryLogoStore
 from palace.registry.util.http import RequestTimedOut
 from palace.registry.util.problem_detail import ProblemDetail
-from testing import DummyHTTPClient
 from tests.fixtures.controller import (
     ControllerFixture,
     ControllerSetupFixture,
@@ -63,6 +62,7 @@ from tests.fixtures.controller import (
     MockLibraryRegistry,
 )
 from tests.fixtures.database import DatabaseTransactionFixture
+from tests.testing import DummyHTTPClient
 
 
 class TestLibraryRegistryAnnotator:
