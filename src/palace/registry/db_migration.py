@@ -2,10 +2,10 @@ import logging
 import os
 
 import psycopg2
-
 from alembic.command import downgrade, stamp, upgrade
 from alembic.config import Config
 from alembic.util.exc import CommandError
+
 from palace.registry.config import Configuration
 
 
