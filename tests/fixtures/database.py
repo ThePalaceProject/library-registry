@@ -11,8 +11,8 @@ import sqlalchemy
 from sqlalchemy.engine import Connection, Engine, Transaction
 from sqlalchemy.orm import Session
 
-from config import Configuration
-from log import LogConfiguration
+from palace.registry.config import Configuration
+from palace.registry.log import LogConfiguration
 from palace.registry.sqlalchemy.model.admin import Admin
 from palace.registry.sqlalchemy.model.audience import Audience
 from palace.registry.sqlalchemy.model.base import Base

@@ -7,6 +7,11 @@ from dataclasses import dataclass
 import flask
 from sqlalchemy.orm import Session
 
+from palace.registry.config import Configuration
+from palace.registry.sqlalchemy.model.configuration_setting import (
+    ConfigurationSetting,
+)
+
 
 @dataclass(frozen=True)
 class Pagination:
@@ -39,11 +44,6 @@ class Pagination:
         :param total_count: Total number of items across all pages (optional).
         :return: Pagination instance with validated parameters.
         """
-        from config import Configuration
-        from palace.registry.sqlalchemy.model.configuration_setting import (
-            ConfigurationSetting,
-        )
-
         # Get configurable default.
         default_size = cls.DEFAULT_SIZE
         if _db:

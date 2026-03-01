@@ -5,9 +5,9 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from config import Configuration
-from controller import LibraryRegistry
-from emailer import Emailer
+from palace.registry.config import Configuration
+from palace.registry.controller import LibraryRegistry
+from palace.registry.emailer import Emailer
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
 from palace.registry.sqlalchemy.util import get_one_or_create

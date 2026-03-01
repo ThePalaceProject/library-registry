@@ -2,17 +2,11 @@ from io import StringIO
 
 import pytest
 
-from config import Configuration
-from emailer import Emailer
-from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
-from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
-from palace.registry.sqlalchemy.model.library import Library
-from palace.registry.sqlalchemy.model.place import Place
-from palace.registry.sqlalchemy.model.service_area import ServiceArea
-from palace.registry.sqlalchemy.util import create, get_one
-from problem_details import INVALID_INTEGRATION_DOCUMENT
-from registrar import LibraryRegistrar
-from scripts import (
+from palace.registry.config import Configuration
+from palace.registry.emailer import Emailer
+from palace.registry.problem_details import INVALID_INTEGRATION_DOCUMENT
+from palace.registry.registrar import LibraryRegistrar
+from palace.registry.scripts import (
     AddLibraryScript,
     ConfigureEmailerScript,
     ConfigureIntegrationScript,
@@ -26,6 +20,12 @@ from scripts import (
     SetCoverageAreaScript,
     ShowIntegrationsScript,
 )
+from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
+from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
+from palace.registry.sqlalchemy.model.library import Library
+from palace.registry.sqlalchemy.model.place import Place
+from palace.registry.sqlalchemy.model.service_area import ServiceArea
+from palace.registry.sqlalchemy.util import create, get_one
 from testing import MockPlace
 from tests.fixtures.database import DatabaseTransactionFixture
 

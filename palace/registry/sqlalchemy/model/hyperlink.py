@@ -77,8 +77,8 @@ class Hyperlink(Base):
         :param url_for: An implementation of Flask's url_for, used to
             generate a validation link if necessary.
         """
-        from config import Configuration
-        from emailer import Emailer
+        from palace.registry.config import Configuration
+        from palace.registry.emailer import Emailer
         from palace.registry.sqlalchemy.model.configuration_setting import (
             ConfigurationSetting,
         )

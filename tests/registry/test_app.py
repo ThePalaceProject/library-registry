@@ -3,16 +3,15 @@ from io import BytesIO
 
 import flask
 
-from app_helpers import (
+from palace.registry.app_helpers import (
     compressible,
     has_library_factory,
     require_admin_authentication,
     uses_location_factory,
 )
+from palace.registry.problem_details import LIBRARY_NOT_FOUND
 from palace.registry.sqlalchemy.model.admin import Admin
-from problem_details import LIBRARY_NOT_FOUND
-
-from .fixtures.controller import ControllerSetupFixture
+from tests.fixtures.controller import ControllerSetupFixture
 
 
 class TestAppHelpers:

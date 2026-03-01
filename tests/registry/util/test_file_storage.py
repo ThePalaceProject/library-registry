@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from config import Configuration
+from palace.registry.config import Configuration
 from palace.registry.util.file_storage import (
     FileObject,
     LibraryLogoStore,

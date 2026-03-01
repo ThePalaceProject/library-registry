@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from authentication_document import AuthenticationDocument
-from config import Configuration
-from opds import OPDSCatalog, OrderFacet
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.config import Configuration
+from palace.registry.opds import OPDSCatalog, OrderFacet
 from palace.registry.sqlalchemy.constants import LibraryType
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink

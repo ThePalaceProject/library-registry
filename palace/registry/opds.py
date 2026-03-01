@@ -8,8 +8,8 @@ import flask
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Query
 
-from authentication_document import AuthenticationDocument
-from config import Configuration
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.config import Configuration
 from palace.registry.sqlalchemy.constants import LibraryType
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink

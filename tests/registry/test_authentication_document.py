@@ -1,11 +1,11 @@
 from collections import defaultdict
 
-from authentication_document import AuthenticationDocument
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.problem_details import INVALID_INTEGRATION_DOCUMENT
 from palace.registry.sqlalchemy.model.audience import Audience
 from palace.registry.sqlalchemy.model.place import Place
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.util.problem_detail import ProblemDetail
-from problem_details import INVALID_INTEGRATION_DOCUMENT
 from testing import MockPlace
 from tests.fixtures.database import DatabaseTransactionFixture
 

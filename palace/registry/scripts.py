@@ -5,12 +5,13 @@ import os
 import sys
 
 import db_migration
-from adobe_vendor_id import AdobeVendorIDClient
 from alembic.util import CommandError
-from authentication_document import AuthenticationDocument
-from config import Configuration
-from emailer import Emailer, EmailTemplate
-from geometry_loader import GeometryLoader
+from palace.registry.adobe.adobe_vendor_id import AdobeVendorIDClient
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.config import Configuration
+from palace.registry.emailer import Emailer, EmailTemplate
+from palace.registry.geometry_loader import GeometryLoader
+from palace.registry.registrar import LibraryRegistrar
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
 from palace.registry.sqlalchemy.model.library import Library, LibraryAlias
@@ -19,7 +20,6 @@ from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.session import production_session
 from palace.registry.sqlalchemy.util import get_one, get_one_or_create
 from palace.registry.util.problem_detail import ProblemDetail
-from registrar import LibraryRegistrar
 
 
 class Script:

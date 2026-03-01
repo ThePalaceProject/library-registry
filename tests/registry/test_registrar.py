@@ -3,12 +3,12 @@ import json
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-from authentication_document import AuthenticationDocument
-from opds import OPDSCatalog
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.opds import OPDSCatalog
+from palace.registry.problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
+from palace.registry.registrar import LibraryRegistrar, VerifyLinkRegexes
 from palace.registry.sqlalchemy.model.library import Library
 from palace.registry.util.problem_detail import ProblemDetail
-from problem_details import INVALID_CONTACT_URI, NO_AUTH_URL
-from registrar import LibraryRegistrar, VerifyLinkRegexes
 from testing import DummyHTTPResponse
 from tests.fixtures.database import DatabaseTransactionFixture
 from tests.utils import mock_response
@@ -264,7 +264,7 @@ class TestRegistrar:
             ],
         }
 
-    @patch("registrar.LibraryLogoStore")
+    @patch("palace.registry.registrar.LibraryLogoStore")
     def test_register_logo_data(self, mock_logo_store, db: DatabaseTransactionFixture):
         """Test an auth document with base64 encoded image data"""
         image_data = "data:image/png;base64,abcdefg"
@@ -291,7 +291,7 @@ class TestRegistrar:
         )
         mock_logo_store.write_from_b64.return_value = "http://localhost/logo"
         with patch(
-            "registrar.LibraryRegistrar.opds_response_links_to_auth_document"
+            "palace.registry.registrar.LibraryRegistrar.opds_response_links_to_auth_document"
         ) as mock_fn:
             mock_fn.return_value = True
             registrar.register(library, Library.TESTING_STAGE)
@@ -305,7 +305,7 @@ class TestRegistrar:
 
         assert library.logo_url == "http://localhost/logo"
 
-    @patch("registrar.LibraryLogoStore")
+    @patch("palace.registry.registrar.LibraryLogoStore")
     def test_register_logo_links(self, mock_logo_store, db: DatabaseTransactionFixture):
         """Test an auth document with an image link"""
         image_link = "http://somelogolink"
@@ -339,7 +339,7 @@ class TestRegistrar:
         mock_logo_store.write.return_value = "http://localhost/logo"
 
         with patch(
-            "registrar.LibraryRegistrar.opds_response_links_to_auth_document"
+            "palace.registry.registrar.LibraryRegistrar.opds_response_links_to_auth_document"
         ) as mock_fn:
             mock_fn.return_value = True
             registrar.register(library, Library.TESTING_STAGE)

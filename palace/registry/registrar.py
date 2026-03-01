@@ -11,13 +11,9 @@ import feedparser
 from flask_babel import lazy_gettext as _
 from PIL import Image
 
-from authentication_document import AuthenticationDocument
-from opds import OPDSCatalog
-from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
-from palace.registry.util.file_storage import LibraryLogoStore
-from palace.registry.util.http import HTTP, RequestTimedOut
-from palace.registry.util.problem_detail import ProblemDetail
-from problem_details import (
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.opds import OPDSCatalog
+from palace.registry.problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
     INVALID_CONTACT_URI,
@@ -25,6 +21,10 @@ from problem_details import (
     LIBRARY_ALREADY_IN_PRODUCTION,
     TIMEOUT,
 )
+from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
+from palace.registry.util.file_storage import LibraryLogoStore
+from palace.registry.util.http import HTTP, RequestTimedOut
+from palace.registry.util.problem_detail import ProblemDetail
 
 if TYPE_CHECKING:
     from palace.registry.sqlalchemy.model.library import Library

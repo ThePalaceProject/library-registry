@@ -15,9 +15,9 @@ from Crypto.PublicKey import RSA
 from flask import Flask, Response, session
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 
-from authentication_document import AuthenticationDocument
-from config import Configuration
-from controller import (
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.config import Configuration
+from palace.registry.controller import (
     AdobeVendorIDController,
     BaseController,
     CoverageController,
@@ -25,9 +25,20 @@ from controller import (
     LibraryRegistryController,
     ValidationController,
 )
-from emailer import Emailer, EmailTemplate
-from opds import OPDSCatalog
-from pagination import Pagination
+from palace.registry.emailer import Emailer, EmailTemplate
+from palace.registry.opds import OPDSCatalog
+from palace.registry.pagination import Pagination
+from palace.registry.problem_details import (
+    ERROR_RETRIEVING_DOCUMENT,
+    INTEGRATION_DOCUMENT_NOT_FOUND,
+    INTEGRATION_ERROR,
+    INVALID_CREDENTIALS,
+    INVALID_INTEGRATION_DOCUMENT,
+    LIBRARY_NOT_FOUND,
+    NO_AUTH_URL,
+    TIMEOUT,
+    UNABLE_TO_NOTIFY,
+)
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
     DelegatedPatronIdentifier,
@@ -44,17 +55,6 @@ from palace.registry.util.datetime_helpers import utc_now
 from palace.registry.util.file_storage import LibraryLogoStore
 from palace.registry.util.http import RequestTimedOut
 from palace.registry.util.problem_detail import ProblemDetail
-from problem_details import (
-    ERROR_RETRIEVING_DOCUMENT,
-    INTEGRATION_DOCUMENT_NOT_FOUND,
-    INTEGRATION_ERROR,
-    INVALID_CREDENTIALS,
-    INVALID_INTEGRATION_DOCUMENT,
-    LIBRARY_NOT_FOUND,
-    NO_AUTH_URL,
-    TIMEOUT,
-    UNABLE_TO_NOTIFY,
-)
 from testing import DummyHTTPClient
 from tests.fixtures.controller import (
     ControllerFixture,

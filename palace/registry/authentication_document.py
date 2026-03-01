@@ -6,12 +6,12 @@ from sqlalchemy.exc import MultipleResultsFound
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm.session import Session
 
+from palace.registry.problem_details import INVALID_INTEGRATION_DOCUMENT
 from palace.registry.sqlalchemy.model.audience import Audience
 from palace.registry.sqlalchemy.model.collection_summary import CollectionSummary
 from palace.registry.sqlalchemy.model.place import Place
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.util import get_one_or_create
-from problem_details import INVALID_INTEGRATION_DOCUMENT
 
 
 class AuthenticationDocument:

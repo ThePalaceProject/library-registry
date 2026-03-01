@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-import adobe_xml_templates as t
-from adobe_vendor_id import (
+from palace.registry.adobe import adobe_xml_templates as t
+from palace.registry.adobe.adobe_vendor_id import (
     AdobeAccountInfoRequestParser,
     AdobeSignInRequestParser,
     AdobeVendorIDClient,
@@ -12,7 +12,7 @@ from adobe_vendor_id import (
     VendorIDAuthenticationError,
     VendorIDServerException,
 )
-from config import Configuration
+from palace.registry.config import Configuration
 from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
     DelegatedPatronIdentifier,
 )

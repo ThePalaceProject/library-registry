@@ -11,7 +11,7 @@ import boto3
 import botocore
 from botocore.config import Config
 
-from config import Configuration
+from palace.registry.config import Configuration
 from palace.registry.sqlalchemy.model.library import Library
 
 if TYPE_CHECKING:
