@@ -4,14 +4,14 @@ import psycopg2
 
 from alembic.command import ensure_version
 from alembic.config import Config
-from db_migration import migrate
 from palace.registry.config import Configuration
+from palace.registry.db_migration import migrate
 
 
 class TestDBMigrate:
-    @mock.patch("db_migration.psycopg2.connect")
-    @mock.patch("db_migration.stamp")
-    @mock.patch("db_migration.upgrade")
+    @mock.patch("palace.registry.db_migration.psycopg2.connect")
+    @mock.patch("palace.registry.db_migration.stamp")
+    @mock.patch("palace.registry.db_migration.upgrade")
     def test_migrate(self, mock_upgrade, mock_stamp, mock_connect):
         fetchone = mock_connect().cursor().fetchone
 
