@@ -6,8 +6,8 @@ from palace.registry.sqlalchemy.model.audience import Audience
 from palace.registry.sqlalchemy.model.place import Place
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.util.problem_detail import ProblemDetail
-from testing import MockPlace
 from tests.fixtures.database import DatabaseTransactionFixture
+from tests.testing import MockPlace
 
 # Alias for a long class name
 AuthDoc = AuthenticationDocument

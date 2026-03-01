@@ -13,7 +13,7 @@ from palace.registry.util.http import (
     RequestNetworkException,
     RequestTimedOut,
 )
-from testing import MockRequestsResponse
+from tests.testing import MockRequestsResponse
 
 
 class TestHTTP:

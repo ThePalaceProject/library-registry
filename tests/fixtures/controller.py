@@ -11,8 +11,8 @@ from palace.registry.emailer import Emailer
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
 from palace.registry.sqlalchemy.util import get_one_or_create
-from testing import DummyHTTPClient
 from tests.fixtures.database import DatabaseTransactionFixture
+from tests.testing import DummyHTTPClient
 
 
 class MockLibraryRegistry(LibraryRegistry):
