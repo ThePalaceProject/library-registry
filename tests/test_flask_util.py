@@ -4,7 +4,11 @@ import re
 import pytest
 from flask import Flask, request
 
-from util.flask_util import IPV4_REGEX, is_public_ipv4_address, originating_ip
+from palace.registry.util.flask_util import (
+    IPV4_REGEX,
+    is_public_ipv4_address,
+    originating_ip,
+)
 
 
 @pytest.fixture

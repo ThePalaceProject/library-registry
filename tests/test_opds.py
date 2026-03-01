@@ -14,8 +14,8 @@ from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
 from palace.registry.sqlalchemy.model.library import Library
 from palace.registry.sqlalchemy.model.resource import Validation
 from palace.registry.sqlalchemy.util import create
+from palace.registry.util.datetime_helpers import utc_now
 from tests.fixtures.database import DatabaseTransactionFixture
-from util.datetime_helpers import utc_now
 
 
 class TestOrderFacet:

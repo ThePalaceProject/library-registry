@@ -39,9 +39,9 @@ from sqlalchemy.sql.expression import join, select
 from palace.registry.sqlalchemy.model.audience import libraries_audiences
 from palace.registry.sqlalchemy.model.base import Base
 from palace.registry.sqlalchemy.util import get_one, get_one_or_create
-from util import GeometryUtility
-from util.datetime_helpers import utc_now
-from util.language import LanguageCodes
+from palace.registry.util import GeometryUtility
+from palace.registry.util.datetime_helpers import utc_now
+from palace.registry.util.language import LanguageCodes
 
 
 class Library(Base):

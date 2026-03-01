@@ -19,11 +19,11 @@ from flask_sqlalchemy_session import flask_scoped_session
 from log import LogConfiguration
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.session import SessionManager
-from util.app_server import (
+from palace.registry.util.app_server import (
     returns_json_or_response_or_problem_detail,
     returns_problem_detail,
 )
-from util.xray import PalaceXrayUtils
+from palace.registry.util.xray import PalaceXrayUtils
 
 app = Flask(__name__)
 babel = Babel(app)

@@ -1,6 +1,6 @@
 import pytest
 
-from util.language import LanguageCodes
+from palace.registry.util.language import LanguageCodes
 
 
 class TestLanguageCodes:

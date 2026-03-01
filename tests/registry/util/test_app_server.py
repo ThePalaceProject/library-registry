@@ -3,7 +3,7 @@ from flask import Flask, make_response
 
 import admin
 from admin.config import Configuration as AdminUiConfig
-from util.app_server import ApplicationVersionController
+from palace.registry.util.app_server import ApplicationVersionController
 
 
 @pytest.mark.parametrize(

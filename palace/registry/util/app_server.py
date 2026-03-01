@@ -14,7 +14,7 @@ from psycopg2 import DatabaseError
 import admin
 from admin.config import Configuration as AdminUiConfig
 from opds import OPDSCatalog
-from util.problem_detail import ProblemDetail
+from palace.registry.util.problem_detail import ProblemDetail
 
 
 def catalog_response(catalog, cache_for=OPDSCatalog.CACHE_TIME):

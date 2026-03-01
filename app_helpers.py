@@ -5,9 +5,9 @@ from io import BytesIO
 import flask
 
 from palace.registry.sqlalchemy.model.admin import Admin
-from util import GeometryUtility
-from util.flask_util import originating_ip
-from util.problem_detail import ProblemDetail
+from palace.registry.util import GeometryUtility
+from palace.registry.util.flask_util import originating_ip
+from palace.registry.util.problem_detail import ProblemDetail
 
 
 def has_library_factory(app):

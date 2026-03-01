@@ -6,7 +6,7 @@ from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
     DelegatedPatronIdentifier,
     ShortClientTokenDecoder,
 )
-from util.short_client_token import ShortClientTokenEncoder
+from palace.registry.util.short_client_token import ShortClientTokenEncoder
 
 from .fixtures.database import DatabaseTransactionFixture
 

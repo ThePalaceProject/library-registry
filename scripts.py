@@ -18,8 +18,8 @@ from palace.registry.sqlalchemy.model.place import Place
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.session import production_session
 from palace.registry.sqlalchemy.util import get_one, get_one_or_create
+from palace.registry.util.problem_detail import ProblemDetail
 from registrar import LibraryRegistrar
-from util.problem_detail import ProblemDetail
 
 
 class Script:

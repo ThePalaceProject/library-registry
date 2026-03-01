@@ -8,7 +8,7 @@ from sqlalchemy.orm.session import Session
 
 from palace.registry.sqlalchemy.model.base import Base
 from palace.registry.sqlalchemy.util import get_one_or_create
-from util.language import LanguageCodes
+from palace.registry.util.language import LanguageCodes
 
 
 class CollectionSummary(Base):

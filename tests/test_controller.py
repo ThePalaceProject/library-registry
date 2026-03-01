@@ -39,6 +39,11 @@ from palace.registry.sqlalchemy.model.place import Place
 from palace.registry.sqlalchemy.model.resource import Validation
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.util import create, get_one, get_one_or_create
+from palace.registry.util import GeometryUtility
+from palace.registry.util.datetime_helpers import utc_now
+from palace.registry.util.file_storage import LibraryLogoStore
+from palace.registry.util.http import RequestTimedOut
+from palace.registry.util.problem_detail import ProblemDetail
 from problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
@@ -58,11 +63,6 @@ from tests.fixtures.controller import (
     MockLibraryRegistry,
 )
 from tests.fixtures.database import DatabaseTransactionFixture
-from util import GeometryUtility
-from util.datetime_helpers import utc_now
-from util.file_storage import LibraryLogoStore
-from util.http import RequestTimedOut
-from util.problem_detail import ProblemDetail
 
 
 class TestLibraryRegistryAnnotator:

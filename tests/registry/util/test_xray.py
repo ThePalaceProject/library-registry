@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, call
 
-from util.xray import PalaceXrayUtils
+from palace.registry.util.xray import PalaceXrayUtils
 
 
 class TestPalaceXrayUtils:
@@ -35,7 +35,9 @@ class TestPalaceXrayUtils:
         mock_middleware = MagicMock()
 
         monkeypatch.setattr(PalaceXrayUtils, "setup_xray", MagicMock())
-        monkeypatch.setattr("util.xray.PalaceXrayMiddleware", mock_middleware)
+        monkeypatch.setattr(
+            "palace.registry.util.xray.PalaceXrayMiddleware", mock_middleware
+        )
 
         # Nothing happens if env isn't set
         monkeypatch.delenv(PalaceXrayUtils.XRAY_ENV_ENABLE, raising=False)
