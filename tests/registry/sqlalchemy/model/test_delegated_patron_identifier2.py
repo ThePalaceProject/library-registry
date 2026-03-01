@@ -7,8 +7,7 @@ from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
     ShortClientTokenDecoder,
 )
 from palace.registry.util.short_client_token import ShortClientTokenEncoder
-
-from .fixtures.database import DatabaseTransactionFixture
+from tests.fixtures.database import DatabaseTransactionFixture
 
 
 class TestShortClientTokenEncoder:
