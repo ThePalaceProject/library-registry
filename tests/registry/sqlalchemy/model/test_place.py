@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import func
 from sqlalchemy.orm.exc import MultipleResultsFound
 
-from config import Configuration
+from palace.registry.config import Configuration
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.place import Place, PlaceAlias
 from palace.registry.sqlalchemy.util import get_one_or_create

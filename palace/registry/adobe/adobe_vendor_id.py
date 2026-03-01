@@ -3,7 +3,7 @@ import re
 import requests
 from flask import Response, request
 
-import adobe_xml_templates as t
+import palace.registry.adobe.adobe_xml_templates as t
 from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
     ShortClientTokenDecoder,
 )

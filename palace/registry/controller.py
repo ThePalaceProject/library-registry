@@ -12,14 +12,29 @@ from flask import Response, redirect, render_template_string, request, session, 
 from flask_babel import lazy_gettext as _
 from sqlalchemy.orm import defaultload, joinedload
 
-from adobe_vendor_id import AdobeVendorIDController
-from authentication_document import AuthenticationDocument
-from config import CannotLoadConfiguration, CannotSendEmail, Configuration
-from emailer import Emailer
-from opds import Annotator, OPDSCatalog, OrderFacet
-from pagination import Pagination
 from palace.registry.admin.config import Configuration as AdminClientConfig
 from palace.registry.admin.templates import admin as admin_template
+from palace.registry.adobe.adobe_vendor_id import AdobeVendorIDController
+from palace.registry.authentication_document import AuthenticationDocument
+from palace.registry.config import (
+    CannotLoadConfiguration,
+    CannotSendEmail,
+    Configuration,
+)
+from palace.registry.emailer import Emailer
+from palace.registry.opds import Annotator, OPDSCatalog, OrderFacet
+from palace.registry.pagination import Pagination
+from palace.registry.problem_details import (
+    AUTHENTICATION_FAILURE,
+    INTEGRATION_ERROR,
+    INVALID_CONTACT_URI,
+    INVALID_CREDENTIALS,
+    INVALID_INPUT,
+    LIBRARY_NOT_FOUND,
+    NO_AUTH_URL,
+    UNABLE_TO_NOTIFY,
+)
+from palace.registry.registrar import LibraryRegistrar
 from palace.registry.sqlalchemy.model.admin import Admin
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
@@ -36,17 +51,6 @@ from palace.registry.util.app_server import (
 from palace.registry.util.http import HTTP
 from palace.registry.util.problem_detail import ProblemDetail
 from palace.registry.util.string_helpers import base64, random_string
-from problem_details import (
-    AUTHENTICATION_FAILURE,
-    INTEGRATION_ERROR,
-    INVALID_CONTACT_URI,
-    INVALID_CREDENTIALS,
-    INVALID_INPUT,
-    LIBRARY_NOT_FOUND,
-    NO_AUTH_URL,
-    UNABLE_TO_NOTIFY,
-)
-from registrar import LibraryRegistrar
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = (

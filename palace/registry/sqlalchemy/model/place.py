@@ -10,7 +10,7 @@ from sqlalchemy import Column, ForeignKey, Integer, Unicode, UniqueConstraint, f
 from sqlalchemy.orm import backref, relationship
 from sqlalchemy.sql.expression import and_, or_, select
 
-from config import Configuration
+from palace.registry.config import Configuration
 from palace.registry.sqlalchemy.constants import LibraryType
 from palace.registry.sqlalchemy.model.base import Base
 from palace.registry.sqlalchemy.util import get_one, get_one_or_create

@@ -3,11 +3,10 @@ from io import StringIO
 import pytest
 from sqlalchemy import func
 
-from geometry_loader import GeometryLoader
+from palace.registry.geometry_loader import GeometryLoader
 from palace.registry.sqlalchemy.model.place import Place, PlaceAlias
 from palace.registry.sqlalchemy.util import get_one_or_create
-
-from .fixtures.database import DatabaseTransactionFixture
+from tests.fixtures.database import DatabaseTransactionFixture
 
 
 class GeometryLoaderFixture:

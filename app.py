@@ -7,16 +7,16 @@ import urllib.parse
 from flask import Flask, Response
 from flask_babel import Babel
 
-from app_helpers import (
+from palace.registry.app_helpers import (
     compressible,
     has_library_factory,
     require_admin_authentication,
     uses_location_factory,
 )
-from config import Configuration
-from controller import LibraryRegistry
-from flask_sqlalchemy_session import flask_scoped_session
-from log import LogConfiguration
+from palace.registry.config import Configuration
+from palace.registry.controller import LibraryRegistry
+from palace.registry.flask_sqlalchemy_session import flask_scoped_session
+from palace.registry.log import LogConfiguration
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.session import SessionManager
 from palace.registry.util.app_server import (

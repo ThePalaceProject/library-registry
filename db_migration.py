@@ -6,7 +6,7 @@ import psycopg2
 from alembic.command import downgrade, stamp, upgrade
 from alembic.config import Config
 from alembic.util.exc import CommandError
-from config import Configuration
+from palace.registry.config import Configuration
 
 
 def migrate(db_url: str = None, action: str = "upgrade", version: str = "head"):

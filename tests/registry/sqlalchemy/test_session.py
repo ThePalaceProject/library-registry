@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from config import Configuration
+from palace.registry.config import Configuration
 from palace.registry.sqlalchemy.session import SessionManager, production_session
 
 

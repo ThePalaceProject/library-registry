@@ -2,10 +2,14 @@ import logging
 
 import pytest
 
-from log import JSONFormatter, LogConfiguration, LogglyHandler, StringFormatter
+from palace.registry.log import (
+    JSONFormatter,
+    LogConfiguration,
+    LogglyHandler,
+    StringFormatter,
+)
 from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
-
-from .fixtures.database import DatabaseTransactionFixture
+from tests.fixtures.database import DatabaseTransactionFixture
 
 
 class TestLogConfiguration:

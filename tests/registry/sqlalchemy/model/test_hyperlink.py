@@ -1,7 +1,7 @@
 import datetime
 
-from config import Configuration
-from emailer import Emailer
+from palace.registry.config import Configuration
+from palace.registry.emailer import Emailer
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
 from palace.registry.util.datetime_helpers import utc_now

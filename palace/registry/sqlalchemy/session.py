@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, exc as sa_exc
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from config import Configuration
+from palace.registry.config import Configuration
 from palace.registry.sqlalchemy.model.base import Base
 
 
@@ -22,7 +22,7 @@ def production_session():
     # incorrectly, but 1) this method isn't normally called during
     # unit tests, and 2) package_setup() will call initialize() again
     # with the right arguments.
-    from log import LogConfiguration
+    from palace.registry.log import LogConfiguration
 
     LogConfiguration.initialize(_db)
     return _db

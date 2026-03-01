@@ -5,7 +5,10 @@ from flask import Flask
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from flask_sqlalchemy_session import current_session, flask_scoped_session
+from palace.registry.flask_sqlalchemy_session import (
+    current_session,
+    flask_scoped_session,
+)
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ import flask
 import pytest
 from flask import Flask
 
-from pagination import Pagination
+from palace.registry.pagination import Pagination
 
 
 class TestPagination:

@@ -4,8 +4,8 @@ import psycopg2
 
 from alembic.command import ensure_version
 from alembic.config import Config
-from config import Configuration
 from db_migration import migrate
+from palace.registry.config import Configuration
 
 
 class TestDBMigrate:

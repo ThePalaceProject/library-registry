@@ -5,8 +5,8 @@ from unittest import mock
 
 import pytest
 
-from config import CannotLoadConfiguration, CannotSendEmail
-from emailer import Emailer, EmailTemplate
+from palace.registry.config import CannotLoadConfiguration, CannotSendEmail
+from palace.registry.emailer import Emailer, EmailTemplate
 from tests.fixtures.database import DatabaseTransactionFixture
 
 

@@ -4,7 +4,7 @@ import socket
 
 from loggly.handlers import HTTPSHandler as LogglyHandler
 
-from config import CannotLoadConfiguration
+from palace.registry.config import CannotLoadConfiguration
 from palace.registry.util.datetime_helpers import utc_now
 
 
