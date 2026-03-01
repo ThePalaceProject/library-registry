@@ -18,9 +18,9 @@ from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
 )
 from palace.registry.sqlalchemy.model.external_integration import ExternalIntegration
 from palace.registry.sqlalchemy.util import create
+from palace.registry.util.short_client_token import ShortClientTokenEncoder
+from palace.registry.util.string_helpers import base64
 from tests.fixtures.database import DatabaseTransactionFixture
-from util.short_client_token import ShortClientTokenEncoder
-from util.string_helpers import base64
 
 
 class MockAdobeVendorIDClient(AdobeVendorIDClient):

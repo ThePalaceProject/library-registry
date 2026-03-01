@@ -11,9 +11,9 @@ from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
 from palace.registry.sqlalchemy.model.library import Library, LibraryAlias
 from palace.registry.sqlalchemy.model.place import Place
 from palace.registry.sqlalchemy.util import get_one_or_create
+from palace.registry.util import GeometryUtility
+from palace.registry.util.datetime_helpers import utc_now
 from tests.fixtures.database import DatabaseTransactionFixture
-from util import GeometryUtility
-from util.datetime_helpers import utc_now
 
 
 class TestLibrary:

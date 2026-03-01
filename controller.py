@@ -29,6 +29,13 @@ from palace.registry.sqlalchemy.model.resource import Resource, Validation
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.session import production_session
 from palace.registry.sqlalchemy.util import get_one, get_one_or_create
+from palace.registry.util.app_server import (
+    ApplicationVersionController,
+    catalog_response,
+)
+from palace.registry.util.http import HTTP
+from palace.registry.util.problem_detail import ProblemDetail
+from palace.registry.util.string_helpers import base64, random_string
 from problem_details import (
     AUTHENTICATION_FAILURE,
     INTEGRATION_ERROR,
@@ -40,10 +47,6 @@ from problem_details import (
     UNABLE_TO_NOTIFY,
 )
 from registrar import LibraryRegistrar
-from util.app_server import ApplicationVersionController, catalog_response
-from util.http import HTTP
-from util.problem_detail import ProblemDetail
-from util.string_helpers import base64, random_string
 
 OPENSEARCH_MEDIA_TYPE = "application/opensearchdescription+xml"
 OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = (

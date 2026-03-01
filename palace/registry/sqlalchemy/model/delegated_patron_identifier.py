@@ -12,8 +12,8 @@ from palace.registry.sqlalchemy.util import (
     get_one,
     get_one_or_create as base_get_one_or_create,
 )
-from util.datetime_helpers import utc_now
-from util.short_client_token import ShortClientTokenTool
+from palace.registry.util.datetime_helpers import utc_now
+from palace.registry.util.short_client_token import ShortClientTokenTool
 
 
 class DelegatedPatronIdentifier(Base):

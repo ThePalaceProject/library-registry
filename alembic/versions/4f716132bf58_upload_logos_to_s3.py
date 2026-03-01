@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass
 
 from alembic import op
-from util.file_storage import LibraryLogoStore
+from palace.registry.util.file_storage import LibraryLogoStore
 
 # revision identifiers, used by Alembic.
 revision = "4f716132bf58"

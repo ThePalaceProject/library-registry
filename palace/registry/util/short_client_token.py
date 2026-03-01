@@ -5,7 +5,7 @@ import logging
 import pytz
 from jwt.algorithms import HMACAlgorithm
 
-from util.datetime_helpers import utc_now
+from palace.registry.util.datetime_helpers import utc_now
 
 
 class ShortClientTokenTool:

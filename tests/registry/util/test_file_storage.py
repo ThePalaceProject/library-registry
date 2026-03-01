@@ -6,8 +6,12 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from config import Configuration
+from palace.registry.util.file_storage import (
+    FileObject,
+    LibraryLogoStore,
+    S3FileStorage,
+)
 from tests.fixtures.database import DatabaseTransactionFixture
-from util.file_storage import FileObject, LibraryLogoStore, S3FileStorage
 
 
 class TestS3FileStorage:
@@ -94,7 +98,7 @@ class TestLibraryLogoStore:
             == f"logo/{library.internal_urn.split(':', 2)[2]}.jpeg"
         )
 
-    @patch("util.file_storage.LibraryLogoStore.write")
+    @patch("palace.registry.util.file_storage.LibraryLogoStore.write")
     def test_write_from_b64(
         self, mock_write: MagicMock, db: DatabaseTransactionFixture
     ):
@@ -108,7 +112,7 @@ class TestLibraryLogoStore:
         assert args[0][1].read() == b"someimagedata"
         assert args[1]["format"] == "image/png"
 
-    @patch("util.file_storage.LibraryLogoStore.write")
+    @patch("palace.registry.util.file_storage.LibraryLogoStore.write")
     def test_write_from_b64_no_match(
         self, mock_write: MagicMock, db: DatabaseTransactionFixture
     ):

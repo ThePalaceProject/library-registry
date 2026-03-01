@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 
-from util.string_helpers import random_string
+from palace.registry.util.string_helpers import random_string
 
 __all__ = [
     "generate_secret",

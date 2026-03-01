@@ -15,7 +15,7 @@ from palace.registry.sqlalchemy.model.configuration_setting import Configuration
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
 from palace.registry.sqlalchemy.model.library import Library
 from palace.registry.sqlalchemy.model.resource import Validation
-from util.http import NormalizedMediaType
+from palace.registry.util.http import NormalizedMediaType
 
 
 class OrderFacet(StrEnum):

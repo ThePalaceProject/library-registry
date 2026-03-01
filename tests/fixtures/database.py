@@ -23,7 +23,7 @@ from palace.registry.sqlalchemy.model.place import Place, PlaceAlias
 from palace.registry.sqlalchemy.model.service_area import ServiceArea
 from palace.registry.sqlalchemy.session import SessionManager
 from palace.registry.sqlalchemy.util import get_one_or_create
-from util import GeometryUtility
+from palace.registry.util import GeometryUtility
 
 
 class ApplicationFixture:

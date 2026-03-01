@@ -5,8 +5,7 @@ import json
 import pytest
 import requests
 
-from testing import MockRequestsResponse
-from util.http import (
+from palace.registry.util.http import (
     HTTP,
     BadResponseException,
     NormalizedMediaType,
@@ -14,6 +13,7 @@ from util.http import (
     RequestNetworkException,
     RequestTimedOut,
 )
+from testing import MockRequestsResponse
 
 
 class TestHTTP:

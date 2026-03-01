@@ -7,8 +7,8 @@ import adobe_xml_templates as t
 from palace.registry.sqlalchemy.model.delegated_patron_identifier import (
     ShortClientTokenDecoder,
 )
-from util.string_helpers import base64
-from util.xmlparser import XMLParser
+from palace.registry.util.string_helpers import base64
+from palace.registry.util.xmlparser import XMLParser
 
 
 class AdobeVendorIDController:

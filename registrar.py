@@ -14,6 +14,9 @@ from PIL import Image
 from authentication_document import AuthenticationDocument
 from opds import OPDSCatalog
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
+from palace.registry.util.file_storage import LibraryLogoStore
+from palace.registry.util.http import HTTP, RequestTimedOut
+from palace.registry.util.problem_detail import ProblemDetail
 from problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
@@ -22,9 +25,6 @@ from problem_details import (
     LIBRARY_ALREADY_IN_PRODUCTION,
     TIMEOUT,
 )
-from util.file_storage import LibraryLogoStore
-from util.http import HTTP, RequestTimedOut
-from util.problem_detail import ProblemDetail
 
 if TYPE_CHECKING:
     from palace.registry.sqlalchemy.model.library import Library

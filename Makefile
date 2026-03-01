@@ -29,7 +29,7 @@ help:
 	@echo "    down-active      - Stop the cluster from the cicd file"
 
 build:
-	docker-compose build
+	docker compose build
 
 db-session:
 	docker exec -it libreg_local_db psql -U postgres
@@ -38,40 +38,40 @@ webapp-shell:
 	docker exec -it libreg_webapp /bin/sh
 
 up:
-	docker-compose up -d
+	docker compose up -d
 
 up-watch:
-	docker-compose up
+	docker compose up
 
 start:
-	docker-compose start
+	docker compose start
 
 stop:
-	docker-compose stop
+	docker compose stop
 
 down:
-	docker-compose down
+	docker compose down
 
 test:
 	docker exec -it libreg_webapp pytest tests
 
 clean:
-	docker-compose down --volumes
+	docker compose down --volumes
 
 full-clean:
-	docker-compose down --volumes --rmi all
+	docker compose down --volumes --rmi all
 
 build-active:
-	docker-compose -f docker-compose-cicd.yml build
+	docker compose -f docker-compose-cicd.yml build
 
 up-active:
-	docker-compose -f docker-compose-cicd.yml up -d
+	docker compose -f docker-compose-cicd.yml up -d
 
 up-active-watch:
-	docker-compose -f docker-compose-cicd.yml up
+	docker compose -f docker-compose-cicd.yml up
 
 test-active:
 	docker exec -it libreg_active_webapp pytest tests
 
 down-active:
-	docker-compose -f docker-compose-cicd.yml down
+	docker compose -f docker-compose-cicd.yml down

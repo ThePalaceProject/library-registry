@@ -82,21 +82,21 @@ class TestProductionSession:
 
     def test_production_session_returns_session(self):
         """Test that production_session() returns a valid SQLAlchemy Session."""
-        # production_session() requires the production database URL to be configured.
-        # This test is skipped in testing because it requires actual production DB config.
+        # `production_session` requires the production database URL to be configured.
+        # This test is usually skipped in testing because it requires actual production DB config.
         # The function is tested indirectly through app initialization and other tests.
         import os
 
         import pytest
 
-        # Only run this test if production database is configured
+        # Only run this test if `production database` is configured
         if not os.environ.get("SIMPLIFIED_PRODUCTION_DATABASE"):
             pytest.skip("Production database not configured")
 
         session = production_session()
         assert session is not None
 
-        # Verify it works
+        # Verify it works.
         result = session.execute(text("SELECT 1"))
         assert result.scalar() == 1
 

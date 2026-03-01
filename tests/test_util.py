@@ -1,4 +1,4 @@
-from util import GeometryUtility
+from palace.registry.util import GeometryUtility
 
 
 class TestGeometryUtility:
