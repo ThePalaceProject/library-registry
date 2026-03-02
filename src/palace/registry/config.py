@@ -52,8 +52,28 @@ def _url_from_environment(environment_variable: str) -> str | None:
     return None
 
 
+# TODO: This might be a handy function to have else where, so
+#  consider moving it to a more appropriate module and adding tests.
+def _find_project_root_or_current() -> Path:
+    """Return the root path of this project.
+
+    Starting from this file, traverse up the file tree until we find the
+    root directory of the project (criteria tested below). If we fail to
+    pass the criteria, we fall back to the current directory of this file.
+    """
+    current = Path(__file__).resolve()
+
+    for parent in current.parents:
+        if (parent / "src").is_dir() and (parent / "pyproject.toml").is_file():
+            return parent
+
+    # Fallback to the current directory, if the root criteria are not met.
+    return current.parent
+
+
 class Configuration:
-    DATADIR = Path(os.path.dirname(__file__)) / "data"
+    # We'd prefer to place the uszipcode data directory in the project root.
+    DATADIR = _find_project_root_or_current() / "data"
 
     instance = None
 
