@@ -1,9 +1,9 @@
 import os
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
 from palace.registry.config import Configuration
 
 # this is the Alembic Config object, which provides
