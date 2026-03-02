@@ -59,6 +59,7 @@ from sqlalchemy.sql.expression import (
 from config import Configuration
 from emailer import Emailer
 from util import GeometryUtility
+from util.datetime_helpers import utc_now
 from util.language import LanguageCodes
 from util.short_client_token import ShortClientTokenTool
 from util.string_helpers import random_string
@@ -291,10 +292,10 @@ class Library(Base):
 
     # When our record of this library was last updated.
     timestamp = Column(
-        DateTime,
+        DateTime(timezone=True),
         index=True,
-        default=lambda: datetime.datetime.utcnow(),
-        onupdate=lambda: datetime.datetime.utcnow(),
+        default=utc_now,
+        onupdate=utc_now,
     )
 
     # The library's logo, as a web url
@@ -1983,10 +1984,10 @@ class Validation(Base):
     id = Column(Integer, primary_key=True)
     success = Column(Boolean, index=True, default=False)
     started_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         index=True,
         nullable=False,
-        default=lambda x: datetime.datetime.utcnow(),
+        default=utc_now,
     )
 
     # Used in OPDS catalogs to convey the status of a validation attempt.
@@ -2013,7 +2014,7 @@ class Validation(Base):
         handled separately by something capable of generating the URL
         to the validation controller.
         """
-        self.started_at = datetime.datetime.utcnow()
+        self.started_at = utc_now()
         self.secret = generate_secret()
         self.success = False
 
@@ -2030,7 +2031,7 @@ class Validation(Base):
         An inactive Validation can't be marked as successful -- it
         needs to be reset.
         """
-        now = datetime.datetime.utcnow()
+        now = utc_now()
         return not self.success and now < self.deadline
 
     def mark_as_successful(self):
@@ -2264,7 +2265,7 @@ class ShortClientTokenDecoder(ShortClientTokenTool):
         # Currently there are two ways of specifying a token's
         # expiration date: as a number of minutes since self.SCT_EPOCH
         # or as a number of seconds since self.JWT_EPOCH.
-        now = datetime.datetime.utcnow()
+        now = utc_now()
 
         # NOTE: The JWT code needs to be removed by the year 4869 or
         # this will break.

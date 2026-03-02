@@ -17,6 +17,7 @@ from model import (
 )
 from opds import OPDSCatalog, OrderFacet
 from tests.fixtures.database import DatabaseTransactionFixture
+from util.datetime_helpers import utc_now
 
 
 class TestOrderFacet:
@@ -364,9 +365,7 @@ class TestOPDSCatalog:
         assert_reservation_status(Validation.IN_PROGRESS)
 
         # Validation has expired
-        validation.started_at = datetime.datetime.utcnow() - datetime.timedelta(
-            days=365
-        )
+        validation.started_at = utc_now() - datetime.timedelta(days=365)
         assert_reservation_status(Validation.INACTIVE)
 
         # Validation has been confirmed
