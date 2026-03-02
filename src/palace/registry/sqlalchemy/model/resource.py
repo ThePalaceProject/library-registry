@@ -28,7 +28,7 @@ class Validation(Base):
         DateTime(timezone=True),
         index=True,
         nullable=False,
-        default=utc_now(),
+        default=utc_now,
     )
 
     # Used in OPDS catalogs to convey the status of a validation attempt.

@@ -284,8 +284,8 @@ class Library(Base):
         )
         return query.count()
 
-    @classmethod
-    def patron_counts_by_library(self, _db, libraries):
+    @staticmethod
+    def patron_counts_by_library(_db, libraries):
         """Determine the number of registered Adobe Account IDs
         (~patrons) for each of the given libraries.
 
@@ -1058,11 +1058,10 @@ class Library(Base):
 
     @classmethod
     def get_hyperlink(cls, library, rel):
-        pass
-
         link = [x for x in library.hyperlinks if x.rel == rel]
         if len(link) > 0:
             return link[0]
+        return None
 
 
 class LibraryAlias(Base):

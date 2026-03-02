@@ -47,10 +47,13 @@ class SessionManager:
 
     @classmethod
     def initialize(cls, url: str) -> tuple[Engine, Connection]:
-        """Initialize the database connection
-        Create all the database tables from the models
-        Optionally, run the alembic migration scripts
-        :param db_url: The Database connection url"""
+        """Initialize the database connection.
+
+        Create all the database tables from the models.
+        Optionally, run the alembic migration scripts.
+
+        :param url: The Database connection url
+        """
         if url in cls.engine_for_url:
             engine = cls.engine_for_url[url]
             return engine, engine.connect()
@@ -64,7 +67,6 @@ class SessionManager:
 
     @classmethod
     def session(cls, url):
-        engine = connection = 0
         import warnings
 
         with warnings.catch_warnings():
