@@ -1,9 +1,9 @@
 from unittest import mock
 
 import psycopg2
-
 from alembic.command import ensure_version
 from alembic.config import Config
+
 from palace.registry.config import Configuration
 from palace.registry.db_migration import migrate
 
