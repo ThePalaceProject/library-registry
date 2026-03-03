@@ -1,7 +1,7 @@
 import pytest
 from flask import Flask, make_response
 
-from palace.registry import admin
+from palace import registry
 from palace.registry.admin.config import Configuration as AdminUiConfig
 from palace.registry.util.app_server import ApplicationVersionController
 
@@ -15,9 +15,9 @@ def test_application_version_controller(
 ):
 
     # Mock the cm version strings
-    monkeypatch.setattr(admin, "__version__", version)
-    monkeypatch.setattr(admin, "__commit__", commit)
-    monkeypatch.setattr(admin, "__branch__", branch)
+    monkeypatch.setattr(registry, "__version__", version)
+    monkeypatch.setattr(registry, "__commit__", commit)
+    monkeypatch.setattr(registry, "__branch__", branch)
 
     # Mock the admin ui version strings
     if ui_package:

@@ -11,7 +11,7 @@ from flask_babel import lazy_gettext as _
 from lxml import etree
 from psycopg2 import DatabaseError
 
-from palace.registry import admin
+from palace import registry
 from palace.registry.admin.config import Configuration as AdminUiConfig
 from palace.registry.opds import OPDSCatalog
 from palace.registry.util.problem_detail import ProblemDetail
@@ -136,9 +136,9 @@ class ApplicationVersionController:
     @staticmethod
     def version():
         response = {
-            "version": admin.__version__,
-            "commit": admin.__commit__,
-            "branch": admin.__branch__,
+            "version": registry.__version__,
+            "commit": registry.__commit__,
+            "branch": registry.__branch__,
             "admin_ui": {
                 "package": AdminUiConfig.package_name(),
                 "version": AdminUiConfig.package_version(),
