@@ -166,6 +166,7 @@ CMD ["/docker-entrypoint.sh"]
 FROM builder AS libreg_local
 
 ENV FLASK_ENV development
+ENV PYTHONPATH="${LIBRARY_REGISTRY_DOCKER_HOME}:${LIBRARY_REGISTRY_DOCKER_HOME}/src"
 
 # Install development dependancies with poetry
 RUN set -ex \
@@ -188,6 +189,6 @@ ENV FLASK_ENV=production
 COPY . ./
 
 # Install the package itself now that source code is available
-RUN poetry install
+RUN poetry install --only-root
 
 ##############################################################################
