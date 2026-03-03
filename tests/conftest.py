@@ -1,7 +1,7 @@
 import pytest
 
-from model import Base
-from testing import DatabaseTest
+from palace.registry.sqlalchemy.model.base import Base
+from tests.testing import DatabaseTest
 
 
 @pytest.fixture(scope="session", autouse=True)

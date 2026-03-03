@@ -23,6 +23,11 @@ repos:
         args:
           - --py312-plus
 
+  - repo: https://github.com/MarcoGorelli/absolufy-imports
+    rev: v0.3.1
+    hooks:
+      - id: absolufy-imports
+
   - repo: https://github.com/myint/autoflake
     rev: v2.3.1
     hooks:
@@ -65,3 +70,11 @@ repos:
           - --config
           - .pymarkdown.config.json
           - scan
+
+  - repo: local
+    hooks:
+      - id: check-namespace-package
+        name: Check that palace is a namespace package
+        language: fail
+        entry: Please remove src/palace/__init__.py
+        files: ^src/palace/__init__.py$

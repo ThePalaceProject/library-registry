@@ -6,7 +6,7 @@ import boto3
 import pytest
 from botocore.exceptions import ClientError
 
-from config import Configuration
+from palace.registry.config import Configuration
 
 
 class S3Fixture:
