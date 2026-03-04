@@ -2192,81 +2192,51 @@ class TestLibraryRegistryController:
                 "http://circmanager.org/logo.png",
             ]
 
-    def test_register_resets_shared_secret(
-        self,
-        registry_controller_fixture: LibraryRegistryControllerFixture,
-        rsa_key_pair: RSA.RsaKey,
-    ):
-        # If we include the old secret in a request and also set
-        # reset_shared_secret, the registry will generate a new secret.
-        fixture = registry_controller_fixture
-        _, library = self._register_library(fixture, rsa_key_pair)
-        old_secret = library.shared_secret
-
-        auth_document = self._auth_document(rsa_key_pair)
-        fixture.http_client.queue_response(
-            200, content=json.dumps(auth_document), url=auth_document["id"]
-        )
-        self.queue_opds_success(fixture)
-
-        with fixture.app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {old_secret}"}, method="POST"
-        ):
-            flask.request.form = ImmutableMultiDict(
-                [
-                    ("url", "http://circmanager.org/authentication.opds"),
-                    ("contact", "mailto:me@library.org"),
-                    ("reset_shared_secret", "y"),
-                ]
-            )
-            response = fixture.controller.register(do_get=fixture.http_client.do_get)
-            assert response.status_code == 200
-            assert library.shared_secret != old_secret
-
-            # The registry encrypted the new secret with the public key, and
-            # it can be decrypted with the private key.
-            catalog = json.loads(response.data)
-            encryptor = PKCS1_OAEP.new(rsa_key_pair)
-            encrypted_secret = base64.b64decode(catalog["metadata"]["shared_secret"])
-            assert (
-                encryptor.decrypt(encrypted_secret).decode("utf8")
-                == library.shared_secret
-            )
-
     @pytest.mark.parametrize(
-        "secret,include_reset_flag,expected_status",
+        "reset_requested,is_correct_secret,expected_status,secret_should_change",
         [
-            # Wrong secret → auth failure before registration completes.
-            pytest.param("notthesecret", True, 401, id="wrong-secret-with-reset-flag"),
-            # Correct secret but no reset flag → registration succeeds, secret unchanged.
-            pytest.param(None, False, 200, id="correct-secret-without-flag"),
+            pytest.param(True, True, 200, True, id="reset-correct-secret"),
+            pytest.param(False, True, 200, False, id="no-reset-correct-secret"),
+            pytest.param(True, False, 401, False, id="reset-incorrect-secret"),
+            pytest.param(False, False, 401, False, id="no-reset-incorrect-secret"),
         ],
     )
-    def test_register_does_not_reset_shared_secret(
+    def test_register_shared_secret_handling(
         self,
         registry_controller_fixture: LibraryRegistryControllerFixture,
         rsa_key_pair: RSA.RsaKey,
-        secret: str | None,
-        include_reset_flag: bool,
+        reset_requested: bool,
+        is_correct_secret: bool,
         expected_status: int,
+        secret_should_change: bool,
     ):
-        fixture = registry_controller_fixture
-        _, library = self._register_library(fixture, rsa_key_pair)
-        old_secret = library.shared_secret
+        """Test shared secret handling during library registration.
 
-        auth_document = self._auth_document(rsa_key_pair)
-        fixture.http_client.queue_response(
-            200, content=json.dumps(auth_document), url=auth_document["id"]
-        )
-        self.queue_opds_success(fixture)
-
-        bearer = secret if secret is not None else old_secret
+        Verifies that:
+        - Secrets reset when explicitly requested with correct credentials.
+        - Secrets don't reset when flag is omitted.
+        - Authentication fails with incorrect credentials.
+        - Encrypted new secrets can be decrypted with the library's RSA public key.
+        """
         form_items = [
             ("url", "http://circmanager.org/authentication.opds"),
             ("contact", "mailto:me@library.org"),
         ]
-        if include_reset_flag:
+
+        if reset_requested:
             form_items.append(("reset_shared_secret", "y"))
+
+        fixture = registry_controller_fixture
+        _, library = self._register_library(fixture, rsa_key_pair)
+        old_secret = library.shared_secret
+
+        auth_document = self._auth_document(rsa_key_pair)
+        fixture.http_client.queue_response(
+            200, content=json.dumps(auth_document), url=auth_document["id"]
+        )
+        self.queue_opds_success(fixture)
+
+        bearer = old_secret if is_correct_secret else "notthesecret"
 
         with fixture.app.test_request_context(
             "/", headers={"Authorization": f"Bearer {bearer}"}, method="POST"
@@ -2274,7 +2244,23 @@ class TestLibraryRegistryController:
             flask.request.form = ImmutableMultiDict(form_items)
             response = fixture.controller.register(do_get=fixture.http_client.do_get)
             assert response.status_code == expected_status
-            assert library.shared_secret == old_secret
+
+            if secret_should_change:
+                assert library.shared_secret != old_secret
+
+                # The registry encrypted the new secret with the public key, and
+                # it can be decrypted with the private key.
+                catalog = json.loads(response.data)
+                encryptor = PKCS1_OAEP.new(rsa_key_pair)
+                encrypted_secret = base64.b64decode(
+                    catalog["metadata"]["shared_secret"]
+                )
+                assert (
+                    encryptor.decrypt(encrypted_secret).decode("utf8")
+                    == library.shared_secret
+                )
+            else:
+                assert library.shared_secret == old_secret
 
     def test_register_with_secret_changes_authentication_url_and_opds_url(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
