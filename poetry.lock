@@ -2120,14 +2120,14 @@ tests = ["attrs", "pandas", "pg8000", "pytest", "pytest-cov", "superjson"]
 
 [[package]]
 name = "tox"
-version = "4.46.0"
+version = "4.47.0"
 description = "tox is a generic virtualenv management and test command line tool"
 optional = false
 python-versions = ">=3.10"
 groups = ["ci"]
 files = [
-    {file = "tox-4.46.0-py3-none-any.whl", hash = "sha256:828f0a119a22028dbff7495d288e3601406478ab20c97891f66be5516d72e4c3"},
-    {file = "tox-4.46.0.tar.gz", hash = "sha256:b9d1aa187101dae184b7e6552f3b1ff85461e9e32f078851426e35a3c2009bc1"},
+    {file = "tox-4.47.0-py3-none-any.whl", hash = "sha256:79260c47814086313eea516c6cd4ce374f93c19be2de6125e7d330356a000364"},
+    {file = "tox-4.47.0.tar.gz", hash = "sha256:db08368214f6f44b3e9b6c6e937140e25a4b0cea63f8489bf1c9b6b34d3e42e3"},
 ]
 
 [package.dependencies]
@@ -2138,7 +2138,7 @@ packaging = ">=26"
 platformdirs = ">=4.9.2"
 pluggy = ">=1.6"
 pyproject-api = ">=1.10"
-virtualenv = ">=20.38"
+virtualenv = ">=20.39"
 
 [package.extras]
 completion = ["argcomplete (>=3.6.3)"]
