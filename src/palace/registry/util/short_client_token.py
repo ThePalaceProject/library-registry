@@ -2,7 +2,6 @@ import base64
 import datetime
 import logging
 
-import pytz
 from jwt.algorithms import HMACAlgorithm
 
 from palace.registry.util.datetime_helpers import utc_now
@@ -43,12 +42,12 @@ class ShortClientTokenTool:
         return base64.decodebytes(to_decode)
 
     JWT_EPOCH = datetime.datetime(
-        1970, 1, 1, tzinfo=pytz.UTC
+        1970, 1, 1, tzinfo=datetime.UTC
     )  # The JWT spec takes January 1 1970 as the epoch.
 
     # For the sake of shortening tokens, the Short Client Token spec takes January 1 2017 as the epoch,
     # and measures time in minutes rather than seconds.
-    SCT_EPOCH = datetime.datetime(2017, 1, 1, tzinfo=pytz.UTC)
+    SCT_EPOCH = datetime.datetime(2017, 1, 1, tzinfo=datetime.UTC)
 
     @classmethod
     def sct_numericdate(cls, d):
