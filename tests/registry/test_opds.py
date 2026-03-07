@@ -7,7 +7,7 @@ import pytest
 
 from palace.registry.authentication_document import AuthenticationDocument
 from palace.registry.config import Configuration
-from palace.registry.opds import OPDSCatalog, OrderFacet
+from palace.registry.opds import AvailabilityFacet, OPDSCatalog, OrderFacet
 from palace.registry.sqlalchemy.constants import LibraryType
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
@@ -38,6 +38,207 @@ class TestOrderFacet:
         assert [str(e) for e in OrderFacet.DEFAULT.sort_order_expressions] == [
             str(e) for e in OrderFacet.MODIFIED.sort_order_expressions
         ]
+
+
+class TestAvailabilityFacet:
+    def test_labels(self):
+        assert AvailabilityFacet.PRODUCTION.label == "Production"
+        assert AvailabilityFacet.HIDDEN.label == "Hidden"
+        assert AvailabilityFacet.ALL.label == "All"
+
+    def test_advertised_facets(self):
+        facets = AvailabilityFacet.advertised_facets()
+        assert facets == [
+            AvailabilityFacet.PRODUCTION,
+            AvailabilityFacet.HIDDEN,
+            AvailabilityFacet.ALL,
+        ]
+
+    def test_str_values(self):
+        assert AvailabilityFacet.PRODUCTION == "production"
+        assert AvailabilityFacet.HIDDEN == "hidden"
+        assert AvailabilityFacet.ALL == "all"
+
+
+class TestAddFacets:
+    """Tests for OPDSCatalog._add_facets."""
+
+    BASE_URL = "https://registry.example.org/libraries/crawlable"
+
+    def _make_catalog(self, order_str=None, availability_str=None):
+        """Build a minimal catalog dict and run _add_facets on it."""
+        catalog = OPDSCatalog.__new__(OPDSCatalog)
+        catalog.catalog = {"metadata": {}, "links": [], "catalogs": []}
+        catalog._add_facets(self.BASE_URL, order_str, availability_str)
+        return catalog.catalog
+
+    def test_facets_structure(self):
+        """Facets array has sort and availability groups with expected metadata."""
+        cat = self._make_catalog()
+        facets = cat["facets"]
+        assert len(facets) == 2
+        assert facets[0]["metadata"]["title"] == "Sort order"
+        assert facets[0]["metadata"]["type"] == OPDSCatalog.SORT_FACET_TYPE
+        assert facets[1]["metadata"]["title"] == "Availability"
+        assert facets[1]["metadata"]["type"] == OPDSCatalog.AVAILABILITY_FACET_TYPE
+
+    def test_sort_facet_counts(self):
+        cat = self._make_catalog()
+        # advertised_facets returns [MODIFIED, NAME, NATURAL]
+        assert len(cat["facets"][0]["links"]) == 3
+
+    def test_availability_facet_counts(self):
+        cat = self._make_catalog()
+        # Three values: production, hidden, all
+        assert len(cat["facets"][1]["links"]) == 3
+
+    @pytest.mark.parametrize(
+        "order_str, availability_str, expected_active_order, expected_active_avail_label",
+        [
+            pytest.param(None, None, "modified", "Production", id="defaults"),
+            pytest.param(
+                "modified",
+                "production",
+                "modified",
+                "Production",
+                id="explicit-defaults",
+            ),
+            pytest.param("name", "hidden", "name", "Hidden", id="non-defaults"),
+            pytest.param("name", "all", "name", "All", id="all-avail"),
+        ],
+    )
+    def test_active_facet_has_rel_self(
+        self,
+        order_str,
+        availability_str,
+        expected_active_order,
+        expected_active_avail_label,
+    ):
+        cat = self._make_catalog(order_str, availability_str)
+        sort_links = cat["facets"][0]["links"]
+        avail_links = cat["facets"][1]["links"]
+
+        active_sort = [l for l in sort_links if l.get("rel") == "self"]
+        assert len(active_sort) == 1
+        assert active_sort[0]["title"] == OrderFacet(expected_active_order).label
+
+        active_avail = [l for l in avail_links if l.get("rel") == "self"]
+        assert len(active_avail) == 1
+        assert active_avail[0]["title"] == expected_active_avail_label
+
+    def test_default_facets_have_default_property(self):
+        """MODIFIED and PRODUCTION facets carry the default property regardless of active."""
+        cat = self._make_catalog(order_str="name", availability_str="hidden")
+        sort_links = cat["facets"][0]["links"]
+        avail_links = cat["facets"][1]["links"]
+
+        default_sort = [
+            l
+            for l in sort_links
+            if l.get("properties", {}).get(OPDSCatalog.FACET_DEFAULT_PROPERTY)
+        ]
+        assert len(default_sort) == 1
+        assert default_sort[0]["title"] == OrderFacet.MODIFIED.label
+
+        default_avail = [
+            l
+            for l in avail_links
+            if l.get("properties", {}).get(OPDSCatalog.FACET_DEFAULT_PROPERTY)
+        ]
+        assert len(default_avail) == 1
+        assert default_avail[0]["title"] == "Production"
+
+    def test_active_and_default_simultaneously(self):
+        """When no params given, modified and production are both active and default."""
+        cat = self._make_catalog()
+        sort_links = cat["facets"][0]["links"]
+        avail_links = cat["facets"][1]["links"]
+
+        modified_link = next(l for l in sort_links if "modified" in l["href"])
+        assert modified_link.get("rel") == "self"
+        assert (
+            modified_link.get("properties", {}).get(OPDSCatalog.FACET_DEFAULT_PROPERTY)
+            is True
+        )
+
+        production_link = next(l for l in avail_links if l["title"] == "Production")
+        assert production_link.get("rel") == "self"
+        assert (
+            production_link.get("properties", {}).get(
+                OPDSCatalog.FACET_DEFAULT_PROPERTY
+            )
+            is True
+        )
+
+    def test_sort_links_preserve_availability(self):
+        """Sort facet links include availability when it was given."""
+        cat = self._make_catalog(order_str="name", availability_str="all")
+        sort_links = cat["facets"][0]["links"]
+        for link in sort_links:
+            assert (
+                "availability=all" in link["href"]
+            )  # no encoding needed for plain values
+
+    def test_sort_links_omit_availability_when_default(self):
+        """Sort facet links omit availability when it was not in the request."""
+        cat = self._make_catalog(order_str="name", availability_str=None)
+        sort_links = cat["facets"][0]["links"]
+        for link in sort_links:
+            assert "availability" not in link["href"]
+
+    def test_avail_links_preserve_order(self):
+        """Availability facet links include order when it was given."""
+        cat = self._make_catalog(order_str="name", availability_str="all")
+        avail_links = cat["facets"][1]["links"]
+        for link in avail_links:
+            assert "order=name" in link["href"]
+
+    def test_avail_links_omit_order_when_default(self):
+        """Availability facet links omit order when it was not in the request."""
+        cat = self._make_catalog(order_str=None, availability_str="hidden")
+        avail_links = cat["facets"][1]["links"]
+        for link in avail_links:
+            assert "order" not in link["href"]
+
+    def test_size_not_in_facet_links(self):
+        """Facet links do not include offset or size (reset pagination)."""
+        cat = self._make_catalog(order_str="name", availability_str="production")
+        all_links = cat["facets"][0]["links"] + cat["facets"][1]["links"]
+        for link in all_links:
+            assert "offset" not in link["href"]
+            assert "size" not in link["href"]
+
+    def test_commas_not_percent_encoded_in_facet_links(self):
+        """Commas in availability values are preserved literally, not encoded as %2C."""
+        cat = self._make_catalog(order_str="name", availability_str="production,hidden")
+        sort_links = cat["facets"][0]["links"]
+        for link in sort_links:
+            assert "availability=production,hidden" in link["href"]
+            assert "%2C" not in link["href"]
+
+    def test_facet_group_metadata_has_param(self):
+        """Each facet group's metadata carries the query parameter name."""
+        cat = self._make_catalog()
+        sort_meta = cat["facets"][0]["metadata"]
+        avail_meta = cat["facets"][1]["metadata"]
+        assert sort_meta[OPDSCatalog.FACET_PARAM_PROPERTY] == "order"
+        assert avail_meta[OPDSCatalog.FACET_PARAM_PROPERTY] == "availability"
+
+    def test_facet_links_have_value_property(self):
+        """Every facet link carries the query-parameter value it represents."""
+        cat = self._make_catalog()
+        sort_links = cat["facets"][0]["links"]
+        avail_links = cat["facets"][1]["links"]
+
+        sort_values = [
+            l["properties"][OPDSCatalog.FACET_VALUE_PROPERTY] for l in sort_links
+        ]
+        assert sort_values == [f.value for f in OrderFacet.advertised_facets()]
+
+        avail_values = [
+            l["properties"][OPDSCatalog.FACET_VALUE_PROPERTY] for l in avail_links
+        ]
+        assert avail_values == [f.value for f in AvailabilityFacet.advertised_facets()]
 
 
 class TestOPDSCatalog:

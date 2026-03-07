@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
-from urllib.parse import urlencode, urlparse, urlunparse
+from urllib.parse import quote, urlencode, urlparse, urlunparse
 
 import flask
 from sqlalchemy.engine.row import Row
@@ -62,6 +62,29 @@ class OrderFacet(StrEnum):
             raise ValueError(f"Unknown order facet: {self}")
 
 
+class AvailabilityFacet(StrEnum):
+    """Availability filter options for library feeds.
+
+    'Availability' is the effective/combined library status as visible to feed
+    consumers — distinct from library_stage and registry_stage, which are the
+    individual opinions of each party.
+    """
+
+    PRODUCTION = "production"  # Both stages must be PRODUCTION.
+    HIDDEN = "hidden"  # At least one stage is TESTING, none CANCELLED.
+    ALL = "all"  # All non-cancelled libraries (production or hidden).
+
+    @property
+    def label(self) -> str:
+        return {"production": "Production", "hidden": "Hidden", "all": "All"}[
+            self.value
+        ]
+
+    @classmethod
+    def advertised_facets(cls) -> list[AvailabilityFacet]:
+        return [cls.PRODUCTION, cls.HIDDEN, cls.ALL]
+
+
 class Annotator:
     def annotate_catalog(self, catalog, live=True):
         pass
@@ -90,6 +113,12 @@ class OPDSCatalog:
     FOCUS_REL = "http://librarysimplified.org/rel/registry/focus"
 
     CACHE_TIME = 3600 * 12
+
+    SORT_FACET_TYPE = "http://palaceproject.io/terms/rel/sort"
+    AVAILABILITY_FACET_TYPE = "http://palaceproject.io/terms/rel/availability"
+    FACET_DEFAULT_PROPERTY = "http://palaceproject.io/terms/facet/default"
+    FACET_PARAM_PROPERTY = "http://palaceproject.io/terms/facet/param"
+    FACET_VALUE_PROPERTY = "http://palaceproject.io/terms/facet/value"
 
     _NORMALIZED_OPDS2_TYPE = NormalizedMediaType(OPDS_TYPE)
     _NORMALIZED_OPDS1_TYPE = NormalizedMediaType(OPDS_1_TYPE)
@@ -123,12 +152,14 @@ class OPDSCatalog:
         pagination=None,
         has_next_page=False,
         order=None,
+        availability=None,
     ):
         """Turn a list of libraries into a catalog.
 
         :param pagination: Pagination object for adding rel links (optional).
         :param has_next_page: Whether there's a next page of results.
-        :param order: Raw order string from request to preserve in pagination URLs (optional).
+        :param order: Raw order string from request to preserve in pagination/facet URLs (optional).
+        :param availability: Raw availability string from request, e.g. "all" or "hidden" (optional).
         """
         if not annotator:
             annotator = Annotator()
@@ -162,9 +193,12 @@ class OPDSCatalog:
                 )
             )
 
-        # Add pagination links if paginated feed.
+        # Add pagination links and facets for paginated feeds.
         if pagination:
-            self._add_pagination_links(url, pagination, has_next_page, order)
+            self._add_pagination_links(
+                url, pagination, has_next_page, order, availability
+            )
+            self._add_facets(url, order, availability)
 
         annotator.annotate_catalog(self, live=live)
 
@@ -208,10 +242,12 @@ class OPDSCatalog:
         pagination,
         has_next_page,
         order=None,
+        availability=None,
     ):
         """Add OPDS 2.0 pagination links (rel=first/previous/next/last).
 
         :param order: Raw order string from the original request, or None if absent.
+        :param availability: Raw availability string from the original request, or None if absent.
         """
 
         parsed = urlparse(base_url)
@@ -220,7 +256,11 @@ class OPDSCatalog:
             params = {"offset": page.offset, "size": page.size}
             if order is not None:
                 params["order"] = order
-            return urlunparse(parsed._replace(query=urlencode(params)))
+            if availability is not None:
+                params["availability"] = availability
+            return urlunparse(
+                parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
+            )
 
         # Add numberOfItems to metadata for progress bars (OPDS 2.0).
         if pagination.total_count is not None:
@@ -260,6 +300,97 @@ class OPDSCatalog:
                 href=paginated_url(pagination.last_page),
                 type=self.OPDS_TYPE,
             )
+
+    def _add_facets(self, base_url, order_str, availability_str):
+        """Add OPDS 2.0 facet groups (sort and availability) to the catalog.
+
+        Each facet link sets one dimension and preserves the other dimension's
+        current raw value (omitting it from the URL when it was not in the request).
+
+        :param order_str: Raw order string from the request, or None if absent.
+        :param availability_str: Raw availability string from the request, or None if absent.
+        """
+        parsed = urlparse(base_url)
+
+        # Effective active values (canonical, accounting for defaults).
+        effective_order = (
+            OrderFacet.MODIFIED.value
+            if order_str in (None, OrderFacet.DEFAULT.value)
+            else order_str
+        )
+        effective_availability = (
+            AvailabilityFacet.PRODUCTION.value
+            if availability_str is None
+            else availability_str
+        )
+
+        def sort_link_url(facet):
+            params = {"order": facet.value}
+            if availability_str is not None:
+                params["availability"] = availability_str
+            return urlunparse(
+                parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
+            )
+
+        def avail_link_url(avail_value):
+            params = {}
+            if order_str is not None:
+                params["order"] = order_str
+            params["availability"] = avail_value
+            return urlunparse(
+                parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
+            )
+
+        # Build sort facet group.
+        sort_links = []
+        for facet in OrderFacet.advertised_facets():
+            properties = {self.FACET_VALUE_PROPERTY: facet.value}
+            if facet == OrderFacet.MODIFIED:
+                properties[self.FACET_DEFAULT_PROPERTY] = True
+            link: dict = {
+                "href": sort_link_url(facet),
+                "title": facet.label,
+                "type": self.OPDS_TYPE,
+                "properties": properties,
+            }
+            if facet.value == effective_order:
+                link["rel"] = "self"
+            sort_links.append(link)
+
+        # Build availability facet group.
+        avail_links = []
+        for facet in AvailabilityFacet.advertised_facets():
+            properties = {self.FACET_VALUE_PROPERTY: facet.value}
+            if facet == AvailabilityFacet.PRODUCTION:
+                properties[self.FACET_DEFAULT_PROPERTY] = True
+            link = {
+                "href": avail_link_url(facet.value),
+                "title": facet.label,
+                "type": self.OPDS_TYPE,
+                "properties": properties,
+            }
+            if facet.value == effective_availability:
+                link["rel"] = "self"
+            avail_links.append(link)
+
+        self.catalog["facets"] = [
+            {
+                "metadata": {
+                    "title": "Sort order",
+                    "type": self.SORT_FACET_TYPE,
+                    self.FACET_PARAM_PROPERTY: "order",
+                },
+                "links": sort_links,
+            },
+            {
+                "metadata": {
+                    "title": "Availability",
+                    "type": self.AVAILABILITY_FACET_TYPE,
+                    self.FACET_PARAM_PROPERTY: "availability",
+                },
+                "links": avail_links,
+            },
+        ]
 
     @classmethod
     def library_catalog(
