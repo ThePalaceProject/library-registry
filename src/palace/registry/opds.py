@@ -18,28 +18,56 @@ from palace.registry.sqlalchemy.model.resource import Validation
 from palace.registry.util.http import NormalizedMediaType
 
 
+class OrderFacetGroup(StrEnum):
+    """Group names for paired sort order variants."""
+
+    MODIFIED = "modified"
+    NAME = "name"
+
+
 class OrderFacet(StrEnum):
     """Sort order options for library feeds."""
 
     DEFAULT = "default"  # Alias for MODIFIED (reverse chronological).
     MODIFIED = "modified"  # Most recently modified first (reverse chronological).
-    NAME = "name"  # Alphabetical A-Z, word-by-word (dictionary order).
+    MODIFIED_ASC = "modified-asc"  # Least recently modified first (chronological).
+    NAME = "name"  # Alphabetical A-Z (case-insensitive).
+    NAME_DESC = "name-desc"  # Alphabetical Z-A (case-insensitive).
     NATURAL = "natural"  # Database natural order (no ORDER BY).
 
     @property
     def label(self) -> str:
         """Human-readable label for display in sort facet links."""
         return {
-            "default": "Default order",
-            "modified": "Most recently modified first",
-            "name": "Library name (A-Z)",
-            "natural": "Database order",
-        }[self.value]
+            OrderFacet.DEFAULT: "Default order",
+            OrderFacet.MODIFIED: "Most recently modified first",
+            OrderFacet.MODIFIED_ASC: "Least recently modified first",
+            OrderFacet.NAME: "Library name (A-Z)",
+            OrderFacet.NAME_DESC: "Library name (Z-A)",
+            OrderFacet.NATURAL: "Database order",
+        }[self]
+
+    @property
+    def group(self) -> OrderFacetGroup | None:
+        """Logical group name for paired sort variants, or None for singletons.
+
+        Group membership is directly asserted so that consumers don't need to
+        use a heuristic to determine that members (e.g. MODIFIED and MODIFIED_ASC)
+        are related to each other.
+        """
+        return {
+            OrderFacet.DEFAULT: OrderFacetGroup.MODIFIED,
+            OrderFacet.MODIFIED: OrderFacetGroup.MODIFIED,
+            OrderFacet.MODIFIED_ASC: OrderFacetGroup.MODIFIED,
+            OrderFacet.NAME: OrderFacetGroup.NAME,
+            OrderFacet.NAME_DESC: OrderFacetGroup.NAME,
+            OrderFacet.NATURAL: None,
+        }[self]
 
     @classmethod
     def advertised_facets(cls) -> list[OrderFacet]:
         """Sort orders to include in feed sort links (excludes the DEFAULT alias)."""
-        return [cls.MODIFIED, cls.NAME, cls.NATURAL]
+        return [cls.MODIFIED, cls.MODIFIED_ASC, cls.NAME, cls.NAME_DESC, cls.NATURAL]
 
     @property
     def sort_order_expressions(self) -> list:
@@ -50,9 +78,21 @@ class OrderFacet(StrEnum):
                 Library.name_sort_key().asc(),
                 Library.id.asc(),
             ]
+        elif self == self.MODIFIED_ASC:
+            return [
+                Library.timestamp.asc(),
+                Library.name_sort_key().asc(),
+                Library.id.asc(),
+            ]
         elif self == self.NAME:
             return [
                 Library.name_sort_key().asc(),
+                Library.timestamp.desc(),
+                Library.id.asc(),
+            ]
+        elif self == self.NAME_DESC:
+            return [
+                Library.name_sort_key().desc(),
                 Library.timestamp.desc(),
                 Library.id.asc(),
             ]
@@ -76,9 +116,11 @@ class AvailabilityFacet(StrEnum):
 
     @property
     def label(self) -> str:
-        return {"production": "Production", "hidden": "Hidden", "all": "All"}[
-            self.value
-        ]
+        return {
+            AvailabilityFacet.PRODUCTION: "Production",
+            AvailabilityFacet.HIDDEN: "Hidden",
+            AvailabilityFacet.ALL: "All: Production and Hidden",
+        }[self]
 
     @classmethod
     def advertised_facets(cls) -> list[AvailabilityFacet]:
@@ -114,14 +156,27 @@ class OPDSCatalog:
 
     CACHE_TIME = 3600 * 12
 
-    SORT_FACET_TYPE = "http://palaceproject.io/terms/rel/sort"
-    AVAILABILITY_FACET_TYPE = "http://palaceproject.io/terms/rel/availability"
-    FACET_DEFAULT_PROPERTY = "http://palaceproject.io/terms/facet/default"
-    FACET_PARAM_PROPERTY = "http://palaceproject.io/terms/facet/param"
-    FACET_VALUE_PROPERTY = "http://palaceproject.io/terms/facet/value"
-
     _NORMALIZED_OPDS2_TYPE = NormalizedMediaType(OPDS_TYPE)
     _NORMALIZED_OPDS1_TYPE = NormalizedMediaType(OPDS_1_TYPE)
+
+    # Together the following properties allow a client to fully introspect
+    # the feed's facet capabilities from a single page — all available facets,
+    # their query parameters and values, defaults, and groupings — without any
+    # prior knowledge of the API.
+
+    # Type URI identifying a sort-order facet group.
+    SORT_FACET_TYPE = "http://palaceproject.io/terms/rel/sort"
+    # Type URI identifying an availability facet group.
+    AVAILABILITY_FACET_TYPE = "http://palaceproject.io/terms/rel/availability"
+    # Facet link property: true when this facet is the implicit default selection.
+    FACET_DEFAULT_PROPERTY = "http://palaceproject.io/terms/facet/default"
+    # Facet group property: the query parameter name this group controls (e.g. "order").
+    # Combined with FACET_VALUE_PROPERTY on each link, clients can construct any facet URL.
+    FACET_PARAM_PROPERTY = "http://palaceproject.io/terms/facet/param"
+    # Facet link property: the query parameter value for this facet (e.g. "name").
+    FACET_VALUE_PROPERTY = "http://palaceproject.io/terms/facet/value"
+    # Facet link property: logical group name linking related sort variants (e.g. asc/desc).
+    FACET_GROUP_PROPERTY = "http://palaceproject.io/terms/facet/group"
 
     @classmethod
     def _strftime(cls, date):
@@ -347,6 +402,8 @@ class OPDSCatalog:
             properties = {self.FACET_VALUE_PROPERTY: facet.value}
             if facet == OrderFacet.MODIFIED:
                 properties[self.FACET_DEFAULT_PROPERTY] = True
+            if facet.group is not None:
+                properties[self.FACET_GROUP_PROPERTY] = facet.group
             link: dict = {
                 "href": sort_link_url(facet),
                 "title": facet.label,

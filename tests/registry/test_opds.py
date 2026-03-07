@@ -25,7 +25,9 @@ class TestOrderFacet:
         "facet, expected_count",
         [
             pytest.param(OrderFacet.MODIFIED, 3, id="modified"),
+            pytest.param(OrderFacet.MODIFIED_ASC, 3, id="modified-asc"),
             pytest.param(OrderFacet.NAME, 3, id="name"),
+            pytest.param(OrderFacet.NAME_DESC, 3, id="name-desc"),
             pytest.param(OrderFacet.NATURAL, 0, id="natural"),
             pytest.param(OrderFacet.DEFAULT, 3, id="default"),
         ],
@@ -39,12 +41,35 @@ class TestOrderFacet:
             str(e) for e in OrderFacet.MODIFIED.sort_order_expressions
         ]
 
+    @pytest.mark.parametrize(
+        "facet, expected_group",
+        [
+            pytest.param(OrderFacet.MODIFIED, "modified", id="modified"),
+            pytest.param(OrderFacet.MODIFIED_ASC, "modified", id="modified-asc"),
+            pytest.param(OrderFacet.NAME, "name", id="name"),
+            pytest.param(OrderFacet.NAME_DESC, "name", id="name-desc"),
+            pytest.param(OrderFacet.NATURAL, None, id="natural-singleton"),
+            pytest.param(OrderFacet.DEFAULT, "modified", id="default-alias"),
+        ],
+    )
+    def test_group(self, facet, expected_group):
+        assert facet.group == expected_group
+
+    def test_advertised_facets(self):
+        assert OrderFacet.advertised_facets() == [
+            OrderFacet.MODIFIED,
+            OrderFacet.MODIFIED_ASC,
+            OrderFacet.NAME,
+            OrderFacet.NAME_DESC,
+            OrderFacet.NATURAL,
+        ]
+
 
 class TestAvailabilityFacet:
     def test_labels(self):
         assert AvailabilityFacet.PRODUCTION.label == "Production"
         assert AvailabilityFacet.HIDDEN.label == "Hidden"
-        assert AvailabilityFacet.ALL.label == "All"
+        assert AvailabilityFacet.ALL.label == "All: Production and Hidden"
 
     def test_advertised_facets(self):
         facets = AvailabilityFacet.advertised_facets()
@@ -84,8 +109,8 @@ class TestAddFacets:
 
     def test_sort_facet_counts(self):
         cat = self._make_catalog()
-        # advertised_facets returns [MODIFIED, NAME, NATURAL]
-        assert len(cat["facets"][0]["links"]) == 3
+        # advertised_facets returns [MODIFIED, MODIFIED_ASC, NAME, NAME_DESC, NATURAL]
+        assert len(cat["facets"][0]["links"]) == 5
 
     def test_availability_facet_counts(self):
         cat = self._make_catalog()
@@ -104,7 +129,9 @@ class TestAddFacets:
                 id="explicit-defaults",
             ),
             pytest.param("name", "hidden", "name", "Hidden", id="non-defaults"),
-            pytest.param("name", "all", "name", "All", id="all-avail"),
+            pytest.param(
+                "name", "all", "name", "All: Production and Hidden", id="all-avail"
+            ),
         ],
     )
     def test_active_facet_has_rel_self(
@@ -215,6 +242,47 @@ class TestAddFacets:
         for link in sort_links:
             assert "availability=production,hidden" in link["href"]
             assert "%2C" not in link["href"]
+
+    def test_paired_sort_links_have_group_property(self):
+        """Paired sort variants share a group property; singletons omit it."""
+        cat = self._make_catalog()
+        sort_links = cat["facets"][0]["links"]
+        links_by_value = {
+            l["properties"][OPDSCatalog.FACET_VALUE_PROPERTY]: l for l in sort_links
+        }
+
+        # Paired variants share their group name.
+        assert (
+            links_by_value["modified"]["properties"][OPDSCatalog.FACET_GROUP_PROPERTY]
+            == "modified"
+        )
+        assert (
+            links_by_value["modified-asc"]["properties"][
+                OPDSCatalog.FACET_GROUP_PROPERTY
+            ]
+            == "modified"
+        )
+        assert (
+            links_by_value["name"]["properties"][OPDSCatalog.FACET_GROUP_PROPERTY]
+            == "name"
+        )
+        assert (
+            links_by_value["name-desc"]["properties"][OPDSCatalog.FACET_GROUP_PROPERTY]
+            == "name"
+        )
+
+        # Singleton has no group property.
+        assert (
+            OPDSCatalog.FACET_GROUP_PROPERTY
+            not in links_by_value["natural"]["properties"]
+        )
+
+    def test_availability_links_have_no_group_property(self):
+        """Availability facet links do not carry a group property."""
+        cat = self._make_catalog()
+        avail_links = cat["facets"][1]["links"]
+        for link in avail_links:
+            assert OPDSCatalog.FACET_GROUP_PROPERTY not in link["properties"]
 
     def test_facet_group_metadata_has_param(self):
         """Each facet group's metadata carries the query parameter name."""

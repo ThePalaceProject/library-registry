@@ -2559,7 +2559,7 @@ class TestLibraryRegistryController:
         # Active availability link is "all" and carries rel="self".
         active_avail = [l for l in avail_group["links"] if l.get("rel") == "self"]
         assert len(active_avail) == 1
-        assert active_avail[0]["title"] == "All"
+        assert active_avail[0]["title"] == "All: Production and Hidden"
         assert active_avail[0]["properties"][OPDSCatalog.FACET_VALUE_PROPERTY] == "all"
 
         # Default facets carry the default property but NOT rel="self".
