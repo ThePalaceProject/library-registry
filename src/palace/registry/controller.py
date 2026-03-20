@@ -22,7 +22,7 @@ from palace.registry.config import (
     Configuration,
 )
 from palace.registry.emailer import Emailer
-from palace.registry.opds import Annotator, OPDSCatalog, OrderFacet
+from palace.registry.opds import Annotator, AvailabilityFacet, OPDSCatalog, OrderFacet
 from palace.registry.pagination import Pagination
 from palace.registry.problem_details import (
     AUTHENTICATION_FAILURE,
@@ -341,13 +341,20 @@ class LibraryRegistryController(BaseController):
         self.log.info("Built library catalog in %.2fsec" % (b - a))
         return catalog_response(catalog)
 
-    def libraries_opds_crawlable(self, live=True):
+    def libraries_opds_crawlable(self):
         """Return paginated libraries in OPDS format for crawlers.
 
-        :param live: If True, only production libraries are shown.
+        Query parameters:
+          - order: Sort order (default: modified). See OrderFacet.
+          - availability: Comma-separated availability filter (default: production).
+            Named values: production, hidden, all.
+            Comma-separated combinations (e.g. production,hidden) are also accepted
+            but not advertised in facets; prefer "all" for the full non-cancelled set.
+          - offset, size: Pagination.
+
         :return: Flask Response with OPDS 2.0 JSON catalog.
         """
-        # Parse order parameter; absent means default (modified DESC).
+        # Parse ?order= — absent means default (modified DESC).
         order_str = flask.request.args.get("order")
         try:
             order = (
@@ -358,10 +365,20 @@ class LibraryRegistryController(BaseController):
                 f"I don't know how to order a feed by '{order_str}'", 400
             )
 
-        # Build query with stage filtering and requested ordering.
+        # Parse ?availability= — absent defaults to production.
+        availability_str = flask.request.args.get("availability")
+        raw_values = availability_str.split(",") if availability_str else ["production"]
+        try:
+            availability = frozenset(AvailabilityFacet(v.strip()) for v in raw_values)
+        except ValueError as e:
+            return INVALID_INPUT.detailed(str(e), 400)
+        if not availability:
+            return INVALID_INPUT.detailed("availability must not be empty", 400)
+
+        # Build query with availability filtering and requested ordering.
         query = (
             self._db.query(Library)
-            .filter(Library._feed_restriction(production=live))
+            .filter(Library._availability_restriction(availability))
             .order_by(*order.sort_order_expressions)
         )
 
@@ -380,20 +397,21 @@ class LibraryRegistryController(BaseController):
 
         self.log.info(
             f"Fetched {len(libraries)} of {pagination.total_count} libraries "
-            f"(offset={pagination.offset}, size={pagination.size}, order={order_str or 'default'})"
+            f"(offset={pagination.offset}, size={pagination.size}, "
+            f"order={order_str or 'default'}, availability={availability_str or 'production'})"
         )
 
-        # Build OPDS catalog with pagination links.
+        # Build OPDS catalog with pagination links and facets.
         catalog = OPDSCatalog(
             self._db,
             "Libraries",
             flask.request.url,
             libraries,
             annotator=self.annotator,
-            live=live,
             pagination=pagination,
             has_next_page=has_next,
             order=order_str,
+            availability=availability_str,
         )
 
         return catalog_response(catalog)

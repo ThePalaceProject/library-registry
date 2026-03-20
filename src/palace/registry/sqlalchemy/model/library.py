@@ -460,6 +460,39 @@ class Library(Base):
             )
 
     @classmethod
+    def _availability_restriction(cls, availability: frozenset):
+        """Return a filter for libraries matching any of the given availability values.
+
+        :param availability: A frozenset of AvailabilityFacet values (or equivalent strings).
+            Named values: "production" (both stages PRODUCTION), "hidden" (neither cancelled,
+            at least one TESTING), "all" (any non-cancelled — short-circuits the others).
+            Multiple values are OR'd, so frozenset({"production", "hidden"}) is equivalent
+            to frozenset({"all"}).
+        """
+        prod = cls.PRODUCTION_STAGE
+        test = cls.TESTING_STAGE
+        conditions = []
+        if "all" in availability:
+            # All non-cancelled: both stages must be production or testing.
+            return and_(
+                cls.library_stage.in_([prod, test]),
+                cls.registry_stage.in_([prod, test]),
+            )
+        if "production" in availability:
+            conditions.append(
+                and_(cls.library_stage == prod, cls.registry_stage == prod)
+            )
+        if "hidden" in availability:
+            conditions.append(
+                and_(
+                    cls.library_stage.in_([prod, test]),
+                    cls.registry_stage.in_([prod, test]),
+                    or_(cls.library_stage == test, cls.registry_stage == test),
+                )
+            )
+        return or_(*conditions) if len(conditions) > 1 else conditions[0]
+
+    @classmethod
     def relevant(cls, _db, target, language, audiences=None, production=True):
         """Find libraries that are most relevant for a user.
 

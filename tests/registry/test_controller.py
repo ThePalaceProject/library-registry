@@ -2428,13 +2428,12 @@ class TestLibraryRegistryController:
             names = [lib["metadata"]["title"] for lib in test_libs]
             assert names == ["aardvark", "Apple", "Banana", "zebra"]
 
-    def test_libraries_opds_crawlable_qa(
+    def test_libraries_opds_crawlable_availability_combo(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
     ):
-        """Test QA crawlable feed includes testing libraries."""
+        """availability=all includes both production and testing libraries."""
         fixture = registry_controller_fixture
 
-        # Create testing library.
         test_lib = fixture.db.library(
             name="Testing Library",
             short_name="test_lib",
@@ -2443,24 +2442,147 @@ class TestLibraryRegistryController:
         )
         fixture.db.session.flush()
 
-        # Production feed should not include testing library.
+        # Production-only feed (default) should not include testing library.
         with fixture.app.test_request_context("/libraries/crawlable"):
-            response = fixture.controller.libraries_opds_crawlable(live=True)
+            response = fixture.controller.libraries_opds_crawlable()
             catalog = json.loads(response.data)
             titles = [cat["metadata"]["title"] for cat in catalog["catalogs"]]
             assert "Testing Library" not in titles
             prod_count = catalog["metadata"]["numberOfItems"]
 
-        # QA feed should include testing library.
-        with fixture.app.test_request_context("/libraries/qa/crawlable"):
-            response = fixture.controller.libraries_opds_crawlable(live=False)
+        # availability=all should include testing library.
+        with fixture.app.test_request_context("/libraries/crawlable?availability=all"):
+            response = fixture.controller.libraries_opds_crawlable()
             catalog = json.loads(response.data)
             titles = [cat["metadata"]["title"] for cat in catalog["catalogs"]]
             assert "Testing Library" in titles
+            all_count = catalog["metadata"]["numberOfItems"]
+            assert all_count == prod_count + 1
 
-            # QA feed should have more libraries than production.
-            qa_count = catalog["metadata"]["numberOfItems"]
-            assert qa_count == prod_count + 1
+    @pytest.mark.parametrize(
+        "availability_param",
+        [
+            pytest.param("all", id="all"),
+            pytest.param("production,hidden", id="production-hidden-combo"),
+            pytest.param("hidden,production", id="hidden-production-combo"),
+        ],
+    )
+    def test_libraries_opds_crawlable_availability_all_equivalent(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        availability_param: str,
+    ):
+        """'all' and comma-separated 'production,hidden' return the same libraries."""
+        fixture = registry_controller_fixture
+        fixture.db.library(
+            name="Testing Library",
+            short_name="test_avail_lib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+        )
+        fixture.db.session.flush()
+
+        with fixture.app.test_request_context(
+            f"/libraries/crawlable?availability={availability_param}"
+        ):
+            response = fixture.controller.libraries_opds_crawlable()
+            catalog = json.loads(response.data)
+
+        titles = [cat["metadata"]["title"] for cat in catalog["catalogs"]]
+        assert "Testing Library" in titles
+        # The three default fixture production libraries are also included.
+        assert catalog["metadata"]["numberOfItems"] == 4
+
+    def test_libraries_opds_crawlable_availability_hidden(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ):
+        """availability=hidden returns only testing-stage libraries."""
+        fixture = registry_controller_fixture
+
+        # All fixture libraries are production; add one testing library.
+        fixture.db.library(
+            name="Hidden Library",
+            short_name="hidden_lib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+        )
+        # Also add a mixed-stage library (registry says testing, library says production).
+        fixture.db.library(
+            name="Mixed Library",
+            short_name="mixed_lib",
+            library_stage=Library.PRODUCTION_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+        )
+        fixture.db.session.flush()
+
+        with fixture.app.test_request_context(
+            "/libraries/crawlable?availability=hidden"
+        ):
+            response = fixture.controller.libraries_opds_crawlable()
+            catalog = json.loads(response.data)
+            titles = [cat["metadata"]["title"] for cat in catalog["catalogs"]]
+            assert "Hidden Library" in titles
+            assert "Mixed Library" in titles
+            assert catalog["metadata"]["numberOfItems"] == 2
+
+    def test_libraries_opds_crawlable_facets(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ):
+        """Crawlable feed includes facet groups for sort and availability."""
+        fixture = registry_controller_fixture
+        with fixture.app.test_request_context(
+            "/libraries/crawlable?order=name&availability=all"
+        ):
+            response = fixture.controller.libraries_opds_crawlable()
+            catalog = json.loads(response.data)
+
+        assert "facets" in catalog
+        facets = catalog["facets"]
+        assert len(facets) == 2
+
+        sort_group, avail_group = facets
+        assert sort_group["metadata"]["title"] == "Sort by"
+        assert avail_group["metadata"]["title"] == "Availability"
+
+        # Facet group metadata carries the query parameter name.
+        assert sort_group["metadata"][OPDSCatalog.FACET_PARAM_PROPERTY] == "order"
+        assert (
+            avail_group["metadata"][OPDSCatalog.FACET_PARAM_PROPERTY] == "availability"
+        )
+
+        # Active sort link is "name" and carries rel="self".
+        active_sort = [l for l in sort_group["links"] if l.get("rel") == "self"]
+        assert len(active_sort) == 1
+        assert active_sort[0]["title"] == "Library name (A-Z)"
+        assert active_sort[0]["properties"][OPDSCatalog.FACET_VALUE_PROPERTY] == "name"
+
+        # Active availability link is "all" and carries rel="self".
+        active_avail = [l for l in avail_group["links"] if l.get("rel") == "self"]
+        assert len(active_avail) == 1
+        assert active_avail[0]["title"] == "All: Production and Hidden"
+        assert active_avail[0]["properties"][OPDSCatalog.FACET_VALUE_PROPERTY] == "all"
+
+        # Default facets carry the default property but NOT rel="self".
+        default_sort = [
+            l
+            for l in sort_group["links"]
+            if l.get("properties", {}).get(OPDSCatalog.PALACE_PROPERTIES_DEFAULT)
+        ]
+        assert len(default_sort) == 1
+        assert (
+            default_sort[0].get("rel") != "self"
+        )  # modified is default but not active
+
+    def test_libraries_opds_crawlable_invalid_availability(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ):
+        """Invalid availability value returns 400."""
+        fixture = registry_controller_fixture
+        with fixture.app.test_request_context(
+            "/libraries/crawlable?availability=bogus"
+        ):
+            response = fixture.controller.libraries_opds_crawlable()
+        assert response.status_code == 400
 
 
 class TestValidationController:
