@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from enum import StrEnum
+from typing import ClassVar
 from urllib.parse import quote, urlencode, urlparse, urlunparse
 
 import flask
@@ -34,6 +35,9 @@ class OrderFacet(StrEnum):
     NAME = "name"  # Alphabetical A-Z (case-insensitive).
     NAME_DESC = "name-desc"  # Alphabetical Z-A (case-insensitive).
     NATURAL = "natural"  # Database natural order (no ORDER BY).
+
+    # The URL query parameter used to pass this facet.
+    _QUERY_PARAM: ClassVar[str] = "order"
 
     @property
     def label(self) -> str:
@@ -113,6 +117,9 @@ class AvailabilityFacet(StrEnum):
     PRODUCTION = "production"  # Both stages must be PRODUCTION.
     HIDDEN = "hidden"  # At least one stage is TESTING, none CANCELLED.
     ALL = "all"  # All non-cancelled libraries (production or hidden).
+
+    # The URL query parameter used to pass this facet.
+    _QUERY_PARAM: ClassVar[str] = "availability"
 
     @property
     def label(self) -> str:
@@ -311,9 +318,9 @@ class OPDSCatalog:
         def paginated_url(page):
             params = {"offset": page.offset, "size": page.size}
             if order is not None:
-                params["order"] = order
+                params[OrderFacet._QUERY_PARAM] = order
             if availability is not None:
-                params["availability"] = availability
+                params[AvailabilityFacet._QUERY_PARAM] = availability
             return urlunparse(
                 parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
             )
@@ -381,9 +388,9 @@ class OPDSCatalog:
         )
 
         def sort_link_url(facet):
-            params = {"order": facet.value}
+            params = {OrderFacet._QUERY_PARAM: facet.value}
             if availability_str is not None:
-                params["availability"] = availability_str
+                params[AvailabilityFacet._QUERY_PARAM] = availability_str
             return urlunparse(
                 parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
             )
@@ -391,8 +398,8 @@ class OPDSCatalog:
         def avail_link_url(avail_value):
             params = {}
             if order_str is not None:
-                params["order"] = order_str
-            params["availability"] = avail_value
+                params[OrderFacet._QUERY_PARAM] = order_str
+            params[AvailabilityFacet._QUERY_PARAM] = avail_value
             return urlunparse(
                 parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
             )
@@ -436,7 +443,7 @@ class OPDSCatalog:
                 "metadata": {
                     "title": "Sort by",
                     "@type": self.SORT_FACET_TYPE,
-                    self.FACET_PARAM_PROPERTY: "order",
+                    self.FACET_PARAM_PROPERTY: OrderFacet._QUERY_PARAM,
                 },
                 "links": sort_links,
             },
@@ -444,7 +451,7 @@ class OPDSCatalog:
                 "metadata": {
                     "title": "Availability",
                     "@type": self.AVAILABILITY_FACET_TYPE,
-                    self.FACET_PARAM_PROPERTY: "availability",
+                    self.FACET_PARAM_PROPERTY: AvailabilityFacet._QUERY_PARAM,
                 },
                 "links": avail_links,
             },
