@@ -2566,7 +2566,7 @@ class TestLibraryRegistryController:
         default_sort = [
             l
             for l in sort_group["links"]
-            if l.get("properties", {}).get(OPDSCatalog.FACET_DEFAULT_PROPERTY)
+            if l.get("properties", {}).get(OPDSCatalog.PALACE_PROPERTIES_DEFAULT)
         ]
         assert len(default_sort) == 1
         assert (

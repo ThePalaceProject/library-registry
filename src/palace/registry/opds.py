@@ -164,12 +164,13 @@ class OPDSCatalog:
     # their query parameters and values, defaults, and groupings — without any
     # prior knowledge of the API.
 
+    # A general use property marking the current entity as the default within a group.
+    PALACE_PROPERTIES_DEFAULT = "http://palaceproject.io/terms/properties/default"
+
     # Type URI identifying a sort-order facet group.
     SORT_FACET_TYPE = "http://palaceproject.io/terms/rel/sort"
     # Type URI identifying an availability facet group.
     AVAILABILITY_FACET_TYPE = "http://palaceproject.io/terms/rel/availability"
-    # Facet link property: true when this facet is the implicit default selection.
-    FACET_DEFAULT_PROPERTY = "http://palaceproject.io/terms/facet/default"
     # Facet group property: the query parameter name this group controls (e.g. "order").
     # Combined with FACET_VALUE_PROPERTY on each link, clients can construct any facet URL.
     FACET_PARAM_PROPERTY = "http://palaceproject.io/terms/facet/param"
@@ -401,7 +402,7 @@ class OPDSCatalog:
         for facet in OrderFacet.advertised_facets():
             properties = {self.FACET_VALUE_PROPERTY: facet.value}
             if facet == OrderFacet.MODIFIED:
-                properties[self.FACET_DEFAULT_PROPERTY] = True
+                properties[self.PALACE_PROPERTIES_DEFAULT] = True
             if facet.group is not None:
                 properties[self.FACET_GROUP_PROPERTY] = facet.group
             link: dict = {
@@ -419,7 +420,7 @@ class OPDSCatalog:
         for facet in AvailabilityFacet.advertised_facets():
             properties = {self.FACET_VALUE_PROPERTY: facet.value}
             if facet == AvailabilityFacet.PRODUCTION:
-                properties[self.FACET_DEFAULT_PROPERTY] = True
+                properties[self.PALACE_PROPERTIES_DEFAULT] = True
             link = {
                 "href": avail_link_url(facet.value),
                 "title": facet.label,
@@ -433,8 +434,8 @@ class OPDSCatalog:
         self.catalog["facets"] = [
             {
                 "metadata": {
-                    "title": "Sort order",
-                    "type": self.SORT_FACET_TYPE,
+                    "title": "Sort by",
+                    "@type": self.SORT_FACET_TYPE,
                     self.FACET_PARAM_PROPERTY: "order",
                 },
                 "links": sort_links,
@@ -442,7 +443,7 @@ class OPDSCatalog:
             {
                 "metadata": {
                     "title": "Availability",
-                    "type": self.AVAILABILITY_FACET_TYPE,
+                    "@type": self.AVAILABILITY_FACET_TYPE,
                     self.FACET_PARAM_PROPERTY: "availability",
                 },
                 "links": avail_links,

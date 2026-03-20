@@ -162,7 +162,7 @@ class TestAddFacets:
         default_sort = [
             l
             for l in sort_links
-            if l.get("properties", {}).get(OPDSCatalog.FACET_DEFAULT_PROPERTY)
+            if l.get("properties", {}).get(OPDSCatalog.PALACE_PROPERTIES_DEFAULT)
         ]
         assert len(default_sort) == 1
         assert default_sort[0]["title"] == OrderFacet.MODIFIED.label
@@ -170,7 +170,7 @@ class TestAddFacets:
         default_avail = [
             l
             for l in avail_links
-            if l.get("properties", {}).get(OPDSCatalog.FACET_DEFAULT_PROPERTY)
+            if l.get("properties", {}).get(OPDSCatalog.PALACE_PROPERTIES_DEFAULT)
         ]
         assert len(default_avail) == 1
         assert default_avail[0]["title"] == "Production"
@@ -184,7 +184,9 @@ class TestAddFacets:
         modified_link = next(l for l in sort_links if "modified" in l["href"])
         assert modified_link.get("rel") == "self"
         assert (
-            modified_link.get("properties", {}).get(OPDSCatalog.FACET_DEFAULT_PROPERTY)
+            modified_link.get("properties", {}).get(
+                OPDSCatalog.PALACE_PROPERTIES_DEFAULT
+            )
             is True
         )
 
@@ -192,7 +194,7 @@ class TestAddFacets:
         assert production_link.get("rel") == "self"
         assert (
             production_link.get("properties", {}).get(
-                OPDSCatalog.FACET_DEFAULT_PROPERTY
+                OPDSCatalog.PALACE_PROPERTIES_DEFAULT
             )
             is True
         )
