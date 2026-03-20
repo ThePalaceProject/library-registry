@@ -102,10 +102,10 @@ class TestAddFacets:
         cat = self._make_catalog()
         facets = cat["facets"]
         assert len(facets) == 2
-        assert facets[0]["metadata"]["title"] == "Sort order"
-        assert facets[0]["metadata"]["type"] == OPDSCatalog.SORT_FACET_TYPE
+        assert facets[0]["metadata"]["title"] == "Sort by"
+        assert facets[0]["metadata"]["@type"] == OPDSCatalog.SORT_FACET_TYPE
         assert facets[1]["metadata"]["title"] == "Availability"
-        assert facets[1]["metadata"]["type"] == OPDSCatalog.AVAILABILITY_FACET_TYPE
+        assert facets[1]["metadata"]["@type"] == OPDSCatalog.AVAILABILITY_FACET_TYPE
 
     def test_sort_facet_counts(self):
         cat = self._make_catalog()

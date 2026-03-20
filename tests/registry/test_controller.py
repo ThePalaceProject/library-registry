@@ -2541,7 +2541,7 @@ class TestLibraryRegistryController:
         assert len(facets) == 2
 
         sort_group, avail_group = facets
-        assert sort_group["metadata"]["title"] == "Sort order"
+        assert sort_group["metadata"]["title"] == "Sort by"
         assert avail_group["metadata"]["title"] == "Availability"
 
         # Facet group metadata carries the query parameter name.
