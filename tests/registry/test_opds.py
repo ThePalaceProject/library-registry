@@ -312,6 +312,13 @@ class TestAddFacets:
 
 
 class TestOPDSCatalog:
+    def test_strftime_format(self):
+        """_strftime produces dates in the expected ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ."""
+        aware = datetime.datetime(2024, 3, 15, 10, 30, 0, tzinfo=datetime.UTC)
+        result = OPDSCatalog._strftime(aware)
+        # Raises ValueError if the format doesn't match exactly.
+        datetime.datetime.strptime(result, "%Y-%m-%dT%H:%M:%SZ")
+
     def mock_url_for(self, route, uuid, **kwargs):
         """A simple replacement for url_for that doesn't require an
         application context.
