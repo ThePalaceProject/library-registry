@@ -150,7 +150,7 @@ class OPDSCatalog:
     have the same semantics as in the overall OPDS 2 Catalog spec.
     """
 
-    TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ%z"
+    TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
     OPDS_TYPE = "application/opds+json"
     OPDS_1_TYPE = "application/atom+xml;profile=opds-catalog;kind=acquisition"

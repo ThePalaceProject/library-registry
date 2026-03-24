@@ -511,6 +511,13 @@ class TestLibraryRegistryController:
             assert self_link["rel"] == "self"
             assert self_link["type"] == OPDSCatalog.OPDS_TYPE
 
+            # Verify all library timestamps are in the expected ISO 8601 format.
+            for entry in catalog["catalogs"]:
+                for key in ("modified", "updated"):
+                    datetime.datetime.strptime(
+                        entry["metadata"][key], "%Y-%m-%dT%H:%M:%SZ"
+                    )
+
     def test_library_details(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
     ):
@@ -2348,6 +2355,13 @@ class TestLibraryRegistryController:
             assert "last" in links
             assert "next" not in links  # No next page (all results fit in one page).
             assert "previous" not in links  # First page has no previous.
+
+            # Verify all library timestamps are in the expected ISO 8601 format.
+            for entry in catalog["catalogs"]:
+                for key in ("modified", "updated"):
+                    datetime.datetime.strptime(
+                        entry["metadata"][key], "%Y-%m-%dT%H:%M:%SZ"
+                    )
 
     def test_libraries_opds_crawlable_pagination(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
