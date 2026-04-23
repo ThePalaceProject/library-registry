@@ -3,7 +3,6 @@ import logging
 import os
 import time
 from smtplib import SMTPException
-from urllib.parse import unquote
 
 import flask
 from Crypto.Cipher import PKCS1_OAEP
@@ -35,6 +34,7 @@ from palace.registry.problem_details import (
     UNABLE_TO_NOTIFY,
 )
 from palace.registry.registrar import LibraryRegistrar
+from palace.registry.route_links import RouteLinkRegistry
 from palace.registry.sqlalchemy.model.admin import Admin
 from palace.registry.sqlalchemy.model.configuration_setting import ConfigurationSetting
 from palace.registry.sqlalchemy.model.hyperlink import Hyperlink
@@ -59,8 +59,13 @@ OPDS_CATALOG_REGISTRATION_MEDIA_TYPE = (
 
 
 class LibraryRegistry:
-    def __init__(self, _db=None, testing=False, emailer_class=Emailer):
-
+    def __init__(
+        self,
+        _db=None,
+        testing=False,
+        emailer_class=Emailer,
+        route_links: RouteLinkRegistry | None = None,
+    ):
         self.log = logging.getLogger("Library registry web app")
 
         if _db is None and not testing:
@@ -68,6 +73,9 @@ class LibraryRegistry:
         self._db = _db
 
         self.testing = testing
+        self.route_links = (
+            route_links if route_links is not None else RouteLinkRegistry()
+        )
 
         self.setup_controllers(emailer_class)
 
@@ -98,31 +106,8 @@ class LibraryRegistryAnnotator(Annotator):
 
     def annotate_catalog(self, catalog, live=True):
         """Add links and metadata to every catalog."""
-        if live:
-            search_controller = "search"
-        else:
-            search_controller = "search_qa"
-        search_url = self.app.url_for(search_controller)
-        catalog.add_link_to_catalog(
-            catalog.catalog, href=search_url, rel="search", type=OPENSEARCH_MEDIA_TYPE
-        )
-        register_url = self.app.url_for("register")
-        catalog.add_link_to_catalog(
-            catalog.catalog,
-            href=register_url,
-            rel="register",
-            type=OPDS_CATALOG_REGISTRATION_MEDIA_TYPE,
-        )
-
-        # Add a templated link for getting a single library's entry.
-        library_url = unquote(self.app.url_for("library", uuid="{uuid}"))
-        catalog.add_link_to_catalog(
-            catalog.catalog,
-            href=library_url,
-            rel="http://librarysimplified.org/rel/registry/library",
-            type=OPDSCatalog.OPDS_TYPE,
-            templated=True,
-        )
+        for link in self.app.route_links.links(self.app.url_for, production_only=live):
+            catalog.add_link_to_catalog(catalog.catalog, **link)
 
         vendor_id, ignore, ignore = Configuration.vendor_id(self.app._db)
         catalog.catalog["metadata"]["adobe_vendor_id"] = vendor_id

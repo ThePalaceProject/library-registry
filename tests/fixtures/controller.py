@@ -40,7 +40,7 @@ class ControllerSetupFixture:
     def setup(
         self, do_setup: Callable[["ControllerFixture"], Any] = lambda x: None
     ) -> "ControllerFixture":
-        from app import app, set_secret_key
+        from app import app, route_links, set_secret_key
 
         fixture = ControllerFixture(self)
         ConfigurationSetting.sitewide(
@@ -56,7 +56,10 @@ class ControllerSetupFixture:
 
         fixture.app = app
         fixture.library_registry = MockLibraryRegistry(
-            self.db.session, testing=True, emailer_class=MockEmailer
+            self.db.session,
+            testing=True,
+            emailer_class=MockEmailer,
+            route_links=route_links,
         )
         fixture.app.library_registry = fixture.library_registry
         fixture.http_client = DummyHTTPClient()
