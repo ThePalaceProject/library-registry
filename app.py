@@ -135,6 +135,7 @@ def confirm_resource(resource_id, secret):
 
 
 @app.route("/libraries")
+@route_links.register(rel="complete", type=OPDSCatalog.OPDS_TYPE, production_only=True)
 @compressible
 @returns_problem_detail
 def libraries_opds():
@@ -142,6 +143,7 @@ def libraries_opds():
 
 
 @app.route("/libraries/qa")
+@route_links.register(rel="complete", type=OPDSCatalog.OPDS_TYPE, production_only=False)
 @compressible
 @returns_problem_detail
 def libraries_qa():
@@ -149,6 +151,7 @@ def libraries_qa():
 
 
 @app.route("/libraries/crawlable")
+@route_links.register(rel="paged", type=OPDSCatalog.OPDS_TYPE)
 @compressible
 @returns_problem_detail
 def libraries_crawlable():

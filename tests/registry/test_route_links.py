@@ -148,6 +148,16 @@ class TestRouteLinkRegistryApp:
                         "type": OPENSEARCH_MEDIA_TYPE,
                     },
                     {
+                        "href": "http://localhost/libraries",
+                        "rel": "current",
+                        "type": OPDSCatalog.OPDS_TYPE,
+                    },
+                    {
+                        "href": "http://localhost/libraries/crawlable",
+                        "rel": "paged",
+                        "type": OPDSCatalog.OPDS_TYPE,
+                    },
+                    {
                         "href": "http://localhost/library/{uuid}",
                         "rel": "http://librarysimplified.org/rel/registry/library",
                         "type": OPDSCatalog.OPDS_TYPE,
@@ -168,6 +178,16 @@ class TestRouteLinkRegistryApp:
                         "href": "http://localhost/qa/search",
                         "rel": "search",
                         "type": OPENSEARCH_MEDIA_TYPE,
+                    },
+                    {
+                        "href": "http://localhost/libraries/qa",
+                        "rel": "current",
+                        "type": OPDSCatalog.OPDS_TYPE,
+                    },
+                    {
+                        "href": "http://localhost/libraries/crawlable",
+                        "rel": "paged",
+                        "type": OPDSCatalog.OPDS_TYPE,
                     },
                     {
                         "href": "http://localhost/library/{uuid}",
