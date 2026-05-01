@@ -19,7 +19,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Poetry
-        uses: ThePalaceProject/circulation/.github/actions/poetry@main
+        uses: ThePalaceProject/github-actions/poetry@v1
         with:
           version: "2.2.1"
 
