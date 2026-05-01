@@ -10,7 +10,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Sync release to Jira
-        uses: ThePalaceProject/circulation/.github/actions/jira-release-sync@main
+        uses: ThePalaceProject/github-actions/jira-release-sync@v1
         with:
           jira-base-url: ${{ secrets.JIRA_BASE_URL }}
           jira-user-email: ${{ secrets.JIRA_USER_EMAIL }}
