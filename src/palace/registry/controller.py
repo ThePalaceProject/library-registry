@@ -289,29 +289,82 @@ class LibraryRegistryController(BaseController):
             joinedload("hyperlinks", "resource", "validation"),
         ]
 
-    def libraries_opds(self, live: bool = True) -> OPDSCatalog:
+    def libraries_opds(self, from_deprecated_qa: bool = False) -> OPDSCatalog:
         """Return all the libraries in OPDS format.
 
-        When `live` is True, only production libraries are included; otherwise
-        both production and testing libraries are included. Canceled libraries
-        should never be included in the client feed.
+        The normal path supports ``?order=`` and ``?availability=`` query parameters
+        and includes OPDS 2.0 facet groups.  The default sort order is library name
+        ascending; the default availability filter is production-only.
 
-        :param live: If this is True, then only production libraries are shown.
-        :return: An OPDS catalog containing production and possibly testing libraries.
+        The deprecated QA path (``from_deprecated_qa=True``) returns all non-cancelled
+        libraries in alphabetical order without facets or query-parameter support.
+        It exists solely to back the legacy ``/libraries/qa`` route.
+
+        :param from_deprecated_qa: Set to True only by the deprecated ``/libraries/qa`` route.
+        :return: An OPDS catalog response.
         """
-        alphabetical = self._db.query(Library).order_by(Library.name_sort_key())
+        if from_deprecated_qa:
+            # Legacy /libraries/qa path — preserved unchanged.
+            query = (
+                self._db.query(Library)
+                .filter(Library._feed_restriction(production=False))
+                .order_by(Library.name_sort_key())
+                .options(*self._hyperlink_load_options())
+            )
+            a = time.time()
+            libraries = query.all()
+            b = time.time()
+            self.log.info("Built QA library list in %.2fsec" % (b - a))
+            a = time.time()
+            catalog = OPDSCatalog(
+                self._db,
+                "Libraries",
+                flask.request.url,
+                libraries,
+                annotator=self.annotator,
+                live=False,
+            )
+            b = time.time()
+            self.log.info("Built QA library catalog in %.2fsec" % (b - a))
+            return catalog_response(catalog)
 
-        # We always want to filter out cancelled libraries.  If live, we also filter out
-        # libraries that are in the testing stage, i.e. only show production libraries.
-        alphabetical = alphabetical.filter(Library._feed_restriction(production=live))
+        # Parse ?order= — default for this feed is name (A-Z).
+        order_str = flask.request.args.get("order")
+        try:
+            order = (
+                OrderFacet.NAME
+                if order_str in (None, OrderFacet.DEFAULT.value)
+                else OrderFacet(order_str)
+            )
+        except ValueError:
+            return INVALID_INPUT.detailed(
+                f"I don't know how to order a feed by '{order_str}'", 400
+            )
 
-        # Pick up each library's hyperlinks and validation information; this will
-        # save database queries when building the feed.
-        alphabetical = alphabetical.options(*self._hyperlink_load_options())
+        # Parse ?availability= — absent defaults to production.
+        availability_str = flask.request.args.get("availability")
+        raw_values = availability_str.split(",") if availability_str else ["production"]
+        try:
+            availability = frozenset(AvailabilityFacet(v.strip()) for v in raw_values)
+        except ValueError as e:
+            return INVALID_INPUT.detailed(str(e), 400)
+        if not availability:
+            return INVALID_INPUT.detailed("availability must not be empty", 400)
+
+        query = (
+            self._db.query(Library)
+            .filter(Library._availability_restriction(availability))
+            .order_by(*order.sort_order_expressions)
+            .options(*self._hyperlink_load_options())
+        )
+
         a = time.time()
-        libraries = alphabetical.all()
+        libraries = query.all()
         b = time.time()
-        self.log.info("Built alphabetical list of all libraries in %.2fsec" % (b - a))
+        self.log.info(
+            "Built library list in %.2fsec (order=%s, availability=%s)"
+            % (b - a, order_str or "default", availability_str or "production")
+        )
 
         a = time.time()
         catalog = OPDSCatalog(
@@ -320,7 +373,10 @@ class LibraryRegistryController(BaseController):
             flask.request.url,
             libraries,
             annotator=self.annotator,
-            live=live,
+            live=True,
+            order=order_str,
+            availability=availability_str,
+            default_order=OrderFacet.NAME,
         )
         b = time.time()
         self.log.info("Built library catalog in %.2fsec" % (b - a))

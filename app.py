@@ -29,6 +29,7 @@ from palace.registry.util.app_server import (
     returns_json_or_response_or_problem_detail,
     returns_problem_detail,
 )
+from palace.registry.util.flask_util import deprecated
 from palace.registry.util.xray import PalaceXrayUtils
 
 app = Flask(__name__)
@@ -144,8 +145,11 @@ def libraries_opds():
 @app.route("/libraries/qa")
 @compressible
 @returns_problem_detail
+@deprecated(replacement="/libraries?availability=production,hidden")
 def libraries_qa():
-    return app.library_registry.registry_controller.libraries_opds(live=False)
+    return app.library_registry.registry_controller.libraries_opds(
+        from_deprecated_qa=True
+    )
 
 
 @app.route("/libraries/crawlable")

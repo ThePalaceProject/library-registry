@@ -28,7 +28,7 @@ from palace.registry.controller import (
     ValidationController,
 )
 from palace.registry.emailer import Emailer, EmailTemplate
-from palace.registry.opds import OPDSCatalog
+from palace.registry.opds import OPDSCatalog, OrderFacet
 from palace.registry.pagination import Pagination
 from palace.registry.problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
@@ -452,7 +452,9 @@ class TestLibraryRegistryController:
         )
 
         with fixture.app.test_request_context("/libraries"):
-            response = fixture.controller.libraries_opds(production_only)
+            response = fixture.controller.libraries_opds(
+                from_deprecated_qa=not production_only
+            )
 
             assert response.status == "200 OK"
             assert response.headers["Content-Type"] == OPDSCatalog.OPDS_TYPE
@@ -517,6 +519,149 @@ class TestLibraryRegistryController:
                     datetime.datetime.strptime(
                         entry["metadata"][key], "%Y-%m-%dT%H:%M:%SZ"
                     )
+
+    def test_libraries_opds_facets_present(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """Production /libraries feed always includes sort and availability facet groups."""
+        fixture = registry_controller_fixture
+        with fixture.app.test_request_context("/libraries"):
+            response = fixture.controller.libraries_opds()
+
+        catalog = response.json
+        assert "facets" in catalog
+        facets = catalog["facets"]
+        assert len(facets) == 2
+        assert facets[0]["metadata"]["title"] == "Sort by"
+        assert facets[1]["metadata"]["title"] == "Availability"
+
+    def test_libraries_opds_default_sort_is_name(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """Default active sort facet is name (A-Z), and it carries the default property."""
+        fixture = registry_controller_fixture
+        with fixture.app.test_request_context("/libraries"):
+            response = fixture.controller.libraries_opds()
+
+        sort_links = response.json["facets"][0]["links"]
+
+        active = [l for l in sort_links if l.get("rel") == "self"]
+        assert len(active) == 1
+        assert active[0]["title"] == OrderFacet.NAME.label
+
+        default_links = [
+            l
+            for l in sort_links
+            if l.get("properties", {}).get(OPDSCatalog.PALACE_PROPERTIES_DEFAULT)
+        ]
+        assert len(default_links) == 1
+        assert default_links[0]["title"] == OrderFacet.NAME.label
+
+    def test_libraries_opds_order_modified(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """?order=modified returns newest-first ordering and marks modified as active."""
+        fixture = registry_controller_fixture
+        base_time = utc_now()
+        lib_old = fixture.db.library(
+            name="AAA Old",
+            short_name="aaaold",
+            library_stage=Library.PRODUCTION_STAGE,
+            registry_stage=Library.PRODUCTION_STAGE,
+        )
+        lib_new = fixture.db.library(
+            name="ZZZ New",
+            short_name="zzznew",
+            library_stage=Library.PRODUCTION_STAGE,
+            registry_stage=Library.PRODUCTION_STAGE,
+        )
+        lib_old.timestamp = base_time - datetime.timedelta(days=10)
+        lib_new.timestamp = base_time
+        fixture.db.session.flush()
+
+        with fixture.app.test_request_context("/libraries?order=modified"):
+            response = fixture.controller.libraries_opds()
+
+        catalog = response.json
+        titles = [c["metadata"]["title"] for c in catalog["catalogs"]]
+        # ZZZ New is newest so should appear first.
+        assert titles.index("ZZZ New") < titles.index("AAA Old")
+
+        sort_links = catalog["facets"][0]["links"]
+        active = [l for l in sort_links if l.get("rel") == "self"]
+        assert len(active) == 1
+        assert active[0]["title"] == OrderFacet.MODIFIED.label
+
+    def test_libraries_opds_availability_all(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """?availability=all includes both production and testing libraries."""
+        fixture = registry_controller_fixture
+        test_lib = fixture.db.library(
+            name="Hidden Library",
+            short_name="hiddenlib",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+        )
+        fixture.db.session.flush()
+
+        with fixture.app.test_request_context("/libraries"):
+            prod_response = fixture.controller.libraries_opds()
+        prod_titles = [c["metadata"]["title"] for c in prod_response.json["catalogs"]]
+        assert "Hidden Library" not in prod_titles
+
+        with fixture.app.test_request_context("/libraries?availability=all"):
+            all_response = fixture.controller.libraries_opds()
+        all_titles = [c["metadata"]["title"] for c in all_response.json["catalogs"]]
+        assert "Hidden Library" in all_titles
+        assert len(all_titles) == len(prod_titles) + 1
+
+    def test_libraries_opds_availability_hidden(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """?availability=hidden returns only testing-stage libraries."""
+        fixture = registry_controller_fixture
+        fixture.db.library(
+            name="Testing Only",
+            short_name="testonly",
+            library_stage=Library.TESTING_STAGE,
+            registry_stage=Library.TESTING_STAGE,
+        )
+        fixture.db.session.flush()
+
+        with fixture.app.test_request_context("/libraries?availability=hidden"):
+            response = fixture.controller.libraries_opds()
+
+        catalog = response.json
+        titles = [c["metadata"]["title"] for c in catalog["catalogs"]]
+        assert titles == ["Testing Only"]
+
+    def test_libraries_opds_invalid_order(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """Invalid ?order= value returns 400."""
+        fixture = registry_controller_fixture
+        with fixture.app.test_request_context("/libraries?order=bogus"):
+            response = fixture.controller.libraries_opds()
+        assert response.status_code == 400
+
+    def test_libraries_opds_invalid_availability(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """Invalid ?availability= value returns 400."""
+        fixture = registry_controller_fixture
+        with fixture.app.test_request_context("/libraries?availability=bogus"):
+            response = fixture.controller.libraries_opds()
+        assert response.status_code == 400
+
+    def test_libraries_opds_qa_no_facets(
+        self, registry_controller_fixture: LibraryRegistryControllerFixture
+    ) -> None:
+        """Deprecated QA feed does not include facets."""
+        fixture = registry_controller_fixture
+        with fixture.app.test_request_context("/libraries/qa"):
+            response = fixture.controller.libraries_opds(from_deprecated_qa=True)
+        assert "facets" not in response.json
 
     def test_library_details(
         self, registry_controller_fixture: LibraryRegistryControllerFixture

@@ -216,6 +216,7 @@ class OPDSCatalog:
         has_next_page=False,
         order=None,
         availability=None,
+        default_order: OrderFacet | None = None,
     ):
         """Turn a list of libraries into a catalog.
 
@@ -223,6 +224,11 @@ class OPDSCatalog:
         :param has_next_page: Whether there's a next page of results.
         :param order: Raw order string from request to preserve in pagination/facet URLs (optional).
         :param availability: Raw availability string from request, e.g. "all" or "hidden" (optional).
+        :param default_order: The sort order active when no ``order`` param is given.
+            When not None, sort/availability facets are included in non-paginated feeds.
+            Controls which facet link gets ``rel="self"`` and ``PALACE_PROPERTIES_DEFAULT``.
+            Paginated feeds (``pagination`` is not None) always include facets and fall back
+            to MODIFIED when this is omitted.
         """
         if not annotator:
             annotator = Annotator()
@@ -256,12 +262,17 @@ class OPDSCatalog:
                 )
             )
 
-        # Add pagination links and facets for paginated feeds.
+        # Add pagination links for paginated feeds.
         if pagination:
             self._add_pagination_links(
                 url, pagination, has_next_page, order, availability
             )
-            self._add_facets(url, order, availability)
+        # Add facets when paginated or when a default_order is supplied.
+        # Paginated feeds fall back to MODIFIED when default_order is omitted.
+        if pagination or default_order is not None:
+            self._add_facets(
+                url, order, availability, default_order or OrderFacet.MODIFIED
+            )
 
         annotator.annotate_catalog(self, live=live)
 
@@ -364,7 +375,13 @@ class OPDSCatalog:
                 type=self.OPDS_TYPE,
             )
 
-    def _add_facets(self, base_url, order_str, availability_str):
+    def _add_facets(
+        self,
+        base_url,
+        order_str,
+        availability_str,
+        default_order: OrderFacet = OrderFacet.MODIFIED,
+    ):
         """Add OPDS 2.0 facet groups (sort and availability) to the catalog.
 
         Each facet link sets one dimension and preserves the other dimension's
@@ -372,12 +389,14 @@ class OPDSCatalog:
 
         :param order_str: Raw order string from the request, or None if absent.
         :param availability_str: Raw availability string from the request, or None if absent.
+        :param default_order: Sort order that is active when ``order_str`` is None or "default".
+            Also marks which sort link carries ``PALACE_PROPERTIES_DEFAULT``.
         """
         parsed = urlparse(base_url)
 
         # Effective active values (canonical, accounting for defaults).
         effective_order = (
-            OrderFacet.MODIFIED.value
+            default_order.value
             if order_str in (None, OrderFacet.DEFAULT.value)
             else order_str
         )
@@ -408,7 +427,7 @@ class OPDSCatalog:
         sort_links = []
         for facet in OrderFacet.advertised_facets():
             properties = {self.FACET_VALUE_PROPERTY: facet.value}
-            if facet == OrderFacet.MODIFIED:
+            if facet == default_order:
                 properties[self.PALACE_PROPERTIES_DEFAULT] = True
             if facet.group is not None:
                 properties[self.FACET_GROUP_PROPERTY] = facet.group

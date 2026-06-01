@@ -310,6 +310,55 @@ class TestAddFacets:
         ]
         assert avail_values == [f.value for f in AvailabilityFacet.advertised_facets()]
 
+    def test_custom_default_order_sets_active_and_default(self):
+        """Passing default_order=NAME makes name the active link and carries default property."""
+        catalog = OPDSCatalog.__new__(OPDSCatalog)
+        catalog.catalog = {"metadata": {}, "links": [], "catalogs": []}
+        catalog._add_facets(self.BASE_URL, None, None, OrderFacet.NAME)
+        sort_links = catalog.catalog["facets"][0]["links"]
+
+        # "name" link should be active (rel="self").
+        active = [l for l in sort_links if l.get("rel") == "self"]
+        assert len(active) == 1
+        assert active[0]["title"] == OrderFacet.NAME.label
+
+        # "name" link should also carry the default property.
+        default_links = [
+            l
+            for l in sort_links
+            if l.get("properties", {}).get(OPDSCatalog.PALACE_PROPERTIES_DEFAULT)
+        ]
+        assert len(default_links) == 1
+        assert default_links[0]["title"] == OrderFacet.NAME.label
+
+        # "modified" is no longer the default.
+        modified_link = next(l for l in sort_links if "modified" in l["href"])
+        assert modified_link.get("rel") != "self"
+        assert not modified_link.get("properties", {}).get(
+            OPDSCatalog.PALACE_PROPERTIES_DEFAULT
+        )
+
+    def test_custom_default_order_with_explicit_order_str(self):
+        """When an explicit order overrides the default, that facet gets rel=self."""
+        catalog = OPDSCatalog.__new__(OPDSCatalog)
+        catalog.catalog = {"metadata": {}, "links": [], "catalogs": []}
+        # User explicitly requests modified-asc even though the feed default is name.
+        catalog._add_facets(self.BASE_URL, "modified-asc", None, OrderFacet.NAME)
+        sort_links = catalog.catalog["facets"][0]["links"]
+
+        active = [l for l in sort_links if l.get("rel") == "self"]
+        assert len(active) == 1
+        assert active[0]["title"] == OrderFacet.MODIFIED_ASC.label
+
+        # "name" still carries the default property even though it is not active.
+        default_links = [
+            l
+            for l in sort_links
+            if l.get("properties", {}).get(OPDSCatalog.PALACE_PROPERTIES_DEFAULT)
+        ]
+        assert len(default_links) == 1
+        assert default_links[0]["title"] == OrderFacet.NAME.label
+
 
 class TestOPDSCatalog:
     def test_strftime_format(self):
