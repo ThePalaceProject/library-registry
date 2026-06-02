@@ -1,11 +1,13 @@
+import datetime
 import ipaddress
 import re
 
 import pytest
-from flask import Flask, request
+from flask import Flask, Response, request
 
 from palace.registry.util.flask_util import (
     IPV4_REGEX,
+    deprecated,
     is_public_ipv4_address,
     originating_ip,
 )
@@ -165,3 +167,132 @@ class TestFlaskUtil:
             "url", headers=headers, environ_base={"REMOTE_ADDR": remote_address}
         ):
             assert originating_ip() == expected_address
+
+
+class TestDeprecated:
+    """Tests for the deprecated() route decorator."""
+
+    def _route(self, **kwargs):
+        """Return a decorated route function using the given deprecated() kwargs."""
+
+        @deprecated(**kwargs)
+        def route():
+            return Response("ok", 200)
+
+        return route
+
+    @pytest.mark.parametrize(
+        "deprecation_date, expected",
+        [
+            pytest.param(None, "true", id="no-date"),
+            pytest.param(
+                datetime.datetime(2025, 6, 1, tzinfo=datetime.UTC),
+                "Sun, 01 Jun 2025 00:00:00 GMT",
+                id="with-date",
+            ),
+        ],
+    )
+    def test_deprecation_header_value(
+        self, generic_app_obj, deprecation_date, expected
+    ):
+        """Deprecation header is 'true' when no date is given, or an IMF-fixdate (RFC 9745 §2)."""
+        route = self._route(deprecation_date=deprecation_date)
+        with generic_app_obj.test_request_context("/"):
+            assert route().headers["Deprecation"] == expected
+
+    def test_sunset_header_when_provided(self, generic_app_obj):
+        """Sunset header is emitted when sunset is given."""
+        date = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+        route = self._route(sunset=date)
+        with generic_app_obj.test_request_context("/"):
+            assert route().headers["Sunset"] == "Thu, 01 Jan 2026 00:00:00 GMT"
+
+    def test_no_sunset_header_when_omitted(self, generic_app_obj):
+        """Sunset header is absent when no sunset date is given."""
+        route = self._route()
+        with generic_app_obj.test_request_context("/"):
+            assert "Sunset" not in route().headers
+
+    @pytest.mark.parametrize(
+        "kwarg, path, expected_rel",
+        [
+            pytest.param(
+                "documentation",
+                "/deprecation-info",
+                'rel="deprecation"',
+                id="documentation",
+            ),
+            pytest.param(
+                "replacement",
+                "/new?x=1",
+                'rel="successor-version"',
+                id="replacement",
+            ),
+        ],
+    )
+    def test_link_header_when_provided(
+        self, generic_app_obj, kwarg, path, expected_rel
+    ):
+        """Link header is emitted for documentation (RFC 9745 §3.1) and replacement (RFC 5829)."""
+        route = self._route(**{kwarg: path})
+        with generic_app_obj.test_request_context("/"):
+            link = route().headers["Link"]
+        assert expected_rel in link
+        assert f"http://localhost{path}" in link
+
+    def test_both_link_parts_combined_in_single_header(self, generic_app_obj):
+        """documentation and replacement are combined into a single Link header."""
+        route = self._route(documentation="/docs", replacement="/new")
+        with generic_app_obj.test_request_context("/"):
+            link = route().headers["Link"]
+        assert 'rel="deprecation"' in link
+        assert 'rel="successor-version"' in link
+        # Both must appear in the same header value, not as separate headers.
+        assert isinstance(link, str)
+
+    def test_existing_link_header_is_preserved(self, generic_app_obj):
+        """Pre-existing Link header values are not clobbered."""
+
+        @deprecated(replacement="/new")
+        def route():
+            r = Response("ok", 200)
+            r.headers["Link"] = '</existing>; rel="related"'
+            return r
+
+        with generic_app_obj.test_request_context("/"):
+            link = route().headers["Link"]
+        assert 'rel="related"' in link
+        assert 'rel="successor-version"' in link
+
+    def test_applies_to_error_responses(self, generic_app_obj):
+        """Deprecation is a property of the endpoint, not the result — added to error responses too."""
+
+        @deprecated()
+        def route():
+            return Response("not found", 404)
+
+        with generic_app_obj.test_request_context("/"):
+            assert route().headers["Deprecation"] == "true"
+
+    def test_applies_to_non_response_return(self, generic_app_obj):
+        """Headers are injected even when the route returns a plain string instead of a Response."""
+
+        @deprecated()
+        def route():
+            return "ok"
+
+        with generic_app_obj.test_request_context("/"):
+            assert route().headers["Deprecation"] == "true"
+
+    @pytest.mark.parametrize(
+        "kwarg",
+        [
+            pytest.param("deprecation_date", id="deprecation-date"),
+            pytest.param("sunset", id="sunset"),
+        ],
+    )
+    def test_naive_datetime_raises(self, kwarg):
+        """Timezone-naive datetimes are rejected at decoration time."""
+        naive = datetime.datetime(2025, 6, 1)
+        with pytest.raises(ValueError, match="timezone-aware"):
+            deprecated(**{kwarg: naive})
