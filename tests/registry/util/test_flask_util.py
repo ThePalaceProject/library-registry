@@ -260,9 +260,25 @@ class TestDeprecated:
             return r
 
         with generic_app_obj.test_request_context("/"):
-            link = route().headers["Link"]
-        assert 'rel="related"' in link
-        assert 'rel="successor-version"' in link
+            links = " ".join(route().headers.getlist("Link"))
+        assert 'rel="related"' in links
+        assert 'rel="successor-version"' in links
+
+    def test_multiple_existing_link_headers_are_preserved(self, generic_app_obj):
+        """All pre-existing Link headers survive when the response carries more than one."""
+
+        @deprecated(replacement="/new")
+        def route():
+            r = Response("ok", 200)
+            r.headers.add("Link", '</existing1>; rel="related"')
+            r.headers.add("Link", '</existing2>; rel="prev"')
+            return r
+
+        with generic_app_obj.test_request_context("/"):
+            links = " ".join(route().headers.getlist("Link"))
+        assert 'rel="related"' in links
+        assert 'rel="prev"' in links
+        assert 'rel="successor-version"' in links
 
     def test_applies_to_error_responses(self, generic_app_obj):
         """Deprecation is a property of the endpoint, not the result — added to error responses too."""

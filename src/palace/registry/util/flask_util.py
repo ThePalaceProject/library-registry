@@ -87,11 +87,7 @@ def deprecated(
                     f'<{urljoin(request.host_url, replacement)}>; rel="successor-version"'
                 )
             if link_parts:
-                new_link = ", ".join(link_parts)
-                existing = response.headers.get("Link")
-                response.headers["Link"] = (
-                    f"{existing}, {new_link}" if existing else new_link
-                )
+                response.headers.add("Link", ", ".join(link_parts))
             return response
 
         return wrapper
