@@ -2,8 +2,12 @@
 
 import ipaddress
 import re
+from datetime import datetime
+from functools import wraps
+from urllib.parse import urljoin
 
-from flask import Response, request
+from flask import Response, make_response, request
+from werkzeug.http import http_date
 
 from palace.registry.util import problem_detail
 from palace.registry.util.language import languages_from_accept
@@ -32,6 +36,63 @@ IPV4_REGEX = re.compile(
                           """,
     re.VERBOSE,
 )
+
+
+def deprecated(
+    *,
+    deprecation_date: datetime | None = None,
+    sunset: datetime | None = None,
+    documentation: str | None = None,
+    replacement: str | None = None,
+):
+    """Mark a route as deprecated, injecting standardized HTTP response headers.
+
+    The approach follows the mapping proposed in the OpenAPI discussion
+    "proposal:OpenAPI 3.3 Proposal: API-Level Deprecation & Sunset Support":
+    https://github.com/OAI/OpenAPI-Specification/discussions/5193
+
+    ``Deprecation: true`` is always emitted; when ``deprecation_date`` is
+    provided its value is used instead of the boolean.
+
+    :param deprecation_date: When the endpoint was (or will be) deprecated.
+        Emitted as ``Deprecation: <IMF-fixdate>`` (RFC 9745 §2).
+    :param sunset: Date after which the endpoint may be removed.
+        Emitted as ``Sunset: <HTTP-date>`` (RFC 8594).
+    :param documentation: URL of a resource describing the deprecation context.
+        Emitted as ``Link: <url>; rel="deprecation"`` (RFC 9745 §3.1).
+    :param replacement: URL of the replacement endpoint.
+        Emitted as ``Link: <url>; rel="successor-version"`` (RFC 5829).
+    """
+    if deprecation_date is not None and deprecation_date.tzinfo is None:
+        raise ValueError("deprecation_date must be timezone-aware")
+    if sunset is not None and sunset.tzinfo is None:
+        raise ValueError("sunset must be timezone-aware")
+
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            response = make_response(f(*args, **kwargs))
+            response.headers["Deprecation"] = (
+                http_date(deprecation_date) if deprecation_date else "true"
+            )
+            if sunset is not None:
+                response.headers["Sunset"] = http_date(sunset)
+            link_parts = []
+            if documentation is not None:
+                link_parts.append(
+                    f'<{urljoin(request.host_url, documentation)}>; rel="deprecation"'
+                )
+            if replacement is not None:
+                link_parts.append(
+                    f'<{urljoin(request.host_url, replacement)}>; rel="successor-version"'
+                )
+            if link_parts:
+                response.headers.add("Link", ", ".join(link_parts))
+            return response
+
+        return wrapper
+
+    return decorator
 
 
 def problem_raw(type, status, title, detail=None, instance=None, headers=None):
