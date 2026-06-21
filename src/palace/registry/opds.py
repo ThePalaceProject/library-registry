@@ -133,6 +133,12 @@ class AvailabilityFacet(StrEnum):
     def advertised_facets(cls) -> list[AvailabilityFacet]:
         return [cls.PRODUCTION, cls.HIDDEN, cls.ALL]
 
+    @classmethod
+    def is_live(cls, availability_str: str | None) -> bool:
+        """Whether the given availability represents a production-only feed."""
+        # TODO: Can be removed when we no longer pass `live` to the annotator.
+        return availability_str in (None, cls.PRODUCTION.value)
+
 
 class Annotator:
     def annotate_catalog(self, catalog, live=True):
