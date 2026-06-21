@@ -2558,6 +2558,53 @@ class TestLibraryRegistryController:
             expected_last = ((total_expected - 1) // size) * size
             assert f"offset={expected_last}&size={size}" in links["last"]["href"]
 
+    @pytest.mark.parametrize(
+        "query_string, expected_order, expected_availability",
+        [
+            pytest.param(
+                "order=name&availability=all",
+                "order=name",
+                "availability=all",
+                id="explicit-params",
+            ),
+            pytest.param(
+                "",
+                "order=modified",
+                "availability=production",
+                id="default-params",
+            ),
+        ],
+    )
+    def test_libraries_opds_crawlable_pagination_preserves_params(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        query_string: str,
+        expected_order: str,
+        expected_availability: str,
+    ):
+        """Pagination links preserve order and availability query parameters."""
+        fixture = registry_controller_fixture
+        size = Pagination.MIN_SIZE
+
+        for i in range(size + 1):
+            fixture.db.library(
+                name=f"PLib {i:03d}",
+                short_name=f"plib{i}",
+                library_stage=Library.PRODUCTION_STAGE,
+                registry_stage=Library.PRODUCTION_STAGE,
+            )
+        fixture.db.session.flush()
+
+        qs = f"size={size}&{query_string}" if query_string else f"size={size}"
+        with fixture.app.test_request_context(f"/libraries/crawlable?{qs}"):
+            response = fixture.controller.libraries_opds_crawlable()
+            catalog = json.loads(response.data)
+
+        links = {link["rel"]: link for link in catalog["links"]}
+        for rel in ("first", "next"):
+            assert expected_order in links[rel]["href"]
+            assert expected_availability in links[rel]["href"]
+
     def test_libraries_opds_crawlable_ordering(
         self, registry_controller_fixture: LibraryRegistryControllerFixture
     ):

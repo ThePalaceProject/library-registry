@@ -289,50 +289,18 @@ class LibraryRegistryController(BaseController):
             joinedload("hyperlinks", "resource", "validation"),
         ]
 
-    def libraries_opds(self, from_deprecated_qa: bool = False) -> OPDSCatalog:
-        """Return all the libraries in OPDS format.
+    def _parse_feed_params(
+        self, *, default_order: OrderFacet = OrderFacet.MODIFIED
+    ) -> tuple[OrderFacet, frozenset[AvailabilityFacet]] | ProblemDetail:
+        """Parse ``?order=`` and ``?availability=`` from the current request.
 
-        The normal path supports ``?order=`` and ``?availability=`` query parameters
-        and includes OPDS 2.0 facet groups.  The default sort order is library name
-        ascending; the default availability filter is production-only.
-
-        The deprecated QA path (``from_deprecated_qa=True``) returns all non-cancelled
-        libraries in alphabetical order without facets or query-parameter support.
-        It exists solely to back the legacy ``/libraries/qa`` route.
-
-        :param from_deprecated_qa: Set to True only by the deprecated ``/libraries/qa`` route.
-        :return: An OPDS catalog response.
+        :param default_order: Sort order when ``?order`` is absent.
+        :return: A (order, availability) tuple, or a ProblemDetail on bad input.
         """
-        if from_deprecated_qa:
-            # Legacy /libraries/qa path — preserved unchanged.
-            query = (
-                self._db.query(Library)
-                .filter(Library._feed_restriction(production=False))
-                .order_by(Library.name_sort_key())
-                .options(*self._hyperlink_load_options())
-            )
-            a = time.time()
-            libraries = query.all()
-            b = time.time()
-            self.log.info("Built QA library list in %.2fsec" % (b - a))
-            a = time.time()
-            catalog = OPDSCatalog(
-                self._db,
-                "Libraries",
-                flask.request.url,
-                libraries,
-                annotator=self.annotator,
-                live=False,
-            )
-            b = time.time()
-            self.log.info("Built QA library catalog in %.2fsec" % (b - a))
-            return catalog_response(catalog)
-
-        # Parse ?order= — default for this feed is name (A-Z).
         order_str = flask.request.args.get("order")
         try:
             order = (
-                OrderFacet.NAME
+                default_order
                 if order_str in (None, OrderFacet.DEFAULT.value)
                 else OrderFacet(order_str)
             )
@@ -341,15 +309,39 @@ class LibraryRegistryController(BaseController):
                 f"I don't know how to order a feed by '{order_str}'", 400
             )
 
-        # Parse ?availability= — absent defaults to production.
         availability_str = flask.request.args.get("availability")
         raw_values = availability_str.split(",") if availability_str else ["production"]
         try:
             availability = frozenset(AvailabilityFacet(v.strip()) for v in raw_values)
         except ValueError as e:
             return INVALID_INPUT.detailed(str(e), 400)
-        if not availability:
-            return INVALID_INPUT.detailed("availability must not be empty", 400)
+
+        return order, availability
+
+    def libraries_opds(self, from_deprecated_qa: bool = False) -> OPDSCatalog:
+        """Return all the libraries in OPDS format.
+
+        Supports ``?order=`` and ``?availability=`` query parameters and includes
+        OPDS 2.0 facet groups.  The default sort order is library name ascending;
+        the default availability filter is production-only.
+
+        The deprecated QA path (``from_deprecated_qa=True``) fixes the order and
+        availability and suppresses facets.  It exists solely to back the legacy
+        ``/libraries/qa`` route.
+
+        :param from_deprecated_qa: Set to True only by the deprecated ``/libraries/qa`` route.
+        :return: An OPDS catalog response.
+        """
+        if from_deprecated_qa:
+            order = OrderFacet.NAME
+            availability = frozenset({AvailabilityFacet.ALL})
+            default_order = None
+        else:
+            result = self._parse_feed_params(default_order=OrderFacet.NAME)
+            if isinstance(result, ProblemDetail):
+                return result
+            order, availability = result
+            default_order = OrderFacet.NAME
 
         query = (
             self._db.query(Library)
@@ -363,7 +355,7 @@ class LibraryRegistryController(BaseController):
         b = time.time()
         self.log.info(
             "Built library list in %.2fsec (order=%s, availability=%s)"
-            % (b - a, order_str or "default", availability_str or "production")
+            % (b - a, order.value, ",".join(sorted(availability)))
         )
 
         a = time.time()
@@ -373,10 +365,10 @@ class LibraryRegistryController(BaseController):
             flask.request.url,
             libraries,
             annotator=self.annotator,
-            live=AvailabilityFacet.is_live(availability_str),
-            order=order_str,
-            availability=availability_str,
-            default_order=OrderFacet.NAME,
+            live=AvailabilityFacet.is_live(availability),
+            order=order,
+            availability=availability,
+            default_order=default_order,
         )
         b = time.time()
         self.log.info("Built library catalog in %.2fsec" % (b - a))
@@ -395,26 +387,10 @@ class LibraryRegistryController(BaseController):
 
         :return: Flask Response with OPDS 2.0 JSON catalog.
         """
-        # Parse ?order= — absent means default (modified DESC).
-        order_str = flask.request.args.get("order")
-        try:
-            order = (
-                OrderFacet(order_str) if order_str is not None else OrderFacet.DEFAULT
-            )
-        except ValueError:
-            return INVALID_INPUT.detailed(
-                f"I don't know how to order a feed by '{order_str}'", 400
-            )
-
-        # Parse ?availability= — absent defaults to production.
-        availability_str = flask.request.args.get("availability")
-        raw_values = availability_str.split(",") if availability_str else ["production"]
-        try:
-            availability = frozenset(AvailabilityFacet(v.strip()) for v in raw_values)
-        except ValueError as e:
-            return INVALID_INPUT.detailed(str(e), 400)
-        if not availability:
-            return INVALID_INPUT.detailed("availability must not be empty", 400)
+        result = self._parse_feed_params(default_order=OrderFacet.MODIFIED)
+        if isinstance(result, ProblemDetail):
+            return result
+        order, availability = result
 
         # Build query with availability filtering and requested ordering.
         query = (
@@ -439,7 +415,7 @@ class LibraryRegistryController(BaseController):
         self.log.info(
             f"Fetched {len(libraries)} of {pagination.total_count} libraries "
             f"(offset={pagination.offset}, size={pagination.size}, "
-            f"order={order_str or 'default'}, availability={availability_str or 'production'})"
+            f"order={order.value}, availability={','.join(sorted(availability))})"
         )
 
         # Build OPDS catalog with pagination links and facets.
@@ -449,11 +425,11 @@ class LibraryRegistryController(BaseController):
             flask.request.url,
             libraries,
             annotator=self.annotator,
-            live=AvailabilityFacet.is_live(availability_str),
+            live=AvailabilityFacet.is_live(availability),
             pagination=pagination,
             has_next_page=has_next,
-            order=order_str,
-            availability=availability_str,
+            order=order,
+            availability=availability,
         )
 
         return catalog_response(catalog)
