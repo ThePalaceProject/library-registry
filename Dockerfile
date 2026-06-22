@@ -38,7 +38,7 @@ EXPOSE 5432
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
-FROM python:3.12-alpine AS builder
+FROM python:3.12-alpine3.21 AS builder
 
 EXPOSE 80
 
