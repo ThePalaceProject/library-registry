@@ -38,7 +38,13 @@ EXPOSE 5432
 #  * Copies in the config files for Gunicorn, Nginx, and Supervisor
 #  * Sets the container entrypoint, which is a script that starts Supervisor
 
-FROM python:3.12-alpine AS builder
+# Pinned to a specific Alpine version because nginx.org does not always publish
+# (at least not in a timely manner) APK packages for the latest Alpine release.
+# Thus, the untagged `alpine` image can float ahead of what nginx.org supports,
+# breaking our builds.
+# We should periodically update this pin to the newest Alpine version listed at
+# https://nginx.org/packages/alpine/.
+FROM python:3.12-alpine3.21 AS builder
 
 EXPOSE 80
 
