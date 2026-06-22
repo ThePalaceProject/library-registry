@@ -318,7 +318,9 @@ class LibraryRegistryController(BaseController):
 
         return order, availability
 
-    def libraries_opds(self, from_deprecated_qa: bool = False) -> OPDSCatalog:
+    def libraries_opds(
+        self, from_deprecated_qa: bool = False
+    ) -> Response | ProblemDetail:
         """Return all the libraries in OPDS format.
 
         Supports ``?order=`` and ``?availability=`` query parameters and includes
