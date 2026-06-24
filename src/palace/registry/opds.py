@@ -133,6 +133,12 @@ class AvailabilityFacet(StrEnum):
     def advertised_facets(cls) -> list[AvailabilityFacet]:
         return [cls.PRODUCTION, cls.HIDDEN, cls.ALL]
 
+    @classmethod
+    def is_live(cls, availability: frozenset[AvailabilityFacet]) -> bool:
+        """Whether the given availability represents a production-only feed."""
+        # TODO: Can be removed when we no longer pass `live` to the annotator.
+        return availability == {cls.PRODUCTION}
+
 
 class Annotator:
     def annotate_catalog(self, catalog, live=True):
@@ -214,15 +220,21 @@ class OPDSCatalog:
         url_for=None,
         pagination=None,
         has_next_page=False,
-        order=None,
-        availability=None,
+        order: OrderFacet | None = None,
+        availability: frozenset[AvailabilityFacet] | None = None,
+        default_order: OrderFacet | None = None,
     ):
         """Turn a list of libraries into a catalog.
 
         :param pagination: Pagination object for adding rel links (optional).
         :param has_next_page: Whether there's a next page of results.
-        :param order: Raw order string from request to preserve in pagination/facet URLs (optional).
-        :param availability: Raw availability string from request, e.g. "all" or "hidden" (optional).
+        :param order: Resolved sort order for pagination/facet URLs (optional).
+        :param availability: Resolved availability filter for pagination/facet URLs (optional).
+        :param default_order: The sort order active when no ``order`` param is given.
+            When not None, sort/availability facets are included in non-paginated feeds.
+            Controls which facet link gets ``rel="self"`` and ``PALACE_PROPERTIES_DEFAULT``.
+            Paginated feeds (``pagination`` is not None) always include facets and fall back
+            to MODIFIED when this is omitted.
         """
         if not annotator:
             annotator = Annotator()
@@ -256,12 +268,17 @@ class OPDSCatalog:
                 )
             )
 
-        # Add pagination links and facets for paginated feeds.
+        # Add pagination links for paginated feeds.
         if pagination:
             self._add_pagination_links(
                 url, pagination, has_next_page, order, availability
             )
-            self._add_facets(url, order, availability)
+        # Add facets when paginated or when a default_order is supplied.
+        # Paginated feeds fall back to MODIFIED when default_order is omitted.
+        if pagination or default_order is not None:
+            self._add_facets(
+                url, order, availability, default_order or OrderFacet.MODIFIED
+            )
 
         annotator.annotate_catalog(self, live=live)
 
@@ -304,23 +321,19 @@ class OPDSCatalog:
         base_url,
         pagination,
         has_next_page,
-        order=None,
-        availability=None,
+        order: OrderFacet | None = None,
+        availability: frozenset[AvailabilityFacet] | None = None,
     ):
-        """Add OPDS 2.0 pagination links (rel=first/previous/next/last).
-
-        :param order: Raw order string from the original request, or None if absent.
-        :param availability: Raw availability string from the original request, or None if absent.
-        """
+        """Add OPDS 2.0 pagination links (rel=first/previous/next/last)."""
 
         parsed = urlparse(base_url)
 
         def paginated_url(page):
             params = {"offset": page.offset, "size": page.size}
             if order is not None:
-                params[OrderFacet._QUERY_PARAM] = order
+                params[OrderFacet._QUERY_PARAM] = order.value
             if availability is not None:
-                params[AvailabilityFacet._QUERY_PARAM] = availability
+                params[AvailabilityFacet._QUERY_PARAM] = ",".join(sorted(availability))
             return urlunparse(
                 parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
             )
@@ -364,42 +377,45 @@ class OPDSCatalog:
                 type=self.OPDS_TYPE,
             )
 
-    def _add_facets(self, base_url, order_str, availability_str):
+    def _add_facets(
+        self,
+        base_url,
+        order: OrderFacet | None,
+        availability: frozenset[AvailabilityFacet] | None,
+        default_order: OrderFacet = OrderFacet.MODIFIED,
+    ):
         """Add OPDS 2.0 facet groups (sort and availability) to the catalog.
 
         Each facet link sets one dimension and preserves the other dimension's
-        current raw value (omitting it from the URL when it was not in the request).
+        current value (omitting it from the URL when it was not provided).
 
-        :param order_str: Raw order string from the request, or None if absent.
-        :param availability_str: Raw availability string from the request, or None if absent.
+        :param order: Resolved sort order, or None if not specified.
+        :param availability: Resolved availability filter, or None if not specified.
+        :param default_order: Sort order active when ``order`` is None.
+            Also marks which sort link carries ``PALACE_PROPERTIES_DEFAULT``.
         """
         parsed = urlparse(base_url)
 
-        # Effective active values (canonical, accounting for defaults).
-        effective_order = (
-            OrderFacet.MODIFIED.value
-            if order_str in (None, OrderFacet.DEFAULT.value)
-            else order_str
-        )
+        effective_order = order if order is not None else default_order
         effective_availability = (
-            AvailabilityFacet.PRODUCTION.value
-            if availability_str is None
-            else availability_str
+            availability
+            if availability is not None
+            else frozenset({AvailabilityFacet.PRODUCTION})
         )
 
         def sort_link_url(facet):
             params = {OrderFacet._QUERY_PARAM: facet.value}
-            if availability_str is not None:
-                params[AvailabilityFacet._QUERY_PARAM] = availability_str
+            if availability is not None:
+                params[AvailabilityFacet._QUERY_PARAM] = ",".join(sorted(availability))
             return urlunparse(
                 parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
             )
 
-        def avail_link_url(avail_value):
+        def avail_link_url(facet: AvailabilityFacet):
             params = {}
-            if order_str is not None:
-                params[OrderFacet._QUERY_PARAM] = order_str
-            params[AvailabilityFacet._QUERY_PARAM] = avail_value
+            if order is not None:
+                params[OrderFacet._QUERY_PARAM] = order.value
+            params[AvailabilityFacet._QUERY_PARAM] = facet.value
             return urlunparse(
                 parsed._replace(query=urlencode(params, quote_via=quote, safe=","))
             )
@@ -408,7 +424,7 @@ class OPDSCatalog:
         sort_links = []
         for facet in OrderFacet.advertised_facets():
             properties = {self.FACET_VALUE_PROPERTY: facet.value}
-            if facet == OrderFacet.MODIFIED:
+            if facet == default_order:
                 properties[self.PALACE_PROPERTIES_DEFAULT] = True
             if facet.group is not None:
                 properties[self.FACET_GROUP_PROPERTY] = facet.group
@@ -418,7 +434,7 @@ class OPDSCatalog:
                 "type": self.OPDS_TYPE,
                 "properties": properties,
             }
-            if facet.value == effective_order:
+            if facet == effective_order:
                 link["rel"] = "self"
             sort_links.append(link)
 
@@ -429,12 +445,12 @@ class OPDSCatalog:
             if facet == AvailabilityFacet.PRODUCTION:
                 properties[self.PALACE_PROPERTIES_DEFAULT] = True
             link = {
-                "href": avail_link_url(facet.value),
+                "href": avail_link_url(facet),
                 "title": facet.label,
                 "type": self.OPDS_TYPE,
                 "properties": properties,
             }
-            if facet.value == effective_availability:
+            if effective_availability == {facet}:
                 link["rel"] = "self"
             avail_links.append(link)
 
