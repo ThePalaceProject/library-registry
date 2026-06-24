@@ -536,6 +536,7 @@ class OPDSCatalog:
         if library.authentication_url:
             cls.add_link_to_catalog(
                 catalog,
+                rel=AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL,
                 href=library.authentication_url,
                 type=AuthenticationDocument.MEDIA_TYPE,
             )

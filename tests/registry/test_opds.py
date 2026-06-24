@@ -507,11 +507,11 @@ class TestOPDSCatalog:
         assert LibraryType.NAME_FOR_CODE[LibraryType.LOCAL] == subject["name"]
 
         [
-            authentication_url,
             web_alternate,
             help,
             eligibility,
             focus,
+            authentication_link,
             opds_self,
             web_self,
         ] = sorted(
@@ -549,9 +549,12 @@ class TestOPDSCatalog:
         assert logo["type"] == "image/png"
         assert logo["href"] == "http://logo-url/"
 
-        assert authentication_url["href"] == library.authentication_url
-        assert "rel" not in authentication_url
-        assert authentication_url["type"] == AuthenticationDocument.MEDIA_TYPE
+        assert authentication_link["href"] == library.authentication_url
+        assert (
+            authentication_link["rel"]
+            == AuthenticationDocument.AUTHENTICATION_DOCUMENT_REL
+        )
+        assert authentication_link["type"] == AuthenticationDocument.MEDIA_TYPE
         # The public Hyperlink was passed into _hyperlink_args,
         # which made it show up in the list of links.
         #
