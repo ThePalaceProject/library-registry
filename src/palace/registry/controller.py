@@ -841,29 +841,39 @@ class LibraryRegistryController(BaseController):
                 # field.
                 library.opds_url = opds_url
 
+        modified_hyperlinks = []
         for rel, candidates in hyperlinks_to_create:
             hyperlink, is_modified = library.set_hyperlink(rel, *candidates)
             if is_modified:
-                # We need to send an email to this email address about
-                # what just happened. This is either so the receipient
-                # can confirm that the address works, or to inform
-                # them a new library is using their address.
-                try:
-                    hyperlink.notify(self.emailer, self.app.url_for)
-                except SMTPException as exc:
-                    self.log.error("EMAIL_SEND_PROBLEM, SMTPException:", exc_info=exc)
-                    # We were unable to send the email due to an SMTP error
-                    return INTEGRATION_ERROR.detailed(
-                        _(
-                            "SMTP error while sending email to %(address)s",
-                            address=hyperlink.resource.href,
-                        )
+                modified_hyperlinks.append(hyperlink)
+
+        # We need to send an email to each modified address about what
+        # just happened. This is either so the recipient can confirm
+        # that the address works, or to inform them a new library is
+        # using their address. Emails bound for the same recipient are
+        # combined into one.
+        if self.emailer:
+            pending = [
+                email
+                for hyperlink in modified_hyperlinks
+                if (email := hyperlink.notification(self.app.url_for))
+            ]
+            try:
+                self.emailer.send_all(pending)
+            except SMTPException as exc:
+                self.log.error("EMAIL_SEND_PROBLEM, SMTPException:", exc_info=exc)
+                # We were unable to send the email due to an SMTP error
+                return INTEGRATION_ERROR.detailed(
+                    _(
+                        "SMTP error while sending email to %(addresses)s",
+                        addresses=", ".join(email.to_address for email in pending),
                     )
-                except CannotSendEmail as exc:
-                    self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail:", exc_info=exc)
-                    return UNABLE_TO_NOTIFY.detailed(
-                        _("The Registry was unable to send a notification email.")
-                    )
+                )
+            except CannotSendEmail as exc:
+                self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail:", exc_info=exc)
+                return UNABLE_TO_NOTIFY.detailed(
+                    _("The Registry was unable to send a notification email.")
+                )
 
         # Create an OPDS 2 catalog containing all available
         # information about the library.

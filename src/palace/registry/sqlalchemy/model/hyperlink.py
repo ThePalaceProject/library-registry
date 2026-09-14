@@ -77,15 +77,28 @@ class Hyperlink(Base):
         :param url_for: An implementation of Flask's url_for, used to
             generate a validation link if necessary.
         """
+        if not emailer or not url_for:
+            # We can't actually send any emails.
+            return
+        email = self.notification(url_for)
+        if email:
+            emailer.send_all([email])
+
+    def notification(self, url_for):
+        """Build, but do not send, the email that notifies the target of
+        this hyperlink. If the underlying resource needs a new validation,
+        the validation is restarted here.
+
+        :param url_for: An implementation of Flask's url_for, used to
+            generate a validation link if necessary.
+        :return: A PendingEmail, or None if there is nothing to send.
+        """
         from palace.registry.config import Configuration
-        from palace.registry.emailer import Emailer
+        from palace.registry.emailer import Emailer, PendingEmail
         from palace.registry.sqlalchemy.model.configuration_setting import (
             ConfigurationSetting,
         )
 
-        if not emailer or not url_for:
-            # We can't actually send any emails.
-            return
         _db = Session.object_session(self)
 
         # These shouldn't happen, but just to be safe, do nothing if
@@ -94,7 +107,7 @@ class Hyperlink(Base):
         resource = self.resource
         library = self.library
         if not resource or not library:
-            return
+            return None
 
         # Default to sending an informative email with no validation
         # link.
@@ -105,7 +118,7 @@ class Hyperlink(Base):
 
         # Are we an email address type of link
         if not re.match(r"[^@]+@.+", to_address):
-            return
+            return None
 
         # Make sure there's a Validation object associated with this
         # Resource.
@@ -139,5 +152,4 @@ class Hyperlink(Base):
             template_args["confirmation_link"] = url_for(
                 "confirm_resource", resource_id=resource.id, secret=validation.secret
             )
-        body = emailer.send(email_type, to_address, **template_args)
-        return body
+        return PendingEmail(email_type, to_address, template_args)

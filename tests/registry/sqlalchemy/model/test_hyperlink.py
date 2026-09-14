@@ -19,8 +19,11 @@ class TestHyperlink:
                 for the Emailer constructor.
                 """
 
-            def send(self, type, to_address, **kwargs):
-                self.sent.append((type, to_address, kwargs))
+            def send_all(self, pending):
+                for email in pending:
+                    self.sent.append(
+                        (email.email_type, email.to_address, email.template_args)
+                    )
 
             def url_for(self, controller, **kwargs):
                 """Just a convenient place to mock Flask's url_for()."""
@@ -102,3 +105,48 @@ class TestHyperlink:
         assert link.resource.validation == validation
         assert validation.deadline > now
         assert secret != validation.secret
+
+    def test_notification(self, db: DatabaseTransactionFixture):
+        """`notification` builds the email that `notify` would send,
+        without sending it. That lets a caller collect several and
+        send them together.
+        """
+        url_for_calls = []
+
+        def url_for(controller, **kwargs):
+            url_for_calls.append((controller, kwargs))
+            return "http://url/"
+
+        library = db.library()
+
+        # A hyperlink to something other than an email address
+        # produces no notification.
+        link, _ = library.set_hyperlink(Hyperlink.HELP_REL, "http://help.library/")
+        assert link.notification(url_for) is None
+        assert link.resource.validation is None
+
+        # A hyperlink to an email address produces a notification
+        # and starts the validation process.
+        link, _ = library.set_hyperlink(
+            Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, "mailto:you@library"
+        )
+        email = link.notification(url_for)
+        assert email.email_type == Emailer.ADDRESS_NEEDS_CONFIRMATION
+        assert email.to_address == "you@library"
+        assert email.template_args["rel_desc"] == "copyright designated agent"
+        assert email.template_args["confirmation_link"] == "http://url/"
+        assert url_for_calls.pop() == (
+            "confirm_resource",
+            dict(resource_id=link.resource.id, secret=link.resource.validation.secret),
+        )
+
+        # A second hyperlink to the same address, built right after,
+        # sees the active validation and only announces the new role.
+        link2, _ = library.set_hyperlink(
+            Hyperlink.INTEGRATION_CONTACT_REL, "mailto:you@library"
+        )
+        email2 = link2.notification(url_for)
+        assert email2.email_type == Emailer.ADDRESS_DESIGNATED
+        assert email2.to_address == "you@library"
+        assert email2.template_args["rel_desc"] == "integration point of contact"
+        assert url_for_calls == []

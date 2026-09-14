@@ -1,12 +1,14 @@
+import email as email_lib
 import os
 import quopri
+from email.header import decode_header
 from email.mime.text import MIMEText
 from unittest import mock
 
 import pytest
 
 from palace.registry.config import CannotLoadConfiguration, CannotSendEmail
-from palace.registry.emailer import Emailer, EmailTemplate
+from palace.registry.emailer import Emailer, EmailTemplate, PendingEmail
 from tests.fixtures.database import DatabaseTransactionFixture
 
 
@@ -328,6 +330,161 @@ class TestEmailer:
             emailer.send(email_type, default_recipient)
             send_email.assert_called_once()
             assert expected_recipient == send_email.call_args_list[0][0][1]
+
+    @staticmethod
+    def _text(body: str) -> str:
+        """Extract the decoded plain text from a complete email message."""
+        [part] = email_lib.message_from_string(body).get_payload()
+        return part.get_payload(decode=True).decode("utf-8")
+
+    @pytest.mark.parametrize(
+        "override, addresses, expected",
+        [
+            pytest.param(
+                None,
+                ["a@library", "b@library"],
+                {"a@library": ["a@library"], "b@library": ["b@library"]},
+                id="different-recipients-no-override",
+            ),
+            pytest.param(
+                None,
+                ["a@library", "a@library"],
+                {"a@library": ["a@library", "a@library"]},
+                id="same-recipient-no-override",
+            ),
+            pytest.param(
+                "override@example.org",
+                ["a@library", "b@library"],
+                {"override@example.org": ["a@library", "b@library"]},
+                id="different-recipients-with-override",
+            ),
+            pytest.param(
+                "override@example.org",
+                ["a@library"],
+                {"override@example.org": ["a@library"]},
+                id="single-email-with-override",
+            ),
+        ],
+    )
+    def test_send_all(
+        self,
+        override: str | None,
+        addresses: list[str],
+        expected: dict[str, list[str]],
+        db: DatabaseTransactionFixture,
+    ):
+        """Emails bound for the same recipient, whether because they share
+        an addressee or because of the recipient override, are combined
+        into one digest. Others are sent separately.
+
+        `expected` maps each recipient to the addressees whose emails
+        should have been delivered to it.
+        """
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, override)
+        self._integration(db)
+        emailer = Emailer.from_sitewide_integration(db.session)
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
+
+        pending = [
+            PendingEmail(
+                Emailer.ADDRESS_NEEDS_CONFIRMATION,
+                address,
+                dict(
+                    rel_desc=f"role {i}",
+                    library="My Library",
+                    library_web_url="https://library/",
+                    confirmation_link=f"https://registry/confirm/{i}",
+                ),
+            )
+            for i, address in enumerate(addresses)
+        ]
+        with mock.patch.object(Emailer, "_send_email", autospec=True) as send_email:
+            emailer.send_all(pending)
+
+        sent = {
+            call.args[1]: self._text(call.args[2]) for call in send_email.call_args_list
+        }
+        assert list(sent) == list(expected)
+        for recipient, addressees in expected.items():
+            text = sent[recipient]
+            emails = [e for e in pending if e.to_address in addressees]
+            for email in emails:
+                # Every addressee and every confirmation link survives,
+                # so the recipient can act on each one.
+                assert email.to_address in text
+                assert email.template_args["confirmation_link"] in text
+                assert email.template_args["rel_desc"] in text
+            if len(emails) > 1:
+                assert f"combines {len(emails)} notifications" in text
+                assert text.count(Emailer.DIGEST_SECTION_DIVIDER.strip()) == (
+                    len(emails) - 1
+                )
+            else:
+                assert "combines" not in text
+
+    def test_send_all_digest_headers(self, db: DatabaseTransactionFixture):
+        """The digest carries its own subject and is addressed to the
+        effective recipient, while each section keeps the original subject.
+        """
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, "override@example.org")
+        self._integration(db)
+        emailer = Emailer.from_sitewide_integration(db.session)
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
+
+        args = dict(library="My Library", library_web_url="https://library/")
+        pending = [
+            PendingEmail(
+                Emailer.ADDRESS_NEEDS_CONFIRMATION,
+                "a@library",
+                dict(args, rel_desc="help address", confirmation_link="https://c/1"),
+            ),
+            PendingEmail(
+                Emailer.ADDRESS_DESIGNATED,
+                "b@library",
+                dict(args, rel_desc="copyright agent"),
+            ),
+        ]
+        with mock.patch.object(Emailer, "_send_email", autospec=True) as send_email:
+            emailer.send_all(pending)
+
+        [call] = send_email.call_args_list
+        message = email_lib.message_from_string(call.args[2])
+        assert message["To"] == "override@example.org"
+        [(subject, _)] = decode_header(message["Subject"])
+        assert subject.decode("utf-8") == "2 notifications for My Library"
+
+        text = self._text(call.args[2])
+        assert "Confirm the help address for My Library" in text
+        assert "This address designated as the copyright agent for My Library" in text
+        # The sections appear in the order the emails were requested.
+        assert text.index("a@library") < text.index("b@library")
+
+    def test_send_all_test_email_is_never_overridden(
+        self, db: DatabaseTransactionFixture
+    ):
+        """A test email keeps its own recipient even when the override is
+        set, so it is not combined with the overridden emails.
+        """
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, "override@example.org")
+        self._integration(db)
+        emailer = Emailer.from_sitewide_integration(db.session)
+        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
+        emailer.templates[Emailer.TEST] = EmailTemplate("Test", "This is a test.")
+
+        pending = [
+            PendingEmail(Emailer.TEST, "tester@example.org"),
+            PendingEmail(
+                Emailer.ADDRESS_DESIGNATED,
+                "a@library",
+                dict(rel_desc="help", library="L", library_web_url="https://l/"),
+            ),
+        ]
+        with mock.patch.object(Emailer, "_send_email", autospec=True) as send_email:
+            emailer.send_all(pending)
+        assert [c.args[1] for c in send_email.call_args_list] == [
+            "tester@example.org",
+            "override@example.org",
+        ]
 
     def test_send_failure(self, db: DatabaseTransactionFixture):
         """

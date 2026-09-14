@@ -27,8 +27,11 @@ class MockEmailer(Emailer):
     def __init__(self):
         self.sent_out = []
 
-    def send(self, email_type, to_address, **template_args):
-        self.sent_out.append((email_type, to_address, template_args))
+    def send_all(self, pending, smtp_class=None):
+        for email in pending:
+            self.sent_out.append(
+                (email.email_type, email.to_address, email.template_args)
+            )
 
 
 class ControllerSetupFixture:

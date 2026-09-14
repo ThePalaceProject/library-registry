@@ -1996,7 +1996,7 @@ class TestLibraryRegistryController:
         # Simulate an SMTP server that won't accept email for
         # whatever reason.
         class NonfunctionalEmailer(MockEmailer):
-            def send(self, *args, **kwargs):
+            def send_all(self, *args, **kwargs):
                 raise SMTPException("SMTP server is broken")
 
         fixture.controller.emailer = NonfunctionalEmailer()
@@ -2018,14 +2018,14 @@ class TestLibraryRegistryController:
             )
             response = fixture.controller.register(do_get=fixture.http_client.do_get)
 
-        # We get back a ProblemDetail the first time
-        # we got a problem sending an email. In this case, it was
-        # trying to contact the library's 'help' address included in the
-        # library's authentication document.
+        # We get back a ProblemDetail naming every address we were
+        # trying to notify: the copyright agent from the library's
+        # authentication document and the integration contact from
+        # the registration request.
         assert response.uri == INTEGRATION_ERROR.uri
         assert (
             response.detail
-            == "SMTP error while sending email to mailto:dmca@library.org"
+            == "SMTP error while sending email to dmca@library.org, me@library.org"
         )
 
     def test_registration_fails_if_email_server_unusable(
