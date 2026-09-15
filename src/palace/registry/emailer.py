@@ -9,8 +9,13 @@ from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from smtplib import SMTP
+from typing import Any
 
-from palace.registry.config import CannotLoadConfiguration, CannotSendEmail
+from palace.registry.config import (
+    CannotLoadConfiguration,
+    CannotSendEmail,
+    EmailerNotConfigured,
+)
 
 # Set up an encoding/decoding between UTF-8 and quoted-printable.
 # Otherwise, the bodies of email messages will be encoded with base64
@@ -19,7 +24,7 @@ from palace.registry.config import CannotLoadConfiguration, CannotSendEmail
 charset.add_charset("utf-8", charset.QP, charset.QP, "utf-8")
 
 
-@dataclass(frozen=True)
+@dataclass
 class PendingEmail:
     """An email that has been requested but not yet sent.
 
@@ -31,7 +36,7 @@ class PendingEmail:
 
     email_type: str
     to_address: str
-    template_args: dict = field(default_factory=dict)
+    template_args: dict[str, Any] = field(default_factory=dict)
 
 
 class Emailer:
@@ -92,7 +97,7 @@ class Emailer:
     # digest email. Each original email becomes one section of the digest.
     DEFAULT_DIGEST_TEMPLATE = (
         "This message combines %(count)s notifications from the Library Simplified library registry "
-        "that would otherwise have been sent separately to this address."
+        "that would otherwise have been sent separately. Each section names its addressee."
         "\n\n"
         "%(sections)s"
     )
@@ -112,13 +117,24 @@ class Emailer:
         DIGEST: DEFAULT_DIGEST_SUBJECT,
     }
 
-    # Every key a template may reference. We use this to catch templates
-    # that contain variables we won't be able to fill in.
+    # Every key a notification template may reference. We use this to
+    # catch templates that contain variables we won't be able to fill in.
     KNOWN_TEMPLATE_KEYS = [
         "rel_desc",
         "library",
         "library_web_url",
         "confirmation_link",
+        "to_address",
+        "from_address",
+        "email",
+        "registry_support",
+    ]
+
+    # The digest describes the whole message, so it only gets values that
+    # apply to every section. Per-section values live in the sections.
+    DIGEST_TEMPLATE_KEYS = [
+        "library",
+        "library_web_url",
         "to_address",
         "from_address",
         "count",
@@ -167,13 +183,34 @@ class Emailer:
         )
 
         # Make sure the templates don't contain any template values we can't handle.
-        test_template_values = {key: "value" for key in self.KNOWN_TEMPLATE_KEYS}
-        for template in list(self.templates.values()):
+        for email_type, template in self.templates.items():
+            keys = (
+                self.DIGEST_TEMPLATE_KEYS
+                if email_type == self.DIGEST
+                else self.KNOWN_TEMPLATE_KEYS
+            )
+            # The count is the one value that is a number at send time, so
+            # a template may format it with %(count)d.
+            test_template_values = {
+                key: 1 if key == "count" else "value" for key in keys
+            }
             try:
-                template.body("from address", "to address", **test_template_values)
+                template.render(**test_template_values)
             except Exception as e:
                 m = f"Template '{template.subject_template}'/'{template.body_template}' contains unrecognized key: {e}"
                 raise CannotLoadConfiguration(m)
+
+            # A digest whose body does not render its sections would
+            # silently drop every notification.
+            if email_type == self.DIGEST:
+                sentinel = "\x00sections\x00"
+                rendered = template.text(
+                    **{**test_template_values, "sections": sentinel}
+                )
+                if sentinel not in rendered:
+                    raise CannotLoadConfiguration(
+                        f"Template '{template.body_template}' for {self.DIGEST!r} must contain %(sections)s"
+                    )
 
     def send(
         self,
@@ -204,23 +241,39 @@ class Emailer:
         `to_address` of each email is kept in the message body, so it is
         clear on whose behalf each part of the email is being sent.
 
+        Recipient addresses are compared without regard to case, since
+        they almost always name the same mailbox. The first spelling seen
+        is the one used in the To: header.
+
         Emails sent together are expected to concern the same library,
         since the digest subject names the library of the first email.
 
+        Every recipient is attempted, even if an earlier one fails.
+
         :param pending: The emails to send.
         :param smtp_class: Use this class for the SMTP protocol client.
-        :raise CannotSendEmail: If any email cannot be rendered or sent.
-            Emails to earlier recipients may already have been sent.
+        :raise CannotSendEmail: If any email could not be rendered or
+            accepted by the SMTP server. The exception names the
+            addressees whose emails were not sent.
         """
-        by_recipient: dict[str, list[PendingEmail]] = {}
+        by_recipient: dict[str, tuple[str, list[PendingEmail]]] = {}
         for email in pending:
             recipient = self._effective_recipient(email.email_type, email.to_address)
-            by_recipient.setdefault(recipient, []).append(email)
+            _, emails = by_recipient.setdefault(recipient.casefold(), (recipient, []))
+            emails.append(email)
 
         from_header = f"{self.from_name} <{self.from_address}>"
-        for recipient, emails in by_recipient.items():
-            on_behalf_of = [e.to_address for e in emails if e.to_address != recipient]
-            suffix = f" on behalf of {on_behalf_of!r}" if on_behalf_of else ""
+        problems: list[str] = []
+        unsent: list[PendingEmail] = []
+        for recipient, emails in by_recipient.values():
+            on_behalf_of = list(
+                dict.fromkeys(
+                    e.to_address
+                    for e in emails
+                    if e.to_address.casefold() != recipient.casefold()
+                )
+            )
+            suffix = f" on behalf of {', '.join(on_behalf_of)}" if on_behalf_of else ""
             try:
                 if len(emails) == 1:
                     [email] = emails
@@ -230,12 +283,18 @@ class Emailer:
                     subject, text = self._render_digest(emails, recipient)
                     description = f"digest of {len(emails)} emails"
                 self.log.info(f"Sending {description} to {recipient!r}{suffix}")
-                body = EmailTemplate.message(from_header, recipient, subject, text)
+                body = build_message(from_header, recipient, subject, text)
                 self._send_email(recipient, body, smtp_class)
             except Exception as exc:
-                raise CannotSendEmail(
-                    f"Could not send email to {recipient!r}{suffix}: {exc}"
-                ) from exc
+                problem = f"Could not send email to {recipient!r}{suffix}: {exc!r}"
+                self.log.error(problem, exc_info=exc)
+                problems.append(problem)
+                unsent.extend(emails)
+        if unsent:
+            raise CannotSendEmail(
+                "; ".join(problems),
+                addresses=list(dict.fromkeys(e.to_address for e in unsent)),
+            )
 
     def _template(self, email_type: str) -> EmailTemplate:
         if email_type not in self.templates:
@@ -253,7 +312,7 @@ class Emailer:
             from_address=self.from_address,
             to_address=email.to_address,
         )
-        return template.subject(**kwargs), template.text(**kwargs)
+        return template.render(**kwargs)
 
     def _render_digest(
         self, emails: list[PendingEmail], recipient: str
@@ -263,24 +322,30 @@ class Emailer:
 
         Each email is rendered as it would have been on its own, and the
         results become sections of the digest. The digest template itself
-        is filled out with the template arguments of the first email,
-        plus `count`, `sections`, and the `to_address` of the digest.
+        is filled out only with values that describe the whole message,
+        listed in DIGEST_TEMPLATE_KEYS. The library is taken from the
+        first email, since emails sent together concern one library.
 
         :return: A 2-tuple (subject, text).
         """
         sections = []
         for email in emails:
             subject, text = self._render(email)
-            sections.append(f"{subject}\n\n{text}")
-        template = self._template(self.DIGEST)
-        kwargs = dict(
-            emails[0].template_args,
+            sections.append(f"{subject}\n({email.to_address})\n\n{text}")
+        # An Emailer built directly from a templates dict may lack a
+        # digest template. The default one is always known to be valid.
+        template = self.templates.get(self.DIGEST) or EmailTemplate(
+            self.DEFAULT_DIGEST_SUBJECT, self.DEFAULT_DIGEST_TEMPLATE
+        )
+        first = emails[0].template_args
+        return template.render(
+            library=first.get("library"),
+            library_web_url=first.get("library_web_url"),
             from_address=self.from_address,
             to_address=recipient,
             count=len(emails),
             sections=self.DIGEST_SECTION_DIVIDER.join(sections),
         )
-        return template.subject(**kwargs), template.text(**kwargs)
 
     def _effective_recipient(self, email_type: str, default: str) -> str:
         """Override the recipient's email address, when applicable.
@@ -293,12 +358,25 @@ class Emailer:
 
     def _send_email(self, to_address, body, smtp_class=SMTP):
         """Actually send an email."""
+        # We let the constructor connect and don't call connect() ourselves,
+        # because a second connect would abandon the first socket, and only
+        # the constructor records the host name that starttls() needs.
         smtp = smtp_class(host=self.smtp_host, port=self.smtp_port)
-        smtp.connect(self.smtp_host, self.smtp_port)
-        smtp.starttls()
-        smtp.login(self.smtp_username, self.smtp_password)
-        smtp.sendmail(self.from_address, to_address, body)
-        smtp.quit()
+        try:
+            smtp.starttls()
+            smtp.login(self.smtp_username, self.smtp_password)
+            smtp.sendmail(self.from_address, to_address, body)
+            try:
+                smtp.quit()
+            except Exception as exc:
+                # The server already accepted the message.
+                self.log.warning(
+                    f"SMTP session did not close cleanly after sending to {to_address!r}",
+                    exc_info=exc,
+                )
+        finally:
+            # Whatever happened, do not leave the socket open.
+            smtp.close()
 
     @classmethod
     def from_sitewide_integration(cls, _db):
@@ -345,8 +423,7 @@ class Emailer:
         qu = _db.query(ExternalIntegration).filter(ExternalIntegration.goal == cls.GOAL)
         integrations = qu.all()
         if not integrations:
-            raise CannotLoadConfiguration("No email integration is configured.")
-            return None
+            raise EmailerNotConfigured("No email integration is configured.")
 
         if len(integrations) > 1:
             # If there are multiple integrations configured, none of
@@ -372,38 +449,25 @@ class EmailTemplate:
         """Fill out the body template."""
         return self.body_template % kwargs
 
-    @staticmethod
-    def message(from_header: str, to_header: str, subject: str, text: str) -> str:
-        """Assemble a complete email message, including headers.
+    def render(self, **kwargs) -> tuple[str, str]:
+        """Fill out both templates.
 
-        :param from_header: Originating address to use in From: header.
-        :param to_header: Destination address to use in To: header.
-        :param subject: The subject line.
-        :param text: The plain text body.
+        :return: A 2-tuple (subject, text).
         """
-        message = MIMEMultipart("mixed")
-        message["From"] = from_header
-        message["To"] = to_header
-        message["Subject"] = Header(subject, "utf-8")
-        message.attach(MIMEText(text, "plain", "utf-8"))
-        return message.as_string()
+        return self.subject(**kwargs), self.text(**kwargs)
 
-    def body(self, from_header, to_header, **kwargs):
-        """
-        Generate the complete body of the email message, including headers.
 
-        :param from_header: Originating address to use in From: header.
-        :param to_header: Destination address to use in To: header.
-        :param kwargs: Arguments to use when filling out the template.
-        """
-        # This might look ugly, because %(from_address)s in a template
-        # is expected to be an unadorned email address, whereas this
-        # might look like '"Name" <email>', but it's better than
-        # nothing.
-        for k, v in (("to_address", to_header), ("from_address", from_header)):
-            if k not in kwargs:
-                kwargs[k] = v
+def build_message(from_header: str, to_header: str, subject: str, text: str) -> str:
+    """Assemble a complete email message, including headers.
 
-        return self.message(
-            from_header, to_header, self.subject(**kwargs), self.text(**kwargs)
-        )
+    :param from_header: Originating address to use in From: header.
+    :param to_header: Destination address to use in To: header.
+    :param subject: The subject line.
+    :param text: The plain text body.
+    """
+    message = MIMEMultipart("mixed")
+    message["From"] = from_header
+    message["To"] = to_header
+    message["Subject"] = Header(subject, "utf-8")
+    message.attach(MIMEText(text, "plain", "utf-8"))
+    return message.as_string()

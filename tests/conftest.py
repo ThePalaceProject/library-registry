@@ -1,5 +1,6 @@
 import pytest
 
+from palace.registry.emailer import Emailer
 from palace.registry.sqlalchemy.model.base import Base
 from tests.testing import DatabaseTest
 
@@ -12,6 +13,12 @@ def teardown_all_tables_after_test_session():
     yield
     engine, connection = DatabaseTest.get_database_connection()
     Base.metadata.drop_all(engine)
+
+
+@pytest.fixture(autouse=True)
+def no_recipient_override(monkeypatch: pytest.MonkeyPatch):
+    """Keep a developer's EMAILER_RECIPIENT_OVERRIDE out of every test."""
+    monkeypatch.delenv(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, raising=False)
 
 
 pytest_plugins = [

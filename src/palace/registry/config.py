@@ -4,6 +4,7 @@ import contextlib
 import copy
 import logging
 import os
+from collections.abc import Iterable
 from pathlib import Path
 
 from attr import dataclass
@@ -28,8 +29,19 @@ class CannotLoadConfiguration(Exception):
     pass
 
 
+class EmailerNotConfigured(CannotLoadConfiguration):
+    """No email integration exists at all, as opposed to one that is broken."""
+
+
 class CannotSendEmail(Exception):
-    pass
+    """One or more emails could not be sent.
+
+    :param addresses: The addressees whose emails were not sent.
+    """
+
+    def __init__(self, message: str = "", *, addresses: Iterable[str] = ()) -> None:
+        super().__init__(message)
+        self.addresses = list(addresses)
 
 
 def _url_from_environment(environment_variable: str) -> str | None:
