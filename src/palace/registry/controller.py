@@ -15,9 +15,9 @@ from palace.registry.admin.templates import admin as admin_template
 from palace.registry.adobe.adobe_vendor_id import AdobeVendorIDController
 from palace.registry.authentication_document import AuthenticationDocument
 from palace.registry.config import (
-    CannotLoadConfiguration,
     CannotSendEmail,
     Configuration,
+    EmailerNotConfigured,
 )
 from palace.registry.emailer import Emailer
 from palace.registry.opds import Annotator, AvailabilityFacet, OPDSCatalog, OrderFacet
@@ -166,12 +166,16 @@ class LibraryRegistryController(BaseController):
         super().__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
+        # Running without any email integration is allowed, for example
+        # in development. A broken one is a configuration error, and
+        # from_sitewide_integration raises so the application does not
+        # start and quietly register libraries without notifying anyone.
         emailer = None
         try:
             emailer = emailer_class.from_sitewide_integration(self._db)
-        except CannotLoadConfiguration as e:
+        except EmailerNotConfigured as e:
             self.log.error(
-                "Cannot load email configuration. Will not be sending any emails.",
+                "No email integration is configured. Will not be sending any emails.",
                 exc_info=e,
             )
         self.emailer = emailer
@@ -850,22 +854,31 @@ class LibraryRegistryController(BaseController):
         # that the address works, or to inform them a new library is
         # using their address. Emails bound for the same recipient are
         # combined into one.
-        if self.emailer:
+        if not self.emailer:
+            if modified_hyperlinks:
+                self.log.warning(
+                    "No email integration is configured; not notifying %s",
+                    ", ".join(x.href for x in modified_hyperlinks),
+                )
+        else:
             pending = [
                 email
                 for hyperlink in modified_hyperlinks
-                if (email := hyperlink.notification(self.app.url_for))
+                if (email := hyperlink.build_notification(self.app.url_for))
             ]
             try:
                 self.emailer.send_all(pending)
             except CannotSendEmail as exc:
-                self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail:", exc_info=exc)
-                return UNABLE_TO_NOTIFY.detailed(
-                    _(
+                # Each failure was already logged with its traceback by the emailer.
+                self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail: %s", exc)
+                if exc.addresses:
+                    detail = _(
                         "The Registry was unable to send a notification email to %(addresses)s.",
-                        addresses=", ".join(email.to_address for email in pending),
+                        addresses=", ".join(exc.addresses),
                     )
-                )
+                else:
+                    detail = _("The Registry was unable to send a notification email.")
+                return UNABLE_TO_NOTIFY.detailed(detail)
 
         # Create an OPDS 2 catalog containing all available
         # information about the library.

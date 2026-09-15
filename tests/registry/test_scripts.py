@@ -498,7 +498,7 @@ class TestConfigureEmailerScript:
 
         # An email was sent out to the test address.
         template, to = Mock.sent
-        assert template == "test"
+        assert template == Emailer.TEST
         assert to == "you@example.com"
 
 
