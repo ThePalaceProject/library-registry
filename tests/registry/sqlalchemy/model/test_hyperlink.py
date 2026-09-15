@@ -19,7 +19,7 @@ class TestHyperlink:
                 for the Emailer constructor.
                 """
 
-            def send_all(self, pending):
+            def send_all(self, pending, smtp_class=None):
                 for email in pending:
                     self.sent.append(
                         (email.email_type, email.to_address, email.template_args)
@@ -38,9 +38,23 @@ class TestHyperlink:
 
         library = db.library()
         library.web_url = "http://library/"
+
+        # Without an emailer, or for a link that is not an email
+        # address, nothing is sent and no validation is started.
+        web_link, is_modified = library.set_hyperlink(
+            Hyperlink.HELP_REL, "http://help.library/"
+        )
+        web_link.notify(emailer, emailer.url_for)
+        assert emailer.sent == []
+        assert web_link.resource.validation is None
+
         link, is_modified = library.set_hyperlink(
             Hyperlink.COPYRIGHT_DESIGNATED_AGENT_REL, "mailto:you@library"
         )
+        link.notify(None, emailer.url_for)
+        assert emailer.sent == []
+        assert link.resource.validation is None
+
         link.notify(emailer, emailer.url_for)
 
         # A Validation object was created for the Hyperlink.
@@ -121,9 +135,9 @@ class TestHyperlink:
 
         # A hyperlink to something other than an email address
         # produces no notification.
-        link, _ = library.set_hyperlink(Hyperlink.HELP_REL, "http://help.library/")
-        assert link.notification(url_for) is None
-        assert link.resource.validation is None
+        web_link, _ = library.set_hyperlink(Hyperlink.HELP_REL, "http://help.library/")
+        assert web_link.notification(url_for) is None
+        assert web_link.resource.validation is None
 
         # A hyperlink to an email address produces a notification
         # and starts the validation process.

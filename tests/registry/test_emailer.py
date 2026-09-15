@@ -1,6 +1,6 @@
 import email as email_lib
-import os
 import quopri
+from contextlib import nullcontext
 from email.header import decode_header
 from email.mime.text import MIMEText
 from unittest import mock
@@ -81,12 +81,21 @@ class MockBrokenEmailer(Emailer):
 
 
 class TestEmailer:
-    @staticmethod
-    def _set_env(key: str, value: str | None):
-        if value:
-            os.environ[key] = value
-        elif key in os.environ:
-            del os.environ[key]
+    def _emailer(
+        self,
+        db: DatabaseTransactionFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        override: str | None = None,
+    ) -> Emailer:
+        """Build an Emailer from a sitewide integration, with the
+        recipient override set to `override` or unset if None.
+        """
+        if override:
+            monkeypatch.setenv(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, override)
+        else:
+            monkeypatch.delenv(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, raising=False)
+        self._integration(db)
+        return Emailer.from_sitewide_integration(db.session)
 
     def _integration(self, db: DatabaseTransactionFixture):
         """Configure a complete sitewide email integration."""
@@ -255,8 +264,11 @@ class TestEmailer:
         for phrase in ["\nhttp://registry/confirm\n", "The link will expire"]:
             assert phrase in body2
 
-    def test_send(self, db: DatabaseTransactionFixture):
+    def test_send(
+        self, db: DatabaseTransactionFixture, monkeypatch: pytest.MonkeyPatch
+    ):
         """Validate our ability to construct and send email."""
+        monkeypatch.delenv(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, raising=False)
         integration = self._integration(db)
         integration.setting("email1_subject").value = "subject %(arg)s"
         integration.setting("email1_body").value = "body %(arg)s"
@@ -301,26 +313,15 @@ class TestEmailer:
         override_is_specified: bool,
         expected_recipient,
         db: DatabaseTransactionFixture,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """Except for test email, recipient should be overridden when an override is specified in the environment."""
 
         default_recipient = "default@example.org"
         override_recipient = "override@example.org"
-
-        # Setup the environment appropriately.
-        environment_override_value = (
-            override_recipient if override_is_specified else None
+        emailer = self._emailer(
+            db, monkeypatch, override_recipient if override_is_specified else None
         )
-        self._set_env(
-            Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, environment_override_value
-        )
-
-        # Configure the Emailer.
-        _ = self._integration(db)
-        emailer = Emailer.from_sitewide_integration(db.session)
-
-        # Always reset the override address environment variable.
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
 
         # Setup a dummy template.
         emailer.templates[email_type] = EmailTemplate("Email", "This is an email.")
@@ -364,6 +365,7 @@ class TestEmailer:
                 {"override@example.org": ["a@library"]},
                 id="single-email-with-override",
             ),
+            pytest.param(None, [], {}, id="nothing-to-send"),
         ],
     )
     def test_send_all(
@@ -372,6 +374,7 @@ class TestEmailer:
         addresses: list[str],
         expected: dict[str, list[str]],
         db: DatabaseTransactionFixture,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         """Emails bound for the same recipient, whether because they share
         an addressee or because of the recipient override, are combined
@@ -380,11 +383,7 @@ class TestEmailer:
         `expected` maps each recipient to the addressees whose emails
         should have been delivered to it.
         """
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, override)
-        self._integration(db)
-        emailer = Emailer.from_sitewide_integration(db.session)
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
-
+        emailer = self._emailer(db, monkeypatch, override)
         pending = [
             PendingEmail(
                 Emailer.ADDRESS_NEEDS_CONFIRMATION,
@@ -401,6 +400,7 @@ class TestEmailer:
         with mock.patch.object(Emailer, "_send_email", autospec=True) as send_email:
             emailer.send_all(pending)
 
+        assert send_email.call_count == len(expected)
         sent = {
             call.args[1]: self._text(call.args[2]) for call in send_email.call_args_list
         }
@@ -422,15 +422,13 @@ class TestEmailer:
             else:
                 assert "combines" not in text
 
-    def test_send_all_digest_headers(self, db: DatabaseTransactionFixture):
+    def test_send_all_digest_headers(
+        self, db: DatabaseTransactionFixture, monkeypatch: pytest.MonkeyPatch
+    ):
         """The digest carries its own subject and is addressed to the
         effective recipient, while each section keeps the original subject.
         """
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, "override@example.org")
-        self._integration(db)
-        emailer = Emailer.from_sitewide_integration(db.session)
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
-
+        emailer = self._emailer(db, monkeypatch, "override@example.org")
         args = dict(library="My Library", library_web_url="https://library/")
         pending = [
             PendingEmail(
@@ -460,15 +458,12 @@ class TestEmailer:
         assert text.index("a@library") < text.index("b@library")
 
     def test_send_all_test_email_is_never_overridden(
-        self, db: DatabaseTransactionFixture
+        self, db: DatabaseTransactionFixture, monkeypatch: pytest.MonkeyPatch
     ):
         """A test email keeps its own recipient even when the override is
         set, so it is not combined with the overridden emails.
         """
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, "override@example.org")
-        self._integration(db)
-        emailer = Emailer.from_sitewide_integration(db.session)
-        self._set_env(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, None)
+        emailer = self._emailer(db, monkeypatch, "override@example.org")
         emailer.templates[Emailer.TEST] = EmailTemplate("Test", "This is a test.")
 
         pending = [
@@ -486,10 +481,62 @@ class TestEmailer:
             "override@example.org",
         ]
 
+    @pytest.mark.parametrize(
+        "failing_step, attempted",
+        [
+            pytest.param("_send_email", ["a@library", "b@library"], id="smtp-failure"),
+            pytest.param("_render", ["a@library"], id="template-failure"),
+        ],
+    )
+    def test_send_all_partial_failure(
+        self,
+        failing_step: str,
+        attempted: list[str],
+        db: DatabaseTransactionFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """A failure while rendering or sending the email for one
+        recipient is reported as CannotSendEmail naming that recipient.
+        Emails to earlier recipients have already gone out, and a
+        rendering failure stops before the SMTP send is attempted.
+
+        `attempted` lists the recipients handed to the SMTP send.
+        """
+        emailer = self._emailer(db, monkeypatch)
+        args = dict(rel_desc="help", library="L", library_web_url="https://l/")
+        pending = [
+            PendingEmail(Emailer.ADDRESS_DESIGNATED, "a@library", args),
+            PendingEmail(Emailer.ADDRESS_DESIGNATED, "b@library", args),
+        ]
+
+        original_render = Emailer._render
+        rendered = []
+
+        def flaky_render(self, email):
+            rendered.append(email)
+            if len(rendered) == 2:
+                raise KeyError("boom")
+            return original_render(self, email)
+
+        render_patch = (
+            mock.patch.object(Emailer, "_render", flaky_render)
+            if failing_step == "_render"
+            else nullcontext()
+        )
+        with mock.patch.object(Emailer, "_send_email", autospec=True) as send_email:
+            if failing_step == "_send_email":
+                send_email.side_effect = [None, Exception("boom")]
+            with render_patch, pytest.raises(CannotSendEmail) as exc:
+                emailer.send_all(pending)
+
+        assert "'b@library'" in str(exc.value)
+        assert "boom" in str(exc.value)
+        assert [call.args[1] for call in send_email.call_args_list] == attempted
+
     def test_send_failure(self, db: DatabaseTransactionFixture):
         """
         GIVEN: An Emailer whose _send_email method raises an Exception
-        WHEN:  The send() method catches that exception
+        WHEN:  send_all() catches that exception
         THEN:  A more specific exception should be raised
         """
         self._integration(db)

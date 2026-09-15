@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, Integer, Unicode, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -10,6 +12,9 @@ from sqlalchemy.orm.session import Session
 
 from palace.registry.sqlalchemy.model.base import Base
 from palace.registry.sqlalchemy.util import create, get_one_or_create
+
+if TYPE_CHECKING:
+    from palace.registry.emailer import Emailer, PendingEmail
 
 
 class Hyperlink(Base):
@@ -62,7 +67,9 @@ class Hyperlink(Base):
         resource, is_new = get_one_or_create(_db, Resource, href=url)
         self.resource = resource
 
-    def notify(self, emailer, url_for):
+    def notify(
+        self, emailer: Emailer | None, url_for: Callable[..., str] | None
+    ) -> None:
         """Notify the target of this hyperlink that it is, in fact,
         a target of the hyperlink.
 
@@ -84,7 +91,7 @@ class Hyperlink(Base):
         if email:
             emailer.send_all([email])
 
-    def notification(self, url_for):
+    def notification(self, url_for: Callable[..., str]) -> PendingEmail | None:
         """Build, but do not send, the email that notifies the target of
         this hyperlink. If the underlying resource needs a new validation,
         the validation is restarted here.

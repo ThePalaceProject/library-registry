@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import time
-from smtplib import SMTPException
 
 import flask
 from Crypto.Cipher import PKCS1_OAEP
@@ -25,7 +24,6 @@ from palace.registry.opds import Annotator, AvailabilityFacet, OPDSCatalog, Orde
 from palace.registry.pagination import Pagination
 from palace.registry.problem_details import (
     AUTHENTICATION_FAILURE,
-    INTEGRATION_ERROR,
     INVALID_CONTACT_URI,
     INVALID_CREDENTIALS,
     INVALID_INPUT,
@@ -860,19 +858,13 @@ class LibraryRegistryController(BaseController):
             ]
             try:
                 self.emailer.send_all(pending)
-            except SMTPException as exc:
-                self.log.error("EMAIL_SEND_PROBLEM, SMTPException:", exc_info=exc)
-                # We were unable to send the email due to an SMTP error
-                return INTEGRATION_ERROR.detailed(
-                    _(
-                        "SMTP error while sending email to %(addresses)s",
-                        addresses=", ".join(email.to_address for email in pending),
-                    )
-                )
             except CannotSendEmail as exc:
                 self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail:", exc_info=exc)
                 return UNABLE_TO_NOTIFY.detailed(
-                    _("The Registry was unable to send a notification email.")
+                    _(
+                        "The Registry was unable to send a notification email to %(addresses)s.",
+                        addresses=", ".join(email.to_address for email in pending),
+                    )
                 )
 
         # Create an OPDS 2 catalog containing all available

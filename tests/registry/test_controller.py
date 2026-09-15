@@ -6,7 +6,6 @@ import json
 import random
 from collections.abc import Generator
 from contextlib import contextmanager
-from smtplib import SMTPException
 from typing import Any
 from urllib.parse import unquote
 
@@ -18,7 +17,7 @@ from flask import Flask, Response, session
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 
 from palace.registry.authentication_document import AuthenticationDocument
-from palace.registry.config import Configuration
+from palace.registry.config import CannotSendEmail, Configuration
 from palace.registry.controller import (
     AdobeVendorIDController,
     BaseController,
@@ -33,7 +32,6 @@ from palace.registry.pagination import Pagination
 from palace.registry.problem_details import (
     ERROR_RETRIEVING_DOCUMENT,
     INTEGRATION_DOCUMENT_NOT_FOUND,
-    INTEGRATION_ERROR,
     INVALID_CREDENTIALS,
     INVALID_INTEGRATION_DOCUMENT,
     LIBRARY_NOT_FOUND,
@@ -1997,7 +1995,7 @@ class TestLibraryRegistryController:
         # whatever reason.
         class NonfunctionalEmailer(MockEmailer):
             def send_all(self, *args, **kwargs):
-                raise SMTPException("SMTP server is broken")
+                raise CannotSendEmail("SMTP server is broken")
 
         fixture.controller.emailer = NonfunctionalEmailer()
 
@@ -2022,16 +2020,19 @@ class TestLibraryRegistryController:
         # trying to notify: the copyright agent from the library's
         # authentication document and the integration contact from
         # the registration request.
-        assert response.uri == INTEGRATION_ERROR.uri
-        assert (
-            response.detail
-            == "SMTP error while sending email to dmca@library.org, me@library.org"
+        assert response.uri == UNABLE_TO_NOTIFY.uri
+        assert response.detail == (
+            "The Registry was unable to send a notification email to "
+            "dmca@library.org, me@library.org."
         )
 
     def test_registration_fails_if_email_server_unusable(
-        self, registry_controller_fixture: LibraryRegistryControllerFixture
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        monkeypatch: pytest.MonkeyPatch,
     ):
         fixture = registry_controller_fixture
+        monkeypatch.delenv(Emailer.ENV_RECIPIENT_OVERRIDE_ADDRESS, raising=False)
 
         """
         GIVEN: An email integration which is missing or not responding
@@ -2052,9 +2053,10 @@ class TestLibraryRegistryController:
             "from_name": "Test",
             "from_address": "test@library.tld",
             "templates": {
-                "address_needs_confirmation": EmailTemplate(
+                Emailer.ADDRESS_NEEDS_CONFIRMATION: EmailTemplate(
                     "subject", "Hello, %(to_address)s, this is %(from_address)s."
-                )
+                ),
+                Emailer.DIGEST: EmailTemplate("subject", "%(sections)s"),
             },
         }
         fixture.controller.emailer = UnresponsiveEmailer(**unresponsive_emailer_kwargs)
@@ -2076,11 +2078,24 @@ class TestLibraryRegistryController:
             )
             response = fixture.controller.register(do_get=fixture.http_client.do_get)
 
-        # We get back a ProblemDetail the first time
-        # we got a problem sending an email. In this case, it was
-        # trying to contact the library's 'help' address included in the
-        # library's authentication document.
+        # The emailer could not deliver the notifications for the
+        # copyright agent and the integration contact, so registration
+        # reports that it was unable to notify anyone.
         assert response.uri == UNABLE_TO_NOTIFY.uri
+
+    def test_registration_succeeds_without_emailer(
+        self,
+        registry_controller_fixture: LibraryRegistryControllerFixture,
+        rsa_key_pair: RSA.RsaKey,
+    ):
+        """With no emailer configured, registration still succeeds, and
+        no validation is started because no one can be told about it.
+        """
+        fixture = registry_controller_fixture
+        fixture.controller.emailer = None
+        response, library = self._register_library(fixture, rsa_key_pair)
+        assert response.status_code == 201
+        assert all(link.resource.validation is None for link in library.hyperlinks)
 
     def test_register_new_library(
         self,
@@ -2195,8 +2210,11 @@ class TestLibraryRegistryController:
         assert integration_contact_link.rel == Hyperlink.INTEGRATION_CONTACT_REL
         assert integration_contact_link.href == "mailto:me@library.org"
 
-        # A confirmation email was sent out for each of those addresses.
-        sent = sorted(fixture.controller.emailer.sent_out, key=lambda x: x[1])
+        # A confirmation email was requested for each of those addresses,
+        # all in a single batch, so the emailer can combine any that go
+        # to the same recipient.
+        [batch] = fixture.controller.emailer.batches
+        sent = sorted(batch, key=lambda x: x[1])
         for email in sent:
             assert email[0] == Emailer.ADDRESS_NEEDS_CONFIRMATION
         assert [x[1] for x in sent] == ["dmca@library.org", "me@library.org"]

@@ -25,13 +25,15 @@ class MockEmailer(Emailer):
         return cls()
 
     def __init__(self):
+        # Every email ever requested, flattened.
         self.sent_out = []
+        # The same emails, grouped by send_all call.
+        self.batches = []
 
     def send_all(self, pending, smtp_class=None):
-        for email in pending:
-            self.sent_out.append(
-                (email.email_type, email.to_address, email.template_args)
-            )
+        batch = [(e.email_type, e.to_address, e.template_args) for e in pending]
+        self.batches.append(batch)
+        self.sent_out.extend(batch)
 
 
 class ControllerSetupFixture:

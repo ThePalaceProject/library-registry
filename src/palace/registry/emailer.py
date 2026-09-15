@@ -112,9 +112,8 @@ class Emailer:
         DIGEST: DEFAULT_DIGEST_SUBJECT,
     }
 
-    # We use this to catch templates that contain variables we won't
-    # be able to fill in. This doesn't include from_address and to_address,
-    # which are filled in separately.
+    # Every key a template may reference. We use this to catch templates
+    # that contain variables we won't be able to fill in.
     KNOWN_TEMPLATE_KEYS = [
         "rel_desc",
         "library",
@@ -176,7 +175,13 @@ class Emailer:
                 m = f"Template '{template.subject_template}'/'{template.body_template}' contains unrecognized key: {e}"
                 raise CannotLoadConfiguration(m)
 
-    def send(self, email_type: str, to_address: str, smtp_class=SMTP, **kwargs):
+    def send(
+        self,
+        email_type: str,
+        to_address: str,
+        smtp_class: type[SMTP] = SMTP,
+        **kwargs,
+    ) -> None:
         """Generate an email from a template and send it.
 
         :param email_type: The name of the template to use.
@@ -187,7 +192,9 @@ class Emailer:
         """
         self.send_all([PendingEmail(email_type, to_address, kwargs)], smtp_class)
 
-    def send_all(self, pending: Iterable[PendingEmail], smtp_class=SMTP):
+    def send_all(
+        self, pending: Iterable[PendingEmail], smtp_class: type[SMTP] = SMTP
+    ) -> None:
         """Generate emails from templates and send them, combining any
         that are bound for the same recipient into a single digest email.
 
@@ -197,36 +204,38 @@ class Emailer:
         `to_address` of each email is kept in the message body, so it is
         clear on whose behalf each part of the email is being sent.
 
+        Emails sent together are expected to concern the same library,
+        since the digest subject names the library of the first email.
+
         :param pending: The emails to send.
         :param smtp_class: Use this class for the SMTP protocol client.
+        :raise CannotSendEmail: If any email cannot be rendered or sent.
+            Emails to earlier recipients may already have been sent.
         """
         by_recipient: dict[str, list[PendingEmail]] = {}
         for email in pending:
             recipient = self._effective_recipient(email.email_type, email.to_address)
             by_recipient.setdefault(recipient, []).append(email)
 
+        from_header = f"{self.from_name} <{self.from_address}>"
         for recipient, emails in by_recipient.items():
             on_behalf_of = [e.to_address for e in emails if e.to_address != recipient]
-            if len(emails) == 1:
-                [email] = emails
-                subject, text = self._render(email)
-                description = f"email of type {email.email_type!r}"
-            else:
-                subject, text = self._render_digest(emails)
-                description = f"digest of {len(emails)} emails"
-            self.log.info(
-                "Sending {} to {!r}{}".format(
-                    description,
-                    recipient,
-                    f" on behalf of {on_behalf_of!r}" if on_behalf_of else "",
-                )
-            )
-            from_header = f"{self.from_name} <{self.from_address}>"
-            body = EmailTemplate.message(from_header, recipient, subject, text)
+            suffix = f" on behalf of {on_behalf_of!r}" if on_behalf_of else ""
             try:
+                if len(emails) == 1:
+                    [email] = emails
+                    subject, text = self._render(email)
+                    description = f"email of type {email.email_type!r}"
+                else:
+                    subject, text = self._render_digest(emails, recipient)
+                    description = f"digest of {len(emails)} emails"
+                self.log.info(f"Sending {description} to {recipient!r}{suffix}")
+                body = EmailTemplate.message(from_header, recipient, subject, text)
                 self._send_email(recipient, body, smtp_class)
             except Exception as exc:
-                raise CannotSendEmail(exc)
+                raise CannotSendEmail(
+                    f"Could not send email to {recipient!r}{suffix}: {exc}"
+                ) from exc
 
     def _template(self, email_type: str) -> EmailTemplate:
         if email_type not in self.templates:
@@ -246,14 +255,16 @@ class Emailer:
         )
         return template.subject(**kwargs), template.text(**kwargs)
 
-    def _render_digest(self, emails: list[PendingEmail]) -> tuple[str, str]:
+    def _render_digest(
+        self, emails: list[PendingEmail], recipient: str
+    ) -> tuple[str, str]:
         """Fill out the digest template for several emails bound for
         the same recipient.
 
         Each email is rendered as it would have been on its own, and the
         results become sections of the digest. The digest template itself
         is filled out with the template arguments of the first email,
-        plus `count` and `sections`.
+        plus `count`, `sections`, and the `to_address` of the digest.
 
         :return: A 2-tuple (subject, text).
         """
@@ -265,6 +276,7 @@ class Emailer:
         kwargs = dict(
             emails[0].template_args,
             from_address=self.from_address,
+            to_address=recipient,
             count=len(emails),
             sections=self.DIGEST_SECTION_DIVIDER.join(sections),
         )
