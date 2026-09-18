@@ -684,8 +684,8 @@ class ConfigureEmailerScript(Script):
 
         emailer = emailer_class.from_sitewide_integration(_db)
         template = EmailTemplate("Test email", "This is a test email.")
-        emailer.templates["test"] = template
-        emailer.send("test", parsed.test_address)
+        emailer.templates[Emailer.TEST] = template
+        emailer.send(Emailer.TEST, parsed.test_address)
 
         # Since the emailer didn't raise an exception we can assume we sent
         # the email successfully.

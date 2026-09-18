@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, Integer, Unicode, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -10,6 +12,9 @@ from sqlalchemy.orm.session import Session
 
 from palace.registry.sqlalchemy.model.base import Base
 from palace.registry.sqlalchemy.util import create, get_one_or_create
+
+if TYPE_CHECKING:
+    from palace.registry.emailer import PendingEmail
 
 
 class Hyperlink(Base):
@@ -62,30 +67,27 @@ class Hyperlink(Base):
         resource, is_new = get_one_or_create(_db, Resource, href=url)
         self.resource = resource
 
-    def notify(self, emailer, url_for):
-        """Notify the target of this hyperlink that it is, in fact,
-        a target of the hyperlink.
+    def build_notification(self, url_for: Callable[..., str]) -> PendingEmail | None:
+        """Build, but do not send, the email that notifies the target of
+        this hyperlink that it is, in fact, a target of the hyperlink.
 
-        If the underlying resource needs a new validation, an
-        ADDRESS_NEEDS_CONFIRMATION email will be sent, asking the person on
-        the other end to confirm the address. Otherwise, an
-        ADDRESS_DESIGNATED email will be sent, informing the person on
-        the other end that their (probably already validated) email
-        address was associated with another library.
+        If the underlying resource needs a new validation, the validation
+        is restarted here and the email is an ADDRESS_NEEDS_CONFIRMATION,
+        asking the person on the other end to confirm the address.
+        Otherwise it is an ADDRESS_DESIGNATED, informing the person on the
+        other end that their (probably already validated) email address
+        was associated with another library.
 
-        :param emailer: An Emailer, for sending out the email.
         :param url_for: An implementation of Flask's url_for, used to
             generate a validation link if necessary.
+        :return: A PendingEmail, or None if there is nothing to send.
         """
         from palace.registry.config import Configuration
-        from palace.registry.emailer import Emailer
+        from palace.registry.emailer import Emailer, PendingEmail
         from palace.registry.sqlalchemy.model.configuration_setting import (
             ConfigurationSetting,
         )
 
-        if not emailer or not url_for:
-            # We can't actually send any emails.
-            return
         _db = Session.object_session(self)
 
         # These shouldn't happen, but just to be safe, do nothing if
@@ -94,7 +96,7 @@ class Hyperlink(Base):
         resource = self.resource
         library = self.library
         if not resource or not library:
-            return
+            return None
 
         # Default to sending an informative email with no validation
         # link.
@@ -105,7 +107,7 @@ class Hyperlink(Base):
 
         # Are we an email address type of link
         if not re.match(r"[^@]+@.+", to_address):
-            return
+            return None
 
         # Make sure there's a Validation object associated with this
         # Resource.
@@ -139,5 +141,4 @@ class Hyperlink(Base):
             template_args["confirmation_link"] = url_for(
                 "confirm_resource", resource_id=resource.id, secret=validation.secret
             )
-        body = emailer.send(email_type, to_address, **template_args)
-        return body
+        return PendingEmail(email_type, to_address, template_args)
