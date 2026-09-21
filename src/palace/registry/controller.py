@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import time
-from smtplib import SMTPException
 
 import flask
 from Crypto.Cipher import PKCS1_OAEP
@@ -16,16 +15,15 @@ from palace.registry.admin.templates import admin as admin_template
 from palace.registry.adobe.adobe_vendor_id import AdobeVendorIDController
 from palace.registry.authentication_document import AuthenticationDocument
 from palace.registry.config import (
-    CannotLoadConfiguration,
     CannotSendEmail,
     Configuration,
+    EmailerNotConfigured,
 )
 from palace.registry.emailer import Emailer
 from palace.registry.opds import Annotator, AvailabilityFacet, OPDSCatalog, OrderFacet
 from palace.registry.pagination import Pagination
 from palace.registry.problem_details import (
     AUTHENTICATION_FAILURE,
-    INTEGRATION_ERROR,
     INVALID_CONTACT_URI,
     INVALID_CREDENTIALS,
     INVALID_INPUT,
@@ -168,12 +166,16 @@ class LibraryRegistryController(BaseController):
         super().__init__(app)
         self.annotator = LibraryRegistryAnnotator(app)
         self.log = self.app.log
+        # Running without any email integration is allowed, for example
+        # in development. A broken one is a configuration error, and
+        # from_sitewide_integration raises so the application does not
+        # start and quietly register libraries without notifying anyone.
         emailer = None
         try:
             emailer = emailer_class.from_sitewide_integration(self._db)
-        except CannotLoadConfiguration as e:
+        except EmailerNotConfigured as e:
             self.log.error(
-                "Cannot load email configuration. Will not be sending any emails.",
+                "No email integration is configured. Will not be sending any emails.",
                 exc_info=e,
             )
         self.emailer = emailer
@@ -841,29 +843,45 @@ class LibraryRegistryController(BaseController):
                 # field.
                 library.opds_url = opds_url
 
+        modified_hyperlinks = []
         for rel, candidates in hyperlinks_to_create:
             hyperlink, is_modified = library.set_hyperlink(rel, *candidates)
             if is_modified:
-                # We need to send an email to this email address about
-                # what just happened. This is either so the receipient
-                # can confirm that the address works, or to inform
-                # them a new library is using their address.
-                try:
-                    hyperlink.notify(self.emailer, self.app.url_for)
-                except SMTPException as exc:
-                    self.log.error("EMAIL_SEND_PROBLEM, SMTPException:", exc_info=exc)
-                    # We were unable to send the email due to an SMTP error
-                    return INTEGRATION_ERROR.detailed(
-                        _(
-                            "SMTP error while sending email to %(address)s",
-                            address=hyperlink.resource.href,
-                        )
+                modified_hyperlinks.append(hyperlink)
+
+        # We need to send an email to each modified address about what
+        # just happened. This is either so the recipient can confirm
+        # that the address works, or to inform them a new library is
+        # using their address. Emails bound for the same recipient are
+        # combined into one.
+        if not self.emailer:
+            skipped = [
+                address for x in modified_hyperlinks if (address := x.email_address)
+            ]
+            if skipped:
+                self.log.warning(
+                    "No email integration is configured; not notifying %s",
+                    ", ".join(skipped),
+                )
+        else:
+            pending = [
+                email
+                for hyperlink in modified_hyperlinks
+                if (email := hyperlink.build_notification(self.app.url_for))
+            ]
+            try:
+                self.emailer.send_all(pending)
+            except CannotSendEmail as exc:
+                # Each failure was already logged with its traceback by the emailer.
+                self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail: %s", exc)
+                if exc.addresses:
+                    detail = _(
+                        "The Registry was unable to send a notification email to %(addresses)s.",
+                        addresses=", ".join(exc.addresses),
                     )
-                except CannotSendEmail as exc:
-                    self.log.error("EMAIL_SEND_PROBLEM, CannotSendEmail:", exc_info=exc)
-                    return UNABLE_TO_NOTIFY.detailed(
-                        _("The Registry was unable to send a notification email.")
-                    )
+                else:
+                    detail = _("The Registry was unable to send a notification email.")
+                return UNABLE_TO_NOTIFY.detailed(detail)
 
         # Create an OPDS 2 catalog containing all available
         # information about the library.

@@ -34,6 +34,9 @@ These environment variables are generally applicable, regardless of installation
 they are not discussed elsewhere in this document.
 
 - EMAILER_RECIPIENT_OVERRIDE: If set, `emailer` will send all non-test email to this email address.
+  Emails that would otherwise go to the same recipient at the same time (for example, all of the
+  notifications from one registration) are combined into a single digest email, so the override
+  typically produces one email per registration.
 
 ## AWS configuration setup for the storage
 
