@@ -427,14 +427,14 @@ websockets = ["websocket-client (>=1.3.0)"]
 
 [[package]]
 name = "dunamai"
-version = "1.26.4"
+version = "1.26.5"
 description = "Dynamic version generation"
 optional = false
 python-versions = ">=3.5"
 groups = ["ci"]
 files = [
-    {file = "dunamai-1.26.4-py3-none-any.whl", hash = "sha256:dba10d5e116c68b81423ac9c9bc051ee9035786e7f964783fd0f354959754546"},
-    {file = "dunamai-1.26.4.tar.gz", hash = "sha256:13b2b2af2af44158ef02f22ae4ff1b280b221c2760bd0f5891ef58b884678754"},
+    {file = "dunamai-1.26.5-py3-none-any.whl", hash = "sha256:91099127a6a16dbcb08c941d5a07879d8b24eb2096368dc37750e681573eedc4"},
+    {file = "dunamai-1.26.5.tar.gz", hash = "sha256:b1435d8d2b0aceef240cde8e8f6ba910e85b1aa0e22fa9e21454d2d22fb0a89c"},
 ]
 
 [package.dependencies]
